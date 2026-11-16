@@ -67,13 +67,27 @@ REQUIRED_SRC_MODULES = [
     "config.js",
     "audio.js",
     "asset_loader.js",
-    "textures_shaders.js",
-    "world_city.js",
-    "world_station.js",
-    "train.js",
-    "weapons_fx.js",
-    "enemies.js",
-    "player_ui.js",
+    "render/textures_procedural.js",
+    "render/materials_shaders.js",
+    "city/city_protos.js",
+    "city/city_district.js",
+    "city/city_api.js",
+    "station/station_geo.js",
+    "station/station_arch.js",
+    "station/station_nav_props.js",
+    "station/station_api.js",
+    "train/train_builders.js",
+    "train/train_fx_damage.js",
+    "train/train_api.js",
+    "weapons/weapons_models.js",
+    "weapons/weapons_fx_ballistics.js",
+    "enemies/enemies_mesh.js",
+    "enemies/enemies_nav.js",
+    "enemies/enemies_ai.js",
+    "player/player_physics.js",
+    "player/player_hud.js",
+    "core/render_pipeline.js",
+    "core/campaign_director.js",
     "main.js",
     "boot.js",
 ]
@@ -182,6 +196,8 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
       </div>
     </div>
 
+    <div id="hud-waypoints" aria-hidden="true"></div>
+
     <div id="crosshair">
       <div class="ch-tick ch-top"></div>
       <div class="ch-tick ch-bot"></div>
@@ -218,6 +234,11 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
           <span id="hp-value">100</span>
         </div>
         <div class="hp-bar-track"><div id="hp-bar-fill"></div></div>
+        <div class="armor-row hidden" id="armor-row">
+          <span class="armor-label">ARMOR</span>
+          <span id="armor-value">0</span>
+          <div class="armor-bar-track"><div id="armor-bar-fill"></div></div>
+        </div>
         <div class="tool-pills">
           <span class="pill-ind" id="pill-flashlight">[F] Senter: OFF</span>
           <span class="pill-ind active" id="pill-lighting">[L] Light: DAY</span>
@@ -229,6 +250,7 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
       <div id="weapon-panel">
         <div id="ammo-card">
           <div id="weapon-name">Pindad G2 9mm</div>
+          <div id="weapon-skin-tag" class="hidden"></div>
           <div id="ammo-readout"><span id="ammo-mag">15</span> <span id="ammo-reserve">/ INF</span></div>
         </div>
         <div id="weapon-slots">
@@ -275,6 +297,16 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
       <!-- Collapsible Settings Panel (Hidden by Default) -->
       <div id="menu-settings-panel" class="zenith-subpanel hidden">
         <div class="setting-row">
+          <span class="setting-label">DIFFICULTY</span>
+          <div class="zenith-tabs" id="menu-difficulty-group">
+            <button class="zenith-tab" data-difficulty="easy" type="button">EASY</button>
+            <button class="zenith-tab active" data-difficulty="medium" type="button">MEDIUM</button>
+            <button class="zenith-tab" data-difficulty="hard" type="button">HARD</button>
+            <button class="zenith-tab" data-difficulty="nightmare" type="button">NIGHTMARE</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
           <span class="setting-label">ATMOSPHERE / LIGHTING</span>
           <button class="zenith-toggle" id="btn-menu-lighting" type="button">DAYLIGHT</button>
         </div>
@@ -290,9 +322,38 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
         <div class="setting-row">
           <span class="setting-label">RENDER QUALITY</span>
           <div class="zenith-tabs" id="menu-quality-group">
-            <button class="zenith-tab active" data-quality="high" type="button">HIGH</button>
-            <button class="zenith-tab" data-quality="balanced" type="button">BALANCED</button>
+            <button class="zenith-tab" data-quality="high" type="button">HIGH</button>
+            <button class="zenith-tab active" data-quality="balanced" type="button">BALANCED</button>
             <button class="zenith-tab" data-quality="potato" type="button">POTATO</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-label">RENDER SCALE</span>
+          <div class="zenith-tabs" id="menu-resscale-group">
+            <button class="zenith-tab active" data-resscale="floor_720" type="button">720P</button>
+            <button class="zenith-tab" data-resscale="native" type="button">NATIVE</button>
+            <button class="zenith-tab" data-resscale="scale_125" type="button">1.25X</button>
+            <button class="zenith-tab" data-resscale="scale_150" type="button">1.5X</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-label">SHADOWS</span>
+          <button class="zenith-toggle" id="btn-menu-shadows" type="button">ON</button>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-label">BLOOM</span>
+          <button class="zenith-toggle" id="btn-menu-bloom" type="button">ON</button>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-label">AO (N8AO)</span>
+          <div class="zenith-tabs" id="menu-ao-group">
+            <button class="zenith-tab active" data-ao="off" type="button">OFF</button>
+            <button class="zenith-tab" data-ao="half" type="button">HALF</button>
+            <button class="zenith-tab" data-ao="full" type="button">FULL</button>
           </div>
         </div>
 
@@ -345,6 +406,16 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
 
       <div class="zenith-subpanel pause-settings">
         <div class="setting-row">
+          <span class="setting-label">DIFFICULTY</span>
+          <div class="zenith-tabs" id="pause-difficulty-group">
+            <button class="zenith-tab" data-difficulty="easy" type="button">EASY</button>
+            <button class="zenith-tab active" data-difficulty="medium" type="button">MEDIUM</button>
+            <button class="zenith-tab" data-difficulty="hard" type="button">HARD</button>
+            <button class="zenith-tab" data-difficulty="nightmare" type="button">NIGHTMARE</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
           <span class="setting-label">LIGHTING</span>
           <button class="zenith-toggle" id="btn-pause-lighting" type="button">DAYLIGHT</button>
         </div>
@@ -360,9 +431,38 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
         <div class="setting-row">
           <span class="setting-label">QUALITY</span>
           <div class="zenith-tabs" id="pause-quality-group">
-            <button class="zenith-tab active" data-quality="high" type="button">HIGH</button>
-            <button class="zenith-tab" data-quality="balanced" type="button">BALANCED</button>
+            <button class="zenith-tab" data-quality="high" type="button">HIGH</button>
+            <button class="zenith-tab active" data-quality="balanced" type="button">BALANCED</button>
             <button class="zenith-tab" data-quality="potato" type="button">POTATO</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-label">RENDER SCALE</span>
+          <div class="zenith-tabs" id="pause-resscale-group">
+            <button class="zenith-tab active" data-resscale="floor_720" type="button">720P</button>
+            <button class="zenith-tab" data-resscale="native" type="button">NATIVE</button>
+            <button class="zenith-tab" data-resscale="scale_125" type="button">1.25X</button>
+            <button class="zenith-tab" data-resscale="scale_150" type="button">1.5X</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-label">SHADOWS</span>
+          <button class="zenith-toggle" id="btn-pause-shadows" type="button">ON</button>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-label">BLOOM</span>
+          <button class="zenith-toggle" id="btn-pause-bloom" type="button">ON</button>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-label">AO (N8AO)</span>
+          <div class="zenith-tabs" id="pause-ao-group">
+            <button class="zenith-tab active" data-ao="off" type="button">OFF</button>
+            <button class="zenith-tab" data-ao="half" type="button">HALF</button>
+            <button class="zenith-tab" data-ao="full" type="button">FULL</button>
           </div>
         </div>
 

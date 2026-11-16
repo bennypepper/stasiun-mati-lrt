@@ -40,28 +40,20 @@ python build.py --strict
 
 ## Project Structure
 
-- [`src/`](src/) — Game modules loaded sequentially via `src/boot.js`:
-  - `config.js` — Station archetypes, lighting moods, player movement, weapon & enemy stats
-  - `audio.js` — Web Audio API mixer + stereo directional & distance attenuation
+- [`src/`](src/) — Modular game scripts loaded sequentially via `src/boot.js`:
+  - `config.js` — Station archetypes, lighting moods, difficulty tiers, weapon/lootbox/skin configs, enemy stats
+  - `audio.js` — Web Audio API mixer, stereo attenuation, and offline narrator/radio voiceover + subtitle sync
   - `asset_loader.js` — Offline GLB/HDR loader with Draco support
-  - `textures_shaders.js` — Procedural PBR textures, flickering fluorescent shaders, station/kiosk signage
-  - `world_station.js` — At-grade stations, PSDs, JPO bridges/stairs, depot/garden wings, plaza aprons, NavGraph & BVH colliders
-  - `world_city.js` — Surrounding Jakarta boulevards, ruko/tower blocks, level crossing gates, foliage & Poly Haven street props
-  - `train.js` — Bidirectional 3-car INKA iE203 (interior, seats, horn, blinking night tubes, dentable hulls, recycled corridor chunks)
-  - `weapons_fx.js` — Viewmodels, ADS scopes, ballistic traces, RPG projectiles, explosions, impacts
-  - `enemies.js` — 14-part `InstancedMesh` articulated zombies (`walker`, `runner`, `brute`, `spitter`), A\* NavGraph pursuit, stuck recovery, 3D audio cues
-  - `player_ui.js` — Capsule physics, flashlight SpotLight + spill, HUD & menus
-  - `main.js` — Boot pipeline, shader warmup, N8AO/Bloom composer, game state machine, `__LRT_DEBUG__`
-- [`assets/`](assets/) — Offline Poly Haven GLBs, textures, HDRIs (`assets/manifest.json`), SFX bank (`assets/sfx/`), and offline narrator/radio voice clips (`assets/voice/`)
+  - [`render/`](src/render/) — Procedural PBR textures/atlases (`textures_procedural.js`) & weathering/flicker shaders (`materials_shaders.js`)
+  - [`city/`](src/city/) — Cached vehicle/tree/prop prototypes + HLOD skyline (`city_protos.js`), Jakarta boulevards/vehicles/street props (`city_district.js`), and frustum/LOD culling API (`city_api.js`)
+  - [`station/`](src/station/) — Geometry/BVH/SpatialGrid (`station_geo.js`), station/hub/depot architecture (`station_arch.js`), NavGraph/props/Cawang signage (`station_nav_props.js`), and pulsing objective halos (`station_api.js`)
+  - [`train/`](src/train/) — 3-car INKA iE203 builders (`train_builders.js`), cruise chunks & hull damage (`train_fx_damage.js`), and state machine (`train_api.js`)
+  - [`weapons/`](src/weapons/) — Viewmodels, unlock progression & live PBR skins (`weapons_models.js`), pooled VFX & statistical lootboxes (`weapons_fx_ballistics.js`)
+  - [`enemies/`](src/enemies/) — 14-part `InstancedMesh` articulated zombies (`enemies_mesh.js`), A\* NavGraph & recovery (`enemies_nav.js`), difficulty/FOV/LOS AI & roamers (`enemies_ai.js`)
+  - [`player/`](src/player/) — Capsule/BVH physics & armor absorption (`player_physics.js`), Zenith HUD, expanded settings & 3D-to-2D waypoints (`player_hud.js`)
+  - [`core/`](src/core/) — Shadow-cached composer/resolution pipeline (`render_pipeline.js`) & 6-station campaign/VO director (`campaign_director.js`)
+  - `main.js` — Boot orchestrator, frame simulation loop, UI bindings & `__LRT_DEBUG__`
+- [`assets/`](assets/) — Offline Poly Haven GLBs, textures, HDRIs (`assets/manifest.json`), SFX bank (`assets/sfx/`), and offline voiceover clips (`assets/voice/`)
 - [`vendor/`](vendor/) — Offline pinned `three@0.170.0`, `three-mesh-bvh@0.8.3`, `n8ao@1.9.3`, and generated `sfx_bank.js`
-- [`research/`](research/) — Original design specs, architecture reference, and photo references
-- [`docs/`](docs/) — Engineering & design guides for agents and contributors:
-  - [`docs/optimization_guide.md`](docs/optimization_guide.md) — Game optimization engineering reference + codebase notes
-  - [`docs/roadmap_and_design_feedback.md`](docs/roadmap_and_design_feedback.md) — Gameplay, story, enemy AI, progression & performance roadmap
-  - [`docs/plans/phase1_plan.md`](docs/plans/phase1_plan.md) — Phase 1 implementation plan
-- [`scripts/`](scripts/) — Asset fetching utilities (`fetch_assets.py`)
-- [`tests/`](tests/) — Headless Playwright D3D11 ANGLE verification suites:
-  - `tests/verify_phase1.py` — Boot, shader warmup, lighting modes, weapon reload timing, walkability
-  - `tests/verify_phase1_fixes.py` — Crossing gates, RPG ADS/SFX, bidirectional Track 1 & Track 2 train travel
-  - `tests/verify_phase2.py` — 4 zombie variants, multi-level NavGraph JPO climbing, combat kill verification
-  - `tests/verify_fixes_v2.py` — Zero ground voids & track overlaps across all 6 stations, 100% NavGraph connectivity, Night Mode + Flashlight, track-escape pursuit
+
+> Non-runtime folders (`docs/`, `tests/`, `research/`, `scripts/`) and `.env` are excluded from Git via [`.gitignore`](.gitignore).
