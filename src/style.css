@@ -1,0 +1,1043 @@
+:root {
+  --bone: #f2f0ea;
+  --bone-soft: rgba(242, 240, 234, 0.78);
+  --ash: rgba(212, 208, 198, 0.54);
+  --ash-dim: rgba(212, 208, 198, 0.36);
+  --amber-muted: #c2a062;
+  --amber-soft: rgba(194, 160, 98, 0.16);
+  --crimson-muted: #a63838;
+  --crimson-bright: #c84b4b;
+  --crimson-soft: rgba(166, 56, 56, 0.18);
+  --plate-bg: rgba(8, 10, 14, 0.78);
+  --plate-bg-strong: rgba(8, 10, 14, 0.86);
+  --hairline: rgba(225, 222, 214, 0.14);
+  --hairline-strong: rgba(225, 222, 214, 0.26);
+  --font-sans: 'Segoe UI', 'Helvetica Neue', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Cascadia Mono', 'Consolas', 'SFMono-Regular', monospace;
+}
+
+* {
+  box-sizing: border-box;
+  user-select: none;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #04060a;
+  color: var(--bone);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+#game-canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Damage / Low HP Vignette */
+#damage-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at center, transparent 48%, rgba(140, 24, 24, 0.72) 100%);
+  opacity: 0;
+  transition: opacity 0.12s ease-out;
+  z-index: 8;
+}
+
+/* Shared Subtle Route Bar (HUD only - Hidden for Zenith Minimalist Theme) */
+.route-bar {
+  display: none;
+}
+
+.route-seg {
+  display: none;
+}
+
+.seg-cb { flex: 1.2; background: var(--crimson-muted); }
+.seg-bk { flex: 1.2; background: #49755f; }
+.seg-gold { flex: 2.6; background: var(--amber-muted); }
+
+/* Badges (Zenith Clean Typographic Tags) */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px 0 0;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--bone-soft);
+  background: transparent;
+  border: none;
+}
+
+.badge-cb {
+  color: #e07070;
+  border-bottom: 1px solid rgba(166, 56, 56, 0.55);
+}
+.badge-bk {
+  color: #72b291;
+  border-bottom: 1px solid rgba(73, 117, 95, 0.55);
+}
+.badge-mode {
+  color: var(--amber-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(194, 160, 98, 0.40);
+  padding: 0 4px 0 0;
+}
+
+/* =========================================================
+   IN-GAME HUD (Understated Horror-Tactical)
+   ========================================================= */
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 12;
+  transition: opacity 0.18s ease;
+}
+
+#hud.hud-minimal {
+  opacity: 0;
+}
+
+#hud-top {
+  position: absolute;
+  top: 18px;
+  left: 22px;
+  right: 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+/* Top-Left Station Telemetry (Zenith Minimalist Gradient Wash) */
+.transit-card {
+  position: relative;
+  background: linear-gradient(90deg, rgba(4, 6, 10, 0.58) 0%, rgba(4, 6, 10, 0.16) 72%, transparent 100%);
+  border: none;
+  border-left: 1px solid rgba(242, 240, 234, 0.22);
+  padding: 8px 18px 8px 14px;
+  min-width: 256px;
+  box-shadow: none;
+}
+
+.transit-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+#hud-station-code {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ash);
+  letter-spacing: 0.12em;
+  margin-left: 2px;
+}
+
+.station-title {
+  font-size: 17px;
+  font-weight: 300;
+  letter-spacing: 0.16em;
+  color: var(--bone);
+  line-height: 1.2;
+  text-transform: uppercase;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.85);
+}
+
+.station-sub {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--ash);
+  letter-spacing: 0.12em;
+  margin-top: 2px;
+  text-transform: uppercase;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
+}
+
+/* Top-Right Objective Directive (Zenith Right-Aligned Gradient Wash) */
+#objective-pill {
+  background: linear-gradient(270deg, rgba(4, 6, 10, 0.58) 0%, rgba(4, 6, 10, 0.14) 72%, transparent 100%);
+  border: none;
+  border-right: 1px solid rgba(194, 160, 98, 0.38);
+  padding: 8px 16px 8px 18px;
+  text-align: right;
+  min-width: 248px;
+  box-shadow: none;
+}
+
+.obj-kicker {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  color: var(--ash-dim);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+#objective-title {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  color: var(--amber-muted);
+  text-transform: uppercase;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.85);
+}
+
+#objective-detail {
+  font-size: 12px;
+  font-weight: 300;
+  color: var(--bone-soft);
+  margin-top: 2px;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
+}
+
+#fps-readout {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ash);
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(242, 240, 234, 0.10);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
+
+/* Center Dynamic Crosshair & ADS Sight Picture */
+#crosshair {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 28px;
+  height: 28px;
+  pointer-events: none;
+  z-index: 14;
+}
+
+.ch-tick {
+  position: absolute;
+  background: rgba(242, 240, 234, 0.72);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.85);
+  transition: opacity 0.12s ease;
+}
+
+.ch-top { width: 1.5px; height: 5px; left: 50%; top: 1px; transform: translateX(-50%); }
+.ch-bot { width: 1.5px; height: 5px; left: 50%; bottom: 1px; transform: translateX(-50%); }
+.ch-left { width: 5px; height: 1.5px; left: 1px; top: 50%; transform: translateY(-50%); }
+.ch-right { width: 5px; height: 1.5px; right: 1px; top: 50%; transform: translateY(-50%); }
+
+.ch-dot {
+  position: absolute;
+  width: 2.5px;
+  height: 2.5px;
+  border-radius: 50%;
+  background: rgba(242, 240, 234, 0.85);
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.12s ease, height 0.12s ease, opacity 0.12s ease;
+}
+
+#crosshair.ads-active .ch-tick {
+  opacity: 0.08;
+}
+
+#crosshair.ads-active .ch-dot {
+  width: 2px;
+  height: 2px;
+  opacity: 0.55;
+}
+
+/* Hitmarker */
+#hitmarker {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 15;
+}
+
+#hitmarker::before, #hitmarker::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 2px;
+  width: 1.5px;
+  height: 18px;
+  background: var(--bone);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+}
+
+#hitmarker::before { transform: rotate(45deg); }
+#hitmarker::after { transform: rotate(-45deg); }
+#hitmarker.crit::before, #hitmarker.crit::after { background: var(--crimson-bright); }
+
+/* Tactical Notice & Interaction Prompt (Zenith Subtle Gradient Washes) */
+#hud-notice {
+  position: fixed;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(4, 6, 10, 0.65) 15%,
+    rgba(4, 6, 10, 0.75) 50%,
+    rgba(4, 6, 10, 0.65) 85%,
+    transparent 100%
+  );
+  border: none;
+  border-bottom: 1px solid rgba(194, 160, 98, 0.45);
+  color: var(--bone);
+  padding: 7px 28px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.95);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 16;
+}
+
+#interact-prompt {
+  position: fixed;
+  bottom: 132px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(4, 6, 10, 0.62) 18%,
+    rgba(4, 6, 10, 0.72) 50%,
+    rgba(4, 6, 10, 0.62) 82%,
+    transparent 100%
+  );
+  border: none;
+  border-bottom: 1px solid rgba(242, 240, 234, 0.25);
+  padding: 6px 20px 6px 14px;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: var(--bone);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 16;
+}
+
+.key-cap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  background: transparent;
+  color: var(--bone);
+  border: 1px solid rgba(242, 240, 234, 0.45);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  padding: 0 5px;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+}
+
+/* Subtitle HUD (Centered Zenith Gradient Wash above bottom bar) */
+#hud-subtitle-box {
+  position: fixed;
+  bottom: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: min(720px, 86vw);
+  padding: 8px 32px 10px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(4, 6, 10, 0.65) 16%,
+    rgba(4, 6, 10, 0.78) 50%,
+    rgba(4, 6, 10, 0.65) 84%,
+    transparent 100%
+  );
+  border: none;
+  border-bottom: 1px solid rgba(194, 160, 98, 0.35);
+  box-shadow: none;
+  pointer-events: none;
+  z-index: 20;
+  transition: opacity 0.18s ease;
+}
+
+#subtitle-speaker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  margin-bottom: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+}
+
+#subtitle-speaker.speaker-occ {
+  color: #e0b422;
+  border-bottom-color: rgba(224, 180, 34, 0.55);
+  background: transparent;
+}
+
+#subtitle-speaker.speaker-player {
+  color: #38bdf8;
+  border-bottom-color: rgba(56, 189, 248, 0.55);
+  background: transparent;
+}
+
+#subtitle-speaker.speaker-ann {
+  color: #4ade80;
+  border-bottom-color: rgba(74, 222, 128, 0.55);
+  background: transparent;
+}
+
+#subtitle-text-id {
+  font-family: var(--font-sans);
+  font-size: 14.5px;
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: 0.04em;
+  color: var(--bone);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.95);
+}
+
+#subtitle-text-en {
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 300;
+  line-height: 1.3;
+  letter-spacing: 0.03em;
+  color: var(--ash);
+  margin-top: 3px;
+  font-style: italic;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.95);
+}
+
+/* Collectible Field Note / Dispatch Log Card Banner (Zenith Gradient Wash) */
+#hud-log-banner {
+  position: fixed;
+  top: 104px;
+  right: 22px;
+  width: min(340px, 42vw);
+  background: linear-gradient(
+    270deg,
+    rgba(4, 6, 10, 0.68) 0%,
+    rgba(4, 6, 10, 0.32) 75%,
+    transparent 100%
+  );
+  border: none;
+  border-right: 1px solid rgba(194, 160, 98, 0.42);
+  padding: 10px 16px 12px 14px;
+  box-shadow: none;
+  pointer-events: none;
+  z-index: 22;
+  transition: opacity 0.22s ease;
+}
+
+.log-kicker {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  color: var(--ash-dim);
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+
+#log-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  color: var(--amber-muted);
+  text-transform: uppercase;
+  line-height: 1.25;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.9);
+}
+
+#log-body {
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 300;
+  line-height: 1.4;
+  color: var(--bone-soft);
+  margin-top: 6px;
+  white-space: pre-line;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9);
+}
+
+/* Bottom HUD Bar */
+#hud-bottom {
+  position: absolute;
+  bottom: 20px;
+  left: 22px;
+  right: 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+/* Bottom-Left Operator Vitals (Zenith Subtle Bottom-Left Gradient Wash) */
+#vitals-card {
+  background: linear-gradient(90deg, rgba(4, 6, 10, 0.56) 0%, rgba(4, 6, 10, 0.12) 78%, transparent 100%);
+  border: none;
+  border-left: 1px solid rgba(242, 240, 234, 0.22);
+  padding: 8px 16px 8px 14px;
+  min-width: 266px;
+  transition: border-color 0.2s ease;
+  box-shadow: none;
+}
+
+#vitals-card.hp-critical {
+  border-left-color: var(--crimson-bright);
+}
+
+.vital-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+  gap: 14px;
+}
+
+.vital-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ash);
+  letter-spacing: 0.18em;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+#hp-value {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--bone);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.85);
+}
+
+#vitals-card.hp-critical #hp-value {
+  color: var(--crimson-bright);
+}
+
+.hp-bar-track {
+  position: relative;
+  width: 100%;
+  height: 2px;
+  background: rgba(242, 240, 234, 0.12);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+#hp-bar-fill {
+  height: 100%;
+  width: 100%;
+  background: rgba(242, 240, 234, 0.78);
+  transition: width 0.12s ease, background 0.2s ease;
+}
+
+#vitals-card.hp-critical #hp-bar-fill {
+  background: var(--crimson-bright);
+}
+
+.tool-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ash);
+}
+
+.pill-ind {
+  padding: 2px 2px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  letter-spacing: 0.10em;
+  color: rgba(242, 240, 234, 0.65);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95);
+  text-transform: uppercase;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.pill-ind.active {
+  color: var(--bone);
+  border-bottom-color: rgba(242, 240, 234, 0.65);
+}
+
+/* Bottom-Right Weapon & Ballistic Counter (Zenith Right-Aligned Wash) */
+#weapon-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+#ammo-card {
+  background: linear-gradient(270deg, rgba(4, 6, 10, 0.56) 0%, rgba(4, 6, 10, 0.12) 78%, transparent 100%);
+  border: none;
+  border-right: 1px solid rgba(242, 240, 234, 0.22);
+  padding: 8px 16px 8px 18px;
+  text-align: right;
+  min-width: 224px;
+  box-shadow: none;
+}
+
+#weapon-name {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ash);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+#ammo-readout {
+  font-family: var(--font-mono);
+  font-size: 30px;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--bone);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.85);
+}
+
+#ammo-reserve {
+  font-size: 14px;
+  color: var(--ash);
+  font-weight: 300;
+  letter-spacing: 0.04em;
+}
+
+#weapon-slots {
+  display: flex;
+  gap: 12px;
+  padding: 3px 12px 3px 28px;
+  background: linear-gradient(270deg, rgba(4, 6, 10, 0.52) 0%, rgba(4, 6, 10, 0.18) 76%, transparent 100%);
+  border: none;
+}
+
+.w-slot {
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid transparent;
+  padding: 3px 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: rgba(242, 240, 234, 0.68);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95);
+  min-width: auto;
+  text-align: center;
+  text-transform: uppercase;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.w-slot.active {
+  border-bottom-color: var(--amber-muted);
+  color: #ffffff;
+  background: transparent;
+}
+
+/* =========================================================
+   ZENITH-STYLE MINIMALIST TRANSPARENT OVERLAYS
+   (Main Menu, Pause, Game Over)
+   ========================================================= */
+.overlay-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 0;
+}
+
+#menu-overlay.menu-asymmetric {
+  background: linear-gradient(
+    90deg,
+    rgba(4, 6, 10, 0.86) 0%,
+    rgba(4, 6, 10, 0.48) 38%,
+    rgba(4, 6, 10, 0.08) 72%,
+    rgba(4, 6, 10, 0.30) 100%
+  );
+  backdrop-filter: none;
+}
+
+#pause-overlay {
+  background: linear-gradient(
+    90deg,
+    rgba(4, 6, 10, 0.92) 0%,
+    rgba(4, 6, 10, 0.70) 44%,
+    rgba(4, 6, 10, 0.46) 100%
+  );
+  backdrop-filter: none;
+}
+
+#gameover-overlay {
+  background: radial-gradient(
+    circle at 30% 45%,
+    rgba(32, 8, 10, 0.72) 0%,
+    rgba(4, 5, 8, 0.94) 76%
+  );
+  backdrop-filter: none;
+}
+
+/* Completely transparent left column — NO card box, NO borders */
+.zenith-column,
+.menu-dock {
+  width: clamp(360px, 38vw, 500px);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: clamp(56px, 11vh, 110px) clamp(32px, 4.5vw, 68px) clamp(32px, 5vh, 52px);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow-y: auto;
+}
+
+.zenith-column > *,
+.menu-dock > * {
+  flex-shrink: 0;
+}
+
+.zenith-header {
+  margin-bottom: clamp(26px, 4.2vh, 46px);
+}
+
+.zenith-kicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  color: var(--ash);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.kicker-alert {
+  color: var(--crimson-bright);
+}
+
+.zenith-title {
+  margin: 0;
+  font-size: clamp(30px, 3.3vw, 44px);
+  font-weight: 300;
+  letter-spacing: 0.22em;
+  line-height: 1.1;
+  color: var(--bone);
+  text-transform: uppercase;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.65);
+}
+
+.zenith-subtitle {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.34em;
+  color: var(--ash);
+  text-transform: uppercase;
+}
+
+.gameover-readout {
+  margin-top: 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--bone-soft);
+}
+
+/* Vertical Borderless Menu Options */
+.zenith-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.zenith-nav-footer {
+  margin-top: 18px;
+}
+
+.zenith-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 11px 20px 11px 14px;
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  text-align: left;
+  cursor: pointer;
+  color: rgba(242, 240, 234, 0.72);
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.zenith-item-title {
+  font-family: var(--font-sans);
+  font-size: clamp(16px, 1.45vw, 20px);
+  font-weight: 400;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  line-height: 1.25;
+}
+
+.zenith-item-sub {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--ash);
+  height: 16px;
+  line-height: 16px;
+  margin-top: 3px;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: opacity 0.18s ease;
+}
+
+.zenith-item:hover,
+.zenith-item:focus-visible,
+.zenith-item.active {
+  outline: none;
+  color: #ffffff;
+  border-left-color: rgba(242, 240, 234, 0.78);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.13) 0%,
+    rgba(255, 255, 255, 0.03) 65%,
+    transparent 100%
+  );
+  transform: translateX(4px);
+}
+
+.zenith-item:hover .zenith-item-sub,
+.zenith-item:focus-visible .zenith-item-sub,
+.zenith-item.active .zenith-item-sub {
+  opacity: 0.85;
+}
+
+/* Collapsible Minimalist Sub-panels (Settings & Controls) */
+.zenith-subpanel {
+  margin-top: 18px;
+  padding: 14px 18px 14px 16px;
+  border-left: 1px solid rgba(242, 240, 234, 0.22);
+  background: linear-gradient(
+    90deg,
+    rgba(6, 8, 12, 0.62) 0%,
+    rgba(6, 8, 12, 0.24) 75%,
+    transparent 100%
+  );
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pause-settings {
+  margin-top: 14px;
+}
+
+.setting-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-head,
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.setting-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: var(--ash);
+  text-transform: uppercase;
+}
+
+.setting-readout {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.10em;
+  color: var(--bone-soft);
+}
+
+/* Minimalist Range Slider */
+.zenith-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 2px;
+  background: rgba(242, 240, 234, 0.22);
+  outline: none;
+  cursor: pointer;
+}
+
+.zenith-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bone);
+  border: 1px solid rgba(4, 6, 10, 0.8);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.zenith-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.zenith-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bone);
+  border: none;
+  cursor: pointer;
+}
+
+/* Clean Text Tabs for Quality & Audio */
+.zenith-tabs {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.zenith-tab,
+.zenith-toggle {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  padding: 2px 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--ash);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.zenith-tab:hover,
+.zenith-toggle:hover {
+  color: var(--bone);
+}
+
+.zenith-tab.active,
+.zenith-toggle:not(.is-muted) {
+  color: var(--bone);
+  border-bottom-color: rgba(242, 240, 234, 0.72);
+}
+
+.zenith-toggle.is-muted {
+  color: var(--ash-dim);
+  border-bottom-color: transparent;
+}
+
+/* Minimalist Borderless Controls List */
+.controls-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px 18px;
+}
+
+.ctrl-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  border-bottom: 1px solid rgba(242, 240, 234, 0.06);
+  padding-bottom: 4px;
+}
+
+.ctrl-key {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--bone-soft);
+  white-space: nowrap;
+}
+
+.ctrl-desc {
+  color: var(--ash);
+  font-size: 11px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .zenith-column,
+  .menu-dock {
+    width: min(440px, 90vw);
+    padding: 28px 24px;
+  }
+  .controls-list {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,21 @@
+# Environment & secrets (NEVER commit)
+.env
+.env.*
+
+# Non-runtime / development directories
+docs/
+tests/
+research/
+scripts/
+.superpowers/
+
+# Generated test reports & logs
+verify_*_report.json
+*.log
+*.tmp
+
+# Python & OS caches
+__pycache__/
+*.py[cod]
+.DS_Store
+Thumbs.db
