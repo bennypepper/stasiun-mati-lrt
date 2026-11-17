@@ -1,328 +1,820 @@
 {
-	"asset":{
-		"generator":"Khronos glTF Blender I/O v5.1.19",
-		"version":"2.0"
-	},
-	"scene":0,
-	"scenes":[
-		{
-			"name":"Scene",
-			"nodes":[
-				0,
-				1,
-				2
-			]
-		}
-	],
-	"nodes":[
-		{
-			"mesh":0,
-			"name":"wooden_military_crate",
-			"translation":[
-				0,
-				0.03392454609274864,
-				0
-			]
-		},
-		{
-			"mesh":1,
-			"name":"wooden_military_crate_lid",
-			"translation":[
-				0,
-				0.41538700461387634,
-				-0.23233745992183685
-			]
-		},
-		{
-			"mesh":2,
-			"name":"wooden_military_crate_latch",
-			"translation":[
-				0,
-				0.39635923504829407,
-				0.23507647216320038
-			]
-		}
-	],
-	"materials":[
-		{
-			"doubleSided":true,
-			"name":"wooden_military_crate",
-			"normalTexture":{
-				"index":0
-			},
-			"pbrMetallicRoughness":{
-				"baseColorTexture":{
-					"index":1
-				},
-				"metallicRoughnessTexture":{
-					"index":2
-				}
-			}
-		}
-	],
-	"meshes":[
-		{
-			"name":"Cube.026",
-			"primitives":[
-				{
-					"attributes":{
-						"POSITION":0,
-						"NORMAL":1,
-						"TEXCOORD_0":2
-					},
-					"indices":3,
-					"material":0
-				}
-			]
-		},
-		{
-			"name":"Cube.029",
-			"primitives":[
-				{
-					"attributes":{
-						"POSITION":4,
-						"NORMAL":5,
-						"TEXCOORD_0":6
-					},
-					"indices":7,
-					"material":0
-				}
-			]
-		},
-		{
-			"name":"Cube.001",
-			"primitives":[
-				{
-					"attributes":{
-						"POSITION":8,
-						"NORMAL":9,
-						"TEXCOORD_0":10
-					},
-					"indices":11,
-					"material":0
-				}
-			]
-		}
-	],
-	"textures":[
-		{
-			"sampler":0,
-			"source":0
-		},
-		{
-			"sampler":0,
-			"source":1
-		},
-		{
-			"sampler":0,
-			"source":2
-		}
-	],
-	"images":[
-		{
-			"mimeType":"image/jpeg",
-			"name":"wooden_military_crate_nor_gl_1k",
-			"uri":"textures/wooden_military_crate_nor_gl_1k.jpg"
-		},
-		{
-			"mimeType":"image/jpeg",
-			"name":"wooden_military_crate_diff_1k",
-			"uri":"textures/wooden_military_crate_diff_1k.jpg"
-		},
-		{
-			"mimeType":"image/jpeg",
-			"name":"wooden_military_crate_arm_1k",
-			"uri":"textures/wooden_military_crate_arm_1k.jpg"
-		}
-	],
-	"accessors":[
-		{
-			"bufferView":0,
-			"componentType":5126,
-			"count":1566,
-			"max":[
-				0.6202749013900757,
-				0.38388755917549133,
-				0.2585269510746002
-			],
-			"min":[
-				-0.6202749013900757,
-				-0.03392454609274864,
-				-0.2585269510746002
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":1,
-			"componentType":5126,
-			"count":1566,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":2,
-			"componentType":5126,
-			"count":1566,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":3,
-			"componentType":5123,
-			"count":2616,
-			"type":"SCALAR"
-		},
-		{
-			"bufferView":4,
-			"componentType":5126,
-			"count":603,
-			"max":[
-				0.6004408001899719,
-				0.048796992748975754,
-				0.4705042243003845
-			],
-			"min":[
-				-0.6004408001899719,
-				-0.0023461561650037766,
-				-0.0024743713438510895
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":5,
-			"componentType":5126,
-			"count":603,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":6,
-			"componentType":5126,
-			"count":603,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":7,
-			"componentType":5123,
-			"count":1257,
-			"type":"SCALAR"
-		},
-		{
-			"bufferView":8,
-			"componentType":5126,
-			"count":103,
-			"max":[
-				0.3934819996356964,
-				0.0391649529337883,
-				0.003822432830929756
-			],
-			"min":[
-				-0.39348530769348145,
-				-0.00119781494140625,
-				-0.003921123221516609
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":9,
-			"componentType":5126,
-			"count":103,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":10,
-			"componentType":5126,
-			"count":103,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":11,
-			"componentType":5123,
-			"count":258,
-			"type":"SCALAR"
-		}
-	],
-	"bufferViews":[
-		{
-			"buffer":0,
-			"byteLength":18792,
-			"byteOffset":0,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":18792,
-			"byteOffset":18792,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":12528,
-			"byteOffset":37584,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":5232,
-			"byteOffset":50112,
-			"target":34963
-		},
-		{
-			"buffer":0,
-			"byteLength":7236,
-			"byteOffset":55344,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":7236,
-			"byteOffset":62580,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":4824,
-			"byteOffset":69816,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":2514,
-			"byteOffset":74640,
-			"target":34963
-		},
-		{
-			"buffer":0,
-			"byteLength":1236,
-			"byteOffset":77156,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":1236,
-			"byteOffset":78392,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":824,
-			"byteOffset":79628,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":516,
-			"byteOffset":80452,
-			"target":34963
-		}
-	],
-	"samplers":[
-		{
-			"magFilter":9729,
-			"minFilter":9987
-		}
-	],
-	"buffers":[
-		{
-			"byteLength":80968,
-			"uri":"wooden_military_crate_1k.bin"
-		}
-	]
+  "asset": {
+    "generator": "Khronos glTF Blender I/O v5.1.19",
+    "version": "2.0"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "wooden_military_crate_LOD0",
+      "translation": [
+        0,
+        0.03422325849533081,
+        0
+      ]
+    },
+    {
+      "mesh": 1,
+      "name": "wooden_military_crate_LOD1",
+      "translation": [
+        0,
+        0.03422325849533081,
+        0
+      ]
+    },
+    {
+      "mesh": 2,
+      "name": "wooden_military_crate_LOD2",
+      "translation": [
+        0,
+        0.03422325849533081,
+        0
+      ]
+    },
+    {
+      "mesh": 3,
+      "name": "wooden_military_crate_lid_LOD0",
+      "translation": [
+        0,
+        0.4156857132911682,
+        -0.23233745992183685
+      ]
+    },
+    {
+      "mesh": 4,
+      "name": "wooden_military_crate_lid_LOD1",
+      "translation": [
+        0,
+        0.4156857132911682,
+        -0.23233745992183685
+      ]
+    },
+    {
+      "mesh": 5,
+      "name": "wooden_military_crate_lid_LOD2",
+      "translation": [
+        0,
+        0.4156857132911682,
+        -0.23233745992183685
+      ]
+    },
+    {
+      "mesh": 6,
+      "name": "wooden_military_crate_latch_LOD0",
+      "translation": [
+        0,
+        0.39665794372558594,
+        0.23507647216320038
+      ]
+    },
+    {
+      "mesh": 7,
+      "name": "wooden_military_crate_latch_LOD1",
+      "translation": [
+        0,
+        0.39665794372558594,
+        0.23507647216320038
+      ]
+    },
+    {
+      "mesh": 8,
+      "name": "wooden_military_crate_latch_LOD2",
+      "translation": [
+        0,
+        0.39665794372558594,
+        0.23507647216320038
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "wooden_military_crate",
+      "normalTexture": {
+        "index": 0
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 1
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "wooden_military_crate_mesh_LOD0",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "wooden_military_crate_mesh_LOD1",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 4,
+            "NORMAL": 5,
+            "TEXCOORD_0": 6
+          },
+          "indices": 7,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "wooden_military_crate_mesh_LOD2",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 8,
+            "NORMAL": 9,
+            "TEXCOORD_0": 10
+          },
+          "indices": 11,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "wooden_military_crate_lid_mesh_LOD0",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 12,
+            "NORMAL": 13,
+            "TEXCOORD_0": 14
+          },
+          "indices": 15,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "wooden_military_crate_lid_mesh_LOD1",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 16,
+            "NORMAL": 17,
+            "TEXCOORD_0": 18
+          },
+          "indices": 19,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "wooden_military_crate_lid_mesh_LOD2",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 20,
+            "NORMAL": 21,
+            "TEXCOORD_0": 22
+          },
+          "indices": 23,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "wooden_military_crate_latch_mesh_LOD0",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 24,
+            "NORMAL": 25,
+            "TEXCOORD_0": 26
+          },
+          "indices": 27,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "wooden_military_crate_latch_mesh_LOD1",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 28,
+            "NORMAL": 29,
+            "TEXCOORD_0": 30
+          },
+          "indices": 31,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "wooden_military_crate_latch_mesh_LOD2",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 32,
+            "NORMAL": 33,
+            "TEXCOORD_0": 34
+          },
+          "indices": 35,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/jpeg",
+      "name": "wooden_military_crate_nor_gl_1k",
+      "uri": "textures/wooden_military_crate_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "wooden_military_crate_diff_1k",
+      "uri": "textures/wooden_military_crate_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "wooden_military_crate_arm_1k",
+      "uri": "textures/wooden_military_crate_arm_1k.jpg"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 1574,
+      "max": [
+        0.6202749013900757,
+        0.38388755917549133,
+        0.2585269510746002
+      ],
+      "min": [
+        -0.6202749013900757,
+        -0.03392454609274864,
+        -0.2585269510746002
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 1574,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 1574,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 2640,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5126,
+      "count": 730,
+      "max": [
+        0.6202749013900757,
+        0.3821052312850952,
+        0.2585269510746002
+      ],
+      "min": [
+        -0.6202749013900757,
+        -0.03392454609274864,
+        -0.2585269510746002
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 730,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 730,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5123,
+      "count": 1134,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 8,
+      "componentType": 5126,
+      "count": 428,
+      "max": [
+        0.6202749013900757,
+        0.3852088749408722,
+        0.2583138942718506
+      ],
+      "min": [
+        -0.6202749013900757,
+        -0.029011065140366554,
+        -0.2583138942718506
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 9,
+      "componentType": 5126,
+      "count": 428,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 10,
+      "componentType": 5126,
+      "count": 428,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 11,
+      "componentType": 5123,
+      "count": 654,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 12,
+      "componentType": 5126,
+      "count": 605,
+      "max": [
+        0.6004408001899719,
+        0.048796992748975754,
+        0.4705042243003845
+      ],
+      "min": [
+        -0.6004408001899719,
+        -0.0023461561650037766,
+        -0.0024743713438510895
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 13,
+      "componentType": 5126,
+      "count": 605,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 14,
+      "componentType": 5126,
+      "count": 605,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 15,
+      "componentType": 5123,
+      "count": 1269,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 16,
+      "componentType": 5126,
+      "count": 299,
+      "max": [
+        0.6004408001899719,
+        0.048796992748975754,
+        0.47044679522514343
+      ],
+      "min": [
+        -0.6004408001899719,
+        -0.0021965433843433857,
+        -0.002115706680342555
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 17,
+      "componentType": 5126,
+      "count": 299,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 18,
+      "componentType": 5126,
+      "count": 299,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 19,
+      "componentType": 5123,
+      "count": 543,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 20,
+      "componentType": 5126,
+      "count": 190,
+      "max": [
+        0.6004408001899719,
+        0.048796992748975754,
+        0.46790245175361633
+      ],
+      "min": [
+        -0.6004408001899719,
+        -0.0037016395945101976,
+        -4.970057852915488e-05
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 21,
+      "componentType": 5126,
+      "count": 190,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 22,
+      "componentType": 5126,
+      "count": 190,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 23,
+      "componentType": 5123,
+      "count": 312,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 24,
+      "componentType": 5126,
+      "count": 103,
+      "max": [
+        0.3934819996356964,
+        0.0391649529337883,
+        0.003822432830929756
+      ],
+      "min": [
+        -0.39348530769348145,
+        -0.00119781494140625,
+        -0.003921123221516609
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 25,
+      "componentType": 5126,
+      "count": 103,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 26,
+      "componentType": 5126,
+      "count": 103,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 27,
+      "componentType": 5123,
+      "count": 258,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 28,
+      "componentType": 5126,
+      "count": 61,
+      "max": [
+        0.3909432291984558,
+        0.0391649529337883,
+        0.0037670843303203583
+      ],
+      "min": [
+        -0.3909423351287842,
+        -0.0009864808525890112,
+        -0.003921123221516609
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 29,
+      "componentType": 5126,
+      "count": 61,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 30,
+      "componentType": 5126,
+      "count": 61,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 31,
+      "componentType": 5123,
+      "count": 111,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 32,
+      "componentType": 5126,
+      "count": 45,
+      "max": [
+        0.38975265622138977,
+        0.037787944078445435,
+        0.0010437548626214266
+      ],
+      "min": [
+        -0.3897527754306793,
+        0.00036461837589740753,
+        -0.0011344067752361298
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 33,
+      "componentType": 5126,
+      "count": 45,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 34,
+      "componentType": 5126,
+      "count": 45,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 35,
+      "componentType": 5123,
+      "count": 63,
+      "type": "SCALAR"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 18888,
+      "byteOffset": 0,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 18888,
+      "byteOffset": 18888,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 12592,
+      "byteOffset": 37776,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 5280,
+      "byteOffset": 50368,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 8760,
+      "byteOffset": 55648,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 8760,
+      "byteOffset": 64408,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 5840,
+      "byteOffset": 73168,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2268,
+      "byteOffset": 79008,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 5136,
+      "byteOffset": 81276,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 5136,
+      "byteOffset": 86412,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 3424,
+      "byteOffset": 91548,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 1308,
+      "byteOffset": 94972,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 7260,
+      "byteOffset": 96280,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 7260,
+      "byteOffset": 103540,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 4840,
+      "byteOffset": 110800,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2538,
+      "byteOffset": 115640,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 3588,
+      "byteOffset": 118180,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 3588,
+      "byteOffset": 121768,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2392,
+      "byteOffset": 125356,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 1086,
+      "byteOffset": 127748,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2280,
+      "byteOffset": 128836,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2280,
+      "byteOffset": 131116,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 1520,
+      "byteOffset": 133396,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 624,
+      "byteOffset": 134916,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 1236,
+      "byteOffset": 135540,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 1236,
+      "byteOffset": 136776,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 824,
+      "byteOffset": 138012,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 516,
+      "byteOffset": 138836,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 732,
+      "byteOffset": 139352,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 732,
+      "byteOffset": 140084,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 488,
+      "byteOffset": 140816,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 222,
+      "byteOffset": 141304,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 540,
+      "byteOffset": 141528,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 540,
+      "byteOffset": 142068,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 360,
+      "byteOffset": 142608,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 126,
+      "byteOffset": 142968,
+      "target": 34963
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 143096,
+      "uri": "wooden_military_crate_1k.bin"
+    }
+  ]
 }

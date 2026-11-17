@@ -442,47 +442,71 @@
     return grid;
   }
 
-  function _extractStationProto(key, targetHeight, filterFn, protoCacheKey) {
+  const _stationNormCache = new Map();
+
+  function _extractStationProto(key, targetHeight, filterFn, protoCacheKey, lodTier) {
     const LRT = window.LRT || {};
     const loader = LRT.AssetLoader;
     if (!loader || typeof loader.getModelRaw !== 'function') return null;
 
+    const tier = lodTier || 0;
     const filterKey = protoCacheKey || (filterFn ? filterFn.toString().replace(/\s+/g, ' ') : '');
-    const cacheKey = `${key}|${targetHeight || 0}|${filterKey}`;
+    const normKey = `${key}|${targetHeight || 0}|${filterKey}`;
+    const cacheKey = `${normKey}|L${tier}`;
     let proto = _stationProtoCache.get(cacheKey);
 
     if (!proto) {
+      if (tier > 0 && !_stationNormCache.has(normKey)) {
+        _extractStationProto(key, targetHeight, filterFn, protoCacheKey, 0);
+      }
       const raw = loader.getModelRaw(key);
       if (!raw) return null;
 
       raw.updateMatrixWorld(true);
+      let hasLodNodes = false;
+      raw.traverse((node) => {
+        if (node.isMesh && /_LOD([012])$/.test(node.name || '')) hasLodNodes = true;
+      });
+      if (tier > 0 && !hasLodNodes) return null;
+
       const selected = [];
       raw.traverse((node) => {
         if (!node.isMesh || !node.geometry) return;
-        if (filterFn && !filterFn(node)) return;
+        const m = (node.name || '').match(/_LOD([012])$/);
+        if (hasLodNodes) {
+          const nodeTier = m ? Number(m[1]) : 0;
+          if (nodeTier !== tier) return;
+        }
+        const cleanNode = m ? { name: node.name.slice(0, -5), isMesh: true, material: node.material } : node;
+        if (filterFn && !filterFn(cleanNode)) return;
         selected.push(node);
       });
       if (selected.length === 0) return null;
 
-      tmp.box.makeEmpty();
-      const mBox = new THREE.Box3();
-      for (let i = 0; i < selected.length; i++) {
-        const g = selected[i].geometry;
-        if (!g.boundingBox) g.computeBoundingBox();
-        mBox.copy(g.boundingBox).applyMatrix4(selected[i].matrixWorld);
-        tmp.box.union(mBox);
+      let norm = _stationNormCache.get(normKey);
+      if (!norm) {
+        tmp.box.makeEmpty();
+        const mBox = new THREE.Box3();
+        for (let i = 0; i < selected.length; i++) {
+          const g = selected[i].geometry;
+          if (!g.boundingBox) g.computeBoundingBox();
+          mBox.copy(g.boundingBox).applyMatrix4(selected[i].matrixWorld);
+          tmp.box.union(mBox);
+        }
+        const sz = tmp.box.getSize(new THREE.Vector3());
+        const ctr = tmp.box.getCenter(new THREE.Vector3());
+        const scale = targetHeight && sz.y > 0.01 ? (targetHeight / sz.y) : 1.0;
+        norm = { ctrX: ctr.x, minY: tmp.box.min.y, ctrZ: ctr.z, scale, sz: { x: sz.x * scale, y: sz.y * scale, z: sz.z * scale } };
+        _stationNormCache.set(normKey, norm);
       }
-      const sz = tmp.box.getSize(new THREE.Vector3());
-      const ctr = tmp.box.getCenter(new THREE.Vector3());
-      const scale = targetHeight && sz.y > 0.01 ? (targetHeight / sz.y) : 1.0;
 
       const parts = [];
       for (let i = 0; i < selected.length; i++) {
         const node = selected[i];
         const g = node.geometry.clone();
         g.applyMatrix4(node.matrixWorld);
-        g.translate(-ctr.x, -tmp.box.min.y, -ctr.z);
-        if (scale !== 1.0) g.scale(scale, scale, scale);
+        g.translate(-norm.ctrX, -norm.minY, -norm.ctrZ);
+        if (norm.scale !== 1.0) g.scale(norm.scale, norm.scale, norm.scale);
         const mat = Array.isArray(node.material) ? node.material[0] : node.material;
         if (mat && 'envMapIntensity' in mat && (!mat.envMapIntensity || mat.envMapIntensity < 0.8)) {
           mat.envMapIntensity = 1.0;
@@ -492,11 +516,7 @@
 
       proto = {
         parts,
-        sz: {
-          x: sz.x * scale,
-          y: sz.y * scale,
-          z: sz.z * scale
-        }
+        sz: norm.sz
       };
       _stationProtoCache.set(cacheKey, proto);
     }
@@ -505,34 +525,47 @@
   }
 
   function _placeNormalizedModel(station, key, x, y, z, ry, targetHeight, filterFn, addCollTag, protoCacheKey) {
-    const proto = _extractStationProto(key, targetHeight, filterFn, protoCacheKey);
-    if (!proto) return null;
-
-    const grp = new THREE.Group();
-    grp.position.set(x, y, z);
-    if (ry) grp.rotation.y = ry;
+    const p0 = _extractStationProto(key, targetHeight, filterFn, protoCacheKey, 0);
+    if (!p0) return null;
+    const p1 = _extractStationProto(key, targetHeight, filterFn, protoCacheKey, 1);
+    const p2 = _extractStationProto(key, targetHeight, filterFn, protoCacheKey, 2);
 
     const shouldCast = !NO_SHADOW_STATION_PROPS.has(key);
+    const buildLevelGroup = (pr, cast) => {
+      const g = new THREE.Group();
+      for (let i = 0; i < pr.parts.length; i++) {
+        const part = pr.parts[i];
+        const m = new THREE.Mesh(part.geo, part.mat);
+        m.castShadow = cast;
+        m.receiveShadow = true;
+        g.add(m);
+      }
+      return g;
+    };
 
-    for (let i = 0; i < proto.parts.length; i++) {
-      const part = proto.parts[i];
-      const m = new THREE.Mesh(part.geo, part.mat);
-      m.castShadow = shouldCast;
-      m.receiveShadow = true;
-      grp.add(m);
+    let rootObj;
+    if (p1 || p2) {
+      rootObj = new THREE.LOD();
+      rootObj.addLevel(buildLevelGroup(p0, shouldCast), 0);
+      if (p1) rootObj.addLevel(buildLevelGroup(p1, shouldCast), 18);
+      if (p2) rootObj.addLevel(buildLevelGroup(p2, false), 36);
+    } else {
+      rootObj = buildLevelGroup(p0, shouldCast);
     }
-    station.rootGroup.add(grp);
+    rootObj.position.set(x, y, z);
+    if (ry) rootObj.rotation.y = ry;
+    station.rootGroup.add(rootObj);
 
     if (addCollTag) {
       const cos = Math.abs(Math.cos(ry || 0));
       const sin = Math.abs(Math.sin(ry || 0));
-      const hw = (cos * proto.sz.x + sin * proto.sz.z) * 0.5;
-      const hd = (sin * proto.sz.x + cos * proto.sz.z) * 0.5;
-      station._addCollider(x - hw, y, z - hd, x + hw, y + proto.sz.y, z + hd, addCollTag, {
+      const hw = (cos * p0.sz.x + sin * p0.sz.z) * 0.5;
+      const hd = (sin * p0.sz.x + cos * p0.sz.z) * 0.5;
+      station._addCollider(x - hw, y, z - hd, x + hw, y + p0.sz.y, z + hd, addCollTag, {
         blocksWalk: true, blocksBullets: true
       });
     }
-    return grp;
+    return rootObj;
   }
 
   S.CONST = CONST;

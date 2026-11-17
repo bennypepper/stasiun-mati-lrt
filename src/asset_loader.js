@@ -244,6 +244,17 @@
       typeof options.envMapIntensity === 'number' ? options.envMapIntensity : null;
 
     const group = gltf.scene.clone(true);
+    let hasLodNodes = false;
+    group.traverse((node) => {
+      if (node.isMesh && /_LOD([012])$/.test(node.name || '')) hasLodNodes = true;
+    });
+    if (hasLodNodes) {
+      const prune = [];
+      group.traverse((node) => {
+        if (node.isMesh && /_LOD[12]$/.test(node.name || '')) prune.push(node);
+      });
+      for (let i = 0; i < prune.length; i++) prune[i].removeFromParent();
+    }
     group.traverse((node) => {
       if (!node.isMesh) return;
       node.castShadow = castShadow;

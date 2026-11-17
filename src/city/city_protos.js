@@ -395,6 +395,7 @@
 
   // Module-level persistent prototype cache & procedural Angsana tree cache (never disposed per station!)
   const _cityProtoCache = new Map();
+  const _cityNormCache = new Map();
   let _angsanaCachedParts = null;
   let _angsanaCachedLeafTex = null;
   let _angsanaCachedMatLeaf = null;
@@ -420,13 +421,19 @@
     return _angsanaCachedMatLeaf;
   }
 
-  // Extract normalized prototype parts from Poly Haven .gltf models (supports multi-variant filter & pivot override)
-  function extractModelProto(key, targetHeight, filterFn, pivotOverride, protoCacheKey) {
+  // Extract normalized prototype parts from Poly Haven .gltf models (supports multi-variant filter, pivot override & 3-tier LOD)
+  function extractModelProto(key, targetHeight, filterFn, pivotOverride, protoCacheKey, lodTier) {
+    const tier = lodTier || 0;
     const filterKey = protoCacheKey || (filterFn ? filterFn.toString().replace(/\s+/g, ' ') : '');
     const pivKey = pivotOverride ? `${pivotOverride.x},${pivotOverride.y},${pivotOverride.z}` : '';
-    const cacheKey = `${key}|${targetHeight || 0}|${filterKey}|${pivKey}`;
+    const normKey = `${key}|${targetHeight || 0}|${filterKey}|${pivKey}`;
+    const cacheKey = `${normKey}|L${tier}`;
     if (_cityProtoCache.has(cacheKey)) {
       return _cityProtoCache.get(cacheKey);
+    }
+
+    if (tier > 0 && !_cityNormCache.has(normKey)) {
+      extractModelProto(key, targetHeight, filterFn, pivotOverride, protoCacheKey, 0);
     }
 
     const LRT = window.LRT;
@@ -436,38 +443,56 @@
     if (!raw) return null;
 
     raw.updateMatrixWorld(true);
+    let hasLodNodes = false;
+    raw.traverse((node) => {
+      if (node.isMesh && /_LOD([012])$/.test(node.name || '')) hasLodNodes = true;
+    });
+    if (tier > 0 && !hasLodNodes) return null;
+
     const selected = [];
     raw.traverse((node) => {
       if (!node.isMesh || !node.geometry) return;
-      if (filterFn && !filterFn(node)) return;
+      const m = (node.name || '').match(/_LOD([012])$/);
+      if (hasLodNodes) {
+        const nodeTier = m ? Number(m[1]) : 0;
+        if (nodeTier !== tier) return;
+      }
+      const cleanNode = m ? { name: node.name.slice(0, -5), isMesh: true, material: node.material } : node;
+      if (filterFn && !filterFn(cleanNode)) return;
       selected.push(node);
     });
     if (selected.length === 0) return null;
 
-    _tmpBox.makeEmpty();
-    const meshBox = new THREE.Box3();
-    for (let i = 0; i < selected.length; i++) {
-      const g = selected[i].geometry;
-      if (!g.boundingBox) g.computeBoundingBox();
-      meshBox.copy(g.boundingBox).applyMatrix4(selected[i].matrixWorld);
-      _tmpBox.union(meshBox);
+    let norm = _cityNormCache.get(normKey);
+    if (!norm) {
+      _tmpBox.makeEmpty();
+      const meshBox = new THREE.Box3();
+      for (let i = 0; i < selected.length; i++) {
+        const g = selected[i].geometry;
+        if (!g.boundingBox) g.computeBoundingBox();
+        meshBox.copy(g.boundingBox).applyMatrix4(selected[i].matrixWorld);
+        _tmpBox.union(meshBox);
+      }
+      const rawSize = _tmpBox.getSize(new THREE.Vector3());
+      const rawCenter = _tmpBox.getCenter(new THREE.Vector3());
+      const scale = targetHeight && rawSize.y > 0.01 ? (targetHeight / rawSize.y) : 1.0;
+      const pivX = pivotOverride && pivotOverride.x !== undefined ? pivotOverride.x : rawCenter.x;
+      const pivY = pivotOverride && pivotOverride.y !== undefined ? pivotOverride.y : _tmpBox.min.y;
+      const pivZ = pivotOverride && pivotOverride.z !== undefined ? pivotOverride.z : rawCenter.z;
+      norm = {
+        pivX, pivY, pivZ, scale,
+        size: { x: rawSize.x * scale, y: rawSize.y * scale, z: rawSize.z * scale }
+      };
+      _cityNormCache.set(normKey, norm);
     }
-
-    const rawSize = _tmpBox.getSize(new THREE.Vector3());
-    const rawCenter = _tmpBox.getCenter(new THREE.Vector3());
-    const scale = targetHeight && rawSize.y > 0.01 ? (targetHeight / rawSize.y) : 1.0;
-
-    const pivX = pivotOverride && pivotOverride.x !== undefined ? pivotOverride.x : rawCenter.x;
-    const pivY = pivotOverride && pivotOverride.y !== undefined ? pivotOverride.y : _tmpBox.min.y;
-    const pivZ = pivotOverride && pivotOverride.z !== undefined ? pivotOverride.z : rawCenter.z;
 
     const partsByMat = new Map();
     for (let i = 0; i < selected.length; i++) {
       const node = selected[i];
       const g = node.geometry.clone();
       g.applyMatrix4(node.matrixWorld);
-      g.translate(-pivX, -pivY, -pivZ);
-      if (scale !== 1.0) g.scale(scale, scale, scale);
+      g.translate(-norm.pivX, -norm.pivY, -norm.pivZ);
+      if (norm.scale !== 1.0) g.scale(norm.scale, norm.scale, norm.scale);
       const normGeo = prepGeo(g, false);
       const mat = Array.isArray(node.material) ? node.material[0] : node.material;
       if (mat && 'envMapIntensity' in mat && (!mat.envMapIntensity || mat.envMapIntensity < 0.8)) {
@@ -491,11 +516,7 @@
 
     const proto = {
       parts,
-      size: {
-        x: rawSize.x * scale,
-        y: rawSize.y * scale,
-        z: rawSize.z * scale
-      }
+      size: norm.size
     };
     _cityProtoCache.set(cacheKey, proto);
     return proto;
@@ -1520,6 +1541,68 @@
     }
   }
 
+  function emitInstancedLodProto(city, protos3, placements, castShadow, receiveShadow, namePrefix, customGroup, isStructural) {
+    if (!protos3 || !protos3[0] || !placements || placements.length === 0) return;
+    const hasPerInstanceColor = placements[0] && placements[0].color !== undefined;
+    const qMatch = (namePrefix || '').match(/_(NW|NE|SW|SE)/);
+    const qKey = qMatch ? qMatch[1] : null;
+
+    // Precompute placement matrices & shared world bounding box once
+    const matArr = new Array(placements.length);
+    for (let i = 0; i < placements.length; i++) {
+      const pl = placements[i];
+      _tmpDummy.position.set(pl.x, pl.y, pl.z);
+      _tmpDummy.rotation.set(pl.rx || 0, pl.ry || 0, pl.rz || 0);
+      _tmpDummy.scale.set(pl.sx !== undefined ? pl.sx : 1, pl.sy !== undefined ? pl.sy : 1, pl.sz !== undefined ? pl.sz : 1);
+      _tmpDummy.updateMatrix();
+      matArr[i] = _tmpDummy.matrix.clone();
+    }
+
+    let sharedBox = null;
+    for (let t = 0; t < 3; t++) {
+      const pr = protos3[t];
+      if (!pr) continue;
+      for (let p = 0; p < pr.parts.length; p++) {
+        const part = pr.parts[p];
+        const inst = new THREE.InstancedMesh(part.geo, part.mat, placements.length);
+        inst.castShadow = t === 0 ? !!castShadow : false;
+        inst.receiveShadow = !!receiveShadow;
+        inst.name = `${namePrefix || 'CityLodProp'}_LOD${t}_${p}`;
+        for (let i = 0; i < placements.length; i++) {
+          inst.setMatrixAt(i, matArr[i]);
+          if (hasPerInstanceColor && p === 0 && !part.mat.vertexColors) {
+            _tmpColor.setHex(placements[i].color);
+            inst.setColorAt(i, _tmpColor);
+          }
+        }
+        inst.instanceMatrix.needsUpdate = true;
+        if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+        if (!sharedBox) {
+          if (typeof inst.computeBoundingBox === 'function') inst.computeBoundingBox();
+          sharedBox = inst.boundingBox ? inst.boundingBox.clone() : new THREE.Box3();
+        } else {
+          inst.boundingBox = sharedBox.clone();
+        }
+        if (typeof inst.computeBoundingSphere === 'function') inst.computeBoundingSphere();
+
+        inst.userData._localBox = sharedBox.clone();
+        inst.userData._worldBox = sharedBox.clone();
+        inst.userData._lodTier = t;
+        inst.userData._lod1Dist = 22;
+        inst.userData._lod2Dist = 46;
+        inst.userData._alwaysStructural = !!isStructural;
+        inst.visible = (t === 0);
+
+        const targetGroup = customGroup || city.rootGroup;
+        targetGroup.add(inst);
+        city.clutterMeshes.push(inst);
+        if (qKey && city.clutterByQuadrant && city.clutterByQuadrant[qKey]) {
+          city.clutterByQuadrant[qKey].push(inst);
+        }
+      }
+    }
+  }
+
   function placeSingleProto(city, proto, x, y, z, ry, scale, parentGroup, castShadow) {
     if (!proto) return null;
     const g = new THREE.Group();
@@ -1665,6 +1748,7 @@
     getTrafficSignalProto,
     extractModelProto,
     emitInstancedProto,
+    emitInstancedLodProto,
     placeSingleProto,
     buildSkylineSilhouetteRing
   });

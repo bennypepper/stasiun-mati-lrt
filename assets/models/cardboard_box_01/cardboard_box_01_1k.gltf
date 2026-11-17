@@ -1,165 +1,329 @@
 {
-	"asset":{
-		"generator":"Khronos glTF Blender I/O v5.1.19",
-		"version":"2.0"
-	},
-	"scene":0,
-	"scenes":[
-		{
-			"name":"Scene",
-			"nodes":[
-				0
-			]
-		}
-	],
-	"nodes":[
-		{
-			"mesh":0,
-			"name":"cardboard_box_01",
-			"translation":[
-				-0.0008704215288162231,
-				0.18262498080730438,
-				-0.032974839210510254
-			]
-		}
-	],
-	"materials":[
-		{
-			"doubleSided":true,
-			"name":"cardboard_box_01",
-			"normalTexture":{
-				"index":0
-			},
-			"pbrMetallicRoughness":{
-				"baseColorTexture":{
-					"index":1
-				},
-				"metallicFactor":0,
-				"metallicRoughnessTexture":{
-					"index":2
-				}
-			}
-		}
-	],
-	"meshes":[
-		{
-			"name":"cardboard_box_01",
-			"primitives":[
-				{
-					"attributes":{
-						"POSITION":0,
-						"NORMAL":1,
-						"TEXCOORD_0":2
-					},
-					"indices":3,
-					"material":0
-				}
-			]
-		}
-	],
-	"textures":[
-		{
-			"sampler":0,
-			"source":0
-		},
-		{
-			"sampler":0,
-			"source":1
-		},
-		{
-			"sampler":0,
-			"source":2
-		}
-	],
-	"images":[
-		{
-			"mimeType":"image/jpeg",
-			"name":"cardboard_box_01_nor_gl_1k",
-			"uri":"textures/cardboard_box_01_nor_gl_1k.jpg"
-		},
-		{
-			"mimeType":"image/jpeg",
-			"name":"cardboard_box_01_diff_1k",
-			"uri":"textures/cardboard_box_01_diff_1k.jpg"
-		},
-		{
-			"mimeType":"image/jpeg",
-			"name":"cardboard_box_01_arm_1k",
-			"uri":"textures/cardboard_box_01_arm_1k.jpg"
-		}
-	],
-	"accessors":[
-		{
-			"bufferView":0,
-			"componentType":5126,
-			"count":608,
-			"max":[
-				0.19444867968559265,
-				0.15767481923103333,
-				0.290523499250412
-			],
-			"min":[
-				-0.1927078366279602,
-				-0.18262498080730438,
-				-0.22457382082939148
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":1,
-			"componentType":5126,
-			"count":608,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":2,
-			"componentType":5126,
-			"count":608,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":3,
-			"componentType":5123,
-			"count":3048,
-			"type":"SCALAR"
-		}
-	],
-	"bufferViews":[
-		{
-			"buffer":0,
-			"byteLength":7296,
-			"byteOffset":0,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":7296,
-			"byteOffset":7296,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":4864,
-			"byteOffset":14592,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":6096,
-			"byteOffset":19456,
-			"target":34963
-		}
-	],
-	"samplers":[
-		{
-			"magFilter":9729,
-			"minFilter":9987
-		}
-	],
-	"buffers":[
-		{
-			"byteLength":25552,
-			"uri":"cardboard_box_01_1k.bin"
-		}
-	]
+  "asset": {
+    "generator": "Khronos glTF Blender I/O v5.1.19",
+    "version": "2.0"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0,
+        1,
+        2
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "cardboard_box_01_LOD0",
+      "translation": [
+        -0.0010061413049697876,
+        0.18340270221233368,
+        -0.03285150229930878
+      ]
+    },
+    {
+      "mesh": 1,
+      "name": "cardboard_box_01_LOD1",
+      "translation": [
+        -0.0010061413049697876,
+        0.18340270221233368,
+        -0.03285150229930878
+      ]
+    },
+    {
+      "mesh": 2,
+      "name": "cardboard_box_01_LOD2",
+      "translation": [
+        -0.0010061413049697876,
+        0.18340270221233368,
+        -0.03285150229930878
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "cardboard_box_01",
+      "normalTexture": {
+        "index": 0
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 1
+        },
+        "metallicFactor": 0,
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "cardboard_box_01_mesh_LOD0",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "cardboard_box_01_mesh_LOD1",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 4,
+            "NORMAL": 5,
+            "TEXCOORD_0": 6
+          },
+          "indices": 7,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "cardboard_box_01_mesh_LOD2",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 8,
+            "NORMAL": 9,
+            "TEXCOORD_0": 10
+          },
+          "indices": 11,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/jpeg",
+      "name": "cardboard_box_01_nor_gl_1k",
+      "uri": "textures/cardboard_box_01_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "cardboard_box_01_diff_1k",
+      "uri": "textures/cardboard_box_01_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "cardboard_box_01_arm_1k",
+      "uri": "textures/cardboard_box_01_arm_1k.jpg"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 559,
+      "max": [
+        0.19453437626361847,
+        0.15767481923103333,
+        0.290523499250412
+      ],
+      "min": [
+        -0.1927078366279602,
+        -0.18262498080730438,
+        -0.22439754009246826
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 559,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 559,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 2778,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5126,
+      "count": 269,
+      "max": [
+        0.19453801214694977,
+        0.15781204402446747,
+        0.291057288646698
+      ],
+      "min": [
+        -0.19271379709243774,
+        -0.18221904337406158,
+        -0.22442187368869781
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 269,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 269,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5123,
+      "count": 1233,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 8,
+      "componentType": 5126,
+      "count": 178,
+      "max": [
+        0.19396838545799255,
+        0.15756875276565552,
+        0.28922611474990845
+      ],
+      "min": [
+        -0.19271379709243774,
+        -0.18365851044654846,
+        -0.22608666121959686
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 9,
+      "componentType": 5126,
+      "count": 178,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 10,
+      "componentType": 5126,
+      "count": 178,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 11,
+      "componentType": 5123,
+      "count": 762,
+      "type": "SCALAR"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 6708,
+      "byteOffset": 0,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 6708,
+      "byteOffset": 6708,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 4472,
+      "byteOffset": 13416,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 5556,
+      "byteOffset": 17888,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 3228,
+      "byteOffset": 23444,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 3228,
+      "byteOffset": 26672,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2152,
+      "byteOffset": 29900,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2466,
+      "byteOffset": 32052,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2136,
+      "byteOffset": 34520,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2136,
+      "byteOffset": 36656,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 1424,
+      "byteOffset": 38792,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 1524,
+      "byteOffset": 40216,
+      "target": 34963
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 41740,
+      "uri": "cardboard_box_01_1k.bin"
+    }
+  ]
 }

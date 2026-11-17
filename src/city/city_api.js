@@ -183,12 +183,24 @@
       return mesh;
     },
 
-    _extractModelProto: function (key, targetHeight, filterFn, pivotOverride, protoCacheKey) {
-      return P.extractModelProto(key, targetHeight, filterFn, pivotOverride, protoCacheKey);
+    _extractModelProto: function (key, targetHeight, filterFn, pivotOverride, protoCacheKey, lodTier) {
+      return P.extractModelProto(key, targetHeight, filterFn, pivotOverride, protoCacheKey, lodTier);
+    },
+
+    _extractModelLodProtos: function (key, targetHeight, filterFn, pivotOverride, protoCacheKey) {
+      return [
+        P.extractModelProto(key, targetHeight, filterFn, pivotOverride, protoCacheKey, 0),
+        P.extractModelProto(key, targetHeight, filterFn, pivotOverride, protoCacheKey, 1),
+        P.extractModelProto(key, targetHeight, filterFn, pivotOverride, protoCacheKey, 2)
+      ];
     },
 
     _emitInstancedProto: function (proto, placements, castShadow, receiveShadow, namePrefix, customGroup) {
       return P.emitInstancedProto(this, proto, placements, castShadow, receiveShadow, namePrefix, customGroup);
+    },
+
+    _emitInstancedLodProto: function (protos3, placements, castShadow, receiveShadow, namePrefix, customGroup, isStructural) {
+      return P.emitInstancedLodProto(this, protos3, placements, castShadow, receiveShadow, namePrefix, customGroup, isStructural);
     },
 
     _placeSingleProto: function (proto, x, y, z, ry, scale, parentGroup, castShadow) {
@@ -647,20 +659,31 @@
         }
       }
 
-      // 2. Cull street clutter InstancedMeshes (FOV + distance + potato/trainCruising)
+      // 2. Cull & dynamically switch 3-tier LODs on instanced props (FOV + distance + structural preservation)
       for (let i = 0; i < this.clutterMeshes.length; i++) {
         const cm = this.clutterMeshes[i];
-        if (isPotato || trainCruising) {
+        const ud = cm.userData || {};
+        const isStruct = !!ud._alwaysStructural;
+        if ((!isStruct && isPotato) || trainCruising) {
           cm.visible = false;
           continue;
         }
-        const wBox = cm.userData && cm.userData._worldBox;
+        const wBox = ud._worldBox;
         if (hasFrustum && wBox && !frustum.intersectsBox(wBox)) {
           cm.visible = false;
           continue;
         }
-        if (camPos && wBox && wBox.distanceToPoint(camPos) > clutterMaxDist) {
+        const dist = (camPos && wBox) ? wBox.distanceToPoint(camPos) : 0;
+        const maxD = isStruct ? bldgMaxDist : clutterMaxDist;
+        if (camPos && wBox && dist > maxD) {
           cm.visible = false;
+          continue;
+        }
+        if (ud._lodTier !== undefined) {
+          const d1 = ud._lod1Dist || 22;
+          const d2 = ud._lod2Dist || 46;
+          const activeTier = dist <= d1 ? 0 : (dist <= d2 ? 1 : 2);
+          cm.visible = (ud._lodTier === activeTier);
           continue;
         }
         cm.visible = true;

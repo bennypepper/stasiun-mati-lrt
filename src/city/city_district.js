@@ -1812,6 +1812,31 @@
     }
     }
 
+    // Shared 48m spatial grid + 3-tier LOD batch emitter for all Poly Haven exterior props
+    const emitSpatialLodBatches = (protos3, placements, baseName, isStructural, collHalfW, collH, collMat) => {
+      if (!protos3 || !protos3[0] || !placements || placements.length === 0) return;
+      const cells = new Map();
+      for (let i = 0; i < placements.length; i++) {
+        const pl = placements[i];
+        const qk = (pl.z < 0 ? 'N' : 'S') + (pl.x >= 0 ? 'E' : 'W');
+        const gx = Math.floor(pl.x / 48);
+        const gz = Math.floor(pl.z / 48);
+        const key = `${qk}_${gx}_${gz}`;
+        if (!cells.has(key)) cells.set(key, []);
+        cells.get(key).push(pl);
+        if (collHalfW && collH) {
+          city._addCollider(
+            pl.x - collHalfW, pl.y, pl.z - collHalfW,
+            pl.x + collHalfW, pl.y + collH, pl.z + collHalfW,
+            collMat || 'wood', { blocksBullets: false }
+          );
+        }
+      }
+      for (const [cellKey, list] of cells.entries()) {
+        city._emitInstancedLodProto(protos3, list, false, true, `${baseName}_${cellKey}`, null, isStructural);
+      }
+    };
+
     function buildSkylineAndPropsStage() {
     // Pad rail corridor exclusion by >= 24m so 46m-wide distant skyline silhouettes never intrude on tracks
     const skyMinX = Math.min(cMinX, Math.min.apply(null, trackXs) - 2.5) - 22.0;
@@ -1819,12 +1844,12 @@
     buildSkylineSilhouetteRing(city, skyMinX, skyMaxX, root);
 
     // =========================================================
-    // 7. OPTIMIZED LOW-POLY JAKARTA PROPS + INSTANCED STREET SCENERY
+    // 7. OPTIMIZED LOW-POLY JAKARTA PROPS + 3-TIER LOD INSTANCED SCENERY
     // =========================================================
     const protoLamp = P.getStreetLampProto();
-    const protoCar = city._extractModelProto('covered_car', 1.65);
+    const protosCar = city._extractModelLodProtos('covered_car', 1.65);
     const protoBarrier = P.getRoadBarrierProto();
-    const protoFence = city._extractModelProto('modular_chainlink_fence', 2.35,
+    const protosFence = city._extractModelLodProtos('modular_chainlink_fence', 2.35,
       (n) => n.name === 'modular_chainlink_fence_double',
       { x: -1.0, y: 0, z: 0.02 }
     );
@@ -1837,22 +1862,22 @@
     const protoTrashBag = P.getTrashBagProto();
     const protoBench = P.getParkBenchProto();
     const protoPlanter = P.getPlanterBoxProto();
-    const protoAircon = city._extractModelProto('exterior_aircon_unit', 0.82,
+    const protosAircon = city._extractModelLodProtos('exterior_aircon_unit', 0.82,
       (n) => n.name === 'exterior_aircon_unit'
     );
-    const protoFireEscape = city._extractModelProto('modular_fire_escape', 8.2,
+    const protosFireEscape = city._extractModelLodProtos('modular_fire_escape', 8.2,
       (n) => n.name !== 'modular_fire_escape_ladder_bottom'
     );
-    const protoFacadeMod = city._extractModelProto('modular_urban_apartments_facade', 4.0,
+    const protosFacadeMod = city._extractModelLodProtos('modular_urban_apartments_facade', 4.0,
       (n) => /^(wall_door_centered_large_01|door_centered_large_01|dado_door_centered_large_01)$/.test(n.name || '')
     );
     const protoShrub1 = P.getFoliageCardProto(1.5, 0.72, 1);
 
     // Shadow casting pruned from minor props (lamps, poles, barriers, fences, trash, trees, etc.)
     city._emitInstancedProto(protoLamp, lampPlacements, false, false, 'StreetLamp');
-    city._emitInstancedProto(protoCar, carPlacements, false, true, 'CoveredCar');
+    emitSpatialLodBatches(protosCar, carPlacements, 'CoveredCar', true, 0, 0, null);
     city._emitInstancedProto(protoBarrier, barrierPlacements, false, true, 'RoadBarrier');
-    city._emitInstancedProto(protoFence, fencePlacements, false, false, 'ChainlinkFence');
+    emitSpatialLodBatches(protosFence, fencePlacements, 'ChainlinkFence', true, 0, 0, null);
     city._emitInstancedProto(protoPole1, pole1Placements, false, false, 'PowerPoleA');
     city._emitInstancedProto(protoPole2, pole2Placements, false, false, 'PowerPoleB');
     city._emitInstancedProto(protoHydrant, hydrantPlacements, false, true, 'FireHydrant');
@@ -1862,14 +1887,14 @@
     city._emitInstancedProto(protoTrashBag, trashBagPlacements, false, true, 'TrashBag');
     city._emitInstancedProto(protoBench, seatingPlacements, false, true, 'StreetBench');
     city._emitInstancedProto(protoPlanter, planterPlacements, false, true, 'PlanterBox');
-    city._emitInstancedProto(protoAircon, airconPlacements, false, true, 'AirconUnit');
-    city._emitInstancedProto(protoFireEscape, fireEscapePlacements, false, true, 'FireEscape');
-    city._emitInstancedProto(protoFacadeMod, facadeModulePlacements, false, true, 'FacadeModule');
+    emitSpatialLodBatches(protosAircon, airconPlacements, 'AirconUnit', false, 0, 0, null);
+    emitSpatialLodBatches(protosFireEscape, fireEscapePlacements, 'FireEscape', false, 0, 0, null);
+    emitSpatialLodBatches(protosFacadeMod, facadeModulePlacements, 'FacadeModule', true, 0, 0, null);
     city._emitInstancedProto(protoShrub1, shrub1Placements, false, true, 'ShrubHedge');
     }
 
     function finalizeVehiclesFoliageAndInteractablesStage() {
-    const protoCoffeeCart = city._extractModelProto('CoffeeCart_01', 1.85);
+    const protosCoffeeCart = city._extractModelLodProtos('CoffeeCart_01', 1.85);
 
     // Procedural Jakarta Street Vehicles & Street Dressing (cached low-draw-call merged prototypes)
     city._emitInstancedProto(P.getSedanMpvProto('sedan_closed'), sedanPlacements, false, true, 'JakartaSedan');
@@ -1901,8 +1926,8 @@
     regDestruct(barrierPlacements, 'concrete', 1.4);
     regDestruct(lampPlacements, 'lamp', 1.2);
 
-    // CoffeeCart_01 vendor cart on East Concourse outer promenade plaza
-    city._placeSingleProto(protoCoffeeCart, eastInnerSwMinX + 4.4, SIDEWALK_Y, 10.5, -Math.PI * 0.5, 1.0, city.quadrants ? city.quadrants.SE : null, false);
+    // CoffeeCart_01 vendor cart on East Concourse outer promenade plaza (3-tier LOD instanced)
+    emitSpatialLodBatches(protosCoffeeCart, [{ x: eastInnerSwMinX + 4.4, y: SIDEWALK_Y, z: 10.5, ry: -Math.PI * 0.5 }], 'CoffeeCart', false, 0, 0, null);
     city._addCollider(eastInnerSwMinX + 3.6, SIDEWALK_Y, 9.2, eastInnerSwMinX + 5.2, SIDEWALK_Y + 1.8, 11.8, 'wood', { blocksBullets: false });
 
     // Alpha-masked Tropical Foliage variants (~12 tris each; zero multi-hundred-thousand-poly bloat!)
@@ -1916,29 +1941,8 @@
     }
 
     // =========================================================
-    // POPULATE SPARSE EXTERIOR ZONES WITH BLENDER-DECIMATED POLY HAVEN PROPS
+    // POPULATE SPARSE EXTERIOR ZONES WITH BLENDER-DECIMATED 3-LOD POLY HAVEN PROPS
     // =========================================================
-    const emitQuadrantClutter = (proto, list, baseName, collHalfW, collH, collMat) => {
-      if (!proto || !list || list.length === 0) return;
-      const byQ = { NW: [], NE: [], SW: [], SE: [] };
-      for (let i = 0; i < list.length; i++) {
-        const pl = list[i];
-        const qk = (pl.z < 0 ? 'N' : 'S') + (pl.x >= 0 ? 'E' : 'W');
-        byQ[qk].push(pl);
-        if (collHalfW && collH) {
-          city._addCollider(
-            pl.x - collHalfW, pl.y, pl.z - collHalfW,
-            pl.x + collHalfW, pl.y + collH, pl.z + collHalfW,
-            collMat || 'wood', { blocksBullets: false }
-          );
-        }
-      }
-      for (const qk of ['NW', 'NE', 'SW', 'SE']) {
-        if (byQ[qk].length > 0) {
-          city._emitInstancedProto(proto, byQ[qk], false, true, `${baseName}_${qk}`);
-        }
-      }
-    };
 
     // 1) East Pocket Park, Gerobak Kaki Lima Seating, Ruko Arcades & West Promenade Coffee Nooks
     for (const pz of [-9.2, -3.2, 2.2]) {
@@ -2042,30 +2046,30 @@
       bermudaGrassPlacements.push({ x: parkX + (rng() - 0.5) * 2.4, y: SIDEWALK_Y, z: pz, ry: rng() * Math.PI * 2, sx: 0.80, sy: 1.7, sz: 0.80 });
     }
 
-    // Extract Blender-optimized GLTF protos & emit quadrant-culled InstancedMeshes
-    const pMonobloc = city._extractModelProto('plastic_monobloc_chair_01', 0.88);
-    const pTableSet = city._extractModelProto('outdoor_table_chair_set_01', 0.86);
-    const pChalk    = city._extractModelProto('standing_chalkboard_01', 1.46);
-    const pCrate2   = city._extractModelProto('plastic_crate_02', 0.28);
-    const pMilCrate = city._extractModelProto('wooden_military_crate', 0.50);
-    const pJerry    = city._extractModelProto('metal_jerrycan_green', 0.48);
-    const pBarrel   = city._extractModelProto('barrel_03', 0.92);
-    const pTyre     = city._extractModelProto('old_tyre', 0.17);
-    const pCardBox  = city._extractModelProto('cardboard_box_01', 0.44);
-    const pGrass    = city._extractModelProto('grass_bermuda_01', 0.24);
-    const pHandTrk  = city._extractModelProto('hand_truck', 1.36);
+    // Extract Blender-optimized 3-LOD GLTF protos & emit spatial-cell LOD InstancedMeshes
+    const pMonobloc = city._extractModelLodProtos('plastic_monobloc_chair_01', 0.88);
+    const pTableSet = city._extractModelLodProtos('outdoor_table_chair_set_01', 0.86);
+    const pChalk    = city._extractModelLodProtos('standing_chalkboard_01', 1.46);
+    const pCrate2   = city._extractModelLodProtos('plastic_crate_02', 0.28);
+    const pMilCrate = city._extractModelLodProtos('wooden_military_crate', 0.50);
+    const pJerry    = city._extractModelLodProtos('metal_jerrycan_green', 0.48);
+    const pBarrel   = city._extractModelLodProtos('barrel_03', 0.92);
+    const pTyre     = city._extractModelLodProtos('old_tyre', 0.17);
+    const pCardBox  = city._extractModelLodProtos('cardboard_box_01', 0.44);
+    const pGrass    = city._extractModelLodProtos('grass_bermuda_01', 0.24);
+    const pHandTrk  = city._extractModelLodProtos('hand_truck', 1.36);
 
-    emitQuadrantClutter(pMonobloc, monoblocChairPlacements, 'MonoblocChair', 0.28, 0.85, 'wood');
-    emitQuadrantClutter(pTableSet, outdoorTablePlacements, 'OutdoorTableSet', 0.55, 0.82, 'wood');
-    emitQuadrantClutter(pChalk, chalkboardPlacements, 'Chalkboard', 0.30, 1.42, 'wood');
-    emitQuadrantClutter(pCrate2, plasticCratePlacements, 'PlasticCrate', 0.24, 0.52, 'wood');
-    emitQuadrantClutter(pMilCrate, militaryCratePlacements, 'MilitaryCrate', 0.52, 0.52, 'wood');
-    emitQuadrantClutter(pJerry, jerrycanPlacements, 'Jerrycan', 0.18, 0.48, 'metal');
-    emitQuadrantClutter(pBarrel, fuelBarrelPlacements, 'FuelBarrel', 0.32, 0.92, 'metal');
-    emitQuadrantClutter(pTyre, oldTyrePlacements, 'OldTyre', 0.28, 0.32, 'wood');
-    emitQuadrantClutter(pCardBox, cardboardBoxPlacements, 'CardboardBox', 0.22, 0.44, 'wood');
-    emitQuadrantClutter(pGrass, bermudaGrassPlacements, 'BermudaGrass', 0, 0, null);
-    emitQuadrantClutter(pHandTrk, handTruckPlacements, 'HandTruck', 0.28, 1.30, 'metal');
+    emitSpatialLodBatches(pMonobloc, monoblocChairPlacements, 'MonoblocChair', false, 0.28, 0.85, 'wood');
+    emitSpatialLodBatches(pTableSet, outdoorTablePlacements, 'OutdoorTableSet', false, 0.55, 0.82, 'wood');
+    emitSpatialLodBatches(pChalk, chalkboardPlacements, 'Chalkboard', false, 0.30, 1.42, 'wood');
+    emitSpatialLodBatches(pCrate2, plasticCratePlacements, 'PlasticCrate', false, 0.24, 0.52, 'wood');
+    emitSpatialLodBatches(pMilCrate, militaryCratePlacements, 'MilitaryCrate', false, 0.52, 0.52, 'wood');
+    emitSpatialLodBatches(pJerry, jerrycanPlacements, 'Jerrycan', false, 0.18, 0.48, 'metal');
+    emitSpatialLodBatches(pBarrel, fuelBarrelPlacements, 'FuelBarrel', false, 0.32, 0.92, 'metal');
+    emitSpatialLodBatches(pTyre, oldTyrePlacements, 'OldTyre', false, 0.28, 0.32, 'wood');
+    emitSpatialLodBatches(pCardBox, cardboardBoxPlacements, 'CardboardBox', false, 0.22, 0.44, 'wood');
+    emitSpatialLodBatches(pGrass, bermudaGrassPlacements, 'BermudaGrass', false, 0, 0, null);
+    emitSpatialLodBatches(pHandTrk, handTruckPlacements, 'HandTruck', false, 0.28, 1.30, 'metal');
 
     // =========================================================
     // 8. CITY STREET & PLAZA SPAWN NODES (FOR ROAMING ZOMBIES)

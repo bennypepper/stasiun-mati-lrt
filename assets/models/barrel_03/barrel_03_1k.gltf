@@ -1,164 +1,313 @@
 {
-	"asset":{
-		"generator":"Khronos glTF Blender I/O v5.1.19",
-		"version":"2.0"
-	},
-	"scene":0,
-	"scenes":[
-		{
-			"name":"Scene",
-			"nodes":[
-				0
-			]
-		}
-	],
-	"nodes":[
-		{
-			"mesh":0,
-			"name":"barrel_03",
-			"translation":[
-				-0.0019064992666244507,
-				0,
-				-2.3633241653442383e-05
-			]
-		}
-	],
-	"materials":[
-		{
-			"doubleSided":true,
-			"name":"barrel_03",
-			"normalTexture":{
-				"index":0
-			},
-			"pbrMetallicRoughness":{
-				"baseColorTexture":{
-					"index":1
-				},
-				"metallicRoughnessTexture":{
-					"index":2
-				}
-			}
-		}
-	],
-	"meshes":[
-		{
-			"name":"Circle.002",
-			"primitives":[
-				{
-					"attributes":{
-						"POSITION":0,
-						"NORMAL":1,
-						"TEXCOORD_0":2
-					},
-					"indices":3,
-					"material":0
-				}
-			]
-		}
-	],
-	"textures":[
-		{
-			"sampler":0,
-			"source":0
-		},
-		{
-			"sampler":0,
-			"source":1
-		},
-		{
-			"sampler":0,
-			"source":2
-		}
-	],
-	"images":[
-		{
-			"mimeType":"image/jpeg",
-			"name":"barrel_03_nor_gl_1k",
-			"uri":"textures/barrel_03_nor_gl_1k.jpg"
-		},
-		{
-			"mimeType":"image/jpeg",
-			"name":"barrel_03_diff_1k",
-			"uri":"textures/barrel_03_diff_1k.jpg"
-		},
-		{
-			"mimeType":"image/jpeg",
-			"name":"barrel_03_arm_1k",
-			"uri":"textures/barrel_03_arm_1k.jpg"
-		}
-	],
-	"accessors":[
-		{
-			"bufferView":0,
-			"componentType":5126,
-			"count":600,
-			"max":[
-				0.3212449252605438,
-				0.9324904084205627,
-				0.319170206785202
-			],
-			"min":[
-				-0.3174319267272949,
-				-1.1793932941372987e-07,
-				-0.31912294030189514
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":1,
-			"componentType":5126,
-			"count":600,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":2,
-			"componentType":5126,
-			"count":600,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":3,
-			"componentType":5123,
-			"count":1890,
-			"type":"SCALAR"
-		}
-	],
-	"bufferViews":[
-		{
-			"buffer":0,
-			"byteLength":7200,
-			"byteOffset":0,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":7200,
-			"byteOffset":7200,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":4800,
-			"byteOffset":14400,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":3780,
-			"byteOffset":19200,
-			"target":34963
-		}
-	],
-	"samplers":[
-		{
-			"magFilter":9729,
-			"minFilter":9987
-		}
-	],
-	"buffers":[
-		{
-			"byteLength":22980,
-			"uri":"barrel_03_1k.bin"
-		}
-	]
+  "asset": {
+    "generator": "Khronos glTF Blender I/O v5.1.19",
+    "version": "2.0"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0,
+        1,
+        2
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "barrel_03_LOD0"
+    },
+    {
+      "mesh": 1,
+      "name": "barrel_03_LOD1"
+    },
+    {
+      "mesh": 2,
+      "name": "barrel_03_LOD2"
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "barrel_03",
+      "normalTexture": {
+        "index": 0
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 1
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "barrel_03_mesh_LOD0",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "barrel_03_mesh_LOD1",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 4,
+            "NORMAL": 5,
+            "TEXCOORD_0": 6
+          },
+          "indices": 7,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "barrel_03_mesh_LOD2",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 8,
+            "NORMAL": 9,
+            "TEXCOORD_0": 10
+          },
+          "indices": 11,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/jpeg",
+      "name": "barrel_03_nor_gl_1k",
+      "uri": "textures/barrel_03_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "barrel_03_diff_1k",
+      "uri": "textures/barrel_03_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "barrel_03_arm_1k",
+      "uri": "textures/barrel_03_arm_1k.jpg"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 615,
+      "max": [
+        0.3212449252605438,
+        0.9324904084205627,
+        0.319170206785202
+      ],
+      "min": [
+        -0.3174319267272949,
+        -1.1793932941372987e-07,
+        -0.31912294030189514
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 615,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 615,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 1941,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5126,
+      "count": 315,
+      "max": [
+        0.32270288467407227,
+        0.9328760504722595,
+        0.32265082001686096
+      ],
+      "min": [
+        -0.3188569247722626,
+        -1.7215005243542691e-07,
+        -0.3313555121421814
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 315,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 315,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5123,
+      "count": 861,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 8,
+      "componentType": 5126,
+      "count": 175,
+      "max": [
+        0.3554587662220001,
+        0.9234084486961365,
+        0.3390602171421051
+      ],
+      "min": [
+        -0.3484898805618286,
+        -1.7215005243542691e-07,
+        -0.36087512969970703
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 9,
+      "componentType": 5126,
+      "count": 175,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 10,
+      "componentType": 5126,
+      "count": 175,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 11,
+      "componentType": 5123,
+      "count": 339,
+      "type": "SCALAR"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 7380,
+      "byteOffset": 0,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 7380,
+      "byteOffset": 7380,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 4920,
+      "byteOffset": 14760,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 3882,
+      "byteOffset": 19680,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 3780,
+      "byteOffset": 23564,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 3780,
+      "byteOffset": 27344,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2520,
+      "byteOffset": 31124,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 1722,
+      "byteOffset": 33644,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2100,
+      "byteOffset": 35368,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2100,
+      "byteOffset": 37468,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 1400,
+      "byteOffset": 39568,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 678,
+      "byteOffset": 40968,
+      "target": 34963
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 41648,
+      "uri": "barrel_03_1k.bin"
+    }
+  ]
 }

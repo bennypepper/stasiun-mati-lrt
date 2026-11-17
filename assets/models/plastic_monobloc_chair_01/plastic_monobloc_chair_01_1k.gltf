@@ -1,164 +1,328 @@
 {
-	"asset":{
-		"generator":"Khronos glTF Blender I/O v5.1.19",
-		"version":"2.0"
-	},
-	"scene":0,
-	"scenes":[
-		{
-			"name":"Scene",
-			"nodes":[
-				0
-			]
-		}
-	],
-	"nodes":[
-		{
-			"mesh":0,
-			"name":"plastic_monobloc_chair_01",
-			"translation":[
-				0,
-				0.0005042239208705723,
-				0.02236787974834442
-			]
-		}
-	],
-	"materials":[
-		{
-			"doubleSided":true,
-			"name":"plastic_monobloc_chair_01",
-			"normalTexture":{
-				"index":0
-			},
-			"pbrMetallicRoughness":{
-				"baseColorTexture":{
-					"index":1
-				},
-				"metallicRoughnessTexture":{
-					"index":2
-				}
-			}
-		}
-	],
-	"meshes":[
-		{
-			"name":"Plane.002",
-			"primitives":[
-				{
-					"attributes":{
-						"POSITION":0,
-						"NORMAL":1,
-						"TEXCOORD_0":2
-					},
-					"indices":3,
-					"material":0
-				}
-			]
-		}
-	],
-	"textures":[
-		{
-			"sampler":0,
-			"source":0
-		},
-		{
-			"sampler":0,
-			"source":1
-		},
-		{
-			"sampler":0,
-			"source":2
-		}
-	],
-	"images":[
-		{
-			"mimeType":"image/jpeg",
-			"name":"plastic_monobloc_chair_01_nor_gl_1k",
-			"uri":"textures/plastic_monobloc_chair_01_nor_gl_1k.jpg"
-		},
-		{
-			"mimeType":"image/jpeg",
-			"name":"plastic_monobloc_chair_01_diff_1k",
-			"uri":"textures/plastic_monobloc_chair_01_diff_1k.jpg"
-		},
-		{
-			"mimeType":"image/jpeg",
-			"name":"plastic_monobloc_chair_01_arm_1k",
-			"uri":"textures/plastic_monobloc_chair_01_arm_1k.jpg"
-		}
-	],
-	"accessors":[
-		{
-			"bufferView":0,
-			"componentType":5126,
-			"count":1261,
-			"max":[
-				0.3227250874042511,
-				0.8805668950080872,
-				0.29182952642440796
-			],
-			"min":[
-				-0.3227251172065735,
-				-0.0005042239208705723,
-				-0.3365652859210968
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":1,
-			"componentType":5126,
-			"count":1261,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":2,
-			"componentType":5126,
-			"count":1261,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":3,
-			"componentType":5123,
-			"count":2835,
-			"type":"SCALAR"
-		}
-	],
-	"bufferViews":[
-		{
-			"buffer":0,
-			"byteLength":15132,
-			"byteOffset":0,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":15132,
-			"byteOffset":15132,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":10088,
-			"byteOffset":30264,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":5670,
-			"byteOffset":40352,
-			"target":34963
-		}
-	],
-	"samplers":[
-		{
-			"magFilter":9729,
-			"minFilter":9987
-		}
-	],
-	"buffers":[
-		{
-			"byteLength":46024,
-			"uri":"plastic_monobloc_chair_01_1k.bin"
-		}
-	]
+  "asset": {
+    "generator": "Khronos glTF Blender I/O v5.1.19",
+    "version": "2.0"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0,
+        1,
+        2
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "plastic_monobloc_chair_01_LOD0",
+      "translation": [
+        0,
+        1.953914761543274e-05,
+        0.022154688835144043
+      ]
+    },
+    {
+      "mesh": 1,
+      "name": "plastic_monobloc_chair_01_LOD1",
+      "translation": [
+        0,
+        1.953914761543274e-05,
+        0.022154688835144043
+      ]
+    },
+    {
+      "mesh": 2,
+      "name": "plastic_monobloc_chair_01_LOD2",
+      "translation": [
+        0,
+        1.953914761543274e-05,
+        0.022154688835144043
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "plastic_monobloc_chair_01",
+      "normalTexture": {
+        "index": 0
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 1
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "plastic_monobloc_chair_01_mesh_LOD0",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "plastic_monobloc_chair_01_mesh_LOD1",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 4,
+            "NORMAL": 5,
+            "TEXCOORD_0": 6
+          },
+          "indices": 7,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "plastic_monobloc_chair_01_mesh_LOD2",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 8,
+            "NORMAL": 9,
+            "TEXCOORD_0": 10
+          },
+          "indices": 11,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/jpeg",
+      "name": "plastic_monobloc_chair_01_nor_gl_1k",
+      "uri": "textures/plastic_monobloc_chair_01_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "plastic_monobloc_chair_01_diff_1k",
+      "uri": "textures/plastic_monobloc_chair_01_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "plastic_monobloc_chair_01_arm_1k",
+      "uri": "textures/plastic_monobloc_chair_01_arm_1k.jpg"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 1294,
+      "max": [
+        0.3227250874042511,
+        0.8805668950080872,
+        0.29182952642440796
+      ],
+      "min": [
+        -0.3227251172065735,
+        -0.0005042239208705723,
+        -0.3365652859210968
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 1294,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 1294,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 2934,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5126,
+      "count": 640,
+      "max": [
+        0.33011311292648315,
+        0.8903260231018066,
+        0.2983538806438446
+      ],
+      "min": [
+        -0.33011311292648315,
+        -0.0010065109236165881,
+        -0.3365785777568817
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 640,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 640,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5123,
+      "count": 1296,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 8,
+      "componentType": 5126,
+      "count": 276,
+      "max": [
+        0.3214414715766907,
+        0.9026474952697754,
+        0.28977423906326294
+      ],
+      "min": [
+        -0.3214414715766907,
+        -0.0026943509001284838,
+        -0.3468531668186188
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 9,
+      "componentType": 5126,
+      "count": 276,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 10,
+      "componentType": 5126,
+      "count": 276,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 11,
+      "componentType": 5123,
+      "count": 492,
+      "type": "SCALAR"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 15528,
+      "byteOffset": 0,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 15528,
+      "byteOffset": 15528,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 10352,
+      "byteOffset": 31056,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 5868,
+      "byteOffset": 41408,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 7680,
+      "byteOffset": 47276,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 7680,
+      "byteOffset": 54956,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 5120,
+      "byteOffset": 62636,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2592,
+      "byteOffset": 67756,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 3312,
+      "byteOffset": 70348,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 3312,
+      "byteOffset": 73660,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2208,
+      "byteOffset": 76972,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 984,
+      "byteOffset": 79180,
+      "target": 34963
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 80164,
+      "uri": "plastic_monobloc_chair_01_1k.bin"
+    }
+  ]
 }

@@ -1,357 +1,850 @@
 {
-  "asset": {
-    "generator": "Khronos glTF Blender I/O v1.6.16",
-    "version": "2.0"
-  },
-  "scene": 0,
-  "scenes": [
-    {
-      "name": "Scene",
-      "nodes": [
-        0,
-        1,
-        2
-      ]
-    }
-  ],
-  "nodes": [
-    {
-      "mesh": 0,
-      "name": "potted_plant_02_pot"
-    },
-    {
-      "mesh": 1,
-      "name": "potted_plant_02_leaves",
-      "translation": [
-        -0.0029038283973932266,
-        0.30528968572616577,
-        0.0006859108689241111
-      ]
-    },
-    {
-      "mesh": 2,
-      "name": "potted_plant_02_dirt",
-      "translation": [
-        -0.12862031161785126,
-        0.31752803921699524,
-        -0.13355804979801178
-      ]
-    }
-  ],
-  "materials": [
-    {
-      "doubleSided": true,
-      "name": "potted_plant_02_pot",
-      "normalTexture": {
-        "index": 0
-      },
-      "pbrMetallicRoughness": {
-        "baseColorTexture": {
-          "index": 1
-        },
-        "metallicFactor": 0,
-        "metallicRoughnessTexture": {
-          "index": 2
-        }
-      }
-    },
-    {
-      "alphaCutoff": 0.5,
-      "alphaMode": "MASK",
-      "doubleSided": true,
-      "name": "potted_plant_02_leaves",
-      "normalTexture": {
-        "index": 3
-      },
-      "pbrMetallicRoughness": {
-        "baseColorTexture": {
-          "index": 4
-        },
-        "metallicFactor": 0,
-        "metallicRoughnessTexture": {
-          "index": 5
-        }
-      }
-    }
-  ],
-  "meshes": [
-    {
-      "name": "Circle",
-      "primitives": [
-        {
-          "attributes": {
-            "POSITION": 0,
-            "NORMAL": 1,
-            "TEXCOORD_0": 2
-          },
-          "indices": 3,
-          "material": 0
-        }
-      ]
-    },
-    {
-      "name": "Circle.001",
-      "primitives": [
-        {
-          "attributes": {
-            "POSITION": 4,
-            "NORMAL": 5,
-            "TEXCOORD_0": 6
-          },
-          "indices": 7,
-          "material": 1
-        }
-      ]
-    },
-    {
-      "name": "low.008",
-      "primitives": [
-        {
-          "attributes": {
-            "POSITION": 8,
-            "NORMAL": 9,
-            "TEXCOORD_0": 10
-          },
-          "indices": 11,
-          "material": 0
-        }
-      ]
-    }
-  ],
-  "textures": [
-    {
-      "sampler": 0,
-      "source": 0
-    },
-    {
-      "sampler": 0,
-      "source": 1
-    },
-    {
-      "sampler": 0,
-      "source": 2
-    },
-    {
-      "sampler": 0,
-      "source": 3
-    },
-    {
-      "sampler": 0,
-      "source": 4
-    },
-    {
-      "sampler": 0,
-      "source": 5
-    }
-  ],
-  "images": [
-    {
-      "mimeType": "image/jpeg",
-      "name": "potted_plant_02_pot_nor_gl",
-      "uri": "textures/potted_plant_02_pot_nor_gl_1k.jpg"
-    },
-    {
-      "mimeType": "image/jpeg",
-      "name": "potted_plant_02_pot_diff",
-      "uri": "textures/potted_plant_02_pot_diff_1k.jpg"
-    },
-    {
-      "mimeType": "image/jpeg",
-      "name": "potted_plant_02_pot_rough",
-      "uri": "textures/potted_plant_02_pot_rough_1k.jpg"
-    },
-    {
-      "mimeType": "image/jpeg",
-      "name": "potted_plant_02_leaves_nor_gl",
-      "uri": "textures/potted_plant_02_leaves_nor_gl_1k.jpg"
-    },
-    {
-      "mimeType": "image/jpeg",
-      "name": "potted_plant_02_leaves_diff",
-      "uri": "textures/potted_plant_02_leaves_diff_1k.jpg"
-    },
-    {
-      "mimeType": "image/jpeg",
-      "name": "potted_plant_02_leaves_rough",
-      "uri": "textures/potted_plant_02_leaves_rough_1k.jpg"
-    }
-  ],
-  "accessors": [
-    {
-      "bufferView": 0,
-      "componentType": 5126,
-      "count": 2840,
-      "max": [
-        0.23707397282123566,
-        0.3361949026584625,
-        0.23707397282123566
-      ],
-      "min": [
-        -0.23707397282123566,
-        0.00005296462768455967,
-        -0.23707395792007446
-      ],
-      "type": "VEC3"
-    },
-    {
-      "bufferView": 1,
-      "componentType": 5126,
-      "count": 2840,
-      "type": "VEC3"
-    },
-    {
-      "bufferView": 2,
-      "componentType": 5126,
-      "count": 2840,
-      "type": "VEC2"
-    },
-    {
-      "bufferView": 3,
-      "componentType": 5123,
-      "count": 15552,
-      "type": "SCALAR"
-    },
-    {
-      "bufferView": 4,
-      "componentType": 5126,
-      "count": 7348,
-      "max": [
-        0.30740082263946533,
-        0.535942018032074,
-        0.22222481667995453
-      ],
-      "min": [
-        -0.3937562108039856,
-        -0.09663186967372894,
-        -0.4209985136985779
-      ],
-      "type": "VEC3"
-    },
-    {
-      "bufferView": 5,
-      "componentType": 5126,
-      "count": 7348,
-      "type": "VEC3"
-    },
-    {
-      "bufferView": 6,
-      "componentType": 5126,
-      "count": 7348,
-      "type": "VEC2"
-    },
-    {
-      "bufferView": 7,
-      "componentType": 5123,
-      "count": 32076,
-      "type": "SCALAR"
-    },
-    {
-      "bufferView": 8,
-      "componentType": 5126,
-      "count": 34606,
-      "max": [
-        0.3351912200450897,
-        0.02323356457054615,
-        0.33649539947509766
-      ],
-      "min": [
-        -0.07898939400911331,
-        -0.020643368363380432,
-        -0.0743584930896759
-      ],
-      "type": "VEC3"
-    },
-    {
-      "bufferView": 9,
-      "componentType": 5126,
-      "count": 34606,
-      "type": "VEC3"
-    },
-    {
-      "bufferView": 10,
-      "componentType": 5126,
-      "count": 34606,
-      "type": "VEC2"
-    },
-    {
-      "bufferView": 11,
-      "componentType": 5123,
-      "count": 161790,
-      "type": "SCALAR"
-    }
-  ],
-  "bufferViews": [
-    {
-      "buffer": 0,
-      "byteLength": 34080,
-      "byteOffset": 0
-    },
-    {
-      "buffer": 0,
-      "byteLength": 34080,
-      "byteOffset": 34080
-    },
-    {
-      "buffer": 0,
-      "byteLength": 22720,
-      "byteOffset": 68160
-    },
-    {
-      "buffer": 0,
-      "byteLength": 31104,
-      "byteOffset": 90880
-    },
-    {
-      "buffer": 0,
-      "byteLength": 88176,
-      "byteOffset": 121984
-    },
-    {
-      "buffer": 0,
-      "byteLength": 88176,
-      "byteOffset": 210160
-    },
-    {
-      "buffer": 0,
-      "byteLength": 58784,
-      "byteOffset": 298336
-    },
-    {
-      "buffer": 0,
-      "byteLength": 64152,
-      "byteOffset": 357120
-    },
-    {
-      "buffer": 0,
-      "byteLength": 415272,
-      "byteOffset": 421272
-    },
-    {
-      "buffer": 0,
-      "byteLength": 415272,
-      "byteOffset": 836544
-    },
-    {
-      "buffer": 0,
-      "byteLength": 276848,
-      "byteOffset": 1251816
-    },
-    {
-      "buffer": 0,
-      "byteLength": 323580,
-      "byteOffset": 1528664
-    }
-  ],
-  "samplers": [
-    {
-      "magFilter": 9729,
-      "minFilter": 9987
-    }
-  ],
-  "buffers": [
-    {
-      "byteLength": 1852244,
-      "uri": "potted_plant_02.bin"
-    }
-  ]
+	"asset":{
+		"generator":"Khronos glTF Blender I/O v5.1.19",
+		"version":"2.0"
+	},
+	"scene":0,
+	"scenes":[
+		{
+			"name":"Scene",
+			"nodes":[
+				0,
+				1,
+				2,
+				3,
+				4,
+				5,
+				6,
+				7,
+				8
+			]
+		}
+	],
+	"nodes":[
+		{
+			"mesh":0,
+			"name":"potted_plant_02_pot_LOD0"
+		},
+		{
+			"mesh":1,
+			"name":"potted_plant_02_pot_LOD1"
+		},
+		{
+			"mesh":2,
+			"name":"potted_plant_02_pot_LOD2"
+		},
+		{
+			"mesh":3,
+			"name":"potted_plant_02_leaves_LOD0",
+			"translation":[
+				-0.0029038283973932266,
+				0.30528968572616577,
+				0.0006859108689241111
+			]
+		},
+		{
+			"mesh":4,
+			"name":"potted_plant_02_leaves_LOD1",
+			"translation":[
+				-0.0029038283973932266,
+				0.30528968572616577,
+				0.0006859108689241111
+			]
+		},
+		{
+			"mesh":5,
+			"name":"potted_plant_02_leaves_LOD2",
+			"translation":[
+				-0.0029038283973932266,
+				0.30528968572616577,
+				0.0006859108689241111
+			]
+		},
+		{
+			"mesh":6,
+			"name":"potted_plant_02_dirt_LOD0",
+			"translation":[
+				-0.12862031161785126,
+				0.31752803921699524,
+				-0.13355804979801178
+			]
+		},
+		{
+			"mesh":7,
+			"name":"potted_plant_02_dirt_LOD1",
+			"translation":[
+				-0.12862031161785126,
+				0.31752803921699524,
+				-0.13355804979801178
+			]
+		},
+		{
+			"mesh":8,
+			"name":"potted_plant_02_dirt_LOD2",
+			"translation":[
+				-0.12862031161785126,
+				0.31752803921699524,
+				-0.13355804979801178
+			]
+		}
+	],
+	"materials":[
+		{
+			"doubleSided":true,
+			"name":"potted_plant_02_pot",
+			"normalTexture":{
+				"index":0
+			},
+			"pbrMetallicRoughness":{
+				"baseColorTexture":{
+					"index":1
+				},
+				"metallicFactor":0,
+				"metallicRoughnessTexture":{
+					"index":2
+				}
+			}
+		},
+		{
+			"alphaMode":"MASK",
+			"doubleSided":true,
+			"name":"potted_plant_02_leaves",
+			"normalTexture":{
+				"index":3
+			},
+			"pbrMetallicRoughness":{
+				"baseColorTexture":{
+					"index":4
+				},
+				"metallicFactor":0,
+				"metallicRoughnessTexture":{
+					"index":5
+				}
+			}
+		}
+	],
+	"meshes":[
+		{
+			"name":"potted_plant_02_pot_mesh_LOD0",
+			"primitives":[
+				{
+					"attributes":{
+						"POSITION":0,
+						"NORMAL":1,
+						"TEXCOORD_0":2
+					},
+					"indices":3,
+					"material":0
+				}
+			]
+		},
+		{
+			"name":"potted_plant_02_pot_mesh_LOD1",
+			"primitives":[
+				{
+					"attributes":{
+						"POSITION":4,
+						"NORMAL":5,
+						"TEXCOORD_0":6
+					},
+					"indices":7,
+					"material":0
+				}
+			]
+		},
+		{
+			"name":"potted_plant_02_pot_mesh_LOD2",
+			"primitives":[
+				{
+					"attributes":{
+						"POSITION":8,
+						"NORMAL":9,
+						"TEXCOORD_0":10
+					},
+					"indices":11,
+					"material":0
+				}
+			]
+		},
+		{
+			"name":"potted_plant_02_leaves_mesh_LOD0",
+			"primitives":[
+				{
+					"attributes":{
+						"POSITION":12,
+						"NORMAL":13,
+						"TEXCOORD_0":14
+					},
+					"indices":15,
+					"material":1
+				}
+			]
+		},
+		{
+			"name":"potted_plant_02_leaves_mesh_LOD1",
+			"primitives":[
+				{
+					"attributes":{
+						"POSITION":16,
+						"NORMAL":17,
+						"TEXCOORD_0":18
+					},
+					"indices":19,
+					"material":1
+				}
+			]
+		},
+		{
+			"name":"potted_plant_02_leaves_mesh_LOD2",
+			"primitives":[
+				{
+					"attributes":{
+						"POSITION":20,
+						"NORMAL":21,
+						"TEXCOORD_0":22
+					},
+					"indices":23,
+					"material":1
+				}
+			]
+		},
+		{
+			"name":"potted_plant_02_dirt_mesh_LOD0",
+			"primitives":[
+				{
+					"attributes":{
+						"POSITION":24,
+						"NORMAL":25,
+						"TEXCOORD_0":26
+					},
+					"indices":27,
+					"material":0
+				}
+			]
+		},
+		{
+			"name":"potted_plant_02_dirt_mesh_LOD1",
+			"primitives":[
+				{
+					"attributes":{
+						"POSITION":28,
+						"NORMAL":29,
+						"TEXCOORD_0":30
+					},
+					"indices":31,
+					"material":0
+				}
+			]
+		},
+		{
+			"name":"potted_plant_02_dirt_mesh_LOD2",
+			"primitives":[
+				{
+					"attributes":{
+						"POSITION":32,
+						"NORMAL":33,
+						"TEXCOORD_0":34
+					},
+					"indices":35,
+					"material":0
+				}
+			]
+		}
+	],
+	"textures":[
+		{
+			"sampler":0,
+			"source":0
+		},
+		{
+			"sampler":0,
+			"source":1
+		},
+		{
+			"sampler":0,
+			"source":2
+		},
+		{
+			"sampler":0,
+			"source":3
+		},
+		{
+			"sampler":0,
+			"source":4
+		},
+		{
+			"sampler":0,
+			"source":5
+		}
+	],
+	"images":[
+		{
+			"mimeType":"image/jpeg",
+			"name":"potted_plant_02_pot_nor_gl_1k",
+			"uri":"textures/potted_plant_02_pot_nor_gl_1k.jpg"
+		},
+		{
+			"mimeType":"image/jpeg",
+			"name":"potted_plant_02_pot_diff_1k",
+			"uri":"textures/potted_plant_02_pot_diff_1k.jpg"
+		},
+		{
+			"mimeType":"image/jpeg",
+			"name":"potted_plant_02_pot_rough_1k",
+			"uri":"textures/potted_plant_02_pot_rough_1k.jpg"
+		},
+		{
+			"mimeType":"image/jpeg",
+			"name":"potted_plant_02_leaves_nor_gl_1k",
+			"uri":"textures/potted_plant_02_leaves_nor_gl_1k.jpg"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"potted_plant_02_leaves_diff_1k",
+			"uri":"textures/potted_plant_02_leaves_diff_1k.png"
+		},
+		{
+			"mimeType":"image/jpeg",
+			"name":"potted_plant_02_leaves_rough_1k",
+			"uri":"textures/potted_plant_02_leaves_rough_1k.jpg"
+		}
+	],
+	"accessors":[
+		{
+			"bufferView":0,
+			"componentType":5126,
+			"count":155,
+			"max":[
+				0.2367691844701767,
+				0.3378407061100006,
+				0.2367652803659439
+			],
+			"min":[
+				-0.23459705710411072,
+				-0.011782561428844929,
+				-0.2467150092124939
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":1,
+			"componentType":5126,
+			"count":155,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":2,
+			"componentType":5126,
+			"count":155,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":3,
+			"componentType":5123,
+			"count":618,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":4,
+			"componentType":5126,
+			"count":76,
+			"max":[
+				0.2533717453479767,
+				0.333299845457077,
+				0.23786357045173645
+			],
+			"min":[
+				-0.2392783910036087,
+				-0.011782561428844929,
+				-0.2544616162776947
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":5,
+			"componentType":5126,
+			"count":76,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":6,
+			"componentType":5126,
+			"count":76,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":7,
+			"componentType":5123,
+			"count":255,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":8,
+			"componentType":5126,
+			"count":43,
+			"max":[
+				0.19604264199733734,
+				0.31341272592544556,
+				0.2293248176574707
+			],
+			"min":[
+				-0.23705986142158508,
+				-0.01168274786323309,
+				-0.21932223439216614
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":9,
+			"componentType":5126,
+			"count":43,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":10,
+			"componentType":5126,
+			"count":43,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":11,
+			"componentType":5123,
+			"count":99,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":12,
+			"componentType":5126,
+			"count":754,
+			"max":[
+				0.3059650659561157,
+				0.5371932983398438,
+				0.21871303021907806
+			],
+			"min":[
+				-0.39177605509757996,
+				-0.09752102196216583,
+				-0.4218542277812958
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":13,
+			"componentType":5126,
+			"count":754,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":14,
+			"componentType":5126,
+			"count":754,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":15,
+			"componentType":5123,
+			"count":1284,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":16,
+			"componentType":5126,
+			"count":504,
+			"max":[
+				0.3059650659561157,
+				0.5212065577507019,
+				0.21871303021907806
+			],
+			"min":[
+				-0.38366949558258057,
+				-0.09752102196216583,
+				-0.41678643226623535
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":17,
+			"componentType":5126,
+			"count":504,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":18,
+			"componentType":5126,
+			"count":504,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":19,
+			"componentType":5123,
+			"count":684,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":20,
+			"componentType":5126,
+			"count":337,
+			"max":[
+				0.3039584755897522,
+				0.521159291267395,
+				0.23769448697566986
+			],
+			"min":[
+				-0.39036640524864197,
+				-0.07665492594242096,
+				-0.3794509768486023
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":21,
+			"componentType":5126,
+			"count":337,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":22,
+			"componentType":5126,
+			"count":337,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":23,
+			"componentType":5123,
+			"count":495,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":24,
+			"componentType":5126,
+			"count":3142,
+			"max":[
+				0.33055055141448975,
+				0.024548333138227463,
+				0.33901411294937134
+			],
+			"min":[
+				-0.07833721488714218,
+				-0.022632265463471413,
+				-0.07522270828485489
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":25,
+			"componentType":5126,
+			"count":3142,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":26,
+			"componentType":5126,
+			"count":3142,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":27,
+			"componentType":5123,
+			"count":6489,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":28,
+			"componentType":5126,
+			"count":1922,
+			"max":[
+				0.329176664352417,
+				0.02393469586968422,
+				0.33901411294937134
+			],
+			"min":[
+				-0.07765718549489975,
+				-0.020682422444224358,
+				-0.07522270828485489
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":29,
+			"componentType":5126,
+			"count":1922,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":30,
+			"componentType":5126,
+			"count":1922,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":31,
+			"componentType":5123,
+			"count":2664,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":32,
+			"componentType":5126,
+			"count":816,
+			"max":[
+				0.3382836580276489,
+				0.02271401137113571,
+				0.33685269951820374
+			],
+			"min":[
+				-0.07609580457210541,
+				-0.020327124744653702,
+				-0.07272792607545853
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":33,
+			"componentType":5126,
+			"count":816,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":34,
+			"componentType":5126,
+			"count":816,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":35,
+			"componentType":5123,
+			"count":1020,
+			"type":"SCALAR"
+		}
+	],
+	"bufferViews":[
+		{
+			"buffer":0,
+			"byteLength":1860,
+			"byteOffset":0,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":1860,
+			"byteOffset":1860,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":1240,
+			"byteOffset":3720,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":1236,
+			"byteOffset":4960,
+			"target":34963
+		},
+		{
+			"buffer":0,
+			"byteLength":912,
+			"byteOffset":6196,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":912,
+			"byteOffset":7108,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":608,
+			"byteOffset":8020,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":510,
+			"byteOffset":8628,
+			"target":34963
+		},
+		{
+			"buffer":0,
+			"byteLength":516,
+			"byteOffset":9140,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":516,
+			"byteOffset":9656,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":344,
+			"byteOffset":10172,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":198,
+			"byteOffset":10516,
+			"target":34963
+		},
+		{
+			"buffer":0,
+			"byteLength":9048,
+			"byteOffset":10716,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":9048,
+			"byteOffset":19764,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":6032,
+			"byteOffset":28812,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":2568,
+			"byteOffset":34844,
+			"target":34963
+		},
+		{
+			"buffer":0,
+			"byteLength":6048,
+			"byteOffset":37412,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":6048,
+			"byteOffset":43460,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":4032,
+			"byteOffset":49508,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":1368,
+			"byteOffset":53540,
+			"target":34963
+		},
+		{
+			"buffer":0,
+			"byteLength":4044,
+			"byteOffset":54908,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":4044,
+			"byteOffset":58952,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":2696,
+			"byteOffset":62996,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":990,
+			"byteOffset":65692,
+			"target":34963
+		},
+		{
+			"buffer":0,
+			"byteLength":37704,
+			"byteOffset":66684,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":37704,
+			"byteOffset":104388,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":25136,
+			"byteOffset":142092,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":12978,
+			"byteOffset":167228,
+			"target":34963
+		},
+		{
+			"buffer":0,
+			"byteLength":23064,
+			"byteOffset":180208,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":23064,
+			"byteOffset":203272,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":15376,
+			"byteOffset":226336,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":5328,
+			"byteOffset":241712,
+			"target":34963
+		},
+		{
+			"buffer":0,
+			"byteLength":9792,
+			"byteOffset":247040,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":9792,
+			"byteOffset":256832,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":6528,
+			"byteOffset":266624,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":2040,
+			"byteOffset":273152,
+			"target":34963
+		}
+	],
+	"samplers":[
+		{
+			"magFilter":9729,
+			"minFilter":9987
+		}
+	],
+	"buffers":[
+		{
+			"byteLength":275192,
+			"uri":"potted_plant_02_1k.bin"
+		}
+	]
 }

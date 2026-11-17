@@ -141,8 +141,8 @@
       "id": "covered_car",
       "category": "street",
       "gltf": "assets/models/covered_car/covered_car_1k.gltf",
-      "binBytes": 394464,
-      "totalBytes": 2349276,
+      "binBytes": 179304,
+      "totalBytes": 310466,
       "files": 5
     },
     "fire_hydrant": {
@@ -197,8 +197,8 @@
       "id": "modular_chainlink_fence",
       "category": "street",
       "gltf": "assets/models/modular_chainlink_fence/modular_chainlink_fence_1k.gltf",
-      "binBytes": 3168016,
-      "totalBytes": 7292015,
+      "binBytes": 156204,
+      "totalBytes": 718841,
       "files": 8
     },
     "modular_electricity_poles": {
@@ -213,32 +213,32 @@
       "id": "exterior_aircon_unit",
       "category": "street",
       "gltf": "assets/models/exterior_aircon_unit/exterior_aircon_unit_1k.gltf",
-      "binBytes": 494784,
-      "totalBytes": 7667928,
-      "files": 14
+      "binBytes": 125936,
+      "totalBytes": 393813,
+      "files": 8
     },
     "modular_urban_apartments_facade": {
       "id": "modular_urban_apartments_facade",
       "category": "street",
       "gltf": "assets/models/modular_urban_apartments_facade/modular_urban_apartments_facade_1k.gltf",
-      "binBytes": 8168772,
-      "totalBytes": 16488693,
-      "files": 14
+      "binBytes": 123804,
+      "totalBytes": 751095,
+      "files": 12
     },
     "modular_fire_escape": {
       "id": "modular_fire_escape",
       "category": "street",
       "gltf": "assets/models/modular_fire_escape/modular_fire_escape_1k.gltf",
-      "binBytes": 515356,
-      "totalBytes": 4806126,
+      "binBytes": 236692,
+      "totalBytes": 454301,
       "files": 8
     },
     "pachira_aquatica_01": {
       "id": "pachira_aquatica_01",
       "category": "foliage",
       "gltf": "assets/models/pachira_aquatica_01/pachira_aquatica_01_1k.gltf",
-      "binBytes": 2036788,
-      "totalBytes": 5138831,
+      "binBytes": 594816,
+      "totalBytes": 813873,
       "files": 8
     },
     "fern_02": {
@@ -277,176 +277,176 @@
       "id": "potted_plant_02",
       "category": "foliage",
       "gltf": "assets/models/potted_plant_02/potted_plant_02_1k.gltf",
-      "binBytes": 1852244,
-      "totalBytes": 2634698,
+      "binBytes": 275192,
+      "totalBytes": 752206,
       "files": 8
     },
     "planter_box_01": {
       "id": "planter_box_01",
       "category": "foliage",
       "gltf": "assets/models/planter_box_01/planter_box_01_1k.gltf",
-      "binBytes": 250580,
-      "totalBytes": 2339417,
+      "binBytes": 113484,
+      "totalBytes": 234487,
       "files": 5
     },
     "WetFloorSign_01": {
       "id": "WetFloorSign_01",
       "category": "station_prop",
       "gltf": "assets/models/WetFloorSign_01/WetFloorSign_01_1k.gltf",
-      "binBytes": 9496,
-      "totalBytes": 266447,
+      "binBytes": 19044,
+      "totalBytes": 90339,
       "files": 5
     },
     "CoffeeCart_01": {
       "id": "CoffeeCart_01",
       "category": "station_prop",
       "gltf": "assets/models/CoffeeCart_01/CoffeeCart_01_1k.gltf",
-      "binBytes": 865700,
-      "totalBytes": 1835504,
+      "binBytes": 214500,
+      "totalBytes": 454386,
       "files": 8
     },
     "CashRegister_01": {
       "id": "CashRegister_01",
       "category": "station_prop",
       "gltf": "assets/models/CashRegister_01/CashRegister_01_1k.gltf",
-      "binBytes": 356396,
-      "totalBytes": 1039472,
+      "binBytes": 155416,
+      "totalBytes": 451168,
       "files": 8
     },
     "ammo_box": {
       "id": "ammo_box",
       "category": "station_prop",
       "gltf": "assets/models/ammo_box/ammo_box_1k.gltf",
-      "binBytes": 153588,
-      "totalBytes": 1472675,
+      "binBytes": 113460,
+      "totalBytes": 204372,
       "files": 5
     },
     "medical_box": {
       "id": "medical_box",
       "category": "station_prop",
       "gltf": "assets/models/medical_box/medical_box_1k.gltf",
-      "binBytes": 127972,
-      "totalBytes": 1975384,
+      "binBytes": 118000,
+      "totalBytes": 255456,
       "files": 5
     },
     "old_military_crate": {
       "id": "old_military_crate",
       "category": "station_prop",
       "gltf": "assets/models/old_military_crate/old_military_crate_1k.gltf",
-      "binBytes": 329004,
-      "totalBytes": 2495423,
+      "binBytes": 140820,
+      "totalBytes": 288122,
       "files": 5
     },
     "Barrel_01": {
       "id": "Barrel_01",
       "category": "station_prop",
       "gltf": "assets/models/Barrel_01/Barrel_01_1k.gltf",
-      "binBytes": 81756,
-      "totalBytes": 692947,
+      "binBytes": 62632,
+      "totalBytes": 188504,
       "files": 5
     },
     "portable_generator": {
       "id": "portable_generator",
       "category": "station_prop",
       "gltf": "assets/models/portable_generator/portable_generator_1k.gltf",
-      "binBytes": 939572,
-      "totalBytes": 3434440,
-      "files": 6
+      "binBytes": 249784,
+      "totalBytes": 890862,
+      "files": 7
     },
     "mounted_fluorescent_lights": {
       "id": "mounted_fluorescent_lights",
       "category": "station_prop",
       "gltf": "assets/models/mounted_fluorescent_lights/mounted_fluorescent_lights_1k.gltf",
-      "binBytes": 551720,
-      "totalBytes": 1864362,
+      "binBytes": 86008,
+      "totalBytes": 186101,
       "files": 6
     },
     "plastic_monobloc_chair_01": {
       "id": "plastic_monobloc_chair_01",
       "category": "street",
       "gltf": "assets/models/plastic_monobloc_chair_01/plastic_monobloc_chair_01_1k.gltf",
-      "binBytes": 46024,
-      "totalBytes": 170490,
+      "binBytes": 80164,
+      "totalBytes": 208616,
       "files": 5
     },
     "outdoor_table_chair_set_01": {
       "id": "outdoor_table_chair_set_01",
       "category": "street",
       "gltf": "assets/models/outdoor_table_chair_set_01/outdoor_table_chair_set_01_1k.gltf",
-      "binBytes": 92564,
-      "totalBytes": 266088,
+      "binBytes": 149924,
+      "totalBytes": 335723,
       "files": 8
     },
     "standing_chalkboard_01": {
       "id": "standing_chalkboard_01",
       "category": "street",
       "gltf": "assets/models/standing_chalkboard_01/standing_chalkboard_01_1k.gltf",
-      "binBytes": 24880,
-      "totalBytes": 147864,
+      "binBytes": 97876,
+      "totalBytes": 224195,
       "files": 8
     },
     "plastic_crate_02": {
       "id": "plastic_crate_02",
       "category": "street",
       "gltf": "assets/models/plastic_crate_02/plastic_crate_02_1k.gltf",
-      "binBytes": 63552,
-      "totalBytes": 443166,
+      "binBytes": 104804,
+      "totalBytes": 488337,
       "files": 5
     },
     "wooden_military_crate": {
       "id": "wooden_military_crate",
       "category": "street",
       "gltf": "assets/models/wooden_military_crate/wooden_military_crate_1k.gltf",
-      "binBytes": 80968,
-      "totalBytes": 203106,
+      "binBytes": 143096,
+      "totalBytes": 276575,
       "files": 5
     },
     "metal_jerrycan_green": {
       "id": "metal_jerrycan_green",
       "category": "street",
       "gltf": "assets/models/metal_jerrycan_green/metal_jerrycan_green_1k.gltf",
-      "binBytes": 45276,
-      "totalBytes": 181904,
+      "binBytes": 82244,
+      "totalBytes": 238893,
       "files": 5
     },
     "barrel_03": {
       "id": "barrel_03",
       "category": "street",
       "gltf": "assets/models/barrel_03/barrel_03_1k.gltf",
-      "binBytes": 22980,
-      "totalBytes": 125289,
+      "binBytes": 41648,
+      "totalBytes": 147534,
       "files": 5
     },
     "old_tyre": {
       "id": "old_tyre",
       "category": "street",
       "gltf": "assets/models/old_tyre/old_tyre_1k.gltf",
-      "binBytes": 24636,
-      "totalBytes": 135812,
+      "binBytes": 43684,
+      "totalBytes": 158763,
       "files": 5
     },
     "cardboard_box_01": {
       "id": "cardboard_box_01",
       "category": "street",
       "gltf": "assets/models/cardboard_box_01/cardboard_box_01_1k.gltf",
-      "binBytes": 25552,
-      "totalBytes": 121214,
+      "binBytes": 41740,
+      "totalBytes": 141380,
       "files": 5
     },
     "grass_bermuda_01": {
       "id": "grass_bermuda_01",
       "category": "foliage",
       "gltf": "assets/models/grass_bermuda_01/grass_bermuda_01_1k.gltf",
-      "binBytes": 32260,
-      "totalBytes": 149884,
+      "binBytes": 67020,
+      "totalBytes": 257555,
       "files": 5
     },
     "hand_truck": {
       "id": "hand_truck",
       "category": "street",
       "gltf": "assets/models/hand_truck/hand_truck_1k.gltf",
-      "binBytes": 72052,
-      "totalBytes": 205615,
+      "binBytes": 131668,
+      "totalBytes": 269148,
       "files": 5
     }
   },

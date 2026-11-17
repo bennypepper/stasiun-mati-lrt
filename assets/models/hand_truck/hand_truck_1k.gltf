@@ -1,164 +1,328 @@
 {
-	"asset":{
-		"generator":"Khronos glTF Blender I/O v5.1.19",
-		"version":"2.0"
-	},
-	"scene":0,
-	"scenes":[
-		{
-			"name":"Scene",
-			"nodes":[
-				0
-			]
-		}
-	],
-	"nodes":[
-		{
-			"mesh":0,
-			"name":"hand_truck",
-			"translation":[
-				0,
-				0.006468645762652159,
-				-0.2501116096973419
-			]
-		}
-	],
-	"materials":[
-		{
-			"doubleSided":true,
-			"name":"hand_truck",
-			"normalTexture":{
-				"index":0
-			},
-			"pbrMetallicRoughness":{
-				"baseColorTexture":{
-					"index":1
-				},
-				"metallicRoughnessTexture":{
-					"index":2
-				}
-			}
-		}
-	],
-	"meshes":[
-		{
-			"name":"hand_truck",
-			"primitives":[
-				{
-					"attributes":{
-						"POSITION":0,
-						"NORMAL":1,
-						"TEXCOORD_0":2
-					},
-					"indices":3,
-					"material":0
-				}
-			]
-		}
-	],
-	"textures":[
-		{
-			"sampler":0,
-			"source":0
-		},
-		{
-			"sampler":0,
-			"source":1
-		},
-		{
-			"sampler":0,
-			"source":2
-		}
-	],
-	"images":[
-		{
-			"mimeType":"image/jpeg",
-			"name":"hand_truck_nor_gl_1k",
-			"uri":"textures/hand_truck_nor_gl_1k.jpg"
-		},
-		{
-			"mimeType":"image/jpeg",
-			"name":"hand_truck_diff_1k",
-			"uri":"textures/hand_truck_diff_1k.jpg"
-		},
-		{
-			"mimeType":"image/jpeg",
-			"name":"hand_truck_arm_1k",
-			"uri":"textures/hand_truck_arm_1k.jpg"
-		}
-	],
-	"accessors":[
-		{
-			"bufferView":0,
-			"componentType":5126,
-			"count":2035,
-			"max":[
-				0.29662641882896423,
-				1.4014302492141724,
-				0.5967289209365845
-			],
-			"min":[
-				-0.2966264486312866,
-				-0.006468645762652159,
-				-0.09650568664073944
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":1,
-			"componentType":5126,
-			"count":2035,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":2,
-			"componentType":5126,
-			"count":2035,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":3,
-			"componentType":5123,
-			"count":3465,
-			"type":"SCALAR"
-		}
-	],
-	"bufferViews":[
-		{
-			"buffer":0,
-			"byteLength":24420,
-			"byteOffset":0,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":24420,
-			"byteOffset":24420,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":16280,
-			"byteOffset":48840,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":6930,
-			"byteOffset":65120,
-			"target":34963
-		}
-	],
-	"samplers":[
-		{
-			"magFilter":9729,
-			"minFilter":9987
-		}
-	],
-	"buffers":[
-		{
-			"byteLength":72052,
-			"uri":"hand_truck_1k.bin"
-		}
-	]
+  "asset": {
+    "generator": "Khronos glTF Blender I/O v5.1.19",
+    "version": "2.0"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0,
+        1,
+        2
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "hand_truck_LOD0",
+      "translation": [
+        0,
+        4.776567220687866e-05,
+        -0.2506285607814789
+      ]
+    },
+    {
+      "mesh": 1,
+      "name": "hand_truck_LOD1",
+      "translation": [
+        0,
+        4.776567220687866e-05,
+        -0.2506285607814789
+      ]
+    },
+    {
+      "mesh": 2,
+      "name": "hand_truck_LOD2",
+      "translation": [
+        0,
+        4.776567220687866e-05,
+        -0.2506285607814789
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "hand_truck",
+      "normalTexture": {
+        "index": 0
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 1
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "hand_truck_mesh_LOD0",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "hand_truck_mesh_LOD1",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 4,
+            "NORMAL": 5,
+            "TEXCOORD_0": 6
+          },
+          "indices": 7,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "hand_truck_mesh_LOD2",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 8,
+            "NORMAL": 9,
+            "TEXCOORD_0": 10
+          },
+          "indices": 11,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/jpeg",
+      "name": "hand_truck_nor_gl_1k",
+      "uri": "textures/hand_truck_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "hand_truck_diff_1k",
+      "uri": "textures/hand_truck_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "hand_truck_arm_1k",
+      "uri": "textures/hand_truck_arm_1k.jpg"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 2063,
+      "max": [
+        0.29662641882896423,
+        1.4014302492141724,
+        0.5967289209365845
+      ],
+      "min": [
+        -0.2966264486312866,
+        -0.006468645762652159,
+        -0.09650568664073944
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 2063,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 2063,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 3552,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5126,
+      "count": 1163,
+      "max": [
+        0.29662641882896423,
+        1.4014302492141724,
+        0.5910196900367737
+      ],
+      "min": [
+        -0.2966264486312866,
+        -0.004283038899302483,
+        -0.10092819482088089
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 1163,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 1163,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5123,
+      "count": 1545,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 8,
+      "componentType": 5126,
+      "count": 533,
+      "max": [
+        0.2847916781902313,
+        1.4014302492141724,
+        0.5910196900367737
+      ],
+      "min": [
+        -0.289459764957428,
+        0.010799633339047432,
+        -0.10488872975111008
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 9,
+      "componentType": 5126,
+      "count": 533,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 10,
+      "componentType": 5126,
+      "count": 533,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 11,
+      "componentType": 5123,
+      "count": 591,
+      "type": "SCALAR"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 24756,
+      "byteOffset": 0,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 24756,
+      "byteOffset": 24756,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 16504,
+      "byteOffset": 49512,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 7104,
+      "byteOffset": 66016,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 13956,
+      "byteOffset": 73120,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 13956,
+      "byteOffset": 87076,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 9304,
+      "byteOffset": 101032,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 3090,
+      "byteOffset": 110336,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 6396,
+      "byteOffset": 113428,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 6396,
+      "byteOffset": 119824,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 4264,
+      "byteOffset": 126220,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 1182,
+      "byteOffset": 130484,
+      "target": 34963
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 131668,
+      "uri": "hand_truck_1k.bin"
+    }
+  ]
 }
