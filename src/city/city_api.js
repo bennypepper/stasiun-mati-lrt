@@ -16,6 +16,8 @@
     cullChunks: [],
     litLampPositions: [],
     _lootboxGlows: null,
+    _lootboxVisuals: null,
+    destructibleProps: null,
     _concourseBounds: null,
     _lastCamPos: null,
     _lastRootWorldX: NaN,
@@ -170,6 +172,8 @@
       this.cullChunks = [];
       this.litLampPositions = [];
       this._lootboxGlows = null;
+      this._lootboxVisuals = null;
+      this.destructibleProps = null;
       this._concourseBounds = null;
       this._lastCamPos = null;
       this._lastRootWorldX = NaN;
@@ -227,6 +231,8 @@
       this.cullChunks = [];
       this.litLampPositions = [];
       this._lootboxGlows = {};
+      this._lootboxVisuals = [];
+      this.destructibleProps = [];
       this._concourseBounds = null;
       this._lastCamPos = null;
       this._lastRootWorldX = NaN;
@@ -344,11 +350,15 @@
       }
     },
 
-    update: function (dt, t) {
+    update: function (dt, t, camPos, camForward, difficultyKey) {
       if (!this.rootGroup) return;
       this._timeAccum = t !== undefined ? t : (this._timeAccum + dt);
       if (typeof P.updateTrafficSignalTime === 'function') {
         P.updateTrafficSignalTime(this._timeAccum);
+      }
+      if (this._lootboxVisuals && this._lootboxVisuals.length > 0 && typeof P.updateLootboxVisuals === 'function') {
+        const oz = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
+        P.updateLootboxVisuals(this._lootboxVisuals, dt, this._timeAccum, camPos, camForward, difficultyKey, oz);
       }
       if (this._lastCamPos) {
         this._repositionPooledLights(this._lastCamPos, this._suppressPooledLights);
@@ -626,6 +636,21 @@
         };
       }
 
+      if (it.type === 'bench') {
+        const oz = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
+        const sp = it.seatPos || { x: it.x, y: it.y - 0.5, z: it.z };
+        const stp = it.standPos || { x: it.x, y: it.y - 0.5, z: it.z };
+        return {
+          ok: true,
+          type: 'bench',
+          action: 'sit_bench',
+          seatPos: { x: sp.x, y: sp.y, z: sp.z + oz },
+          standPos: { x: stp.x, y: stp.y, z: stp.z + oz },
+          yaw: typeof it.yaw === 'number' ? it.yaw : undefined,
+          message: 'Duduk di bangku — tekan [E] atau WASD untuk berdiri'
+        };
+      }
+
       if (it.type === 'lootbox') {
         if (LRT.Audio && typeof LRT.Audio.play === 'function') {
           LRT.Audio.play('turnstile_beep', { gain: 0.72 });
@@ -641,6 +666,13 @@
         if (this._usedIds) this._usedIds.add(it.id);
         if (this._lootboxGlows && this._lootboxGlows[it.id]) {
           this._lootboxGlows[it.id].visible = false;
+        }
+        if (this._lootboxVisuals) {
+          for (let i = 0; i < this._lootboxVisuals.length; i++) {
+            if (this._lootboxVisuals[i].id === it.id) {
+              this._lootboxVisuals[i].used = true;
+            }
+          }
         }
         if (fresh && isAlley && LRT.Enemies && typeof LRT.Enemies.alertAllTo === 'function') {
           LRT.Enemies.alertAllTo({ x: it.x, y: it.y, z: it.z }, 32.0);
@@ -663,6 +695,57 @@
 
     getUsedIds: function () {
       return Array.from(this._usedIds || []);
+    },
+
+    damageAt: function (worldPos, radius, dmg, isExplosion) {
+      if (!this.rootGroup || !worldPos) return null;
+      const oz = this.rootGroup.position.z || 0;
+      const lx = worldPos.x;
+      const ly = worldPos.y;
+      const lz = worldPos.z - oz;
+      const rad = Math.max(0.4, radius || 1.2);
+      const events = [];
+
+      // Check fire hydrants for pressurized water-jet burst
+      if (this.hydrants && this.hydrants.length > 0) {
+        for (let i = 0; i < this.hydrants.length; i++) {
+          const h = this.hydrants[i];
+          if (h.burst) continue;
+          const dx = h.x - lx;
+          const dz = h.z - lz;
+          if (dx * dx + dz * dz <= (rad + 0.75) * (rad + 0.75)) {
+            h.burst = true;
+            events.push({ kind: 'hydrant', x: h.x, y: h.y + 0.6, z: h.z + oz });
+            if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+              LRT.Audio.play('metal_impact', { gain: 0.75, pitchVar: 0.12 });
+            }
+          }
+        }
+      }
+
+      // Check street vehicles, stalls, barriers & streetlamps for reactive FX
+      if (this.destructibleProps && this.destructibleProps.length > 0) {
+        for (let i = 0; i < this.destructibleProps.length; i++) {
+          const p = this.destructibleProps[i];
+          const hitR = p.radius + (isExplosion ? rad : 0.4);
+          const dx = p.x - lx;
+          const dz = p.z - lz;
+          if (dx * dx + dz * dz <= hitR * hitR && Math.abs(p.y - ly) <= 3.5) {
+            p.hp = Math.max(0, p.hp - (dmg || 25));
+            const justDamaged = !p.damaged && p.hp <= 55;
+            if (justDamaged) p.damaged = true;
+            events.push({
+              kind: p.kind,
+              justDamaged,
+              x: p.x,
+              y: p.y + 0.5,
+              z: p.z + oz
+            });
+            if (!isExplosion) break;
+          }
+        }
+      }
+      return events;
     },
 
     raycastHydrants: function (origin, dir, maxDist) {

@@ -146,8 +146,26 @@
         });
       }
 
+      // Models replaced by lightweight procedural protos (avoid downloading/decoding 200+ MB of redundant 2K textures)
+      const SKIP_REPLACED_MODELS = new Set([
+        'concrete_road_barrier',
+        'street_lamp_01',
+        'fire_hydrant',
+        'modular_electricity_poles',
+        'power_box_01',
+        'modular_street_seating',
+        'water_manhole_cover',
+        'metal_trash_can',
+        'trashbag',
+        'shrub_01',
+        'shrub_02',
+        'fern_02',
+        'calathea_orbifolia_01'
+      ]);
+
       const modelEntries = Object.entries(manifest.models || {});
       for (const [key, entry] of modelEntries) {
+        if (SKIP_REPLACED_MODELS.has(key)) continue;
         tasks.push({
           type: 'model',
           key,
@@ -177,7 +195,7 @@
       let loaded = 0;
       report(0, Math.max(1, total), total > 0 ? `Loading ${total} asset bundles...` : 'No assets queued');
 
-      await runWithConcurrency(tasks, 6, (task) => {
+      await runWithConcurrency(tasks, 3, (task) => {
         loaded++;
         report(loaded, Math.max(1, total), task.label);
       });

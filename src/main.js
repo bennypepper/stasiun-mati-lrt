@@ -19,6 +19,7 @@
   let _bootPromise = null;
   let _lastActiveObjKey = null;
   const _camForward = new THREE.Vector3();
+  const _bvhMeshesScratch = [];
   const consoleErrors = [];
 
   function computePlayerCityContext(pState) {
@@ -159,8 +160,14 @@
     }
 
     const pState = LRT.PlayerUI.getState();
+    if (pState) {
+      const cp = Math.cos(pState.pitch || 0);
+      _camForward.set(-Math.sin(pState.yaw || 0) * cp, Math.sin(pState.pitch || 0), -Math.cos(pState.yaw || 0) * cp).normalize();
+    } else if (CORE.camera) {
+      CORE.camera.getWorldDirection(_camForward);
+    }
     if (LRT.Station && LRT.Station.update) {
-      LRT.Station.update(dt, pState ? pState.pos : undefined);
+      LRT.Station.update(dt, pState ? pState.pos : undefined, _camForward, CORE.difficultyKey);
     }
 
     cityVisibilityTimer -= dt;
@@ -179,7 +186,8 @@
     const stationGrid = LRT.Station && LRT.Station.getSpatialGrid ? LRT.Station.getSpatialGrid() : null;
     const stationCols = LRT.Station && LRT.Station.getColliders ? LRT.Station.getColliders() : [];
     const trainCols = LRT.Train && LRT.Train.getColliders ? LRT.Train.getColliders() : [];
-    const bvhMeshes = [];
+    const bvhMeshes = _bvhMeshesScratch;
+    bvhMeshes.length = 0;
     if (LRT.Station && typeof LRT.Station.getBVHMeshes === 'function') {
       const list = LRT.Station.getBVHMeshes();
       if (Array.isArray(list)) for (let i = 0; i < list.length; i++) bvhMeshes.push(list[i]);
@@ -376,6 +384,10 @@
         }
         if (e.target.closest('#btn-menu-bloom, #btn-pause-bloom')) {
           if (typeof CORE.setBloomEnabled === 'function') CORE.setBloomEnabled(!CORE.bloomEnabled);
+          return;
+        }
+        if (e.target.closest('#btn-menu-fps, #btn-pause-fps')) {
+          if (typeof CORE.setFpsCounterEnabled === 'function') CORE.setFpsCounterEnabled(!CORE.fpsCounterEnabled);
         }
       });
     });
@@ -453,12 +465,12 @@
       CORE.sunLight = new THREE.DirectionalLight(0xfff3de, 2.75);
       CORE.sunLight.position.set(28, 46, 22);
       CORE.sunLight.castShadow = true;
-      CORE.sunLight.shadow.camera.left = -55;
-      CORE.sunLight.shadow.camera.right = 55;
-      CORE.sunLight.shadow.camera.top = 55;
-      CORE.sunLight.shadow.camera.bottom = -55;
+      CORE.sunLight.shadow.camera.left = -38;
+      CORE.sunLight.shadow.camera.right = 38;
+      CORE.sunLight.shadow.camera.top = 38;
+      CORE.sunLight.shadow.camera.bottom = -38;
       CORE.sunLight.shadow.camera.near = 1;
-      CORE.sunLight.shadow.camera.far = 160;
+      CORE.sunLight.shadow.camera.far = 140;
       CORE.sunLight.shadow.bias = -0.00045;
       CORE.sunLight.shadow.normalBias = 0.025;
       CORE.sunLight.shadow.mapSize.set(1024, 1024);
@@ -477,6 +489,7 @@
         if (typeof savedSettings.shadowsEnabled === 'boolean' && typeof CORE.setShadowsEnabled === 'function') CORE.setShadowsEnabled(savedSettings.shadowsEnabled);
         if (typeof savedSettings.bloomEnabled === 'boolean' && typeof CORE.setBloomEnabled === 'function') CORE.setBloomEnabled(savedSettings.bloomEnabled);
         if (savedSettings.aoMode && typeof CORE.setAoMode === 'function') CORE.setAoMode(savedSettings.aoMode);
+        if (typeof savedSettings.fpsCounterEnabled === 'boolean' && typeof CORE.setFpsCounterEnabled === 'function') CORE.setFpsCounterEnabled(savedSettings.fpsCounterEnabled);
         if (savedSettings.difficultyKey && typeof CORE.setDifficulty === 'function') CORE.setDifficulty(savedSettings.difficultyKey);
       }
 
@@ -741,7 +754,8 @@
         setRenderScale: CORE.setRenderScale,
         setShadowsEnabled: CORE.setShadowsEnabled,
         setBloomEnabled: CORE.setBloomEnabled,
-        setAoMode: CORE.setAoMode
+        setAoMode: CORE.setAoMode,
+        setFpsCounterEnabled: CORE.setFpsCounterEnabled
       };
 
       if (!loopPaused) {
@@ -761,6 +775,7 @@
     setShadowsEnabled: CORE.setShadowsEnabled,
     setBloomEnabled: CORE.setBloomEnabled,
     setAoMode: CORE.setAoMode,
+    setFpsCounterEnabled: CORE.setFpsCounterEnabled,
     setDifficulty: (k, notify) => applyDifficultySetting(k, !!notify),
     getRenderSettings: CORE.getSettings,
     setBrightness: CORE.setBrightness,

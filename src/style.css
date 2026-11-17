@@ -913,16 +913,22 @@ html, body {
 /* Completely transparent left column — NO card box, NO borders */
 .zenith-column,
 .menu-dock {
-  width: clamp(360px, 38vw, 500px);
+  width: clamp(390px, 42vw, 540px);
   height: 100%;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  padding: clamp(56px, 11vh, 110px) clamp(32px, 4.5vw, 68px) clamp(32px, 5vh, 52px);
+  padding: clamp(22px, 3.8vh, 48px) clamp(26px, 3.5vw, 48px) clamp(18px, 3vh, 32px);
   background: transparent;
   border: none;
   box-shadow: none;
   overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.zenith-column::-webkit-scrollbar,
+.menu-dock::-webkit-scrollbar {
+  display: none;
 }
 
 .zenith-column > *,
@@ -931,7 +937,7 @@ html, body {
 }
 
 .zenith-header {
-  margin-bottom: clamp(26px, 4.2vh, 46px);
+  margin-bottom: clamp(16px, 2.8vh, 32px);
 }
 
 .zenith-kicker {
@@ -1051,13 +1057,13 @@ html, body {
 
 /* Collapsible Minimalist Sub-panels (Settings & Controls) */
 .zenith-subpanel {
-  margin-top: 14px;
-  padding: 12px 16px;
-  border-left: 1px solid rgba(242, 240, 234, 0.22);
+  margin: 4px 0 10px 12px;
+  padding: 12px 18px;
+  border-left: 2px solid rgba(242, 240, 234, 0.28);
   background: linear-gradient(
     90deg,
-    rgba(6, 8, 12, 0.62) 0%,
-    rgba(6, 8, 12, 0.24) 75%,
+    rgba(6, 8, 12, 0.72) 0%,
+    rgba(6, 8, 12, 0.34) 75%,
     transparent 100%
   );
   display: flex;
@@ -1071,26 +1077,33 @@ html, body {
 
 #menu-settings-panel,
 .pause-settings {
-  max-height: min(52vh, 430px);
+  max-height: min(64vh, 520px);
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgba(242, 240, 234, 0.24) transparent;
+  scrollbar-color: rgba(242, 240, 234, 0.20) transparent;
 }
 
 #menu-settings-panel::-webkit-scrollbar,
 .pause-settings::-webkit-scrollbar {
-  width: 4px;
+  width: 3px;
+}
+
+#menu-settings-panel::-webkit-scrollbar-track,
+.pause-settings::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 #menu-settings-panel::-webkit-scrollbar-thumb,
 .pause-settings::-webkit-scrollbar-thumb {
-  background: rgba(242, 240, 234, 0.24);
+  background: rgba(242, 240, 234, 0.20);
+  border-radius: 2px;
 }
 
 .setting-block {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  padding: 2px 0;
 }
 
 .setting-head,
@@ -1098,7 +1111,8 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
+  min-height: 24px;
 }
 
 .setting-label {

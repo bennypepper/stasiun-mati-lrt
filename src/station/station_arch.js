@@ -1068,9 +1068,9 @@
       };
 
       const sortedTracks = trackXs.slice().sort((a, b) => a - b);
-      const plazaZ0 = CROSSING_Z_SOUTH + CROSSING_HALF_W; // -68
-      const plazaZ1 = CROSSING_Z_NORTH - CROSSING_HALF_W; // +68
-      let curX = corridorMinX - 0.05;
+      const plazaZ0 = CROSSING_Z_SOUTH + CROSSING_HALF_W + 0.02; // -67.98 (zero overlap with z=-68 crossing)
+      const plazaZ1 = CROSSING_Z_NORTH - CROSSING_HALF_W - 0.02; // +67.98
+      let curX = corridorMinX + 0.02;
       const bands = [];
       for (let ti = 0; ti < sortedTracks.length; ti++) {
         const t0 = sortedTracks[ti] - 1.66;
@@ -1078,7 +1078,7 @@
         if (t0 > curX + 0.15) bands.push({ x0: curX, x1: t0, z0: plazaZ0, z1: plazaZ1 });
         curX = Math.max(curX, t1);
       }
-      if (corridorMaxX + 0.05 > curX + 0.15) bands.push({ x0: curX, x1: corridorMaxX + 0.05, z0: plazaZ0, z1: plazaZ1 });
+      if (corridorMaxX - 0.02 > curX + 0.15) bands.push({ x0: curX, x1: corridorMaxX - 0.02, z0: plazaZ0, z1: plazaZ1 });
 
       let freeRects = bands;
       for (let hi = 0; hi < deckHoles.length; hi++) {

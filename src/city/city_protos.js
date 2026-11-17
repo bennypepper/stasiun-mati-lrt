@@ -863,29 +863,63 @@
     return proto;
   }
 
-  // Abandoned Indonesian Ojol Scooter (Gojek/Grab green & black courier accent)
+  // Detailed Abandoned Indonesian Ojol Scooter (Gojek/Grab green & black courier livery)
   function getOjolProto() {
-    const cacheKey = 'proc_veh_ojol';
+    const cacheKey = 'proc_veh_ojol_v2';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
 
     const bTrim = [];
-    // Wheels (leaned slightly on kickstand around Z)
-    addColoredCylinder(bTrim, 0.24, 0.24, 0.11, 8, 0, 0.24, 0.62, 0, 0, Math.PI * 0.5, 0x181a1e, 0.8);
-    addColoredCylinder(bTrim, 0.24, 0.24, 0.11, 8, 0, 0.24, -0.62, 0, 0, Math.PI * 0.5, 0x181a1e, 0.8);
-    // Step-through deck & body fairing (green/black Ojol livery)
-    addColoredBox(bTrim, 0.34, 0.18, 0.72, 0, 0.28, 0.0, 0, 0, 0, 0x1f2428, 0.8);
-    addColoredBox(bTrim, 0.36, 0.44, 0.68, 0, 0.54, -0.38, 0, 0, 0, 0x16a34a, 0.82);
-    // Front leg shield + handlebar column
-    addColoredBox(bTrim, 0.34, 0.58, 0.24, 0, 0.62, 0.48, -0.22, 0, 0, 0x16a34a, 0.85);
-    addColoredBox(bTrim, 0.66, 0.07, 0.10, 0, 0.98, 0.40, 0, 0, 0, 0x1b1e22, 0.9);
-    // Black seat & rear courier box
-    addColoredBox(bTrim, 0.28, 0.12, 0.64, 0, 0.76, -0.22, 0, 0, 0, 0x181a1e, 0.85);
-    addColoredBox(bTrim, 0.42, 0.36, 0.40, 0, 0.96, -0.66, 0, 0, 0, 0x15803d, 0.88);
-    addColoredBox(bTrim, 0.44, 0.06, 0.42, 0, 1.14, -0.66, 0, 0, 0, 0x181a1e, 0.9);
+    // Front & rear rubber tires + silver 5-spoke hub rims + brake rotor (12-seg wheels)
+    for (const wz of [0.64, -0.62]) {
+      addColoredCylinder(bTrim, 0.25, 0.25, 0.11, 12, 0, 0.25, wz, 0, 0, Math.PI * 0.5, 0x16181c, 0.78);
+      addColoredCylinder(bTrim, 0.155, 0.155, 0.125, 10, 0, 0.25, wz, 0, 0, Math.PI * 0.5, 0x9ca3af, 0.88);
+      addColoredCylinder(bTrim, 0.06, 0.06, 0.135, 8, 0, 0.25, wz, 0, 0, Math.PI * 0.5, 0x1e2228, 0.9);
+    }
+    // Front telescopic fork tubes & arched mudguard fender
+    for (const fx of [-0.085, 0.085]) {
+      addColoredCylinder(bTrim, 0.022, 0.022, 0.54, 6, fx, 0.50, 0.54, -0.26, 0, 0, 0xb8c0cc, 0.9);
+    }
+    addColoredBox(bTrim, 0.15, 0.05, 0.34, 0, 0.49, 0.63, -0.22, 0, 0, 0x15803d, 0.85);
+    // Lower engine casing / CVT swingarm + muffler exhaust pipe
+    addColoredBox(bTrim, 0.24, 0.16, 0.62, -0.04, 0.27, -0.34, 0, 0, 0, 0x262930, 0.82);
+    addColoredCylinder(bTrim, 0.045, 0.052, 0.48, 8, 0.16, 0.26, -0.44, Math.PI * 0.5 - 0.18, 0, 0, 0x3f444d, 0.85);
+    addColoredBox(bTrim, 0.025, 0.08, 0.34, 0.19, 0.26, -0.44, -0.18, 0, 0, 0xcfd4dc, 0.9);
+    // Recessed step-through floorboard deck
+    addColoredBox(bTrim, 0.34, 0.08, 0.56, 0, 0.25, 0.08, 0, 0, 0, 0x1c1f24, 0.8);
+    addColoredBox(bTrim, 0.38, 0.10, 0.58, 0, 0.19, 0.06, 0, 0, 0, 0x16a34a, 0.82);
+    // Angled front leg-shield fairing (two-tone Gojek green + matte charcoal inner knee panel)
+    addColoredBox(bTrim, 0.38, 0.56, 0.22, 0, 0.58, 0.45, -0.24, 0, 0, 0x16a34a, 0.86);
+    addColoredBox(bTrim, 0.32, 0.48, 0.10, 0, 0.57, 0.35, -0.24, 0, 0, 0x22262c, 0.82);
+    // Front headlamp cowl + visor + amber turn signals
+    addColoredBox(bTrim, 0.26, 0.14, 0.12, 0, 0.68, 0.53, -0.18, 0, 0, 0xeef6ff, 0.95);
+    addColoredBox(bTrim, 0.06, 0.06, 0.06, -0.13, 0.68, 0.51, 0, 0, 0, 0xf59e0b, 0.92);
+    addColoredBox(bTrim, 0.06, 0.06, 0.06, 0.13, 0.68, 0.51, 0, 0, 0, 0xf59e0b, 0.92);
+    // Steering stem, sculpted speedometer cowl, swept handlebars + grips + twin mirrors
+    addColoredBox(bTrim, 0.22, 0.11, 0.18, 0, 0.95, 0.34, -0.12, 0, 0, 0x15803d, 0.88);
+    addColoredBox(bTrim, 0.14, 0.04, 0.12, 0, 1.00, 0.31, -0.45, 0, 0, 0x101820, 0.95);
+    addColoredBox(bTrim, 0.66, 0.045, 0.06, 0, 0.95, 0.32, 0, 0, 0, 0x1f2429, 0.9);
+    addColoredCylinder(bTrim, 0.025, 0.025, 0.14, 6, -0.32, 0.95, 0.31, 0, 0, Math.PI * 0.5, 0x111317, 0.85);
+    addColoredCylinder(bTrim, 0.025, 0.025, 0.14, 6, 0.32, 0.95, 0.31, 0, 0, Math.PI * 0.5, 0x111317, 0.85);
+    for (const sx of [-1, 1]) {
+      addColoredCylinder(bTrim, 0.01, 0.01, 0.16, 5, sx * 0.25, 1.04, 0.32, 0, 0, -sx * 0.24, 0x26292e, 0.85);
+      addColoredBox(bTrim, 0.11, 0.065, 0.025, sx * 0.28, 1.12, 0.32, 0, 0, 0, 0x1a1e24, 0.9);
+    }
+    // Tapered rear side body panels + contoured matte leather saddle + rear grab rail
+    addColoredBox(bTrim, 0.36, 0.34, 0.70, 0, 0.53, -0.36, 0.05, 0, 0, 0x16a34a, 0.84);
+    addColoredBox(bTrim, 0.30, 0.12, 0.64, 0, 0.72, -0.26, -0.06, 0, 0, 0x181a1f, 0.86);
+    addColoredBox(bTrim, 0.24, 0.07, 0.30, 0, 0.77, -0.10, 0.08, 0, 0, 0x20232a, 0.9);
+    // Tail light + rear fender/plate
+    addColoredBox(bTrim, 0.20, 0.08, 0.06, 0, 0.56, -0.73, 0, 0, 0, 0xdc2626, 0.9);
+    addColoredBox(bTrim, 0.16, 0.14, 0.04, 0, 0.40, -0.76, -0.22, 0, 0, 0x111316, 0.9);
+    // Side kickstand + Ojol thermal delivery box (Gojek green/white stripe)
+    addColoredCylinder(bTrim, 0.015, 0.015, 0.28, 5, -0.14, 0.13, -0.10, 0, 0, 0.52, 0x26292e, 0.85);
+    addColoredBox(bTrim, 0.42, 0.34, 0.40, 0, 0.93, -0.62, 0, 0, 0, 0x15803d, 0.88);
+    addColoredBox(bTrim, 0.44, 0.055, 0.42, 0, 1.11, -0.62, 0, 0, 0, 0x181a1e, 0.9);
+    addColoredBox(bTrim, 0.43, 0.045, 0.41, 0, 0.94, -0.62, 0, 0, 0, 0xe5e7eb, 0.95);
 
-    // Slight 8 deg kickstand tilt
+    // Slight natural 7.5 deg kickstand lean
     for (let i = 0; i < bTrim.length; i++) {
-      bTrim[i].rotateZ(0.14);
+      bTrim[i].rotateZ(0.13);
     }
 
     const proto = {
@@ -894,6 +928,403 @@
     };
     _cityProtoCache.set(cacheKey, proto);
     return proto;
+  }
+
+  // Grounded Cast-Iron & Stained-Teak Jakarta Park Bench (replaces broken GLTF)
+  function getParkBenchProto() {
+    const cacheKey = 'proc_prop_park_bench_v1';
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+
+    const bTrim = [];
+    // Two cast-iron end frames + center stiffener strut (grounded at y = 0)
+    for (const fx of [-0.82, 0.82]) {
+      addColoredBox(bTrim, 0.10, 0.03, 0.62, fx, 0.015, 0.02, 0, 0, 0, 0x1e2329, 0.85); // base pad
+      addColoredBox(bTrim, 0.06, 0.42, 0.07, fx, 0.21, 0.24, 0, 0, 0, 0x242a32, 0.85);  // front leg
+      addColoredBox(bTrim, 0.06, 0.42, 0.07, fx, 0.21, -0.22, 0, 0, 0, 0x242a32, 0.85); // back leg
+      addColoredBox(bTrim, 0.06, 0.06, 0.56, fx, 0.42, 0.01, 0, 0, 0, 0x242a32, 0.85);  // seat rail
+      addColoredBox(bTrim, 0.055, 0.48, 0.065, fx, 0.66, -0.25, -0.14, 0, 0, 0x242a32, 0.88); // backrest post
+      // Welded armrest loop connected cleanly from seat rail to backrest post
+      addColoredBox(bTrim, 0.055, 0.20, 0.055, fx, 0.52, 0.22, 0, 0, 0, 0x242a32, 0.88);
+      addColoredBox(bTrim, 0.065, 0.045, 0.46, fx, 0.62, 0.01, 0, 0, 0, 0x2b313a, 0.92);
+    }
+    addColoredBox(bTrim, 0.05, 0.39, 0.06, 0, 0.20, -0.02, 0, 0, 0, 0x242a32, 0.85); // center brace
+    addColoredBox(bTrim, 1.64, 0.045, 0.045, 0, 0.36, -0.02, 0, 0, 0, 0x242a32, 0.85); // under-seat tie bar
+
+    // 4 Stained teak wood seat planks
+    for (let s = 0; s < 4; s++) {
+      const sz = -0.17 + s * 0.125;
+      addColoredBox(bTrim, 1.84, 0.042, 0.095, 0, 0.455, sz, 0, 0, 0, 0x7a4b2a, 0.86);
+    }
+    // 3 Stained teak backrest planks matching -0.14 backrest angle
+    for (let r = 0; r < 3; r++) {
+      const ry = 0.58 + r * 0.125;
+      const rz = -0.22 - r * 0.018;
+      addColoredBox(bTrim, 1.84, 0.088, 0.038, 0, ry, rz, -0.14, 0, 0, 0x7c4d2c, 0.88);
+    }
+
+    const proto = {
+      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      size: { x: 1.90, y: 0.90, z: 0.68 }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
+  // Ultra-low-poly Sloped Concrete Jersey Road Barrier (~36 tris vs 60,928-tri GLTF!)
+  function getRoadBarrierProto() {
+    const cacheKey = 'proc_prop_road_barrier_v1';
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+    const bTrim = [];
+    // Wide concrete foot + sloped waist + hazard yellow/dark band top
+    addColoredBox(bTrim, 1.62, 0.24, 0.64, 0, 0.12, 0, 0, 0, 0, 0x7d8084, 0.82);
+    addColoredBox(bTrim, 1.60, 0.40, 0.38, 0, 0.44, 0, 0, 0, 0, 0x8e9296, 0.86);
+    addColoredBox(bTrim, 1.58, 0.20, 0.24, 0, 0.74, 0, 0, 0, 0, 0x9aa0a6, 0.90);
+    // Black & amber hazard reflection cap strip
+    addColoredBox(bTrim, 0.50, 0.14, 0.26, -0.48, 0.72, 0, 0, 0, 0, 0xd99b18, 0.94);
+    addColoredBox(bTrim, 0.50, 0.14, 0.26, 0.48, 0.72, 0, 0, 0, 0, 0x20242a, 0.92);
+
+    const proto = {
+      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      size: { x: 1.62, y: 0.84, z: 0.64 }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
+  // Jakarta PJU Street Lamp (~76 tris vs 30,050-tri GLTF! Arm extends +X cleanly over roadway)
+  function getStreetLampProto() {
+    const cacheKey = 'proc_prop_street_lamp_v2';
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+    const bTrim = [];
+    const bBulb = [];
+    // Concrete octagonal pedestal base + tapered dark-iron pole + curved cantilever arm along +X + hood
+    addColoredCylinder(bTrim, 0.17, 0.22, 0.58, 8, 0, 0.29, 0, 0, 0, 0, 0x262b31, 0.80);
+    addColoredCylinder(bTrim, 0.065, 0.105, 4.05, 8, 0, 2.55, 0, 0, 0, 0, 0x23282e, 0.84);
+    addColoredBox(bTrim, 1.15, 0.09, 0.09, 0.46, 4.66, 0, 0, 0, 0.14, 0x2c323a, 0.88);
+    addColoredBox(bTrim, 0.52, 0.09, 0.28, 1.05, 4.74, 0, 0, 0, 0, 0x353c46, 0.90);
+    const bulb = new THREE.BoxGeometry(0.40, 0.06, 0.22);
+    bulb.translate(1.05, 4.68, 0);
+    bBulb.push(prepGeo(bulb, false));
+
+    const proto = {
+      parts: mergePartBuckets([
+        { bucket: bTrim, mat: getVehicleTrimMaterial() },
+        { bucket: bBulb, mat: getLampBulbMaterial() }
+      ]),
+      size: { x: 1.35, y: 4.80, z: 0.45 }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
+  // Fire Hydrant (~68 tris vs 43,158-tri GLTF!)
+  function getFireHydrantProto() {
+    const cacheKey = 'proc_prop_fire_hydrant_v1';
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+    const bTrim = [];
+    addColoredCylinder(bTrim, 0.17, 0.19, 0.10, 8, 0, 0.05, 0, 0, 0, 0, 0x451212, 0.80);
+    addColoredCylinder(bTrim, 0.12, 0.13, 0.56, 8, 0, 0.38, 0, 0, 0, 0, 0xb91c1c, 0.84);
+    addColoredCylinder(bTrim, 0.14, 0.11, 0.12, 8, 0, 0.70, 0, 0, 0, 0, 0xdc2626, 0.90);
+    addColoredCylinder(bTrim, 0.04, 0.05, 0.08, 6, 0, 0.79, 0, 0, 0, 0, 0xd4d4d8, 0.95);
+    addColoredCylinder(bTrim, 0.055, 0.055, 0.36, 6, 0, 0.52, 0, 0, 0, Math.PI * 0.5, 0xcbd5e1, 0.92);
+    addColoredCylinder(bTrim, 0.07, 0.07, 0.12, 6, 0, 0.50, 0.12, Math.PI * 0.5, 0, 0, 0xcbd5e1, 0.92);
+
+    const proto = {
+      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      size: { x: 0.38, y: 0.83, z: 0.38 }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
+  // PLN Concrete Utility Pole (~52 tris vs 28,839-tri GLTF!)
+  function getPowerPoleProto(variantIdx) {
+    const cacheKey = `proc_prop_power_pole_v1_${variantIdx || 0}`;
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+    const bTrim = [];
+    addColoredCylinder(bTrim, 0.11, 0.19, 6.80, 7, 0, 3.40, 0, 0, 0, 0, 0x8b8e92, 0.82);
+    addColoredCylinder(bTrim, 0.175, 0.178, 0.45, 7, 0, 1.35, 0, 0, 0, 0, 0xeab308, 0.9);
+    // Steel crossarms + ceramic insulators
+    addColoredBox(bTrim, 1.85, 0.08, 0.09, 0, 6.25, 0, 0, 0, 0, 0x4b5563, 0.88);
+    if ((variantIdx || 0) === 1) {
+      addColoredBox(bTrim, 1.55, 0.08, 0.09, 0, 5.55, 0, 0, 0, 0, 0x4b5563, 0.88);
+      addColoredCylinder(bTrim, 0.24, 0.24, 0.72, 8, 0.28, 4.75, 0, 0, 0, 0, 0x475569, 0.85);
+    }
+    for (const ix of [-0.78, 0, 0.78]) {
+      addColoredCylinder(bTrim, 0.04, 0.05, 0.14, 6, ix, 6.35, 0, 0, 0, 0, 0xd1d5db, 0.94);
+    }
+
+    const proto = {
+      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      size: { x: 1.9, y: 6.8, z: 0.5 }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
+  // PLN Power Junction Cabinet (~28 tris vs 21,272-tri GLTF!)
+  function getPowerBoxProto() {
+    const cacheKey = 'proc_prop_power_box_v1';
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+    const bTrim = [];
+    addColoredBox(bTrim, 0.72, 0.92, 0.44, 0, 0, 0, 0, 0, 0, 0x525a65, 0.82);
+    addColoredBox(bTrim, 0.76, 0.07, 0.48, 0, 0.48, 0, 0, 0, 0, 0x3b424c, 0.88);
+    addColoredBox(bTrim, 0.16, 0.16, 0.02, 0.16, 0.14, 0.23, 0, 0, 0, 0xeab308, 0.94);
+
+    const proto = {
+      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      size: { x: 0.76, y: 0.96, z: 0.48 }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
+  // Cast-Iron Manhole Cover (~16 tris vs 50,408-tri GLTF!)
+  function getManholeProto() {
+    const cacheKey = 'proc_prop_manhole_v1';
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+    const bTrim = [];
+    addColoredCylinder(bTrim, 0.36, 0.38, 0.03, 10, 0, 0.015, 0, 0, 0, 0, 0x26292e, 0.85);
+    addColoredCylinder(bTrim, 0.30, 0.30, 0.036, 10, 0, 0.018, 0, 0, 0, 0, 0x373c44, 0.90);
+    const proto = {
+      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      size: { x: 0.76, y: 0.04, z: 0.76 }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
+  // Jakarta Municipal Street Trash Bin (~32 tris vs 51,424-tri GLTF!)
+  function getTrashCanProto() {
+    const cacheKey = 'proc_prop_trash_can_v1';
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+    const bTrim = [];
+    addColoredCylinder(bTrim, 0.25, 0.22, 0.76, 8, 0, 0.38, 0, 0, 0, 0, 0x1e5c3a, 0.82);
+    addColoredCylinder(bTrim, 0.27, 0.26, 0.08, 8, 0, 0.78, 0, 0, 0, 0, 0x23282e, 0.90);
+    addColoredBox(bTrim, 0.28, 0.16, 0.28, 0, 0.86, 0, 0, 0, 0, 0x2a3038, 0.88);
+    const proto = {
+      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      size: { x: 0.54, y: 0.94, z: 0.54 }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
+  // Tied Plastic Trash Bags (~24 tris vs 35,856-tri GLTF!)
+  function getTrashBagProto() {
+    const cacheKey = 'proc_prop_trash_bag_v1';
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+    const bTrim = [];
+    addColoredCylinder(bTrim, 0.16, 0.24, 0.44, 7, -0.06, 0.22, 0.02, 0, 0, 0.12, 0x16191d, 0.82);
+    addColoredCylinder(bTrim, 0.12, 0.19, 0.34, 7, 0.18, 0.17, -0.08, 0.14, 0, -0.18, 0x1c2026, 0.85);
+    const proto = {
+      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      size: { x: 0.62, y: 0.46, z: 0.54 }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
+  // Concrete Boulevard Planter Box (~28 tris vs 24,282-tri GLTF!)
+  function getPlanterBoxProto() {
+    const cacheKey = 'proc_prop_planter_box_v1';
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+    const bTrim = [];
+    addColoredBox(bTrim, 1.32, 0.42, 0.62, 0, 0.21, 0, 0, 0, 0, 0x767a80, 0.82);
+    addColoredBox(bTrim, 1.38, 0.06, 0.68, 0, 0.43, 0, 0, 0, 0, 0x8f949a, 0.90);
+    addColoredBox(bTrim, 1.18, 0.08, 0.48, 0, 0.41, 0, 0, 0, 0, 0x3b2a1e, 0.85);
+    const proto = {
+      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      size: { x: 1.38, y: 0.46, z: 0.68 }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
+  // Alpha-Masked Tropical Understory Shrub/Fern Cluster (~12 tris vs 156k-tri GLTF!)
+  function getFoliageCardProto(width, height, seedOffset) {
+    const w = width || 1.3;
+    const h = height || 0.85;
+    const cacheKey = `proc_foliage_card_${w.toFixed(2)}_${h.toFixed(2)}_${seedOffset || 0}`;
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+
+    const planes = [];
+    const ang0 = (seedOffset || 0) * 0.7;
+    for (let k = 0; k < 3; k++) {
+      const p = new THREE.PlaneGeometry(w, h);
+      p.translate(0, h * 0.46, 0);
+      p.rotateX(-0.18 + (k - 1) * 0.12);
+      p.rotateY(ang0 + k * (Math.PI / 3));
+      planes.push(prepGeo(p, false));
+    }
+    const merged = THREE_UTILS.mergeGeometries(planes, false);
+    for (let i = 0; i < planes.length; i++) planes[i].dispose();
+
+    const proto = {
+      parts: [{ geo: merged, mat: getCachedAngsanaLeafMaterial() }],
+      size: { x: w, y: h, z: w }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
+  // Shared Hinged Tactical Lootbox + Difficulty-Scaled Yellow Perimeter Halo Builder
+  let _lootCrateBodyMat = null;
+  let _lootCrateRimMat = null;
+  let _lootCrateGoldMat = null;
+  function getLootboxMats() {
+    if (!_lootCrateBodyMat) {
+      _lootCrateBodyMat = new THREE.MeshStandardMaterial({ color: 0x262f28, roughness: 0.62, metalness: 0.28 });
+      _lootCrateRimMat = new THREE.MeshStandardMaterial({ color: 0x171b20, roughness: 0.42, metalness: 0.65 });
+      _lootCrateGoldMat = new THREE.MeshStandardMaterial({
+        color: 0xfacc15, emissive: new THREE.Color(0xeab308), emissiveIntensity: 0.55, roughness: 0.35, metalness: 0.45
+      });
+    }
+    return { body: _lootCrateBodyMat, rim: _lootCrateRimMat, gold: _lootCrateGoldMat };
+  }
+
+  function createLootboxVisual(parentGroup, disposableGeos, disposableMats, id, x, y, z, ry, used) {
+    const mats = getLootboxMats();
+    const grp = new THREE.Group();
+    grp.name = `${id}_Crate`;
+    grp.position.set(x, y, z);
+    if (ry) grp.rotation.y = ry;
+
+    const addPart = (geo, mat, px, py, pz, rx) => {
+      disposableGeos.push(geo);
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(px, py, pz);
+      if (rx) m.rotation.x = rx;
+      m.castShadow = false;
+      m.receiveShadow = true;
+      grp.add(m);
+      return m;
+    };
+
+    // Armored lower tub & interior supply tray (revealed when lid opens!)
+    addPart(new THREE.BoxGeometry(0.92, 0.42, 0.60), mats.body, 0, 0.21, 0);
+    for (const cx of [-0.44, 0.44]) {
+      addPart(new THREE.BoxGeometry(0.06, 0.44, 0.62), mats.rim, cx, 0.22, 0);
+      addPart(new THREE.BoxGeometry(0.06, 0.05, 0.22), mats.rim, cx * 1.08, 0.28, 0);
+    }
+    addPart(new THREE.BoxGeometry(0.96, 0.05, 0.64), mats.rim, 0, 0.415, 0);
+    // Yellow tactical lock clasps on front face
+    for (const lx of [-0.24, 0.24]) {
+      addPart(new THREE.BoxGeometry(0.07, 0.14, 0.04), mats.gold, lx, 0.36, 0.31);
+    }
+    // Interior ammo rack & first-aid pack insert visible once lid hinges back
+    addPart(new THREE.BoxGeometry(0.76, 0.06, 0.44), mats.gold, 0, 0.43, 0);
+
+    // Hinged Lid Pivot anchored along back top edge (z = -0.31, y = 0.44)
+    const lidPivot = new THREE.Group();
+    lidPivot.name = `${id}_LidPivot`;
+    lidPivot.position.set(0, 0.44, -0.31);
+    lidPivot.rotation.x = used ? -1.72 : 0;
+
+    const addLidPart = (geo, mat, px, py, pz) => {
+      disposableGeos.push(geo);
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(px, py, pz);
+      m.castShadow = false;
+      m.receiveShadow = true;
+      lidPivot.add(m);
+      return m;
+    };
+    addLidPart(new THREE.BoxGeometry(0.96, 0.12, 0.64), mats.rim, 0, 0.06, 0.31);
+    addLidPart(new THREE.BoxGeometry(0.84, 0.04, 0.52), mats.body, 0, 0.13, 0.31);
+    addLidPart(new THREE.BoxGeometry(0.68, 0.025, 0.07), mats.gold, 0, 0.155, 0.50);
+    grp.add(lidPivot);
+
+    // Yellow-only perimeter halo around the crate model (ZERO floating orb/cone!)
+    const haloGroup = new THREE.Group();
+    haloGroup.name = `${id}_YellowHalo`;
+    haloGroup.visible = !used;
+
+    const ringGeo = new THREE.RingGeometry(0.56, 0.72, 24);
+    ringGeo.rotateX(-Math.PI * 0.5);
+    const haloShellGeo = new THREE.BoxGeometry(1.06, 0.66, 0.74);
+    disposableGeos.push(ringGeo, haloShellGeo);
+
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0xfacc15,
+      transparent: true,
+      opacity: 0.68,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide
+    });
+    const shellMat = new THREE.MeshBasicMaterial({
+      color: 0xeab308,
+      transparent: true,
+      opacity: 0.22,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide
+    });
+    disposableMats.push(ringMat, shellMat);
+
+    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+    ringMesh.position.y = 0.03;
+    const shellMesh = new THREE.Mesh(haloShellGeo, shellMat);
+    shellMesh.position.y = 0.30;
+    haloGroup.add(ringMesh);
+    haloGroup.add(shellMesh);
+    grp.add(haloGroup);
+
+    if (parentGroup) parentGroup.add(grp);
+    return { id, group: grp, lidPivot, haloGroup, ringMat, shellMat, ringMesh, x, y, z, used: !!used };
+  }
+
+  function updateLootboxVisuals(visuals, dt, timeAccum, camPos, camForward, difficultyKey, worldOffsetZ) {
+    if (!visuals || visuals.length === 0) return;
+    const diff = String(difficultyKey || 'medium').toLowerCase();
+    const offZ = worldOffsetZ || 0;
+    const pulse = 0.76 + 0.24 * Math.sin((timeAccum || 0) * 3.8);
+
+    for (let i = 0; i < visuals.length; i++) {
+      const v = visuals[i];
+      if (!v) continue;
+      // Smoothly animate hinged lid opening
+      const targetRot = v.used ? -1.72 : 0.0;
+      if (v.lidPivot && Math.abs(v.lidPivot.rotation.x - targetRot) > 0.005) {
+        const step = Math.min(1, (dt || 0.016) * 9.5);
+        v.lidPivot.rotation.x += (targetRot - v.lidPivot.rotation.x) * step;
+      }
+      if (!v.haloGroup) continue;
+      if (v.used) {
+        v.haloGroup.visible = false;
+        continue;
+      }
+
+      let showHalo = true;
+      if (camPos && diff !== 'easy') {
+        const dx = v.x - camPos.x;
+        const dy = (v.y + 0.35) - camPos.y;
+        const dz = (v.z + offZ) - camPos.z;
+        const dist = Math.hypot(dx, dy, dz);
+        if (diff === 'medium') {
+          showHalo = dist <= 12.0;
+        } else if (diff === 'hard') {
+          showHalo = dist <= 3.6;
+        } else if (diff === 'nightmare') {
+          if (dist > 1.75) {
+            showHalo = false;
+          } else if (camForward && dist > 0.05) {
+            const dot = (dx * camForward.x + dy * camForward.y + dz * camForward.z) / dist;
+            showHalo = dot >= 0.62;
+          }
+        }
+      }
+      v.haloGroup.visible = showHalo;
+      if (showHalo) {
+        if (v.ringMat) v.ringMat.opacity = 0.62 * pulse;
+        if (v.shellMat) v.shellMat.opacity = 0.22 * pulse;
+        if (v.ringMesh) {
+          const s = 0.97 + 0.05 * pulse;
+          v.ringMesh.scale.set(s, 1, s);
+        }
+      }
+    }
   }
 
   // Jakarta Gerobak Kaki Lima (street food pushcart)
@@ -1016,7 +1447,7 @@
       const targetGroup = customGroup || city.rootGroup;
       targetGroup.add(inst);
 
-      const isClutter = /^(ManholeCover|TrashBag|TrashCan|Fern|Calathea|PowerBox|Shrub|Pachira|PlanterBox|AirconUnit)/.test(namePrefix);
+      const isClutter = /^(ManholeCover|TrashBag|TrashCan|Fern|Calathea|PowerBox|Shrub|Pachira|PlanterBox|AirconUnit|FireEscape|RoadBarrier|FireHydrant)/.test(namePrefix);
       if (isClutter) {
         city.clutterMeshes.push(inst);
         const qMatch = namePrefix.match(/_(NW|NE|SW|SE)/);
@@ -1155,6 +1586,19 @@
     getAngkotProto,
     getTransJakartaBusProto,
     getOjolProto,
+    getParkBenchProto,
+    getRoadBarrierProto,
+    getStreetLampProto,
+    getFireHydrantProto,
+    getPowerPoleProto,
+    getPowerBoxProto,
+    getManholeProto,
+    getTrashCanProto,
+    getTrashBagProto,
+    getPlanterBoxProto,
+    getFoliageCardProto,
+    createLootboxVisual,
+    updateLootboxVisuals,
     getGerobakProto,
     getTrafficSignalProto,
     extractModelProto,

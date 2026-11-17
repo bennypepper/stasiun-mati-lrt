@@ -203,99 +203,104 @@
           <span class="zenith-item-sub">Atmosphere lighting, brightness, render quality &amp; audio</span>
         </button>
 
+        <!-- Collapsible Settings Panel (Directly under SETTINGS) -->
+        <div id="menu-settings-panel" class="zenith-subpanel hidden">
+          <div class="setting-row">
+            <span class="setting-label">DIFFICULTY</span>
+            <div class="zenith-tabs" id="menu-difficulty-group">
+              <button class="zenith-tab" data-difficulty="easy" type="button">EASY</button>
+              <button class="zenith-tab active" data-difficulty="medium" type="button">MEDIUM</button>
+              <button class="zenith-tab" data-difficulty="hard" type="button">HARD</button>
+              <button class="zenith-tab" data-difficulty="nightmare" type="button">NIGHTMARE</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <span class="setting-label">ATMOSPHERE / LIGHTING</span>
+            <button class="zenith-toggle" id="btn-menu-lighting" type="button">DAYLIGHT</button>
+          </div>
+
+          <div class="setting-block">
+            <div class="setting-head">
+              <span class="setting-label">ATMOSPHERE BRIGHTNESS</span>
+              <span class="setting-readout" id="brightness-readout">100% · DARK HORROR</span>
+            </div>
+            <input type="range" id="brightness-slider" class="zenith-slider" min="0.4" max="1.8" step="0.05" value="1.0" aria-label="Atmosphere Brightness">
+          </div>
+
+          <div class="setting-row">
+            <span class="setting-label">RENDER QUALITY</span>
+            <div class="zenith-tabs" id="menu-quality-group">
+              <button class="zenith-tab" data-quality="high" type="button">HIGH</button>
+              <button class="zenith-tab active" data-quality="balanced" type="button">BALANCED</button>
+              <button class="zenith-tab" data-quality="potato" type="button">POTATO</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <span class="setting-label">RENDER SCALE</span>
+            <div class="zenith-tabs" id="menu-resscale-group">
+              <button class="zenith-tab active" data-resscale="floor_720" type="button">720P</button>
+              <button class="zenith-tab" data-resscale="native" type="button">NATIVE</button>
+              <button class="zenith-tab" data-resscale="scale_125" type="button">1.25X</button>
+              <button class="zenith-tab" data-resscale="scale_150" type="button">1.5X</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <span class="setting-label">SHADOWS</span>
+            <button class="zenith-toggle" id="btn-menu-shadows" type="button">ON</button>
+          </div>
+
+          <div class="setting-row">
+            <span class="setting-label">BLOOM</span>
+            <button class="zenith-toggle" id="btn-menu-bloom" type="button">ON</button>
+          </div>
+
+          <div class="setting-row">
+            <span class="setting-label">AO (N8AO)</span>
+            <div class="zenith-tabs" id="menu-ao-group">
+              <button class="zenith-tab active" data-ao="off" type="button">OFF</button>
+              <button class="zenith-tab" data-ao="half" type="button">HALF</button>
+              <button class="zenith-tab" data-ao="full" type="button">FULL</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <span class="setting-label">FPS COUNTER</span>
+            <button class="zenith-toggle is-off" id="btn-menu-fps" type="button">OFF</button>
+          </div>
+
+          <div class="setting-row">
+            <span class="setting-label">AUDIO</span>
+            <button class="zenith-toggle" id="btn-menu-mute" type="button">ON</button>
+          </div>
+        </div>
+
         <button class="zenith-item" id="btn-menu-controls" type="button">
           <span class="zenith-item-title">CONTROLS</span>
           <span class="zenith-item-sub">Operator keybinds &amp; tactical inputs</span>
         </button>
+
+        <!-- Collapsible Controls Panel (Directly under CONTROLS) -->
+        <div id="menu-controls-panel" class="zenith-subpanel hidden">
+          <div class="controls-list">
+            <div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-desc">Move</span></div>
+            <div class="ctrl-row"><span class="ctrl-key">SPACE</span><span class="ctrl-desc">Jump</span></div>
+            <div class="ctrl-row"><span class="ctrl-key">SHIFT / CTRL</span><span class="ctrl-desc">Sprint / Crouch</span></div>
+            <div class="ctrl-row"><span class="ctrl-key">LMB / RMB</span><span class="ctrl-desc">Fire / Aim (ADS)</span></div>
+            <div class="ctrl-row"><span class="ctrl-key">1-4 / WHEEL</span><span class="ctrl-desc">Switch Weapon</span></div>
+            <div class="ctrl-row"><span class="ctrl-key">R</span><span class="ctrl-desc">Reload</span></div>
+            <div class="ctrl-row"><span class="ctrl-key">E</span><span class="ctrl-desc">Interact / Tap Kartu</span></div>
+            <div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-desc">Flashlight</span></div>
+            <div class="ctrl-row"><span class="ctrl-key">L</span><span class="ctrl-desc">Cycle Lighting</span></div>
+            <div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-desc">Summon / Depart LRT</span></div>
+            <div class="ctrl-row"><span class="ctrl-key">F3</span><span class="ctrl-desc">FPS Telemetry</span></div>
+            <div class="ctrl-row"><span class="ctrl-key">H</span><span class="ctrl-desc">Toggle HUD</span></div>
+            <div class="ctrl-row"><span class="ctrl-key">M</span><span class="ctrl-desc">Mute Audio</span></div>
+          </div>
+        </div>
       </nav>
-
-      <!-- Collapsible Settings Panel (Hidden by Default) -->
-      <div id="menu-settings-panel" class="zenith-subpanel hidden">
-        <div class="setting-row">
-          <span class="setting-label">DIFFICULTY</span>
-          <div class="zenith-tabs" id="menu-difficulty-group">
-            <button class="zenith-tab" data-difficulty="easy" type="button">EASY</button>
-            <button class="zenith-tab active" data-difficulty="medium" type="button">MEDIUM</button>
-            <button class="zenith-tab" data-difficulty="hard" type="button">HARD</button>
-            <button class="zenith-tab" data-difficulty="nightmare" type="button">NIGHTMARE</button>
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">ATMOSPHERE / LIGHTING</span>
-          <button class="zenith-toggle" id="btn-menu-lighting" type="button">DAYLIGHT</button>
-        </div>
-
-        <div class="setting-block">
-          <div class="setting-head">
-            <span class="setting-label">ATMOSPHERE BRIGHTNESS</span>
-            <span class="setting-readout" id="brightness-readout">100% · DARK HORROR</span>
-          </div>
-          <input type="range" id="brightness-slider" class="zenith-slider" min="0.4" max="1.8" step="0.05" value="1.0" aria-label="Atmosphere Brightness">
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">RENDER QUALITY</span>
-          <div class="zenith-tabs" id="menu-quality-group">
-            <button class="zenith-tab" data-quality="high" type="button">HIGH</button>
-            <button class="zenith-tab active" data-quality="balanced" type="button">BALANCED</button>
-            <button class="zenith-tab" data-quality="potato" type="button">POTATO</button>
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">RENDER SCALE</span>
-          <div class="zenith-tabs" id="menu-resscale-group">
-            <button class="zenith-tab active" data-resscale="floor_720" type="button">720P</button>
-            <button class="zenith-tab" data-resscale="native" type="button">NATIVE</button>
-            <button class="zenith-tab" data-resscale="scale_125" type="button">1.25X</button>
-            <button class="zenith-tab" data-resscale="scale_150" type="button">1.5X</button>
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">SHADOWS</span>
-          <button class="zenith-toggle" id="btn-menu-shadows" type="button">ON</button>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">BLOOM</span>
-          <button class="zenith-toggle" id="btn-menu-bloom" type="button">ON</button>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">AO (N8AO)</span>
-          <div class="zenith-tabs" id="menu-ao-group">
-            <button class="zenith-tab active" data-ao="off" type="button">OFF</button>
-            <button class="zenith-tab" data-ao="half" type="button">HALF</button>
-            <button class="zenith-tab" data-ao="full" type="button">FULL</button>
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">AUDIO</span>
-          <button class="zenith-toggle" id="btn-menu-mute" type="button">ON</button>
-        </div>
-      </div>
-
-      <!-- Collapsible Controls Panel (Hidden by Default) -->
-      <div id="menu-controls-panel" class="zenith-subpanel hidden">
-        <div class="controls-list">
-          <div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-desc">Move</span></div>
-          <div class="ctrl-row"><span class="ctrl-key">SPACE</span><span class="ctrl-desc">Jump</span></div>
-          <div class="ctrl-row"><span class="ctrl-key">SHIFT / CTRL</span><span class="ctrl-desc">Sprint / Crouch</span></div>
-          <div class="ctrl-row"><span class="ctrl-key">LMB / RMB</span><span class="ctrl-desc">Fire / Aim (ADS)</span></div>
-          <div class="ctrl-row"><span class="ctrl-key">1-4 / WHEEL</span><span class="ctrl-desc">Switch Weapon</span></div>
-          <div class="ctrl-row"><span class="ctrl-key">R</span><span class="ctrl-desc">Reload</span></div>
-          <div class="ctrl-row"><span class="ctrl-key">E</span><span class="ctrl-desc">Interact / Tap Kartu</span></div>
-          <div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-desc">Flashlight</span></div>
-          <div class="ctrl-row"><span class="ctrl-key">L</span><span class="ctrl-desc">Cycle Lighting</span></div>
-          <div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-desc">Summon / Depart LRT</span></div>
-          <div class="ctrl-row"><span class="ctrl-key">F3</span><span class="ctrl-desc">FPS Telemetry</span></div>
-          <div class="ctrl-row"><span class="ctrl-key">H</span><span class="ctrl-desc">Toggle HUD</span></div>
-          <div class="ctrl-row"><span class="ctrl-key">M</span><span class="ctrl-desc">Mute Audio</span></div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -379,6 +384,11 @@
             <button class="zenith-tab" data-ao="half" type="button">HALF</button>
             <button class="zenith-tab" data-ao="full" type="button">FULL</button>
           </div>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-label">FPS COUNTER</span>
+          <button class="zenith-toggle is-off" id="btn-pause-fps" type="button">OFF</button>
         </div>
 
         <div class="setting-row">

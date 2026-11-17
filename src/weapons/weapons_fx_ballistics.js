@@ -512,6 +512,39 @@
     W._flashLightTimer = duration;
   }
 
+  function emitCityDamageFx(evList, fallbackPt, norm, isExplosion) {
+    if (!evList || evList.length === 0) return;
+    for (let i = 0; i < evList.length; i++) {
+      const ev = evList[i];
+      const ep = _v3.set(ev.x, ev.y, ev.z);
+      if (ev.kind === 'hydrant') {
+        spawnSparks(ep, 10, _upVec);
+        for (let k = 0; k < 14; k++) {
+          _v1.set((Math.random() - 0.5) * 2.2, 3.8 + Math.random() * 4.2, (Math.random() - 0.5) * 2.2);
+          spawnSmoke(ep, _v1, 0.25, 1.35, 0.9, 0xdbeafe);
+        }
+      } else if (ev.kind === 'vehicle' || ev.kind === 'bus' || ev.kind === 'bike') {
+        spawnSparks(fallbackPt || ep, isExplosion ? 16 : 8, norm || _upVec);
+        if (ev.justDamaged || isExplosion) {
+          for (let k = 0; k < (isExplosion ? 8 : 4); k++) {
+            _v1.set((Math.random() - 0.5) * 1.4, 1.4 + Math.random() * 2.2, (Math.random() - 0.5) * 1.4);
+            spawnSmoke(ep, _v1, 0.35, 1.8, 0.9, 0x26292e);
+          }
+          if (ev.kind !== 'bike') spawnGlassShards(fallbackPt || ep, isExplosion ? 6 : 2);
+          if (LRT.Audio && LRT.Audio.play && ev.justDamaged) {
+            LRT.Audio.play('impact_metal', { gain: 0.72, pitchVar: 0.1 });
+          }
+        }
+      } else if (ev.kind === 'wood_stall') {
+        spawnRubble(fallbackPt || ep, isExplosion ? 10 : 5, norm || _upVec);
+        _v1.set((Math.random() - 0.5) * 1.6, 1.2 + Math.random() * 1.5, (Math.random() - 0.5) * 1.6);
+        spawnSmoke(ep, _v1, 0.24, 1.1, 0.65, 0xcbd5e1);
+      } else {
+        spawnSparks(fallbackPt || ep, isExplosion ? 10 : 5, norm || _upVec);
+      }
+    }
+  }
+
   function applyExplosion(origin, radius, maxDmg, impulse, fromEnemy) {
     if (!origin) return;
     const rad = radius !== undefined ? radius : 6.5;
@@ -548,9 +581,13 @@
       LRT.Enemies.applyBlast(origVec, rad, dmg, imp);
     }
 
-    // 3. Station destruction (pillars, glass, dynamic props, lights)
+    // 3. Station & City destruction (pillars, glass, dynamic props, lights, vehicles, hydrants, stalls)
     if (!enemyBlast && LRT.Station && typeof LRT.Station.damageAt === 'function') {
       LRT.Station.damageAt(origVec, rad, dmg, imp, true);
+    }
+    if (!enemyBlast && LRT.City && typeof LRT.City.damageAt === 'function') {
+      const cityEvs = LRT.City.damageAt(origVec, rad, dmg, true);
+      emitCityDamageFx(cityEvs, origVec, _upVec, true);
     }
 
     // 4. Train destruction (windows, livery dent/char, seats, straps, LCDs)
@@ -903,6 +940,10 @@
         let stDmgRes = null;
         if (LRT.Station && typeof LRT.Station.damageAt === 'function') {
           stDmgRes = LRT.Station.damageAt(pt, 0.45, Math.round((wCfg.damage || 25) * dmgScale), wCfg.knockback || 2.0, false, _shotDir);
+        }
+        if (LRT.City && typeof LRT.City.damageAt === 'function') {
+          const cityEvs = LRT.City.damageAt(pt, 0.85, Math.round((wCfg.damage || 25) * dmgScale), false);
+          if (cityEvs && cityEvs.length > 0 && p === 0) emitCityDamageFx(cityEvs, pt, norm, false);
         }
         const afterGlass = (LRT.Station && typeof LRT.Station.getStats === 'function') ? (LRT.Station.getStats().brokenGlassCount || 0) : prevGlass;
         const paneJustShattered = afterGlass > prevGlass || !!(stDmgRes && stDmgRes.shardsSpawned);

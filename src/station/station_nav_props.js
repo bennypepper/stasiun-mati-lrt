@@ -491,7 +491,35 @@
         paintPropSpecs.push({ x: tx, y: 0.45, z: bz + 2.2, sx: 0.55, sy: 0.90, sz: 0.40, rx: 0, ry: 0, rz: 0, color: 0x3b82c4, halfH: 0.45, dynamic: true });
       }
       if (!isInStairExclusion(tx, bz, 0.5, 1.2)) {
-        metalPropSpecs.push({ x: tx, y: 0.26, z: bz, sx: 0.56, sy: 0.52, sz: 2.1, rx: 0, ry: 0, rz: 0, color: 0x383e44, halfH: 0.26, dynamic: true });
+        const cityInt = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.city;
+        const benchProto = (cityInt && typeof cityInt.getParkBenchProto === 'function') ? cityInt.getParkBenchProto() : null;
+        if (benchProto && benchProto.parts && benchProto.parts.length) {
+          const bGrp = new THREE.Group();
+          bGrp.position.set(tx, 0.0, bz);
+          bGrp.rotation.y = Math.PI * 0.5;
+          for (let bp = 0; bp < benchProto.parts.length; bp++) {
+            const bm = new THREE.Mesh(benchProto.parts[bp].geo, benchProto.parts[bp].mat);
+            bm.castShadow = false;
+            bm.receiveShadow = true;
+            bGrp.add(bm);
+          }
+          root.add(bGrp);
+          station._addCollider(tx - 0.36, 0.0, bz - 0.96, tx + 0.36, 0.88, bz + 0.96, 'wood', { blocksBullets: false });
+          station.interactables.push({
+            id: 'bench_plat_' + bi,
+            type: 'bench',
+            x: tx,
+            y: 0.55,
+            z: bz,
+            seatPos: { x: tx + 0.14, y: 0.02, z: bz },
+            standPos: { x: tx + 0.92, y: 0.02, z: bz },
+            yaw: -Math.PI * 0.5,
+            label: '[E] Duduk di Bangku Peron',
+            prompt: '[E] Duduk di Bangku Peron'
+          });
+        } else {
+          metalPropSpecs.push({ x: tx, y: 0.26, z: bz, sx: 0.56, sy: 0.52, sz: 2.1, rx: 0, ry: 0, rz: 0, color: 0x383e44, halfH: 0.26, dynamic: true });
+        }
       }
       if (rng() > 0.3 && !isInStairExclusion(tx - 0.5, bz - 2.6, 0.5, 0.5)) {
         paintPropSpecs.push({ x: tx - 0.5, y: 0.32, z: bz - 2.6, sx: 0.46, sy: 0.64, sz: 0.28, rx: rng() > 0.5 ? 1.4 : 0, ry: rng() * 3, rz: 0, color: rng() > 0.5 ? 0x7c2d2d : 0x2f3b4a, halfH: 0.24, dynamic: true });
@@ -698,30 +726,29 @@
     station._placeNormalizedModel('ammo_box', supX + 0.85, UPPER_FLOOR_Y, supZ, 0.25, 0.26);
 
     // =========================================================
-    // 9B. TACTICAL LOOTBOX CRATES (2 PER STATION)
+    // 9B. TACTICAL LOOTBOX CRATES (2 PER STATION — Hinged Lid & Yellow Halo)
     // =========================================================
     station._lootboxGlows = new Map();
-    const glowStripGeo = new THREE.BoxGeometry(0.46, 0.035, 0.08);
-    station.disposableGeometries.push(glowStripGeo);
+    station._lootboxVisuals = [];
     const placeLootbox = (id, lx, ly, lz, ry, riskLuck, title) => {
       const used = station._usedIds.has(id);
-      station._placeNormalizedModel('ammo_box', lx, ly, lz, ry, 0.38);
-      const glowColor = riskLuck >= 0.5 ? 0xc084fc : 0x34d399;
-      const glowMat = new THREE.MeshBasicMaterial({
-        color: glowColor,
-        transparent: true,
-        opacity: 0.92
+      const cityInt = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.city;
+      if (cityInt && typeof cityInt.createLootboxVisual === 'function') {
+        const vis = cityInt.createLootboxVisual(
+          root, station.disposableGeometries, station.disposableMaterials,
+          id, lx, ly, lz, ry, used
+        );
+        station._lootboxVisuals.push(vis);
+        station._lootboxGlows.set(id, vis.haloGroup);
+      } else {
+        station._placeNormalizedModel('ammo_box', lx, ly, lz, ry, 0.38);
+      }
+      station._addCollider(lx - 0.50, ly, lz - 0.50, lx + 0.50, ly + 0.64, lz + 0.50, 'metal', {
+        blocksWalk: true, blocksBullets: false
       });
-      station.disposableMaterials.push(glowMat);
-      const glowMesh = new THREE.Mesh(glowStripGeo, glowMat);
-      glowMesh.position.set(lx, ly + 0.39, lz);
-      glowMesh.rotation.y = ry;
-      glowMesh.visible = !used;
-      root.add(glowMesh);
-      station._lootboxGlows.set(id, glowMesh);
 
       const tierTag = riskLuck >= 0.5 ? '(Risiko Tinggi — Amunisi Berat & Medis)' : '(Amunisi Taktis & Medis)';
-      const lbl = used ? `[E] ${title} (Sudah Dibuka)` : `[E] Buka ${title} ${tierTag}`;
+      const lbl = used ? `[E] ${title} (Sudah Dibuka)` : `[E / Klik] Buka ${title} ${tierTag}`;
       station.interactables.push({
         id: id,
         type: 'lootbox',

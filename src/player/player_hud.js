@@ -101,7 +101,8 @@
       'menu-resscale-group', 'pause-resscale-group',
       'btn-menu-shadows', 'btn-pause-shadows',
       'btn-menu-bloom', 'btn-pause-bloom',
-      'menu-ao-group', 'pause-ao-group'
+      'menu-ao-group', 'pause-ao-group',
+      'btn-menu-fps', 'btn-pause-fps'
     ];
     for (const id of ids) {
       dom[id] = document.getElementById(id);
@@ -325,6 +326,14 @@
     syncTabGroup([dom['menu-ao-group'], dom['pause-ao-group']], 'ao', aoKey || 'off');
   }
 
+  function syncFpsUi(enabled) {
+    const isOn = !!enabled;
+    syncToggleButtons([dom['btn-menu-fps'], dom['btn-pause-fps']], isOn, 'ON', 'OFF', 'is-off');
+    if (dom['fps-readout']) {
+      dom['fps-readout'].classList.toggle('hidden', !isOn);
+    }
+  }
+
   function syncAllSettingsUi(settings) {
     const s = settings || {};
     syncDifficultyUi(s.difficultyKey || s.difficulty || 'medium');
@@ -333,6 +342,7 @@
     syncShadowsUi(s.shadowsEnabled !== undefined ? s.shadowsEnabled : (s.shadows !== undefined ? s.shadows : true));
     syncBloomUi(s.bloomEnabled !== undefined ? s.bloomEnabled : (s.bloom !== undefined ? s.bloom : true));
     syncAoUi(s.aoMode || s.ao || 'off');
+    syncFpsUi(s.fpsCounterEnabled !== undefined ? s.fpsCounterEnabled : false);
     if (typeof s.brightness === 'number') {
       syncBrightnessUi(s.brightness);
     } else if (LRT.Main && typeof LRT.Main.getBrightness === 'function') {
@@ -895,6 +905,7 @@
     syncShadowsUi,
     syncBloomUi,
     syncAoUi,
+    syncFpsUi,
     syncAllSettingsUi,
     syncBrightnessUi,
     syncLightingUi,
@@ -918,11 +929,20 @@
     setLook: (yaw, pitch) => {
       PL.state.yaw = yaw;
       PL.state.pitch = Math.max(-1.46, Math.min(1.46, pitch));
+      if (PL.refs.camera) {
+        PL.refs.camera.rotation.order = 'YXZ';
+        PL.refs.camera.rotation.set(PL.state.pitch, PL.state.yaw, 0);
+        PL.refs.camera.updateMatrixWorld();
+      }
     },
     setPosition: (x, y, z) => {
       PL.state.pos.set(x, y, z);
       PL.state.vel.set(0, 0, 0);
       PL.state.lastSafePos.copy(PL.state.pos);
+      if (PL.refs.camera) {
+        PL.refs.camera.position.set(x, y + PL.state.eyeHeight, z);
+        PL.refs.camera.updateMatrixWorld();
+      }
     },
     applyImpulse: (vx, vy, vz) => {
       PL.state.vel.x += vx || 0;

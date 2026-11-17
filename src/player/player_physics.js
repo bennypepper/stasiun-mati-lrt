@@ -49,6 +49,7 @@
     maxArmor: 100,
     isInsideTrain: false,
     isSitting: false,
+    sitSource: null,
     seatLocalPos: null,
     standLocalPos: null,
     flashlightOn: false,
@@ -148,6 +149,7 @@
     if (!seatLocal) return;
     const tz = (LRT.Train && LRT.Train.getOffsetZ) ? LRT.Train.getOffsetZ() : 0;
     state.isSitting = true;
+    state.sitSource = 'train';
     state.seatLocalPos = { x: seatLocal.x, y: seatLocal.y || 0, z: seatLocal.z, yaw: seatLocal.yaw };
     state.standLocalPos = standLocal
       ? { x: standLocal.x, y: standLocal.y || 0, z: standLocal.z }
@@ -167,14 +169,47 @@
     state.isInsideTrain = true;
   }
 
+  function sitOnWorldBench(seatWorld, standWorld, yaw) {
+    if (!seatWorld) return;
+    state.isSitting = true;
+    state.sitSource = 'world';
+    state.seatLocalPos = { x: seatWorld.x, y: seatWorld.y || 0, z: seatWorld.z, yaw: typeof yaw === 'number' ? yaw : state.yaw };
+    state.standLocalPos = standWorld
+      ? { x: standWorld.x, y: standWorld.y || 0, z: standWorld.z }
+      : { x: state.pos.x, y: state.pos.y, z: state.pos.z };
+    if (typeof state.seatLocalPos.yaw === 'number') state.yaw = state.seatLocalPos.yaw;
+    state.pitch = 0;
+    state.vel.set(0, 0, 0);
+    state.grounded = true;
+    state.crouching = false;
+    state.sprinting = false;
+    state.isInsideTrain = false;
+    state.pos.set(seatWorld.x, seatWorld.y || 0, seatWorld.z);
+    state.lastSafePos.copy(state.pos);
+  }
+
   function standFromSeat(silent) {
     if (!state.isSitting) return;
+    const wasWorld = state.sitSource === 'world';
+    const sl = state.standLocalPos || { x: state.pos.x, y: state.pos.y, z: state.pos.z };
+    if (wasWorld) {
+      state.isSitting = false;
+      state.sitSource = null;
+      state.pos.set(sl.x, sl.y || 0, sl.z);
+      state.vel.set(0, 0, 0);
+      state.grounded = true;
+      state.seatLocalPos = null;
+      state.standLocalPos = null;
+      state.lastSafePos.copy(state.pos);
+      if (!silent && PL.setNotice) PL.setNotice('Berdiri dari bangku', '#94a3b8');
+      return;
+    }
     const tz = (LRT.Train && LRT.Train.getOffsetZ) ? LRT.Train.getOffsetZ() : 0;
-    const sl = state.standLocalPos || { x: 0.0, y: 0.0, z: state.seatLocalPos ? state.seatLocalPos.z : 0.0 };
     const worldStand = (LRT.Train && LRT.Train.localToWorld)
       ? LRT.Train.localToWorld(sl)
       : { x: sl.x, y: sl.y || 0.02, z: sl.z + tz };
     state.isSitting = false;
+    state.sitSource = null;
     state.pos.set(worldStand.x, worldStand.y || 0.02, worldStand.z);
     state.vel.set(0, 0, 0);
     state.grounded = true;
@@ -212,6 +247,9 @@
     }
 
     if (res) {
+      if (res.action === 'sit_bench' && res.seatPos) {
+        sitOnWorldBench(res.seatPos, res.standPos || state.pos, res.yaw);
+      }
       const healAmt = res.healAmount ?? res.heal ?? 0;
       if (healAmt > 0 && state.health < state.maxHealth) {
         state.health = Math.min(state.maxHealth, state.health + healAmt);
@@ -258,7 +296,12 @@
       } else if (e.code === 'KeyH') {
         if (PL.toggleHud) PL.toggleHud();
       } else if (e.code === 'F3') {
-        if (PL.dom && PL.dom['fps-readout']) PL.dom['fps-readout'].classList.toggle('hidden');
+        if (LRT.Main && typeof LRT.Main.setFpsCounterEnabled === 'function' && typeof LRT.Main.getRenderSettings === 'function') {
+          const cur = !!LRT.Main.getRenderSettings().fpsCounterEnabled;
+          LRT.Main.setFpsCounterEnabled(!cur);
+        } else if (PL.dom && PL.dom['fps-readout']) {
+          PL.dom['fps-readout'].classList.toggle('hidden');
+        }
       } else if (e.code === 'KeyM') {
         if (LRT.Audio) {
           LRT.Audio.setMute(!LRT.Audio.isMuted());
@@ -312,6 +355,10 @@
         requestLock();
       }
       if (e.button === 0) {
+        if (state.activeInteractable && state.activeInteractable.type === 'lootbox' && !state.activeInteractable.used && !state.ads) {
+          triggerInteract();
+          return;
+        }
         if (callbacks.onWeaponShootDown) callbacks.onWeaponShootDown();
         else if (LRT.Weapons) LRT.Weapons.fireDown();
       } else if (e.button === 2) {
@@ -711,7 +758,21 @@
 
     let horizSpeed = 0;
     if (state.isSitting && state.seatLocalPos) {
-      if (!LRT.Train || !LRT.Train.getState || LRT.Train.getState() === 'AWAY') {
+      if (state.sitSource === 'world') {
+        if (keys.KeyW || keys.KeyS || keys.KeyA || keys.KeyD || keys.ArrowUp || keys.ArrowDown || keys.ArrowLeft || keys.ArrowRight) {
+          standFromSeat(false);
+        } else {
+          state.pos.set(state.seatLocalPos.x, state.seatLocalPos.y || 0, state.seatLocalPos.z);
+          state.vel.set(0, 0, 0);
+          state.grounded = true;
+          state.crouching = false;
+          state.sprinting = false;
+          state.isInsideTrain = false;
+          state.speed = 0;
+          state.eyeHeight += (1.12 - state.eyeHeight) * Math.min(1, dt * 12);
+          state.bobPhase = 0;
+        }
+      } else if (!LRT.Train || !LRT.Train.getState || LRT.Train.getState() === 'AWAY') {
         standFromSeat(true);
       } else {
         const tz = LRT.Train.getOffsetZ ? LRT.Train.getOffsetZ() : 0;
@@ -977,6 +1038,7 @@
     state.invulnerable = !!invulnerable;
     state.isInsideTrain = false;
     state.isSitting = false;
+    state.sitSource = null;
     state.seatLocalPos = null;
     state.standLocalPos = null;
     state.ads = false;

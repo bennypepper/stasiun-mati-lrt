@@ -57,6 +57,7 @@
     _coolLightAnchors: [],
     _cawangHazardRing: null,
     _lootboxGlows: null,
+    _lootboxVisuals: null,
     _activeObjectiveIds: new Set(),
     _objectiveBeacons: [],
     _beaconMats: null,
@@ -217,6 +218,7 @@
       this._coolLightAnchors = [];
       this._cawangHazardRing = null;
       this._lootboxGlows = null;
+      this._lootboxVisuals = null;
       this._activeObjectiveIds = new Set();
       this._objectiveBeacons = [];
       this._beaconMats = null;
@@ -497,18 +499,23 @@
       return this.setStreetLightIntensity(val);
     },
 
-    update: function (dt, playerPos) {
+    update: function (dt, playerPos, camForward, difficultyKey) {
       if (!this.rootGroup) return;
       this._timeAccum += dt;
       this._beaconSharedTime.value = this._timeAccum;
 
+      const offsetZ = this.rootGroup.position.z || 0;
+      const pRef = playerPos || (LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function' ? LRT.PlayerUI.getState().pos : null);
+
       if (LRT.City && typeof LRT.City.update === 'function') {
-        LRT.City.update(dt, this._timeAccum);
+        LRT.City.update(dt, this._timeAccum, pRef, camForward, difficultyKey);
+      }
+      const cityInt = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.city;
+      if (this._lootboxVisuals && this._lootboxVisuals.length > 0 && cityInt && typeof cityInt.updateLootboxVisuals === 'function') {
+        cityInt.updateLootboxVisuals(this._lootboxVisuals, dt, this._timeAccum, pRef, camForward, difficultyKey, offsetZ);
       }
 
       // Resolve local player coordinates for pooled light tracking
-      const offsetZ = this.rootGroup.position.z || 0;
-      const pRef = playerPos || (LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function' ? LRT.PlayerUI.getState().pos : null);
       const px = pRef ? pRef.x : 4.2;
       const py = pRef ? pRef.y : 0.0;
       const pz = (pRef ? pRef.z : -6.0) - offsetZ;
@@ -813,10 +820,9 @@
           item: it
         });
 
-        if (!MISSION_IDS.has(it.id) && !isLootbox) continue;
+        if (isLootbox || !MISSION_IDS.has(it.id)) continue;
 
-        const defaultTier = isTrain ? this._beaconMats.cyan
-          : (isLootbox ? ((it.riskLuck || 0) >= 0.5 ? this._beaconMats.lootViolet : this._beaconMats.lootEmerald) : this._beaconMats.amber);
+        const defaultTier = isTrain ? this._beaconMats.cyan : this._beaconMats.amber;
 
         const grp = new THREE.Group();
         grp.position.set(it.x, it.y, it.z);
@@ -1576,6 +1582,21 @@
         return res;
       }
 
+      if (it.type === 'bench') {
+        const oz = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
+        const sp = it.seatPos || { x: it.x, y: it.y - 0.5, z: it.z };
+        const stp = it.standPos || { x: it.x, y: it.y - 0.5, z: it.z };
+        return {
+          ok: true,
+          type: 'bench',
+          action: 'sit_bench',
+          seatPos: { x: sp.x, y: sp.y, z: sp.z + oz },
+          standPos: { x: stp.x, y: stp.y, z: stp.z + oz },
+          yaw: typeof it.yaw === 'number' ? it.yaw : undefined,
+          message: 'Duduk di bangku peron — tekan [E] atau WASD untuk berdiri'
+        };
+      }
+
       if (it.type === 'lootbox') {
         if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('turnstile_beep', { gain: 0.7 });
         const fresh = !it.used;
@@ -1587,6 +1608,13 @@
         if (this._lootboxGlows && this._lootboxGlows.has(id)) {
           const gm = this._lootboxGlows.get(id);
           if (gm) gm.visible = false;
+        }
+        if (this._lootboxVisuals) {
+          for (let i = 0; i < this._lootboxVisuals.length; i++) {
+            if (this._lootboxVisuals[i].id === id) {
+              this._lootboxVisuals[i].used = true;
+            }
+          }
         }
         this._syncObjectiveBeacons();
         return {

@@ -458,7 +458,7 @@
           metalness: 0.04,
           clearcoat: 0.45,
           clearcoatRoughness: 0.24,
-          envMapIntensity: 1.25
+          envMapIntensity: 0.72
         })), u, { wetTerrazzo: true, minRough: 0.26 }),
 
         checkerFloor: applyWorldWeatheringShader(new THREE.MeshPhysicalMaterial(makePbrProps(checker, {
@@ -467,28 +467,31 @@
           metalness: 0.04,
           clearcoat: 0.58,
           clearcoatRoughness: 0.18,
-          envMapIntensity: 1.35
+          envMapIntensity: 0.78
         })), u, { wetTerrazzo: true, minRough: 0.22 }),
 
         asphaltRoad: applyWorldWeatheringShader(new THREE.MeshStandardMaterial(makePbrProps(asphalt, {
-          color: 0x4c515a,
+          color: 0x454a52,
           normalScale: new THREE.Vector2(1.08, 1.08),
-          roughness: 0.78,
-          metalness: 0.04
-        })), u, { minRough: 0.28, mossStrength: 0.06 }),
+          roughness: 0.80,
+          metalness: 0.04,
+          envMapIntensity: 0.42
+        })), u, { minRough: 0.34, mossStrength: 0.06 }),
 
         highwayAsphalt: applyWorldWeatheringShader(new THREE.MeshStandardMaterial(makePbrProps(asphalt, {
-          color: 0x4c515a,
+          color: 0x454a52,
           normalScale: new THREE.Vector2(1.08, 1.08),
-          roughness: 0.78,
-          metalness: 0.04
-        })), u, { minRough: 0.28, mossStrength: 0.06 }),
+          roughness: 0.80,
+          metalness: 0.04,
+          envMapIntensity: 0.42
+        })), u, { minRough: 0.34, mossStrength: 0.06 }),
 
         sidewalkPaver: applyWorldWeatheringShader(new THREE.MeshStandardMaterial(makePbrProps(sidewalkPaver, {
           normalScale: new THREE.Vector2(1.0, 1.0),
-          roughness: 0.82,
-          metalness: 0.02
-        })), u, { minRough: 0.56, mossStrength: 0.18 }),
+          roughness: 0.84,
+          metalness: 0.02,
+          envMapIntensity: 0.45
+        })), u, { minRough: 0.58, mossStrength: 0.18 }),
 
         tactile: applyWorldWeatheringShader(new THREE.MeshStandardMaterial({
           map: tactile.map,

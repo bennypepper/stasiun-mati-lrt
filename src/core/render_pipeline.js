@@ -21,7 +21,7 @@
   CORE.sunLight = null;
 
   const SETTINGS_STORAGE_KEY = 'lrt_settings_v1';
-  const SHADOW_DYNAMIC_INTERVAL = 1 / 12; // max ~12 Hz dynamic shadow refresh while moving/in combat
+  const SHADOW_DYNAMIC_INTERVAL = 1 / 8; // max ~8 Hz dynamic shadow refresh while moving/in combat
   const SHADOW_SHIFT_SQ = 9.0; // 3.0m^2 sun target shift threshold
 
   CORE.gameState = CORE.gameState || STATES.MENU;
@@ -30,6 +30,7 @@
   CORE.shadowsEnabled = true;
   CORE.bloomEnabled = true;
   CORE.aoMode = 'off';
+  CORE.fpsCounterEnabled = false;
   CORE.difficultyKey = 'medium';
   CORE.currentLightingKey = 'DAYLIGHT_CLEAR';
   CORE.lightingLockedByUser = false;
@@ -89,6 +90,9 @@
       if (parsed.aoMode === 'off' || parsed.aoMode === 'half' || parsed.aoMode === 'full') {
         CORE.aoMode = parsed.aoMode;
       }
+      if (typeof parsed.fpsCounterEnabled === 'boolean') {
+        CORE.fpsCounterEnabled = parsed.fpsCounterEnabled;
+      }
       if (parsed.difficultyKey && C.DIFFICULTY_TIERS && (parsed.difficultyKey in C.DIFFICULTY_TIERS)) {
         CORE.difficultyKey = parsed.difficultyKey;
       }
@@ -107,6 +111,7 @@
         shadowsEnabled: CORE.shadowsEnabled,
         bloomEnabled: CORE.bloomEnabled,
         aoMode: CORE.aoMode,
+        fpsCounterEnabled: CORE.fpsCounterEnabled,
         difficultyKey: CORE.difficultyKey,
         brightness: CORE.currentBrightness
       }));
@@ -120,6 +125,7 @@
       shadowsEnabled: CORE.shadowsEnabled,
       bloomEnabled: CORE.bloomEnabled,
       aoMode: CORE.aoMode,
+      fpsCounterEnabled: CORE.fpsCounterEnabled,
       difficultyKey: CORE.difficultyKey,
       brightness: CORE.currentBrightness
     };
@@ -306,6 +312,13 @@
     saveSettings();
     syncSettingsUi();
     return CORE.aoMode;
+  }
+
+  function setFpsCounterEnabled(flag) {
+    CORE.fpsCounterEnabled = !!flag;
+    saveSettings();
+    syncSettingsUi();
+    return CORE.fpsCounterEnabled;
   }
 
   function setDifficulty(key) {
@@ -502,7 +515,7 @@
   function updateSunTracking(focusX, focusZ) {
     if (!CORE.sunLight) return;
     const mapSize = CORE.sunLight.shadow.mapSize.width || 1024;
-    const texelWorld = 110.0 / mapSize;
+    const texelWorld = 76.0 / mapSize;
 
     _sunRight.crossVectors(_upAxis, _sunDir);
     if (_sunRight.lengthSq() < 1e-5) _sunRight.set(1, 0, 0);
@@ -538,57 +551,71 @@
     const b = CORE.currentBrightness;
     const isMenu = CORE.gameState === STATES.MENU;
     const over = Math.max(0, b - 1.0);
-    const lightScale = b <= 1.0 ? Math.pow(b, 1.35) : 1.0;
+    const lightScale = baseMood.isDaylight
+      ? (b <= 1.0 ? Math.pow(b, 1.35) : 1.0)
+      : (b <= 1.0 ? Math.pow(b, 1.85) : 1.0);
 
     syncMenuLights();
 
     if (CORE.hemiLight) {
-      const baseHemi = baseMood.hemiIntensity * lightScale + over * 0.65;
-      CORE.hemiLight.intensity = baseHemi + (isMenu && !baseMood.isDaylight ? 0.14 : 0);
+      const baseHemi = baseMood.hemiIntensity * lightScale + over * (baseMood.isDaylight ? 0.65 : 0.25);
+      CORE.hemiLight.intensity = baseHemi + (isMenu && !baseMood.isDaylight ? 0.08 : 0);
     }
     if (CORE.sunLight) {
-      const baseSun = baseMood.sunIntensity * lightScale + over * 0.95;
-      CORE.sunLight.intensity = baseSun + (isMenu && !baseMood.isDaylight ? 0.22 : 0);
+      const baseSun = baseMood.sunIntensity * lightScale + over * (baseMood.isDaylight ? 0.95 : 0.35);
+      CORE.sunLight.intensity = baseSun + (isMenu && !baseMood.isDaylight ? 0.14 : 0);
     }
     if (CORE.renderer) {
       const baseExp = baseMood.exposure || 1.05;
-      const exp = b <= 1.0
-        ? Math.max(0.32, baseExp * (0.28 + b * 0.72))
-        : Math.min(1.65, baseExp + over * 0.55);
+      const exp = baseMood.isDaylight
+        ? (b <= 1.0 ? Math.max(0.32, baseExp * (0.28 + b * 0.72)) : Math.min(1.65, baseExp + over * 0.55))
+        : (b <= 1.0 ? Math.max(0.54, baseExp * (0.58 + b * 0.42)) : Math.min(1.45, baseExp + over * 0.42));
       CORE.renderer.toneMappingExposure = exp;
     }
     if (CORE.scene) {
       if ('environmentIntensity' in CORE.scene) {
-        const envVal = b <= 1.0
-          ? Math.max(0.03, baseMood.envIntensity * (0.22 + 0.78 * b))
-          : Math.min(1.85, baseMood.envIntensity + over * 0.85);
-        CORE.scene.environmentIntensity = envVal + (isMenu && !baseMood.isDaylight ? 0.14 : 0);
+        let envVal;
+        if (baseMood.isDaylight) {
+          envVal = b <= 1.0
+            ? Math.max(0.03, baseMood.envIntensity * (0.22 + 0.78 * b))
+            : Math.min(1.85, baseMood.envIntensity + over * 0.85);
+        } else {
+          envVal = b <= 1.0
+            ? Math.max(0.004, baseMood.envIntensity * Math.pow(b, 1.9))
+            : Math.min(0.45, baseMood.envIntensity + over * 0.22);
+        }
+        CORE.scene.environmentIntensity = envVal + (isMenu && !baseMood.isDaylight ? 0.06 : 0);
       }
       if (CORE.scene.fog) {
-        const fogLift = (!baseMood.isDaylight && over > 0) ? Math.min(0.65, (over / 0.8) * 0.65) : 0;
+        const fogLift = (!baseMood.isDaylight && over > 0) ? Math.min(0.42, (over / 0.8) * 0.42) : 0;
         CORE.scene.fog.color.copy(baseMood.fogColor).lerp(_brightFogTarget, fogLift);
         if (CORE.scene.background && CORE.scene.background.isColor) {
           CORE.scene.background.copy(CORE.scene.fog.color);
         }
         if (LRT.Materials) {
           LRT.Materials.uGlobals.uFogHazeColor.value.copy(CORE.scene.fog.color);
-          LRT.Materials.uGlobals.uFogHazeDensity.value = baseMood.isDaylight ? 0.16 : 0.42;
+          LRT.Materials.uGlobals.uFogHazeDensity.value = baseMood.isDaylight ? 0.16 : 0.52;
         }
         if (CORE.scene.fog.isFogExp2) {
           const fogFactor = b <= 1.0
-            ? 1.0 + (1.0 - b) * 0.10
-            : Math.max(0.55, 1.0 - over * 0.50);
+            ? 1.0 + (1.0 - b) * 0.14
+            : Math.max(0.55, 1.0 - over * 0.45);
           CORE.scene.fog.density = baseMood.fogDensity * fogFactor;
         }
       }
     }
     if (CORE.bloomPass) {
-      CORE.bloomPass.strength = baseMood.bloomStrength * (b <= 1.0 ? 0.85 + 0.15 * b : 1.0 + over * 0.25);
+      CORE.bloomPass.strength = baseMood.bloomStrength * (b <= 1.0 ? 0.88 + 0.12 * b : 1.0 + over * 0.25);
     }
-    applyStreetLightsIntensity(baseMood.streetLampIntensity * (b <= 1.0 ? (0.30 + 0.70 * b) : 1.0));
+    const localLampScale = baseMood.isDaylight
+      ? (b <= 1.0 ? (0.30 + 0.70 * b) : 1.0)
+      : (b <= 1.0 ? (0.78 + 0.22 * b) : 1.0 + over * 0.20);
+    applyStreetLightsIntensity(baseMood.streetLampIntensity * localLampScale);
     if (LRT.Materials && LRT.Materials.mats) {
       const m = LRT.Materials.mats;
-      const tubeFactor = b <= 1.0 ? (0.30 + 0.70 * b) : (1.0 + over * 0.55);
+      const tubeFactor = baseMood.isDaylight
+        ? (b <= 1.0 ? (0.30 + 0.70 * b) : (1.0 + over * 0.55))
+        : (b <= 1.0 ? (0.72 + 0.28 * b) : (1.0 + over * 0.45));
       if (m.flickerTube) {
         m.flickerTube.emissiveIntensity = 1.65 * baseMood.tubeIntensity * tubeFactor;
       }
@@ -596,7 +623,7 @@
         m.tubeHalo.opacity = Math.min(0.28, 0.12 * baseMood.tubeIntensity * tubeFactor);
       }
       if (m.skylineBuilding) {
-        m.skylineBuilding.emissiveIntensity = baseMood.isDaylight ? 0.08 : (0.14 + 0.18 * Math.min(1.2, b));
+        m.skylineBuilding.emissiveIntensity = baseMood.isDaylight ? 0.08 : (0.14 + 0.14 * Math.min(1.2, b));
       }
     }
     if (LRT.Train && typeof LRT.Train.syncLights === 'function') {
@@ -786,10 +813,27 @@
 
       CORE.scene.add(warmupGroup);
 
-      if (typeof CORE.renderer.compileAsync === 'function') {
-        await CORE.renderer.compileAsync(CORE.scene, CORE.camera);
-      } else {
-        CORE.renderer.compile(CORE.scene, CORE.camera);
+      // Snapshot & force all scene meshes temporarily visible & unculled so every material/GLTF shader compiles at boot
+      const restoredVis = [];
+      CORE.scene.traverse((obj) => {
+        if (obj.isMesh && !obj.userData?.isShadowProxy) {
+          restoredVis.push({ obj, vis: obj.visible, fc: obj.frustumCulled });
+          obj.visible = true;
+          obj.frustumCulled = false;
+        }
+      });
+      try {
+        if (typeof CORE.renderer.compileAsync === 'function') {
+          await CORE.renderer.compileAsync(CORE.scene, CORE.camera);
+        } else {
+          CORE.renderer.compile(CORE.scene, CORE.camera);
+        }
+      } finally {
+        for (let i = 0; i < restoredVis.length; i++) {
+          const rec = restoredVis[i];
+          rec.obj.visible = rec.vis;
+          rec.obj.frustumCulled = rec.fc;
+        }
       }
     } finally {
       CORE.scene.remove(warmupGroup);
@@ -860,6 +904,7 @@
   CORE.setShadowsEnabled = setShadowsEnabled;
   CORE.setBloomEnabled = setBloomEnabled;
   CORE.setAoMode = setAoMode;
+  CORE.setFpsCounterEnabled = setFpsCounterEnabled;
   CORE.setDifficulty = setDifficulty;
   CORE.getSettings = getSettings;
   CORE.saveSettings = saveSettings;
