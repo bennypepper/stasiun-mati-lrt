@@ -472,10 +472,15 @@
       T.headlightLight.intensity = active ? T.headlightIntensityTarget : 0.0;
     }
     const atm = LRT.Station && typeof LRT.Station.getAtmosphere === 'function' ? LRT.Station.getAtmosphere() : null;
-    const isDay = atm && atm.mood ? !!atm.mood.isDaylight : false;
+    const mBlend = (LRT.Main && typeof LRT.Main.getMoodBlendState === 'function') ? LRT.Main.getMoodBlendState() : null;
+    const dayBlend = (mBlend && mBlend.active)
+      ? (mBlend.daylightBlend !== undefined ? mBlend.daylightBlend : 0.0)
+      : (atm && atm.mood && atm.mood.isDaylight ? 1.0 : 0.0);
+    const nightMix = 1.0 - dayBlend;
     const bright = (LRT.Main && typeof LRT.Main.getBrightness === 'function') ? LRT.Main.getBrightness() : 1.0;
     const bFactor = bright <= 1.0 ? (0.28 + 0.72 * bright) : (1.0 + (bright - 1.0) * 0.35);
-    const baseCabin = isDay ? 1.85 : (0.52 * bFactor);
+    const nightCabin = 0.52 * bFactor;
+    const baseCabin = nightCabin + (1.85 - nightCabin) * dayBlend;
 
     // Resolve player or camera Z to position the single pooled cabin PointLight at the active car
     let focusZ = 0.0;
@@ -497,7 +502,7 @@
       cl.position.set(T.localXToWorld(0), 1.86, T.localZToWorld(anchorZ));
       if (!active) {
         cl.intensity = 0.0;
-      } else if (isDay) {
+      } else if (dayBlend >= 0.999) {
         cl.intensity = baseCabin;
       } else {
         // Eerie dark-mode fluorescent blink/flicker inside train cars (strongest in middle Car 2)
@@ -511,20 +516,22 @@
         } else {
           flick = (s1 < -0.72 && s2 < -0.25) ? 0.28 : (0.76 + 0.24 * s1);
         }
-        cl.intensity = baseCabin * flick;
+        const blendedFlick = 1.0 + (flick - 1.0) * nightMix;
+        cl.intensity = baseCabin * blendedFlick;
       }
     }
-    if (!isDay && active && T.tubeInst && T.tubeInst.geometry && T.tubeInst.geometry.attributes.aTubeState) {
+    if (nightMix > 0.02 && active && T.tubeInst && T.tubeInst.geometry && T.tubeInst.geometry.attributes.aTubeState) {
       const attr = T.tubeInst.geometry.attributes.aTubeState;
       for (let i = 0; i < ceilingTubes.length; i++) {
         const t = ceilingTubes[i];
         if (t.health <= 0.05) continue;
         const flickerGate = Math.sin(T.animTime * (7.0 + t.seed * 3.1) + i * 1.9);
         const drop = (i % 5 === 1 && flickerGate < -0.58) ? 0.12 : (i % 7 === 3 && Math.sin(T.animTime * 19.0 + i) < -0.7 ? 0.25 : 0.72);
-        attr.array[i * 2 + 1] = Math.min(t.health, t.baseHealth * drop);
+        const blendedDrop = 1.0 + (drop - 1.0) * nightMix;
+        attr.array[i * 2 + 1] = Math.min(t.health, t.baseHealth * blendedDrop);
       }
       attr.needsUpdate = true;
-    } else if (isDay && T.tubeInst && T.tubeInst.geometry && T.tubeInst.geometry.attributes.aTubeState) {
+    } else if (nightMix <= 0.02 && T.tubeInst && T.tubeInst.geometry && T.tubeInst.geometry.attributes.aTubeState) {
       const attr = T.tubeInst.geometry.attributes.aTubeState;
       let dirty = false;
       for (let i = 0; i < ceilingTubes.length; i++) {

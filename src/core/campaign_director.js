@@ -24,12 +24,12 @@
   CORE.prevTrainState = 'AWAY';
 
   const CAMPAIGN_MOODS = [
-    'GOLDEN_DUSK',          // 0: Dukuh Atas BSI
-    'TOXIC_SMOG',           // 1: Cawang Interchange
-    'BLACKOUT_EMERGENCY',   // 2: Harjamukti
-    'MONSOON_OVERCAST',     // 3: Kuningan
-    'HAZY_DUSK',            // 4: Cikoko
-    'CRIMSON_BLOOD_MOON'    // 5: Setiabudi
+    'GOLDEN_DUSK',          // 0: Dukuh Atas BSI (Sunset)
+    'HAZY_DUSK',            // 1: Cawang Interchange (Blue-Hour Twilight)
+    'BLACKOUT_EMERGENCY',   // 2: Harjamukti (Blackout Night)
+    'MONSOON_OVERCAST',     // 3: Kuningan (Monsoon Night)
+    'TOXIC_SMOG',           // 4: Cikoko (Toxic Spore Night)
+    'CRIMSON_BLOOD_MOON'    // 5: Setiabudi (Crimson Blood Moon)
   ];
 
   const campaignState = {
@@ -42,11 +42,14 @@
       1: { fuseFound: false, waveCleared: false },
       2: { vaxFound: false, depotDone: false, waveCleared: false },
       3: { plnDone: false, waveCleared: false },
-      4: { waveCleared: false },
+      4: { barricadeCleared: false, waveCleared: false },
       5: { relays: { totem: false, pln: false, jpo: false }, waveCleared: false, omegaActive: false, holdoutElapsed: 0 }
     },
     voTriggered: new Set(),
-    campaignVictory: false
+    collectedLogs: [],
+    campaignVictory: false,
+    firstBarrelExploded: false,
+    barrelCueActive: false
   };
 
   function resetCampaignState() {
@@ -60,12 +63,51 @@
       1: { fuseFound: false, waveCleared: false },
       2: { vaxFound: false, depotDone: false, waveCleared: false },
       3: { plnDone: false, waveCleared: false },
-      4: { waveCleared: false },
+      4: { barricadeCleared: false, waveCleared: false },
       5: { relays: { totem: false, pln: false, jpo: false }, waveCleared: false, omegaActive: false, holdoutElapsed: 0 }
     };
     campaignState.voTriggered.clear();
+    campaignState.collectedLogs.length = 0;
     campaignState.campaignVictory = false;
+    campaignState.firstBarrelExploded = false;
+    campaignState.barrelCueActive = false;
+    if (LRT.Station && typeof LRT.Station.setBarrelCueActive === 'function') {
+      LRT.Station.setBarrelCueActive(false);
+    }
   }
+
+  CORE.recordFieldLog = function (title, body) {
+    if (!title && !body) return;
+    const key = String(title || '').trim();
+    if (!key) return;
+    if (!campaignState.collectedLogs.some((l) => l.title === key)) {
+      campaignState.collectedLogs.push({
+        title: key,
+        body: String(body || ''),
+        stationIndex: CORE.stationIndex
+      });
+    }
+  };
+
+  CORE.onCikokoBarricadeCleared = function () {
+    if (campaignState.stationObjectives[4]) {
+      campaignState.stationObjectives[4].barricadeCleared = true;
+    }
+    if (CORE.stationIndex === 4) {
+      triggerObjectiveSurgeWave(4);
+      if (isStationPrimaryObjectiveComplete(4) && getWaveRemainingCountSafe() === 0) {
+        campaignState.clearedStations.add(CORE.stationIndex);
+      }
+    }
+  };
+
+  CORE.onBarrelExploded = function () {
+    campaignState.firstBarrelExploded = true;
+    campaignState.barrelCueActive = false;
+    if (LRT.Station && typeof LRT.Station.setBarrelCueActive === 'function') {
+      LRT.Station.setBarrelCueActive(false);
+    }
+  };
 
   function saveCurrentStationUsedIds() {
     let existing = campaignState.stationUsedIds.get(CORE.stationIndex);
@@ -462,7 +504,7 @@
     if (idx === 1) return !!obj.fuseFound;
     if (idx === 2) return !!(obj.vaxFound && obj.depotDone);
     if (idx === 3) return !!obj.plnDone;
-    if (idx === 4) return true;
+    if (idx === 4) return !!obj.barricadeCleared;
     if (idx === 5) return !!(obj.relays && obj.relays.totem && obj.relays.pln && obj.relays.jpo);
     return true;
   }
@@ -518,6 +560,7 @@
           else if (s === 1) hint = 'Ambil sekring bypass dari kabin Jalur 4 [E]!';
           else if (s === 2) hint = 'Amankan vaksin (Kebun Atap) & data depot [E]!';
           else if (s === 3) hint = 'Aktifkan kotak relai PLN jalanan [E]!';
+          else if (s === 4) hint = 'Hancurkan barikade jalan tol Cikoko [E / Tembak]!';
           else if (s === 5) hint = 'Hubungkan ketiga relai sinyal evakuasi Setiabudi [E]!';
           if (LRT.Audio) LRT.Audio.play('station_chime', { gain: 0.55 });
           LRT.PlayerUI.setNotice(`OBJEKTIF BELUM SELESAI: ${hint}`, '#e0b422');
@@ -556,6 +599,20 @@
     );
   }
 
+  function initRideMoodTransition() {
+    if (CORE.gameMode !== MODES.SURVIVAL || CORE.lightingLockedByUser) return;
+    const fromIdx = CORE.stationIndex;
+    const toIdx = Math.max(0, fromIdx + CORE.activeTravelDir);
+    const moods = CORE.CAMPAIGN_MOODS || [];
+    const fromMood = moods[fromIdx % 6] || CORE.currentLightingKey || 'GOLDEN_DUSK';
+    const toMood = (fromIdx === 5 && CORE.activeTravelDir === 1)
+      ? fromMood
+      : (moods[toIdx % 6] || fromMood);
+    CORE._rideFromMoodKey = fromMood;
+    CORE._rideToMoodKey = toMood;
+    CORE.isMoodLerping = true;
+  }
+
   function departTrainNow() {
     if (CORE.gameState !== STATES.TRAIN_BOARDING) return;
     if (!LRT.Train) return;
@@ -569,6 +626,7 @@
     LRT.Train.departNow();
     CORE.gameState = STATES.TRAIN_DEPARTING;
     CORE.boardingCloseTimer = 0;
+    initRideMoodTransition();
     LRT.PlayerUI.setNotice('PINTU DITUTUP — BERANGKAT!', '#4ade80');
     campaignState.voTriggered.add('VO_24_DOOR_CLOSE');
     if (LRT.Audio && typeof LRT.Audio.playVoice === 'function') {
@@ -576,8 +634,8 @@
     }
   }
 
-  function handleEnemyDrop(dropPos, dropType, dropMeta) {
-    if (!dropPos || !LRT.Weapons || !LRT.Weapons.addAmmo) return;
+  function collectEnemyDrop(dropType, dropMeta) {
+    if (!LRT.Weapons || !LRT.Weapons.addAmmo) return;
     const meta = dropMeta || {};
     const tierCfg = (C.DIFFICULTY_TIERS && C.DIFFICULTY_TIERS[CORE.difficultyKey]) || {};
     const healMult = typeof meta.healMult === 'number'
@@ -609,17 +667,30 @@
       return;
     }
 
-    const roll = Math.random();
-    if (roll < 0.72) {
-      const rifleAmt = Math.max(1, Math.round(20 * ammoMult));
-      const sgAmt = Math.max(1, Math.round(4 * ammoMult));
-      LRT.Weapons.addAmmo('rifle', rifleAmt);
-      LRT.Weapons.addAmmo('shotgun', sgAmt);
-      LRT.PlayerUI.setNotice('+AMMO RESUPPLY', '#e0b422');
-    } else {
+    if (dropType === 'rpg') {
       LRT.Weapons.addAmmo('rpg', 1);
       LRT.PlayerUI.setNotice('+1 RPG ROCKET', '#f97316');
+      return;
     }
+
+    const rifleAmt = Math.max(1, Math.round(20 * ammoMult));
+    const sgAmt = Math.max(1, Math.round(4 * ammoMult));
+    LRT.Weapons.addAmmo('rifle', rifleAmt);
+    LRT.Weapons.addAmmo('shotgun', sgAmt);
+    LRT.PlayerUI.setNotice('+AMMO RESUPPLY', '#e0b422');
+  }
+
+  function handleEnemyDrop(dropPos, dropType, dropMeta) {
+    if (!dropPos || !LRT.Weapons || !LRT.Weapons.addAmmo) return;
+    let resolvedType = dropType;
+    if (resolvedType !== 'lootcrate' && resolvedType !== 'health' && resolvedType !== 'rpg') {
+      resolvedType = Math.random() < 0.72 ? 'ammo' : 'rpg';
+    }
+    if (CORE.gameMode === MODES.SURVIVAL && LRT.Station && typeof LRT.Station.spawnGroundPickup === 'function') {
+      LRT.Station.spawnGroundPickup(dropPos, resolvedType, dropMeta);
+      return;
+    }
+    collectEnemyDrop(resolvedType, dropMeta);
   }
 
   function handlePlayerHit(dmg, srcPos) {
@@ -862,6 +933,16 @@
     }
 
     if (sIdx === 4) {
+      if (!campaignState.stationObjectives[4] || !campaignState.stationObjectives[4].barricadeCleared) {
+        return {
+          mode: CORE.gameMode,
+          stationName: name,
+          stationCode: code,
+          stationSub: sub,
+          objectiveTitle: 'BREACH HIGHWAY BARRICADE',
+          objectiveDetail: 'Destroy Cikoko Roadblock with [E] Breach Charge or Firepower'
+        };
+      }
       if (alive > 0) {
         return {
           mode: CORE.gameMode,
@@ -929,7 +1010,7 @@
     };
   }
 
-  function getActiveObjectiveTargetIds() {
+  function getBaseObjectiveTargetIds() {
     if (CORE.gameState !== STATES.STATION_ACTIVE) return [];
     if (CORE.gameMode === MODES.EXPLORATION) return ['call_train', 'call_train_p2'];
 
@@ -963,6 +1044,7 @@
       return ['call_train', 'call_train_p2'];
     }
     if (sIdx === 4) {
+      if (!obj.barricadeCleared) return ['cikoko_barricade'];
       if (waveRemaining > 0) return [];
       return ['call_train', 'call_train_p2'];
     }
@@ -978,6 +1060,22 @@
     }
 
     return waveRemaining > 0 ? [] : ['call_train', 'call_train_p2'];
+  }
+
+  function getActiveObjectiveTargetIds() {
+    const ids = getBaseObjectiveTargetIds();
+    if (
+      CORE.gameState === STATES.STATION_ACTIVE &&
+      CORE.gameMode === MODES.SURVIVAL &&
+      campaignState.barrelCueActive &&
+      !campaignState.firstBarrelExploded &&
+      LRT.Station &&
+      LRT.Station.explosiveBarrels &&
+      LRT.Station.explosiveBarrels.length > 0
+    ) {
+      ids.push('explosive_barrel_cue');
+    }
+    return ids;
   }
 
   function updateTrainCampaign(dt, pState) {
@@ -1002,7 +1100,7 @@
           if (LRT.Station && LRT.Station.dispose) LRT.Station.dispose(CORE.scene);
         },
         (incomingZ) => {
-          // Spawn next/previous station along corridor dynamically
+          // Spawn next/previous station along corridor dynamically (incremental build during cruise)
           saveCurrentStationUsedIds();
           const nextIdx = Math.max(0, CORE.stationIndex + CORE.activeTravelDir);
           const isBacktrack = CORE.activeTravelDir === -1;
@@ -1015,11 +1113,19 @@
             CORE.currentWave += 1;
           }
           CORE.wavesPerStation = 1;
-          if (CORE.buildStation) {
-            CORE.buildStation(CORE.stationIndex, incomingZ !== undefined ? incomingZ : (215 * CORE.activeTravelDir));
+          const spawnZ = incomingZ !== undefined ? incomingZ : (215 * CORE.activeTravelDir);
+          if (typeof CORE.beginBuildStation === 'function') {
+            CORE.beginBuildStation(CORE.stationIndex, spawnZ);
+          } else if (CORE.buildStation) {
+            CORE.buildStation(CORE.stationIndex, spawnZ);
           }
           CORE.rideCompleteReady = true;
           return LRT.Station;
+        },
+        (builtStats, builtZ) => {
+          if (typeof CORE.finishBuildStation === 'function') {
+            CORE.finishBuildStation(CORE.stationIndex, builtZ || 0, builtStats);
+          }
         }
       );
 
@@ -1037,6 +1143,18 @@
             if (LRT.Station && LRT.Station.setPsdOpen) LRT.Station.setPsdOpen(1, CORE.activeTravelDir);
             LRT.Train.openDoors();
             if (wasArrival) {
+              if (CORE.gameMode === MODES.SURVIVAL && !CORE.lightingLockedByUser) {
+                const finalMoodKey = CORE._rideToMoodKey || (CORE.CAMPAIGN_MOODS && CORE.CAMPAIGN_MOODS[CORE.stationIndex % 6]) || CORE.currentLightingKey;
+                if (finalMoodKey && typeof CORE.applyMoodLighting === 'function') {
+                  CORE.currentLightingKey = finalMoodKey;
+                  const stAtmos = (LRT.Station && typeof LRT.Station.getAtmosphere === 'function') ? LRT.Station.getAtmosphere() : null;
+                  const stStats = (LRT.Station && typeof LRT.Station.getStats === 'function') ? LRT.Station.getStats() : null;
+                  CORE.applyMoodLighting(stStats, stAtmos ? { ...stAtmos, moodKey: finalMoodKey } : { moodKey: finalMoodKey });
+                }
+              }
+              CORE._rideFromMoodKey = null;
+              CORE._rideToMoodKey = null;
+              CORE.isMoodLerping = false;
               const isNewStop = !campaignState.visitedStations.has(CORE.stationIndex);
               campaignState.visitedStations.add(CORE.stationIndex);
               if (isNewStop) {
@@ -1078,13 +1196,25 @@
           }
         } else if (trState === 'DEPARTING') {
           CORE.gameState = STATES.TRAIN_DEPARTING;
+          if (!CORE.isMoodLerping || !CORE._rideFromMoodKey || !CORE._rideToMoodKey) {
+            initRideMoodTransition();
+          }
           if (LRT.Station && LRT.Station.setPsdOpen) LRT.Station.setPsdOpen(0, CORE.activeTravelDir);
         } else if (trState === 'CRUISE') {
           CORE.gameState = STATES.TRAIN_CRUISE;
         } else if (trState === 'ARRIVING') {
           CORE.gameState = STATES.TRAIN_ARRIVING;
+          if (typeof CORE.markShadowDirty === 'function') CORE.markShadowDirty();
         }
         CORE.prevTrainState = trState;
+      }
+
+      if ((trState === 'DEPARTING' || trState === 'CRUISE' || trState === 'ARRIVING') &&
+          CORE.gameMode === MODES.SURVIVAL && !CORE.lightingLockedByUser &&
+          CORE._rideFromMoodKey && CORE._rideToMoodKey &&
+          typeof CORE.lerpMoodLighting === 'function' &&
+          typeof LRT.Train.getRideProgress === 'function') {
+        CORE.lerpMoodLighting(CORE._rideFromMoodKey, CORE._rideToMoodKey, LRT.Train.getRideProgress());
       }
 
       // Sync PSD smooth slide & disembark flow across both Peron 1 and Peron 2
@@ -1167,6 +1297,14 @@
           for (let i = 0; i < summary.length; i++) {
             const e = summary[i];
             const dist = Math.hypot(e.x - pState.pos.x, e.z - pState.pos.z);
+            if (dist < 28.0 && e.variant === 'brute' && !campaignState.firstBarrelExploded && !campaignState.barrelCueActive) {
+              if (LRT.Station && LRT.Station.explosiveBarrels && LRT.Station.explosiveBarrels.some((b) => !b.exploded)) {
+                campaignState.barrelCueActive = true;
+                if (typeof LRT.Station.setBarrelCueActive === 'function') {
+                  LRT.Station.setBarrelCueActive(true);
+                }
+              }
+            }
             if (dist < 24.0) {
               if (e.variant === 'spitter' && !campaignState.voTriggered.has('VO_09_SPITTER_SEE')) {
                 campaignState.voTriggered.add('VO_09_SPITTER_SEE');
@@ -1185,6 +1323,15 @@
                 }
               }
             }
+          }
+        }
+        if (LRT.Station && typeof LRT.Station.setBarrelCueActive === 'function') {
+          const hasUnexploded = !!(LRT.Station.explosiveBarrels && LRT.Station.explosiveBarrels.some((b) => !b.exploded));
+          if (campaignState.firstBarrelExploded || !hasUnexploded) {
+            campaignState.barrelCueActive = false;
+            LRT.Station.setBarrelCueActive(false);
+          } else {
+            LRT.Station.setBarrelCueActive(campaignState.barrelCueActive);
           }
         }
         if (CORE.stationIndex >= 1 && !campaignState.voTriggered.has('VO_15_RETREAT_NOTE')) {
@@ -1255,6 +1402,7 @@
   CORE.spawnCurrentWave = spawnCurrentWave;
   CORE.summonTrain = summonTrain;
   CORE.departTrainNow = departTrainNow;
+  CORE.collectEnemyDrop = collectEnemyDrop;
   CORE.handleEnemyDrop = handleEnemyDrop;
   CORE.handlePlayerHit = handlePlayerHit;
   CORE.buildObjectiveInfo = buildObjectiveInfo;

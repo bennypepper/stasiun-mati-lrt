@@ -64,34 +64,72 @@
     return (CORE.campaignSeed + idx * 7919) >>> 0;
   }
 
-  function buildStation(idx, offsetZ) {
+  CORE.updateCityVisibility = updateCityVisibility;
+
+  function _resolveStationBuildParams(idx) {
     const seed = getStationSeed(idx);
+    const autoMood = (CORE.gameState !== STATES.MENU && CORE.gameMode === MODES.SURVIVAL && !CORE.lightingLockedByUser);
+    const targetMoodKey = autoMood
+      ? (CORE.CAMPAIGN_MOODS[idx % 6] || 'GOLDEN_DUSK')
+      : CORE.currentLightingKey;
+    const savedUsed = CORE.campaignState.stationUsedIds ? CORE.campaignState.stationUsedIds.get(idx) : null;
+    const usedIds = savedUsed ? new Set(savedUsed) : new Set();
+    const powerRestored = (idx > 0) || !!(CORE.campaignState.stationObjectives && CORE.campaignState.stationObjectives[0] && CORE.campaignState.stationObjectives[0].genOn);
+    return { seed, targetMoodKey, usedIds, powerRestored };
+  }
+
+  function finishBuildStation(idx, offsetZ, st) {
+    _lastActiveObjKey = null;
+    const pState = LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function' ? LRT.PlayerUI.getState() : null;
+    updateCityVisibility(pState);
+    if (typeof CORE.onStationBuilt === 'function') {
+      CORE.onStationBuilt(idx, offsetZ || 0, st);
+    }
+    return st;
+  }
+
+  function beginBuildStation(idx, offsetZ) {
+    if (!LRT.Station) return null;
+    const p = _resolveStationBuildParams(idx);
+    if (typeof LRT.Station.beginIncrementalBuild === 'function') {
+      LRT.Station.beginIncrementalBuild(idx, p.seed, CORE.gameMode, CORE.scene, offsetZ || 0, {
+        usedIds: p.usedIds,
+        powerRestored: p.powerRestored,
+        moodKey: p.targetMoodKey,
+        preserveFog: true,
+        deferAttach: true
+      });
+      return LRT.Station;
+    }
+    return buildStation(idx, offsetZ);
+  }
+
+  function buildStation(idx, offsetZ) {
+    const p = _resolveStationBuildParams(idx);
     if (LRT.Station && LRT.Station.build) {
-      if (CORE.gameState !== STATES.MENU && CORE.gameMode === MODES.SURVIVAL && !CORE.lightingLockedByUser) {
-        CORE.currentLightingKey = CORE.CAMPAIGN_MOODS[idx % 6] || 'GOLDEN_DUSK';
-      }
-      const savedUsed = CORE.campaignState.stationUsedIds ? CORE.campaignState.stationUsedIds.get(idx) : null;
-      const usedIds = savedUsed ? new Set(savedUsed) : new Set();
-      const powerRestored = (idx > 0) || !!(CORE.campaignState.stationObjectives && CORE.campaignState.stationObjectives[0] && CORE.campaignState.stationObjectives[0].genOn);
-      LRT.Station.build(idx, seed, CORE.gameMode, CORE.scene, offsetZ || 0, { usedIds, powerRestored });
+      CORE.currentLightingKey = p.targetMoodKey;
+      LRT.Station.build(idx, p.seed, CORE.gameMode, CORE.scene, offsetZ || 0, {
+        usedIds: p.usedIds,
+        powerRestored: p.powerRestored,
+        moodKey: CORE.currentLightingKey
+      });
       const st = LRT.Station.getStats ? LRT.Station.getStats() : null;
       CORE.applyMoodLighting(st, { moodKey: CORE.currentLightingKey });
-      _lastActiveObjKey = null;
-      const pState = LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function' ? LRT.PlayerUI.getState() : null;
-      updateCityVisibility(pState);
-      if (typeof CORE.onStationBuilt === 'function') {
-        CORE.onStationBuilt(idx, offsetZ || 0, st);
-      }
-      return st;
+      return finishBuildStation(idx, offsetZ || 0, st);
     }
     return null;
   }
 
+  CORE.beginBuildStation = beginBuildStation;
+  CORE.finishBuildStation = finishBuildStation;
   CORE.buildStation = buildStation;
 
   function startGame(mode) {
     CORE.gameMode = mode === MODES.EXPLORATION ? MODES.EXPLORATION : MODES.SURVIVAL;
     CORE.lightingLockedByUser = false;
+    CORE.isMoodLerping = false;
+    CORE._rideFromMoodKey = null;
+    CORE._rideToMoodKey = null;
     _lastActiveObjKey = null;
     if (LRT.Audio) {
       LRT.Audio.unlock();
@@ -130,6 +168,7 @@
     const stats = buildStation(CORE.stationIndex, 0);
     const spawnPos = (stats && stats.spawnPos) || CORE.pickPlayerSpawnPos();
     LRT.PlayerUI.reset(spawnPos, CORE.gameMode === MODES.EXPLORATION, CORE.gameMode);
+    updateCityVisibility(LRT.PlayerUI.getState());
     LRT.PlayerUI.setPaused(false, true);
     LRT.PlayerUI.showScreen('play');
     LRT.PlayerUI.requestLock();
@@ -234,8 +273,9 @@
     CORE.updateSurvivalAndVoChecks(dt, pState, stationGrid, trainCols, enemyOpts);
 
     const alive = LRT.Enemies && LRT.Enemies.getAliveCount ? LRT.Enemies.getAliveCount() : 0;
+    const isTrainCruise = CORE.gameState === STATES.TRAIN_CRUISE || tState === 'CRUISE';
     if (typeof CORE.tickShadowCache === 'function') {
-      CORE.tickShadowCache(dt, trainSpeed > 0.05 || tState === 'APPROACHING', alive);
+      CORE.tickShadowCache(dt, !isTrainCruise && (trainSpeed > 0.05 || tState === 'APPROACHING'), alive, isTrainCruise);
     }
 
     const activeIds = typeof CORE.getActiveObjectiveTargetIds === 'function'
@@ -626,6 +666,7 @@
           visitedStations: Array.from(CORE.campaignState.visitedStations),
           stationObjectives: JSON.parse(JSON.stringify(CORE.campaignState.stationObjectives)),
           voTriggered: Array.from(CORE.campaignState.voTriggered),
+          collectedLogs: (CORE.campaignState.collectedLogs || []).slice(),
           campaignVictory: CORE.campaignState.campaignVictory,
           stationUsedIds: Array.from(CORE.campaignState.stationUsedIds.entries()).map(([k, v]) => [k, Array.from(v)])
         }),
@@ -687,6 +728,7 @@
           const st = buildStation(CORE.stationIndex, 0);
           const sp = (st && st.spawnPos) || CORE.pickPlayerSpawnPos();
           LRT.PlayerUI.reset(sp, CORE.gameMode === MODES.EXPLORATION, CORE.gameMode);
+          updateCityVisibility(LRT.PlayerUI.getState());
           CORE.updateSunTracking(sp.x, sp.z);
           CORE.renderFrame();
           return st;
@@ -783,6 +825,7 @@
     setLightingMode: CORE.setLightingMode,
     cycleLightingMode: CORE.cycleLightingMode,
     getLightingMode: CORE.getLightingMode,
+    getMoodBlendState: () => (typeof CORE.getMoodBlendState === 'function' ? CORE.getMoodBlendState() : null),
     summonTrain: CORE.summonTrain,
     departTrainNow: CORE.departTrainNow,
     getState: () => CORE.gameState,

@@ -389,6 +389,7 @@
     T.rideDist = 0.0;
     T.oldDisposed = false;
     T.nextSpawned = false;
+    T.nextBuildInProgress = false;
     T.incomingStationZ = 220.0;
     T.activeOldRootGroup = null;
 
@@ -492,6 +493,7 @@
     T.rideDist = 0.0;
     T.oldDisposed = false;
     T.nextSpawned = false;
+    T.nextBuildInProgress = false;
     T.incomingStationZ = 215.0 * T.travelDir;
     T.activeOldRootGroup = (stationRef && stationRef.rootGroup) ? stationRef.rootGroup : null;
 
@@ -508,7 +510,19 @@
     }
   }
 
-  function update(dt, stationRef, onDisposeOld, onSpawnNext) {
+  function getRideProgress() {
+    if (T.state !== 'DEPARTING' && T.state !== 'CRUISE' && T.state !== 'ARRIVING') return 0.0;
+    const totalDist = 375.0; // 160m departure scroll + 215m incoming station approach
+    if (!T.oldDisposed) {
+      return Math.max(0.0, Math.min(160.0 / totalDist, T.rideDist / totalDist));
+    }
+    if (!T.nextSpawned) return 160.0 / totalDist;
+    const rem = Math.max(0.0, Math.min(215.0, T.incomingStationZ * T.travelDir));
+    const done = 160.0 + (215.0 - rem);
+    return Math.max(0.0, Math.min(1.0, done / totalDist));
+  }
+
+  function update(dt, stationRef, onDisposeOld, onSpawnNext, onBuildComplete) {
     if (!T.initialized) return;
     const clampedDt = Math.min(dt || 0.016, 0.05);
     T.animTime += clampedDt;
@@ -607,20 +621,37 @@
         T.nextSpawned = true;
         T.incomingStationZ = 215.0 * T.travelDir;
         const spawned = typeof onSpawnNext === 'function' ? onSpawnNext(T.incomingStationZ) : null;
+        const targetRef = spawned || stationRef;
+        T.nextBuildInProgress = !!(targetRef && typeof targetRef.isIncrementalBuilding === 'function' && targetRef.isIncrementalBuilding());
         if (spawned && spawned.rootGroup) {
           spawned.rootGroup.position.z = T.incomingStationZ;
         } else if (stationRef && stationRef.rootGroup && stationRef.rootGroup !== T.activeOldRootGroup) {
           stationRef.rootGroup.position.z = T.incomingStationZ;
           stationWorldZ = T.incomingStationZ;
         }
+        if (!T.nextBuildInProgress && typeof onBuildComplete === 'function' && targetRef && typeof targetRef.getStats === 'function') {
+          onBuildComplete(targetRef.getStats(), T.incomingStationZ);
+        }
       } else if (T.nextSpawned) {
+        if (T.nextBuildInProgress && stationRef && typeof stationRef.stepIncrementalBuild === 'function') {
+          const stepRes = stationRef.stepIncrementalBuild();
+          if (stepRes && stepRes.done) {
+            T.nextBuildInProgress = false;
+            if (typeof onBuildComplete === 'function') {
+              onBuildComplete(stepRes.stats, T.incomingStationZ);
+            }
+          }
+        }
         T.incomingStationZ -= T.travelDir * stepZ;
+        if (T.nextBuildInProgress && (T.incomingStationZ * T.travelDir) < 116.0) {
+          T.incomingStationZ = 116.0 * T.travelDir;
+        }
         const remDist = T.incomingStationZ * T.travelDir;
         if (stationRef && stationRef.rootGroup && stationRef.rootGroup !== T.activeOldRootGroup) {
           stationRef.rootGroup.position.z = T.incomingStationZ;
           stationWorldZ = T.incomingStationZ;
         }
-        if (T.state === 'CRUISE' && remDist <= 114.0) {
+        if (T.state === 'CRUISE' && !T.nextBuildInProgress && remDist <= 114.0) {
           T.state = 'ARRIVING';
           T.brakeSoundPlayed = false;
         }
@@ -777,14 +808,24 @@
         if (item.action === 'horn') {
           T.safeAudioPlay('train_horn', { gain: 0.95 });
           const lure = T.localToWorld({ x: 0, y: 1.0, z: 0 });
-          if (LRT.Enemies && typeof LRT.Enemies.alertAllTo === 'function') {
-            LRT.Enemies.alertAllTo(lure, 60.0);
+          let stunnedCount = 0;
+          if (LRT.Enemies) {
+            if (typeof LRT.Enemies.alertAllTo === 'function') {
+              LRT.Enemies.alertAllTo(lure, 60.0);
+            }
+            if (typeof LRT.Enemies.stunByHorn === 'function') {
+              const sRes = LRT.Enemies.stunByHorn(lure, 32.0);
+              stunnedCount = sRes && sRes.stunned ? sRes.stunned : 0;
+            }
           }
           return {
             handled: true,
             action: 'horn',
             lurePos: lure,
-            message: 'Klakson LRT Jabodebek dibunyikan — Menarik perhatian infected!'
+            stunnedCount: stunnedCount,
+            message: stunnedCount > 0
+              ? `Klakson LRT dibunyikan — ${stunnedCount} infected terguncang gelombang akustik!`
+              : 'Klakson LRT Jabodebek dibunyikan — Menarik perhatian infected!'
           };
         }
         if (item.action === 'sit') {
@@ -814,6 +855,7 @@
     departNow,
     update,
     stepRide: update,
+    getRideProgress,
     getState: () => T.state,
     getSpeed: () => T.speed,
     getDoorOpen: () => T.doorOpen,
@@ -842,7 +884,11 @@
       doorOpen: T.doorOpen,
       trainZ: T.trainZ,
       activeTrackX: T.activeTrackX,
-      travelDir: T.travelDir
+      travelDir: T.travelDir,
+      rideProgress: getRideProgress(),
+      oldDisposed: !!T.oldDisposed,
+      nextSpawned: !!T.nextSpawned,
+      nextBuildInProgress: !!T.nextBuildInProgress
     }),
     syncLights: T.syncTrainLights
   };

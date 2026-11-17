@@ -7,6 +7,21 @@
 
   const _tmpWorldOffset = new THREE.Vector3();
   const _tmpLocalCam = new THREE.Vector3();
+  const _chosenLampIdx = [-1, -1, -1];
+  const _chosenLampDSq = [Infinity, Infinity, Infinity];
+  const _emptyArr = [];
+  const _persistentCityMats = new Map();
+  const PERSISTENT_MAT_KEYS = new Set(['cityStripeWhite', 'cityStripeYellow', 'citySkylineDistant']);
+  let _sharedInvisCollMat = null;
+  const _cityStepInProgress = Object.freeze({ done: false });
+  const _cityStepDone = Object.freeze({ done: true });
+  const _persistentCityLights = [];
+
+  function evalTrafficBlink(worldX, worldZ, t) {
+    return typeof P.evalTrafficSignalBlink === 'function'
+      ? P.evalTrafficSignalBlink(worldX, worldZ, t)
+      : 1.0;
+  }
 
   const City = {
     rootGroup: null,
@@ -15,6 +30,7 @@
     clutterByQuadrant: null,
     cullChunks: [],
     litLampPositions: [],
+    trafficSignalPositions: [],
     _lootboxGlows: null,
     _lootboxVisuals: null,
     destructibleProps: null,
@@ -37,11 +53,41 @@
     _matCache: null,
     _timeAccum: 0,
     _lightingFactor: 1.0,
+    _isBuilding: false,
+    _buildRunner: null,
+
+    _getInvisCollMat: function () {
+      if (!_sharedInvisCollMat) {
+        _sharedInvisCollMat = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
+      }
+      return _sharedInvisCollMat;
+    },
+
+    _acquirePooledLight: function (slotIdx, targetScene, colorHex, initialInt, distance, decay) {
+      let l = _persistentCityLights[slotIdx];
+      if (!l) {
+        l = new THREE.PointLight(colorHex, 0, distance, decay);
+        l.visible = true; // NEVER toggle light.visible!
+        l.castShadow = false;
+        _persistentCityLights[slotIdx] = l;
+      }
+      l.color.setHex(colorHex);
+      l.distance = distance;
+      l.decay = decay;
+      l.visible = true;
+      l.intensity = initialInt;
+      if (targetScene && l.parent !== targetScene) {
+        targetScene.add(l);
+      }
+      return l;
+    },
 
     _getMat: function (key, texKey, opts) {
       if (!this._matCache) this._matCache = new Map();
       const mats = (LRT.Materials && LRT.Materials.mats) || {};
       if (mats[key]) return mats[key];
+      const isPersistent = PERSISTENT_MAT_KEYS.has(key);
+      if (isPersistent && _persistentCityMats.has(key)) return _persistentCityMats.get(key);
       if (this._matCache.has(key)) return this._matCache.get(key);
 
       const o = opts || {};
@@ -78,8 +124,12 @@
         }
         mat = new THREE.MeshStandardMaterial(params);
       }
-      this._matCache.set(key, mat);
-      this.disposableMaterials.push(mat);
+      if (isPersistent) {
+        _persistentCityMats.set(key, mat);
+      } else {
+        this._matCache.set(key, mat);
+        this.disposableMaterials.push(mat);
+      }
       return mat;
     },
 
@@ -144,6 +194,13 @@
     },
 
     dispose: function () {
+      for (let i = 0; i < this.streetLights.length; i++) {
+        const sl = this.streetLights[i];
+        if (sl && sl.light) {
+          sl.light.visible = true; // NEVER toggle light.visible!
+          sl.light.intensity = 0;
+        }
+      }
       if (this.rootGroup && this.rootGroup.parent) {
         this.rootGroup.parent.remove(this.rootGroup);
       }
@@ -171,6 +228,7 @@
       this.clutterByQuadrant = null;
       this.cullChunks = [];
       this.litLampPositions = [];
+      this.trafficSignalPositions = [];
       this._lootboxGlows = null;
       this._lootboxVisuals = null;
       this.destructibleProps = null;
@@ -195,9 +253,11 @@
       this._matCache = null;
       this._timeAccum = 0;
       this._lightingFactor = 1.0;
+      this._isBuilding = false;
+      this._buildRunner = null;
     },
 
-    build: function (arch, rngArg, parentGroup, opts) {
+    beginIncrementalBuild: function (arch, rngArg, parentGroup, opts) {
       this.dispose();
 
       const rng = typeof rngArg === 'function' ? rngArg : P.fallbackRng(4207);
@@ -205,6 +265,7 @@
       this._usedIds = (o.usedIds) ? (o.usedIds instanceof Set ? new Set(o.usedIds) : new Set(o.usedIds)) : new Set();
       this._plnRestored = !!o.plnRestored;
       this._arch = arch;
+      this._isBuilding = true;
 
       const root = new THREE.Group();
       root.name = 'JakartaCityRoot';
@@ -230,6 +291,7 @@
       this.clutterByQuadrant = { NW: [], NE: [], SW: [], SE: [] };
       this.cullChunks = [];
       this.litLampPositions = [];
+      this.trafficSignalPositions = [];
       this._lootboxGlows = {};
       this._lootboxVisuals = [];
       this.destructibleProps = [];
@@ -241,8 +303,38 @@
       this.trackGates = [];
       this._trackGatesOpen = false;
 
-      P.buildDistrict(this, arch, rng, root, o);
+      if (typeof P.createDistrictBuilder === 'function') {
+        this._buildRunner = P.createDistrictBuilder(this, arch, rng, root, o);
+      } else {
+        P.buildDistrict(this, arch, rng, root, o);
+        this._buildRunner = null;
+        this._isBuilding = false;
+      }
 
+      return this;
+    },
+
+    stepIncrementalBuild: function () {
+      if (!this._buildRunner) {
+        this._isBuilding = false;
+        return _cityStepDone;
+      }
+      const done = !!this._buildRunner.step();
+      if (done) {
+        this._buildRunner = null;
+        this._isBuilding = false;
+        return _cityStepDone;
+      }
+      return _cityStepInProgress;
+    },
+
+    isIncrementalBuilding: function () {
+      return !!this._isBuilding;
+    },
+
+    build: function (arch, rngArg, parentGroup, opts) {
+      this.beginIncrementalBuild(arch, rngArg, parentGroup, opts);
+      while (!this.stepIncrementalBuild().done) {}
       return this;
     },
 
@@ -253,7 +345,15 @@
         const sl = this.streetLights[i];
         const distScale = sl._distScale !== undefined ? sl._distScale : 1.0;
         sl.light.visible = true;
-        sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale;
+        if (sl.kind === 'traffic') {
+          const blinkScale = sl._blinkScale !== undefined
+            ? sl._blinkScale
+            : evalTrafficBlink(sl._worldX, sl._worldZ, this._timeAccum);
+          sl._blinkScale = blinkScale;
+          sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale * blinkScale;
+        } else {
+          sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale;
+        }
       }
     },
 
@@ -296,10 +396,9 @@
     },
 
     _repositionPooledLights: function (camPos, suppressLights) {
-      if (!this.streetLights || this.streetLights.length === 0 || !this.litLampPositions || this.litLampPositions.length === 0) {
+      if (!this.streetLights || this.streetLights.length === 0 || !camPos || !this.rootGroup) {
         return;
       }
-      if (!camPos) return;
       this.rootGroup.getWorldPosition(_tmpWorldOffset);
       _tmpLocalCam.set(
         camPos.x - _tmpWorldOffset.x,
@@ -307,42 +406,101 @@
         camPos.z - _tmpWorldOffset.z
       );
 
-      // Find the 2 closest lit streetlamps to camPos in local space
+      // Find the 3 closest lit streetlamps to camPos in local space
+      const lamps = this.litLampPositions;
       let best0 = -1, bestD0 = Infinity;
       let best1 = -1, bestD1 = Infinity;
-      const lamps = this.litLampPositions;
-      for (let i = 0; i < lamps.length; i++) {
-        const lp = lamps[i];
-        const dx = lp.x - _tmpLocalCam.x;
-        const dy = lp.y - _tmpLocalCam.y;
-        const dz = lp.z - _tmpLocalCam.z;
-        const dSq = dx * dx + dy * dy + dz * dz;
-        if (dSq < bestD0) {
-          bestD1 = bestD0;
-          best1 = best0;
-          bestD0 = dSq;
-          best0 = i;
-        } else if (dSq < bestD1) {
-          bestD1 = dSq;
-          best1 = i;
+      let best2 = -1, bestD2 = Infinity;
+      if (lamps && lamps.length > 0) {
+        for (let i = 0; i < lamps.length; i++) {
+          const lp = lamps[i];
+          const dx = lp.x - _tmpLocalCam.x;
+          const dy = lp.y - _tmpLocalCam.y;
+          const dz = lp.z - _tmpLocalCam.z;
+          const dSq = dx * dx + dy * dy + dz * dz;
+          if (dSq < bestD0) {
+            bestD2 = bestD1; best2 = best1;
+            bestD1 = bestD0; best1 = best0;
+            bestD0 = dSq; best0 = i;
+          } else if (dSq < bestD1) {
+            bestD2 = bestD1; best2 = best1;
+            bestD1 = dSq; best1 = i;
+          } else if (dSq < bestD2) {
+            bestD2 = dSq; best2 = i;
+          }
+        }
+      }
+      _chosenLampIdx[0] = best0;
+      _chosenLampIdx[1] = best1 >= 0 ? best1 : best0;
+      _chosenLampIdx[2] = best2 >= 0 ? best2 : _chosenLampIdx[1];
+      _chosenLampDSq[0] = bestD0;
+      _chosenLampDSq[1] = best1 >= 0 ? bestD1 : bestD0;
+      _chosenLampDSq[2] = best2 >= 0 ? bestD2 : _chosenLampDSq[1];
+
+      // Find the closest traffic signal pole to camPos in local space
+      const sigs = this.trafficSignalPositions;
+      let bestSig = -1, bestSigDSq = Infinity;
+      if (sigs && sigs.length > 0) {
+        for (let i = 0; i < sigs.length; i++) {
+          const sp = sigs[i];
+          const dx = sp.x - _tmpLocalCam.x;
+          const dy = sp.y - _tmpLocalCam.y;
+          const dz = sp.z - _tmpLocalCam.z;
+          const dSq = dx * dx + dy * dy + dz * dz;
+          if (dSq < bestSigDSq) {
+            bestSigDSq = dSq;
+            bestSig = i;
+          }
         }
       }
 
-      const chosen = [best0, best1 >= 0 ? best1 : best0];
-      const chosenDSq = [bestD0, best1 >= 0 ? bestD1 : bestD0];
+      let lampSlot = 0;
       for (let i = 0; i < this.streetLights.length; i++) {
         const sl = this.streetLights[i];
-        const idx = chosen[i % chosen.length];
-        if (idx < 0) continue;
-        const lp = lamps[idx];
-        sl.light.position.set(lp.x, lp.y, lp.z);
         sl.light.visible = true; // NEVER toggle visible!
+
+        if (sl.kind === 'traffic') {
+          if (bestSig >= 0) {
+            const sp = sigs[bestSig];
+            sl.light.position.set(
+              sp.x + _tmpWorldOffset.x,
+              sp.y + _tmpWorldOffset.y,
+              sp.z + _tmpWorldOffset.z
+            );
+            sl._worldX = sp.x + _tmpWorldOffset.x;
+            sl._worldZ = sp.z + _tmpWorldOffset.z;
+            if (suppressLights) {
+              sl._distScale = 0.0;
+            } else {
+              const dist = Math.sqrt(bestSigDSq);
+              sl._distScale = dist <= 50 ? 1.0 : (dist >= 88 ? 0.0 : (1.0 - (dist - 50) / 38.0));
+            }
+            sl._blinkScale = evalTrafficBlink(sl._worldX, sl._worldZ, this._timeAccum);
+            sl.light.intensity = sl.baseIntensity * this._lightingFactor * sl._distScale * sl._blinkScale;
+          } else {
+            sl._distScale = 0.0;
+            sl._blinkScale = 0.0;
+            sl.light.intensity = 0.0;
+          }
+          continue;
+        }
+
+        const slotIdx = lampSlot % 3;
+        lampSlot++;
+        const idx = _chosenLampIdx[slotIdx];
+        if (idx < 0 || !lamps) continue;
+        const lp = lamps[idx];
+        sl.light.position.set(
+          lp.x + _tmpWorldOffset.x,
+          lp.y + _tmpWorldOffset.y,
+          lp.z + _tmpWorldOffset.z
+        );
         sl.flicker = !!lp.flicker;
         if (suppressLights) {
           sl._distScale = 0.0;
         } else {
-          const dist = Math.sqrt(chosenDSq[i % chosen.length]);
-          sl._distScale = dist <= 40 ? 1.0 : (dist >= 72 ? 0.0 : (1.0 - (dist - 40) / 32.0));
+          const dist = Math.sqrt(_chosenLampDSq[slotIdx]);
+          sl._distScale = dist <= 50 ? 1.0 : (dist >= 88 ? 0.0 : (1.0 - (dist - 50) / 38.0));
         }
         if (!sl.flicker) {
           sl.light.intensity = sl.baseIntensity * this._lightingFactor * sl._distScale;
@@ -351,7 +509,7 @@
     },
 
     update: function (dt, t, camPos, camForward, difficultyKey) {
-      if (!this.rootGroup) return;
+      if (!this.rootGroup || this._isBuilding) return;
       this._timeAccum = t !== undefined ? t : (this._timeAccum + dt);
       if (typeof P.updateTrafficSignalTime === 'function') {
         P.updateTrafficSignalTime(this._timeAccum);
@@ -360,14 +518,21 @@
         const oz = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
         P.updateLootboxVisuals(this._lootboxVisuals, dt, this._timeAccum, camPos, camForward, difficultyKey, oz);
       }
-      if (this._lastCamPos) {
-        this._repositionPooledLights(this._lastCamPos, this._suppressPooledLights);
+      const focusPos = camPos || this._lastCamPos;
+      if (focusPos) {
+        this._repositionPooledLights(focusPos, this._suppressPooledLights);
       }
       for (let i = 0; i < this.streetLights.length; i++) {
         const sl = this.streetLights[i];
+        const distScale = sl._distScale !== undefined ? sl._distScale : 1.0;
+        if (sl.kind === 'traffic') {
+          sl._blinkScale = evalTrafficBlink(sl._worldX, sl._worldZ, this._timeAccum);
+          sl.light.visible = true;
+          sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale * sl._blinkScale;
+          continue;
+        }
         if (!sl.flicker) continue;
         // Subtle sodium-vapor streetlamp buzz (NEVER toggles visible!)
-        const distScale = sl._distScale !== undefined ? sl._distScale : 1.0;
         const pulse = 0.85 + 0.15 * Math.sin(this._timeAccum * 17.0 + i * 3.1) * Math.sin(this._timeAccum * 4.3);
         sl.light.visible = true;
         sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale * pulse;
@@ -396,7 +561,7 @@
     },
 
     updateVisibility: function (camPos, qualityKey, frustum, playerContext) {
-      if (!this.rootGroup) return;
+      if (!this.rootGroup || this._isBuilding) return;
 
       if (camPos) {
         if (!this._lastCamPos) this._lastCamPos = new THREE.Vector3();
@@ -490,23 +655,23 @@
     },
 
     getBVHMeshes: function () {
-      return this.bvhMeshes;
+      return this._isBuilding ? _emptyArr : this.bvhMeshes;
     },
 
     getBVHMesh: function () {
-      return this.bvhMeshes[0] || null;
+      return this._isBuilding ? null : (this.bvhMeshes[0] || null);
     },
 
     getColliders: function () {
-      return this.colliders;
+      return this._isBuilding ? _emptyArr : this.colliders;
     },
 
     getStreetLights: function () {
-      return this.streetLights;
+      return this._isBuilding ? _emptyArr : this.streetLights;
     },
 
     getLights: function () {
-      return this.streetLights;
+      return this._isBuilding ? _emptyArr : this.streetLights;
     },
 
     getSpawnNodes: function () {
@@ -518,7 +683,7 @@
     },
 
     getInteractableNear: function (pos, lookDir) {
-      if (!this.interactables || !pos) return null;
+      if (this._isBuilding || !this.interactables || !pos) return null;
       let best = null;
       let bestScore = -999;
       for (let i = 0; i < this.interactables.length; i++) {
@@ -698,7 +863,7 @@
     },
 
     damageAt: function (worldPos, radius, dmg, isExplosion) {
-      if (!this.rootGroup || !worldPos) return null;
+      if (!this.rootGroup || this._isBuilding || !worldPos) return null;
       const oz = this.rootGroup.position.z || 0;
       const lx = worldPos.x;
       const ly = worldPos.y;
@@ -749,7 +914,7 @@
     },
 
     raycastHydrants: function (origin, dir, maxDist) {
-      if (!this.hydrants || !origin || !dir) return null;
+      if (this._isBuilding || !this.hydrants || !origin || !dir) return null;
       let best = null;
       let bestDist = maxDist || 200;
 

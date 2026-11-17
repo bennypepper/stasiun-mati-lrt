@@ -3,6 +3,7 @@
 
   window.__LRT_INTERNAL__ = window.__LRT_INTERNAL__ || {};
   const S = (window.__LRT_INTERNAL__.station = window.__LRT_INTERNAL__.station || {});
+  const _pooledStationLights = [];
 
   function buildStallsAndTubes(station, ctx) {
     const { UPPER_FLOOR_Y } = S.CONST;
@@ -329,7 +330,12 @@
     ctx.tubeCoords = tubeCoords;
   }
 
-  function buildDestructiblesAndNav(station, ctx) {
+  function buildDestructiblesAndNav(station, ctx, opts) {
+    const o = opts || {};
+    const doDestruct = !o.onlyFinalizeNav;
+    const doCitySync = !o.onlyDestructibles && !o.onlyFinalizeNav && !o.skipCity;
+    const doFinalizeNav = !o.onlyDestructibles;
+
     const {
       STREET_GROUND_Y, SIDEWALK_Y, TRACK_BED_Y, UPPER_FLOOR_Y,
       CROSSING_Z_SOUTH, CROSSING_Z_NORTH
@@ -353,6 +359,7 @@
       supX, supZ, rotioX, rotioZ, turnstileList, tubeCoords
     } = ctx;
 
+    if (doDestruct) {
     // =========================================================
     // 8. DESTRUCTIBLE PILLARS + SHATTERABLE GLASS + TUBES + DYNAMIC PROPS
     // =========================================================
@@ -774,35 +781,265 @@
     placeLootbox('station_far_lootbox', farLootX, 0.0, farLootZ, farLootRy, 0.65, arch.hasDepotShed ? 'Peti Taktis Depot' : 'Peti Taktis Peron 2');
 
     station.explosiveBarrels = [];
+    station._barrelCueVisual = null;
     if (arch.hasDepotShed) {
-      const b1 = station._placeNormalizedModel('Barrel_01', depotMaxX - 1.3, 0.0, 41.0, 0.0, 0.90, null, 'barrel');
-      const c1 = station.colliders[station.colliders.length - 1];
-      if (c1) c1.barrelId = 0;
-      station.explosiveBarrels.push({
-        id: 0, x: depotMaxX - 1.3, y: 0.0, z: 41.0, hp: 35, exploded: false, mesh: b1, colliderIdx: station.colliders.length - 1
+      const barrelHaloRingGeo = new THREE.RingGeometry(0.46, 0.72, 24);
+      barrelHaloRingGeo.rotateX(-Math.PI * 0.5);
+      const barrelHaloShellGeo = new THREE.CylinderGeometry(0.48, 0.56, 1.08, 16, 1, true);
+      const barrelHaloRingMat = new THREE.MeshBasicMaterial({
+        color: 0xff5a1f,
+        transparent: true,
+        opacity: 0.78,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
       });
+      const barrelHaloShellMat = new THREE.MeshBasicMaterial({
+        color: 0xff4500,
+        transparent: true,
+        opacity: 0.22,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
+      });
+      station.disposableGeometries.push(barrelHaloRingGeo, barrelHaloShellGeo);
+      station.disposableMaterials.push(barrelHaloRingMat, barrelHaloShellMat);
 
-      const b2 = station._placeNormalizedModel('Barrel_01', depotMaxX - 1.3, 0.0, 48.0, 1.2, 0.90, null, 'barrel');
-      const c2 = station.colliders[station.colliders.length - 1];
-      if (c2) c2.barrelId = 1;
-      station.explosiveBarrels.push({
-        id: 1, x: depotMaxX - 1.3, y: 0.0, z: 48.0, hp: 35, exploded: false, mesh: b2, colliderIdx: station.colliders.length - 1
+      const addExplosiveBarrel = (id, bx, bz, rotY) => {
+        const mesh = station._placeNormalizedModel('Barrel_01', bx, 0.0, bz, rotY, 0.90, null, 'barrel');
+        const cIdx = station.colliders.length - 1;
+        const col = station.colliders[cIdx];
+        if (col) col.barrelId = id;
+
+        const haloGroup = new THREE.Group();
+        haloGroup.position.set(bx, 0.0, bz);
+        const haloRing = new THREE.Mesh(barrelHaloRingGeo, barrelHaloRingMat);
+        haloRing.position.y = 0.035;
+        const haloShell = new THREE.Mesh(barrelHaloShellGeo, barrelHaloShellMat);
+        haloShell.position.y = 0.54;
+        haloGroup.add(haloRing);
+        haloGroup.add(haloShell);
+        root.add(haloGroup);
+
+        station.explosiveBarrels.push({
+          id: id,
+          x: bx,
+          y: 0.0,
+          z: bz,
+          hp: 35,
+          exploded: false,
+          mesh: mesh,
+          colliderIdx: cIdx,
+          haloGroup: haloGroup,
+          haloRing: haloRing,
+          haloShell: haloShell
+        });
+      };
+
+      addExplosiveBarrel(0, depotMaxX - 1.3, 41.0, 0.0);
+      addExplosiveBarrel(1, depotMaxX - 1.3, 50.0, 1.2);
+
+      const cueOrbGeo = new THREE.SphereGeometry(0.18, 12, 10);
+      const cueShellGeo = new THREE.OctahedronGeometry(0.28, 0);
+      const cueBeamGeo = new THREE.CylinderGeometry(0.05, 0.30, 1.55, 12, 1, true);
+      const cueOrbMat = new THREE.MeshBasicMaterial({
+        color: 0xff8c38,
+        transparent: true,
+        opacity: 0.92,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
       });
+      const cueShellMat = new THREE.MeshBasicMaterial({
+        color: 0xffb347,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.72,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      });
+      const cueBeamMat = new THREE.MeshBasicMaterial({
+        color: 0xff5a1f,
+        transparent: true,
+        opacity: 0.24,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
+      });
+      station.disposableGeometries.push(cueOrbGeo, cueShellGeo, cueBeamGeo);
+      station.disposableMaterials.push(cueOrbMat, cueShellMat, cueBeamMat);
+
+      const cueGroup = new THREE.Group();
+      cueGroup.visible = false;
+      const cueOrb = new THREE.Mesh(cueOrbGeo, cueOrbMat);
+      cueOrb.position.y = 1.65;
+      const cueShell = new THREE.Mesh(cueShellGeo, cueShellMat);
+      cueShell.position.y = 1.65;
+      const cueBeam = new THREE.Mesh(cueBeamGeo, cueBeamMat);
+      cueBeam.position.y = 0.80;
+      cueGroup.add(cueBeam);
+      cueGroup.add(cueOrb);
+      cueGroup.add(cueShell);
+      root.add(cueGroup);
+
+      station._barrelCueVisual = {
+        group: cueGroup,
+        orb: cueOrb,
+        shell: cueShell,
+        beam: cueBeam,
+        ringMat: barrelHaloRingMat,
+        shellMat: barrelHaloShellMat
+      };
+    }
+
+    station._groundPickups = [];
+    station._cikokoBarricade = null;
+    if (arch.id === 'cikoko' || arch.hasTollOverpass) {
+      const bcX = concMaxX + 12.5;
+      const bcY = S.CONST.STREET_GROUND_Y;
+      const bcZ = -48.0;
+      const cleared = !!(station._usedIds && station._usedIds.has('cikoko_barricade'));
+
+      const bcConcGeo = new THREE.BoxGeometry(2.0, 1.05, 0.72);
+      const bcBeamGeo = new THREE.BoxGeometry(6.2, 0.24, 0.16);
+      const bcDrumGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.88, 12);
+      const bcGlowGeo = new THREE.BoxGeometry(1.1, 0.16, 0.18);
+      const bcConcMat = new THREE.MeshStandardMaterial({ color: 0x5c6066, roughness: 0.90, metalness: 0.08 });
+      const bcHazMat = new THREE.MeshStandardMaterial({ color: 0xd94826, emissive: 0x3b1206, roughness: 0.55, metalness: 0.35 });
+      const bcGlowMat = new THREE.MeshBasicMaterial({ color: 0xff6b2b });
+      station.disposableGeometries.push(bcConcGeo, bcBeamGeo, bcDrumGeo, bcGlowGeo);
+      station.disposableMaterials.push(bcConcMat, bcHazMat, bcGlowMat);
+
+      const bcGroup = new THREE.Group();
+      bcGroup.position.set(bcX, bcY, bcZ);
+      bcGroup.visible = !cleared;
+      for (const dx of [-2.1, 0.0, 2.1]) {
+        const blk = new THREE.Mesh(bcConcGeo, bcConcMat);
+        blk.position.set(dx, 0.525, 0);
+        blk.castShadow = true;
+        blk.receiveShadow = true;
+        bcGroup.add(blk);
+      }
+      const rail1 = new THREE.Mesh(bcBeamGeo, bcHazMat);
+      rail1.position.set(0, 1.25, 0);
+      bcGroup.add(rail1);
+      const drum = new THREE.Mesh(bcDrumGeo, bcHazMat);
+      drum.position.set(0, 0.44, 0.65);
+      bcGroup.add(drum);
+      const beaconStrip = new THREE.Mesh(bcGlowGeo, bcGlowMat);
+      beaconStrip.position.set(0, 1.44, 0.05);
+      bcGroup.add(beaconStrip);
+      root.add(bcGroup);
+
+      station._addCollider(bcX - 3.3, bcY, bcZ - 0.55, bcX + 3.3, bcY + 1.55, bcZ + 0.85, 'barricade', {
+        disabled: cleared,
+        blocksWalk: !cleared,
+        blocksBullets: !cleared,
+        barricadeId: 'cikoko_barricade'
+      });
+      const bcCollIdx = station.colliders.length - 1;
+      const bcItem = {
+        id: 'cikoko_barricade',
+        type: 'barricade_breach',
+        x: bcX,
+        y: bcY + 0.90,
+        z: bcZ + 1.15,
+        used: cleared,
+        label: cleared ? '[E] Barikade Jalan Tol Ditembus' : '[E / Tembak] Ledakkan Barikade Tol Cikoko',
+        prompt: cleared ? '[E] Barikade Jalan Tol Ditembus' : '[E / Tembak] Ledakkan Barikade Tol Cikoko'
+      };
+      station.interactables.push(bcItem);
+      station._cikokoBarricade = {
+        id: 'cikoko_barricade',
+        x: bcX,
+        y: bcY,
+        z: bcZ,
+        hp: 90,
+        maxHp: 90,
+        cleared: cleared,
+        group: bcGroup,
+        colliderIdx: bcCollIdx,
+        interactItem: bcItem
+      };
+    }
+
+    station._track1Barricade = null;
+    if (arch.id === 'setiabudi') {
+      const tbX = 0.0;
+      const tbY = S.CONST.RAIL_TOP_Y;
+      const tbZ = platMaxZ + 2.5;
+      const tbPostGeo = new THREE.BoxGeometry(0.24, 2.35, 0.24);
+      const tbBeamGeo = new THREE.BoxGeometry(3.45, 0.28, 0.20);
+      const tbSignGeo = new THREE.BoxGeometry(1.75, 0.62, 0.08);
+      const tbLampGeo = new THREE.SphereGeometry(0.14, 10, 8);
+      const tbSteelMat = new THREE.MeshStandardMaterial({ color: 0x3b4048, roughness: 0.55, metalness: 0.72 });
+      const tbRedMat = new THREE.MeshStandardMaterial({ color: 0xb91c1c, emissive: 0x450a0a, roughness: 0.50, metalness: 0.30 });
+      const tbLampMat = new THREE.MeshBasicMaterial({ color: 0xff3b3b });
+      station.disposableGeometries.push(tbPostGeo, tbBeamGeo, tbSignGeo, tbLampGeo);
+      station.disposableMaterials.push(tbSteelMat, tbRedMat, tbLampMat);
+
+      const tbGroup = new THREE.Group();
+      tbGroup.position.set(tbX, tbY, tbZ);
+      for (const sx of [-1.55, 1.55]) {
+        const post = new THREE.Mesh(tbPostGeo, tbSteelMat);
+        post.position.set(sx, 1.18, 0);
+        tbGroup.add(post);
+        const lamp = new THREE.Mesh(tbLampGeo, tbLampMat);
+        lamp.position.set(sx, 2.45, 0);
+        tbGroup.add(lamp);
+      }
+      for (const sy of [0.85, 1.65]) {
+        const beam = new THREE.Mesh(tbBeamGeo, tbRedMat);
+        beam.position.set(0, sy, 0);
+        tbGroup.add(beam);
+      }
+      const sign = new THREE.Mesh(tbSignGeo, tbRedMat);
+      sign.position.set(0, 1.25, -0.14);
+      tbGroup.add(sign);
+      root.add(tbGroup);
+
+      station._track1Barricade = {
+        x: tbX,
+        y: tbY,
+        z: tbZ,
+        smashed: false,
+        group: tbGroup
+      };
     }
 
     // =========================================================
-    // 10. STATION POOLED POINTLIGHTS (2 DYNAMIC LIGHTS, NEVER TOGGLED VIA .visible!)
+    // 10. STATION POOLED POINTLIGHTS (2 PERSISTENT SCENE LIGHTS, NEVER REMOVED OR TOGGLED VIA .visible!)
     // =========================================================
     station.stationLights = [];
     const tubeInt = mood && mood.tubeIntensity !== undefined ? mood.tubeIntensity : 0.85;
     const pwr = station._powerRestored ? 1.0 : 0.22;
+    const poolScene = (ctx && ctx.scene) || (window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core && window.__LRT_INTERNAL__.core.scene) || root;
+    const stationOffsetZ = (station.rootGroup && station.rootGroup.position.z) || 0;
     const addPooledLight = (lx, ly, lz, colorHex, baseInt, dist, kind) => {
-      const l = new THREE.PointLight(colorHex, baseInt * tubeInt * station._lightingFactor * pwr, dist, 1.35);
-      l.position.set(lx, ly, lz);
-      l.visible = true; // NEVER toggle light.visible at runtime!
-      l.castShadow = false;
-      root.add(l);
-      station.stationLights.push({ light: l, baseIntensity: baseInt, kind: kind });
+      const slotIdx = station.stationLights.length;
+      let l = _pooledStationLights[slotIdx];
+      if (!l) {
+        l = new THREE.PointLight(colorHex, 0, dist, 1.35);
+        l.visible = true; // NEVER toggle light.visible at runtime!
+        l.castShadow = false;
+        _pooledStationLights[slotIdx] = l;
+      }
+      l.color.setHex(colorHex);
+      l.distance = dist;
+      l.decay = 1.35;
+      l.visible = true;
+      l.position.set(lx, ly, lz + stationOffsetZ);
+      l.intensity = station._isBuilding ? 0.0 : (baseInt * tubeInt * station._lightingFactor * pwr);
+      if (poolScene && l.parent !== poolScene) {
+        poolScene.add(l);
+      }
+      station.stationLights.push({
+        light: l,
+        baseIntensity: baseInt,
+        kind: kind,
+        homeX: lx,
+        homeY: ly,
+        homeZ: lz
+      });
     };
     addPooledLight(rotioX, 2.45, rotioZ + 1.35, 0xffb45a, 7.2, 26, 'warm');
     addPooledLight(p1MinX + 2.8, 3.85, 0.0, 0xd8ecff, 6.8, 30, 'cool');
@@ -841,21 +1078,31 @@
     if (!isIsland) endApronSpans.push([p2MinX, p2MaxX]);
     else if (isCawang) endApronSpans.push([i2MinX, i2MaxX]);
 
-    if (LRT.City && typeof LRT.City.build === 'function') {
-      LRT.City.build(arch, rng, root, {
-        corridorMinX: corridorMinX,
-        corridorMaxX: corridorMaxX,
-        platMinZ: platMinZ,
-        platMaxZ: platMaxZ,
-        trackXs: trackXs,
-        endApronSpans: endApronSpans,
-        isIsland: isIsland,
-        isCawang: isCawang,
-        moodKey: chosenMoodKey,
-        tubeIntensity: tubeInt,
-        usedIds: station._usedIds
-      });
-      const cityCols = LRT.City.getColliders ? LRT.City.getColliders() : [];
+    ctx.cityBuildOpts = {
+      corridorMinX: corridorMinX,
+      corridorMaxX: corridorMaxX,
+      platMinZ: platMinZ,
+      platMaxZ: platMaxZ,
+      trackXs: trackXs,
+      endApronSpans: endApronSpans,
+      isIsland: isIsland,
+      isCawang: isCawang,
+      moodKey: chosenMoodKey,
+      tubeIntensity: tubeInt,
+      streetLampIntensity: mood && mood.streetLampIntensity !== undefined ? mood.streetLampIntensity : (mood && mood.isDaylight ? 0.0 : 2.0),
+      usedIds: station._usedIds,
+      scene: (ctx && ctx.scene) || null
+    };
+    }
+
+    if (doCitySync && LRT.City && typeof LRT.City.build === 'function') {
+      LRT.City.build(arch, rng, root, ctx.cityBuildOpts);
+    }
+
+    if (!doFinalizeNav) return;
+
+    if (LRT.City && typeof LRT.City.getColliders === 'function') {
+      const cityCols = LRT.City.getColliders();
       for (let ci = 0; ci < cityCols.length; ci++) {
         const cc = cityCols[ci];
         station._addCollider(cc.minX, cc.minY, cc.minZ, cc.maxX, cc.maxY, cc.maxZ, cc.tag, {

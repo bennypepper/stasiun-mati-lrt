@@ -1402,7 +1402,15 @@
     ctx.supZ = supZ;
   }
 
-  function mergeStaticBuckets(station, ctx) {
+  let _sharedInvisStairSlopeMat = null;
+  function getInvisStairSlopeMat() {
+    if (!_sharedInvisStairSlopeMat) {
+      _sharedInvisStairSlopeMat = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
+    }
+    return _sharedInvisStairSlopeMat;
+  }
+
+  function mergeStaticBucketsBatch(station, ctx, batchIdx) {
     const { STREET_GROUND_Y } = S.CONST;
     const { addBox, mergeBucket } = S;
     const { arch, root, mats, matConcrete, matConcreteRough, matDarkWood, matCanopy, buckets } = ctx;
@@ -1412,52 +1420,66 @@
       bStairStepsConc, bStairStepsSteel, bStairSlopeBvh
     } = buckets;
 
-    // Cikoko Elevated Inner-Ring Highway Overpass crossing high above z = -88 (clearing trains & cross street!)
-    if (arch.hasTollOverpass) {
-      const tollZ = -90.0;
-      const tollY = 6.6;
-      const tollMat = mats.highwayAsphalt || matConcreteRough;
-      addBox(bConcrete, 175, 0.80, 14.5, 5.0, tollY - 0.40, tollZ, 0, 0, 0, 12, 2);
-      const tollTop = new THREE.Mesh(new THREE.BoxGeometry(175, 0.06, 13.4), tollMat);
-      tollTop.position.set(5.0, tollY + 0.03, tollZ);
-      station.disposableGeometries.push(tollTop.geometry);
-      root.add(tollTop);
-      addBox(bJpo, 175, 0.90, 0.50, 5.0, tollY + 0.45, tollZ);
-      addBox(bConcrete, 175, 0.85, 0.45, 5.0, tollY + 0.42, tollZ - 7.0);
-      addBox(bConcrete, 175, 0.85, 0.45, 5.0, tollY + 0.42, tollZ + 7.0);
-      for (const px of [-36, -15, 34, 62]) {
-        const pH = (tollY - 0.8) - STREET_GROUND_Y;
-        addBox(bConcrete, 1.8, pH, 2.2, px, STREET_GROUND_Y + pH * 0.5, tollZ);
-        addBox(bConcrete, 2.2, 0.9, 10.5, px, tollY - 1.1, tollZ);
-        station._addCollider(px - 0.95, STREET_GROUND_Y, tollZ - 1.15, px + 0.95, tollY, tollZ + 1.15, 'concrete');
+    if (batchIdx === 0) {
+      // Cikoko Elevated Inner-Ring Highway Overpass crossing high above z = -88 (clearing trains & cross street!)
+      if (arch.hasTollOverpass) {
+        const tollZ = -90.0;
+        const tollY = 6.6;
+        const tollMat = mats.highwayAsphalt || matConcreteRough;
+        addBox(bConcrete, 175, 0.80, 14.5, 5.0, tollY - 0.40, tollZ, 0, 0, 0, 12, 2);
+        const tollTop = new THREE.Mesh(new THREE.BoxGeometry(175, 0.06, 13.4), tollMat);
+        tollTop.position.set(5.0, tollY + 0.03, tollZ);
+        station.disposableGeometries.push(tollTop.geometry);
+        root.add(tollTop);
+        addBox(bJpo, 175, 0.90, 0.50, 5.0, tollY + 0.45, tollZ);
+        addBox(bConcrete, 175, 0.85, 0.45, 5.0, tollY + 0.42, tollZ - 7.0);
+        addBox(bConcrete, 175, 0.85, 0.45, 5.0, tollY + 0.42, tollZ + 7.0);
+        for (const px of [-36, -15, 34, 62]) {
+          const pH = (tollY - 0.8) - STREET_GROUND_Y;
+          addBox(bConcrete, 1.8, pH, 2.2, px, STREET_GROUND_Y + pH * 0.5, tollZ);
+          addBox(bConcrete, 2.2, 0.9, 10.5, px, tollY - 1.1, tollZ);
+          station._addCollider(px - 0.95, STREET_GROUND_Y, tollZ - 1.15, px + 0.95, tollY, tollZ + 1.15, 'concrete');
+        }
+      }
+
+      // =========================================================
+      // 7. MERGE STATIC STATION BUCKETS & BUILD MESH BVHs (BATCH 0)
+      // =========================================================
+      mergeBucket(bConcrete, matConcrete, true, true, station.disposableGeometries, root, 'StationConcrete', station.bvhMeshes);
+      mergeBucket(bConcreteRough, matConcreteRough, false, true, station.disposableGeometries, root, 'StationBallast', station.bvhMeshes);
+      mergeBucket(bTerrazzo, mats.terrazzo || matConcrete, false, true, station.disposableGeometries, root, 'StationTerrazzo', station.bvhMeshes);
+      mergeBucket(bChecker, mats.checkerFloor || matConcrete, false, true, station.disposableGeometries, root, 'StationChecker', station.bvhMeshes);
+      mergeBucket(bTactile, mats.tactile || matConcrete, false, true, station.disposableGeometries, root, 'StationTactile', null);
+      return;
+    }
+
+    if (batchIdx === 1) {
+      mergeBucket(bRoof, matCanopy, true, true, station.disposableGeometries, root, 'StationCanopy', station.bvhMeshes);
+      mergeBucket(bTruss, mats.steelTruss || matConcrete, false, false, station.disposableGeometries, root, 'StationTrusses', station.bvhMeshes);
+      mergeBucket(bSign, mats.signageAtlas || matConcrete, false, false, station.disposableGeometries, root, 'StationSignage', null);
+      mergeBucket(bBanner, mats.stationBanner || matConcrete, false, false, station.disposableGeometries, root, 'StationBanner', null);
+      return;
+    }
+
+    if (batchIdx === 2) {
+      mergeBucket(bSteelDark, mats.steelDark || matConcrete, false, true, station.disposableGeometries, root, 'StationSteelDark', station.bvhMeshes);
+      mergeBucket(bJpo, mats.jpoOrange || matConcrete, false, true, station.disposableGeometries, root, 'StationJPO', station.bvhMeshes);
+      mergeBucket(bStall, mats.stallAtlas || matDarkWood, false, true, station.disposableGeometries, root, 'StationStalls', station.bvhMeshes);
+      mergeBucket(bStairStepsConc, matConcrete, false, true, station.disposableGeometries, root, 'StationStairStepsConc', null);
+      mergeBucket(bStairStepsSteel, mats.steelDark || matConcrete, false, true, station.disposableGeometries, root, 'StationStairStepsSteel', null);
+      mergeBucket(bStairSlopeBvh, getInvisStairSlopeMat(), false, false, station.disposableGeometries, root, 'StationStairSlopes', station.bvhMeshes);
+
+      if (ctx.cawangSignBucket && ctx.cawangSignBucket.length > 0) {
+        const cSignMat = buildCawangTrackSignMaterial(station);
+        mergeBucket(ctx.cawangSignBucket, cSignMat, false, false, station.disposableGeometries, root, 'StationCawangTrackSigns', null);
       }
     }
+  }
 
-    // =========================================================
-    // 7. MERGE STATIC STATION BUCKETS & BUILD MESH BVHs
-    // =========================================================
-    mergeBucket(bConcrete, matConcrete, true, true, station.disposableGeometries, root, 'StationConcrete', station.bvhMeshes);
-    mergeBucket(bConcreteRough, matConcreteRough, false, true, station.disposableGeometries, root, 'StationBallast', station.bvhMeshes);
-    mergeBucket(bTerrazzo, mats.terrazzo || matConcrete, false, true, station.disposableGeometries, root, 'StationTerrazzo', station.bvhMeshes);
-    mergeBucket(bChecker, mats.checkerFloor || matConcrete, false, true, station.disposableGeometries, root, 'StationChecker', station.bvhMeshes);
-    mergeBucket(bTactile, mats.tactile || matConcrete, false, true, station.disposableGeometries, root, 'StationTactile', null);
-    mergeBucket(bRoof, matCanopy, true, true, station.disposableGeometries, root, 'StationCanopy', station.bvhMeshes);
-    mergeBucket(bTruss, mats.steelTruss || matConcrete, false, false, station.disposableGeometries, root, 'StationTrusses', station.bvhMeshes);
-    mergeBucket(bSteelDark, mats.steelDark || matConcrete, false, true, station.disposableGeometries, root, 'StationSteelDark', station.bvhMeshes);
-    mergeBucket(bJpo, mats.jpoOrange || matConcrete, false, true, station.disposableGeometries, root, 'StationJPO', station.bvhMeshes);
-    mergeBucket(bStall, mats.stallAtlas || matDarkWood, false, true, station.disposableGeometries, root, 'StationStalls', station.bvhMeshes);
-    mergeBucket(bSign, mats.signageAtlas || matConcrete, false, false, station.disposableGeometries, root, 'StationSignage', null);
-    mergeBucket(bBanner, mats.stationBanner || matConcrete, false, false, station.disposableGeometries, root, 'StationBanner', null);
-    mergeBucket(bStairStepsConc, matConcrete, false, true, station.disposableGeometries, root, 'StationStairStepsConc', null);
-    mergeBucket(bStairStepsSteel, mats.steelDark || matConcrete, false, true, station.disposableGeometries, root, 'StationStairStepsSteel', null);
-    const matInvisStairSlope = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
-    station.disposableMaterials.push(matInvisStairSlope);
-    mergeBucket(bStairSlopeBvh, matInvisStairSlope, false, false, station.disposableGeometries, root, 'StationStairSlopes', station.bvhMeshes);
-
-    if (ctx.cawangSignBucket && ctx.cawangSignBucket.length > 0) {
-      const cSignMat = buildCawangTrackSignMaterial(station);
-      mergeBucket(ctx.cawangSignBucket, cSignMat, false, false, station.disposableGeometries, root, 'StationCawangTrackSigns', null);
-    }
+  function mergeStaticBuckets(station, ctx) {
+    mergeStaticBucketsBatch(station, ctx, 0);
+    mergeStaticBucketsBatch(station, ctx, 1);
+    mergeStaticBucketsBatch(station, ctx, 2);
   }
 
   function buildCawangTrackSignMaterial(station) {
@@ -1564,6 +1586,7 @@
 
   S.arch = {
     buildArchitecture: buildArchitecture,
-    mergeStaticBuckets: mergeStaticBuckets
+    mergeStaticBuckets: mergeStaticBuckets,
+    mergeStaticBucketsBatch: mergeStaticBucketsBatch
   };
 })(window.LRT = window.LRT || {});

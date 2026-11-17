@@ -211,7 +211,44 @@
     }
   }
 
+  function renderPauseFieldLogs() {
+    const listEl = document.getElementById('pause-field-logs-list');
+    const countEl = document.getElementById('pause-logs-count');
+    if (!listEl) return;
+    const logs = (I.core && I.core.campaignState && Array.isArray(I.core.campaignState.collectedLogs))
+      ? I.core.campaignState.collectedLogs
+      : [];
+    if (countEl) {
+      countEl.textContent = `${logs.length} ${logs.length === 1 ? 'LOG' : 'LOGS'}`;
+    }
+    listEl.innerHTML = '';
+    if (logs.length === 0) {
+      const emptyEl = document.createElement('div');
+      emptyEl.className = 'pause-log-empty';
+      emptyEl.textContent = 'No field logs recovered yet.';
+      listEl.appendChild(emptyEl);
+      return;
+    }
+    for (let i = logs.length - 1; i >= 0; i--) {
+      const item = logs[i];
+      const row = document.createElement('div');
+      row.className = 'pause-log-entry';
+      const tEl = document.createElement('div');
+      tEl.className = 'pause-log-title';
+      tEl.textContent = item.title || 'FIELD NOTE';
+      const bEl = document.createElement('div');
+      bEl.className = 'pause-log-body';
+      bEl.textContent = item.body || '';
+      row.appendChild(tEl);
+      row.appendChild(bEl);
+      listEl.appendChild(row);
+    }
+  }
+
   function showFieldLog(title, body, durationSec) {
+    if (I.core && typeof I.core.recordFieldLog === 'function') {
+      I.core.recordFieldLog(title, body);
+    }
     const banner = dom['hud-log-banner'];
     if (!banner) return;
     if (dom['log-title']) {
@@ -567,7 +604,9 @@
       sy = Math.round(Math.max(marginY, Math.min(maxY, sy)));
 
       const rawType = String(m.type || m.kind || m.id || '').toLowerCase();
-      const typeClass = rawType.includes('train') ? 'wp-train' : (rawType.includes('loot') ? 'wp-loot' : 'wp-objective');
+      const typeClass = rawType.includes('train')
+        ? 'wp-train'
+        : (rawType.includes('loot') ? 'wp-loot' : ((rawType.includes('hazard') || rawType.includes('barrel')) ? 'wp-hazard' : 'wp-objective'));
       if (slot.lastType !== typeClass) {
         slot.el.classList.remove(slot.lastType);
         slot.el.classList.add(typeClass);
@@ -814,6 +853,9 @@
       if (LRT.Main && typeof LRT.Main.getLightingMode === 'function') {
         const lk = LRT.Main.getLightingMode();
         syncLightingUi(lk, C.MOODS ? C.MOODS[lk] : null);
+      }
+      if (screenName === 'pause') {
+        renderPauseFieldLogs();
       }
     }
   }

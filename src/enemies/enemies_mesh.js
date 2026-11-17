@@ -575,11 +575,12 @@
         yaw: 0,
         hp: 70, maxHp: 70,
         armorHp: 0, hasArmor: false,
-        speed: 1.95,
+        speed: 1.32,
+        baseSpeed: 1.32,
         scale: 1.0,
-        damage: 10,
+        damage: 20,
         attackRange: 1.75,
-        attackCooldown: 1.25,
+        attackCooldown: 1.35,
         attackTimer: 0,
         spitTimer: 1.5,
         staggerTimer: 0,
@@ -587,6 +588,12 @@
         deathTimer: 0,
         fallAngle: 0,
         fallSign: 1,
+        fallPitchSign: 1,
+        legDmg: 0,
+        legCrippled: false,
+        hitZone: 'torso',
+        hitSide: 0,
+        hornVulnTimer: 0,
         animPhase: Math.random() * 6.28,
         seed: Math.random() * 100,
         limbBias: Math.random() > 0.5 ? 1 : -1,
@@ -679,26 +686,31 @@
 
   function applyZombieColors(z) {
     const idx = z.id;
-    const flash = z.hitFlashTimer > 0 ? 1.55 : 1.0;
+    const isHit = z.hitFlashTimer > 0;
+    const rTint = isHit ? 1.15 : 1.0;
+    const gbTint = isHit ? 0.58 : 1.0;
 
-    _color.copy(z.skinColor).multiplyScalar(flash);
+    _color.copy(z.skinColor);
+    if (isHit) _color.setRGB(_color.r * rTint, _color.g * gbTint, _color.b * gbTint);
     _headMesh.setColorAt(idx, _color);
     _forearmLMesh.setColorAt(idx, _color);
     _forearmRMesh.setColorAt(idx, _color);
 
-    _color.copy(z.shirtColor).multiplyScalar(flash);
+    _color.copy(z.shirtColor);
+    if (isHit) _color.setRGB(_color.r * rTint, _color.g * gbTint, _color.b * gbTint);
     _torsoMesh.setColorAt(idx, _color);
     _upperArmLMesh.setColorAt(idx, _color);
     _upperArmRMesh.setColorAt(idx, _color);
 
-    _color.copy(z.pantsColor).multiplyScalar(flash);
+    _color.copy(z.pantsColor);
+    if (isHit) _color.setRGB(_color.r * rTint, _color.g * gbTint, _color.b * gbTint);
     _thighLMesh.setColorAt(idx, _color);
     _thighRMesh.setColorAt(idx, _color);
     _calfLMesh.setColorAt(idx, _color);
     _calfRMesh.setColorAt(idx, _color);
 
     _color.copy(z.gearColor);
-    if (z.variant === 'brute' && z.hitFlashTimer > 0) _color.multiplyScalar(1.4);
+    if (z.variant === 'brute' && isHit) _color.multiplyScalar(0.85);
     _bruteArmorMesh.setColorAt(idx, _color);
     _bruteHelmetMesh.setColorAt(idx, _color);
     _spitterBioMesh.setColorAt(idx, z.gearColor);
@@ -937,15 +949,19 @@
     const sc = z.scale;
     const widthMult = z.variant === 'brute' ? 1.24 : (z.variant === 'runner' ? 0.90 : 0.98);
     let sinkY = 0;
-    let scaleDecay = 1.0;
+    const scaleDecay = 1.0;
+    let deadStage1 = 0;
+    let deadStage2 = 0;
+    const deadDir = z.fallPitchSign || z.fallSign || 1;
 
     if (z.dead) {
-      const collapseT = Math.min(1.0, z.deathTimer / 0.36);
-      z.fallAngle = collapseT * (Math.PI * 0.48) * z.fallSign;
-      if (z.deathTimer > 0.45) {
-        const fadeT = Math.min(1.0, (z.deathTimer - 0.45) / 0.85);
-        sinkY = -0.34 * fadeT;
-        scaleDecay = Math.max(0.01, 1.0 - fadeT);
+      deadStage1 = Math.min(1.0, z.deathTimer / 0.22);
+      const raw2 = Math.max(0.0, Math.min(1.0, (z.deathTimer - 0.18) / 0.36));
+      deadStage2 = 1.0 - (1.0 - raw2) * (1.0 - raw2);
+      z.fallAngle = deadStage2 * (Math.PI * 0.48) * deadDir + deadStage1 * (1.0 - deadStage2) * 0.25 * deadDir;
+      if (z.deathTimer > 10.8) {
+        const fadeT = Math.min(1.0, (z.deathTimer - 10.8) / 1.2);
+        sinkY = -0.35 * sc * fadeT;
       }
     }
 
@@ -958,20 +974,27 @@
     let torsoPitch = z.dead
       ? z.fallAngle
       : (z.variant === 'runner' ? 0.56 : z.variant === 'spitter' ? 0.24 : z.variant === 'brute' ? (z.chargeTimer > 0 ? 0.44 : 0.16) : z.variant === 'screamer' ? 0.38 : 0.28);
-    if (z.staggerTimer > 0 && !z.dead) torsoPitch -= 0.30 * (z.staggerTimer / 0.35);
+    if (z.staggerTimer > 0 && !z.dead) {
+      const stagT = Math.min(1.0, z.staggerTimer / 0.35);
+      torsoPitch -= (z.hitZone === 'legs' ? -0.18 : 0.10) * stagT;
+    }
     if (z.chargeWindup > 0 && !z.dead) torsoPitch += 0.24;
     if (z.shriekTimer > 0 && !z.dead) torsoPitch = -0.16;
 
-    const torsoRoll = z.dead
-      ? 0
-      : (z.variant === 'walker' ? (Math.sin(phase) * 0.14 + limp * 0.08)
+    let torsoRoll = z.dead
+      ? (deadDir * 0.08 * deadStage2 * z.fallSign)
+      : (z.variant === 'walker' ? (Math.sin(phase) * 0.12 + limp * 0.08)
         : z.variant === 'spitter' ? (Math.sin(timeSec * 4.5 + z.seed) * 0.08 + limp * 0.10)
         : Math.sin(phase) * 0.06);
+    if (!z.dead && z.legCrippled) torsoRoll += limp * 0.16;
+    if (!z.dead && z.staggerTimer > 0 && z.hitSide) torsoRoll += z.hitSide * 0.14 * Math.min(1.0, z.staggerTimer / 0.35);
 
     const walkBob = z.dead ? 0 : Math.abs(Math.sin(phase)) * (z.variant === 'runner' ? 0.065 : 0.04) * s;
+    const crippleDrop = (!z.dead && z.legCrippled) ? 0.14 * s : 0;
+    const stagLegDrop = (!z.dead && z.staggerTimer > 0 && z.hitZone === 'legs') ? 0.12 * s * Math.min(1.0, z.staggerTimer / 0.42) : 0;
     const hipHeight = z.dead
-      ? (0.76 * s * Math.cos(z.fallAngle * 0.92) + 0.14)
-      : (0.77 * s - (z.variant === 'runner' ? 0.05 * s : 0) + walkBob);
+      ? (0.77 * s * (1.0 - 0.46 * deadStage1) * (1.0 - deadStage2) + 0.15 * s * deadStage2)
+      : (0.77 * s - (z.variant === 'runner' ? 0.05 * s : 0) - crippleDrop - stagLegDrop + walkBob);
 
     // 1. Torso
     _e1.set(torsoPitch, z.yaw, torsoRoll, 'YXZ');
@@ -1050,9 +1073,9 @@
         elbowFlex = 0.82;
         uaRoll = side * -0.62 + Math.sin(timeSec * 32.0) * 0.08;
       } else if (z.dead) {
-        uaPitch = -0.35 + side * 0.25;
-        elbowFlex = 0.28;
-        uaRoll = side * -0.45;
+        uaPitch = (deadDir > 0 ? (0.45 + 0.95 * deadStage2) : (-0.35 - 1.15 * deadStage2)) + side * 0.24 * deadStage2;
+        elbowFlex = 0.38 - 0.22 * deadStage2;
+        uaRoll = side * (-0.28 - 0.62 * deadStage2);
       } else if (z.variant === 'runner') {
         const sgn = side < 0 ? 1 : -1;
         uaPitch = -0.85 + Math.sin(phase) * 0.72 * sgn + attackSwing;
@@ -1105,15 +1128,16 @@
       const calfMesh = side < 0 ? _calfLMesh : _calfRMesh;
       const legPhase = side < 0 ? phase : (phase + Math.PI);
 
-      // Asymmetric walker drag on injured leg
-      const dragMult = (!z.dead && z.variant === 'walker' && side !== limp) ? 0.62 : 1.0;
+      // Asymmetric walker drag on injured leg (exaggerated when legCrippled)
+      const isCrippledLeg = !z.dead && z.legCrippled && side !== limp;
+      const dragMult = isCrippledLeg ? 0.32 : ((!z.dead && z.variant === 'walker' && side !== limp) ? 0.62 : 1.0);
       const thighPitch = z.dead
-        ? (z.fallAngle * 0.8 + side * 0.12)
-        : (Math.sin(legPhase) * thighSwingAmp * dragMult - (z.variant === 'runner' ? 0.15 : 0));
+        ? (deadDir * (Math.PI * 0.46) * deadStage2 - 0.65 * deadStage1 * (1.0 - deadStage2) + side * 0.12 * deadStage2)
+        : (Math.sin(legPhase) * thighSwingAmp * dragMult - (z.variant === 'runner' ? 0.15 : 0) - (isCrippledLeg ? 0.22 : 0));
       // Positive X rotation bends lower leg BACKWARD cleanly at the knee
       const kneeFlex = z.dead
-        ? 0.18
-        : Math.max(0.06, Math.sin(legPhase + 1.15) * kneeAmp + (z.variant === 'runner' ? 0.24 : 0.12));
+        ? (1.35 * deadStage1 * (1.0 - deadStage2) + 0.14 * deadStage2)
+        : Math.max(0.06, Math.sin(legPhase + 1.15) * kneeAmp + (z.variant === 'runner' ? 0.24 : 0.12) + (isCrippledLeg ? 0.45 : 0));
 
       attachTorso(side * 0.105, -0.25, 0, _v1);
       _e1.set(thighPitch, z.yaw, side * -0.04, 'YXZ');

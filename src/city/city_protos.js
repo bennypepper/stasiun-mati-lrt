@@ -551,9 +551,23 @@
   let _highwaySignMat = null;
   let _cityLodMat = null;
   let _lampBulbMat = null;
+  const TRAFFIC_BLINK_RATE = 1.15;
+  const TRAFFIC_BLINK_PHASE_SCALE = 0.037;
+  const TRAFFIC_BLINK_THRESHOLD = 0.45;
   const _trafficSignalUniforms = {
     uBlinkTime: { value: 0 }
   };
+
+  /** Evaluates the traffic signal blink multiplier in sync with getTrafficAmberMaterial(). */
+  function evalTrafficSignalBlink(worldX, worldZ, time) {
+    const t = time !== undefined ? time : _trafficSignalUniforms.uBlinkTime.value;
+    const phaseRaw = ((worldX || 0) + (worldZ || 0)) * TRAFFIC_BLINK_PHASE_SCALE;
+    const sigPhase = phaseRaw - Math.floor(phaseRaw);
+    const waveRaw = (t || 0) * TRAFFIC_BLINK_RATE + sigPhase;
+    const wave = waveRaw - Math.floor(waveRaw);
+    const blinkOn = wave >= TRAFFIC_BLINK_THRESHOLD ? 1.0 : 0.0;
+    return (0.14 + 1.65 * blinkOn) / 1.79;
+  }
 
   function getVehiclePaintMaterial() {
     if (!_vehPaintMat) {
@@ -1360,7 +1374,7 @@
     return proto;
   }
 
-  // Cantilever Traffic Signal Pole (0 PointLights; blinking amber lens via shader!)
+  // Cantilever Traffic Signal Pole (amber lens blink via shader; paired with 1 pooled amber PointLight)
   function getTrafficSignalProto() {
     const cacheKey = 'proc_prop_traffic_signal';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
@@ -1578,6 +1592,7 @@
     getVehiclePaintMaterial,
     getVehicleTrimMaterial,
     getTrafficAmberMaterial,
+    evalTrafficSignalBlink,
     updateTrafficSignalTime,
     getHighwaySignMaterial,
     getCityLodMaterial,

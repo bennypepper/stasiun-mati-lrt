@@ -100,6 +100,8 @@
   W._flashLightTimer = 0;
   W._flashLightDuration = 0.07;
   W._flashLightMaxIntensity = 5.0;
+  W._rocketLight = null;
+  W._meleeCooldown = 0;
   W._muzzleFlashTimer = 0;
 
   W._weaponStates = [];
@@ -1509,6 +1511,7 @@
         _attachedScorches[0].visible = true;
       }
       if (W._flashLight) W._flashLight.visible = true;
+      if (W._rocketLight) W._rocketLight.visible = true;
     } else {
       W._warmupActive = false;
       if (W._viewmodelRoot) W._viewmodelRoot.visible = W._savedVmRootVisible;

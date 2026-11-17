@@ -196,6 +196,8 @@
     _renderer: null,
     _scene: null,
     _fallbackEnvRT: null,
+    _currentEnvKey: null,
+    _currentEnvCacheKey: null,
     uGlobals: {
       uTime: { value: 0 },
       uWetness: { value: 0.28 },
@@ -244,6 +246,15 @@
       if (targetRenderer) this._renderer = targetRenderer;
       if (targetScene) this._scene = targetScene;
 
+      if (
+        typeof envTexOrKey === 'string' &&
+        this._currentEnvKey === envTexOrKey &&
+        this.envRT &&
+        (!targetScene || targetScene.environment === this.envRT.texture)
+      ) {
+        return this.envRT.texture;
+      }
+
       let hdrTex = null;
       if (typeof envTexOrKey === 'string') {
         if (LRT.AssetLoader && typeof LRT.AssetLoader.getHdri === 'function') {
@@ -255,6 +266,14 @@
 
       if (hdrTex && targetRenderer) {
         const cacheKey = typeof envTexOrKey === 'string' ? `${envTexOrKey}_${hdrTex.uuid}` : hdrTex.uuid;
+        if (
+          this._currentEnvCacheKey === cacheKey &&
+          this.envRT &&
+          (!targetScene || targetScene.environment === this.envRT.texture)
+        ) {
+          this._currentEnvKey = typeof envTexOrKey === 'string' ? envTexOrKey : null;
+          return this.envRT.texture;
+        }
         let rt = this._pmremCache.get(cacheKey);
         if (!rt) {
           if (!this._pmremGen) {
@@ -264,12 +283,16 @@
           rt = this._pmremGen.fromEquirectangular(hdrTex);
           this._pmremCache.set(cacheKey, rt);
         }
+        this._currentEnvKey = typeof envTexOrKey === 'string' ? envTexOrKey : null;
+        this._currentEnvCacheKey = cacheKey;
         this.envRT = rt;
         if (targetScene) targetScene.environment = rt.texture;
         return rt.texture;
       }
 
       if (this._fallbackEnvRT) {
+        this._currentEnvKey = typeof envTexOrKey === 'string' ? envTexOrKey : null;
+        this._currentEnvCacheKey = '__fallback__';
         this.envRT = this._fallbackEnvRT;
         if (targetScene) targetScene.environment = this._fallbackEnvRT.texture;
         return this._fallbackEnvRT.texture;
@@ -736,6 +759,24 @@
           polygonOffset: true,
           polygonOffsetFactor: -2,
           side: THREE.DoubleSide
+        }),
+
+        cityStripeWhite: new THREE.MeshStandardMaterial({
+          color: 0xe2e6ec,
+          roughness: 0.75,
+          metalness: 0.02
+        }),
+
+        cityStripeYellow: new THREE.MeshStandardMaterial({
+          color: 0xe2b424,
+          roughness: 0.72,
+          metalness: 0.02
+        }),
+
+        citySkylineDistant: new THREE.MeshStandardMaterial({
+          color: 0x141f2b,
+          roughness: 0.95,
+          metalness: 0.05
         })
       };
 

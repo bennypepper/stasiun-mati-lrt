@@ -4,7 +4,7 @@
   const I = (window.__LRT_INTERNAL__ = window.__LRT_INTERNAL__ || {});
   const P = I.city || {};
 
-  function buildCityDistrict(city, arch, rng, root, o) {
+  function createDistrictBuilder(city, arch, rng, root, o) {
     const {
       STREET_GROUND_Y,
       SIDEWALK_Y,
@@ -36,6 +36,7 @@
     const platMaxZ = o.platMaxZ !== undefined ? o.platMaxZ : 62.0;
     const trackXs = Array.isArray(o.trackXs) && o.trackXs.length > 0 ? o.trackXs : [0.0, -4.70];
     const tubeIntensity = o.tubeIntensity !== undefined ? o.tubeIntensity : 0.85;
+    const streetLampIntensity = o.streetLampIntensity !== undefined ? o.streetLampIntensity : tubeIntensity;
 
     // Resolve Poly Haven PBR materials (using LRT.Materials.mats when present, AssetLoader PBR fallback otherwise)
     const matAsphalt = city._getMat('asphaltRoad', 'asphalt_road', { color: 0x3b3d42, roughness: 0.82, metalness: 0.04 });
@@ -57,8 +58,7 @@
     });
     const matMarkWhite = city._getMat('cityStripeWhite', null, { color: 0xe2e6ec, roughness: 0.75, metalness: 0.02 });
     const matMarkYellow = city._getMat('cityStripeYellow', null, { color: 0xe2b424, roughness: 0.72, metalness: 0.02 });
-    const matInvisColl = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
-    city.disposableMaterials.push(matInvisColl);
+    const matInvisColl = city._getInvisCollMat();
 
     // Geometry buckets (roads/street infra vs spatial building sectors)
     const bAsphalt = [];
@@ -156,6 +156,76 @@
     const midBranchA0 = -29.0, midBranchA1 = -19.0; // 10m wide street at z = -24
     const midBranchB0 = 19.0, midBranchB1 = 29.0;   // 10m wide street at z = +24
 
+    const westRoadCX = (westRoadMinX + westRoadMaxX) * 0.5;
+    const eastRoadCX = (eastRoadMinX + eastRoadMaxX) * 0.5;
+    const parkX = eastOuterSwMinX + 4.2;
+
+    const zSpans = [
+      [DIST_Z_MIN, southCrossZ0],
+      [southCrossZ1, midBranchA0],
+      [midBranchA1, midBranchB0],
+      [midBranchB1, northCrossZ0],
+      [northCrossZ1, DIST_Z_MAX]
+    ];
+    const innerWestBlocks = [];
+    const innerEastBlocks = [];
+    const outerWestBlocks = [];
+    const outerEastBlocks = [];
+    for (let zi = 0; zi < zSpans.length; zi++) {
+      const [bz0, bz1] = zSpans[zi];
+      innerWestBlocks.push({ x0: westColRoadMaxX, z0: bz0, x1: westOuterSwMaxX, z1: bz1, zi });
+      innerEastBlocks.push({ x0: eastOuterSwMinX, z0: bz0, x1: eastColRoadMinX, z1: bz1, zi });
+      outerWestBlocks.push({ x0: DIST_X_MIN, z0: bz0, x1: westColRoadMinX, z1: bz1, zi });
+      outerEastBlocks.push({ x0: eastColRoadMaxX, z0: bz0, x1: DIST_X_MAX, z1: bz1, zi });
+    }
+
+    const self = city;
+    const fireEscapePlacements = [];
+    const airconPlacements = [];
+    const facadeModulePlacements = [];
+
+    const fencePlacements = [];
+    const pole1Placements = [];
+    const pole2Placements = [];
+    const lampPlacements = [];
+    const carPlacements = [];
+    const barrierPlacements = [];
+    const hydrantPlacements = [];
+    const manholePlacements = [];
+    const powerBoxPlacements = [];
+    const trashCanPlacements = [];
+    const trashBagPlacements = [];
+    const seatingPlacements = [];
+    const planterPlacements = [];
+    const pachiraPlacements = [[], [], [], []];
+    const shrub1Placements = [];
+    const shrub2Placements = [[], [], [], []];
+    const fernPlacements = [[], [], [], []];
+    const calatheaPlacements = [[], [], []];
+    const angsanaTransforms = [];
+    const sedanPlacements = [];
+    const mpvAjarPlacements = [];
+    const angkotPlacements = [];
+    const busPlacements = [];
+    const ojolPlacements = [];
+    const gerobakPlacements = [];
+    const trafficSignalPlacements = [];
+
+    const sectorPartDefs = [
+      { key: 'facadeModern', mat: matFacadeModern, canShadow: true, receiveShadow: true, prefix: 'BuildingsModern' },
+      { key: 'facadePlaster', mat: matFacadePlaster, canShadow: true, receiveShadow: true, prefix: 'BuildingsPlaster' },
+      { key: 'brick', mat: matBrick, canShadow: true, receiveShadow: true, prefix: 'BuildingsBrick' },
+      { key: 'darkWood', mat: matDarkWood, canShadow: true, receiveShadow: true, prefix: 'RukoWood' },
+      { key: 'roofTerra', mat: matRoofTerra, canShadow: true, receiveShadow: true, prefix: 'RoofsTerra' },
+      { key: 'roofOchre', mat: matRoofOchre, canShadow: true, receiveShadow: true, prefix: 'RoofsOchre' },
+      { key: 'curb', mat: matCurb, canShadow: true, receiveShadow: true, prefix: 'BuildingCurb' },
+      { key: 'truss', mat: matTruss, canShadow: false, receiveShadow: true, prefix: 'BuildingTrim' },
+      { key: 'steelDark', mat: matSteelDark, canShadow: false, receiveShadow: true, prefix: 'BuildingSteel' },
+      { key: 'amber', mat: matAmber, canShadow: false, receiveShadow: false, prefix: 'BuildingBeacons' },
+      { key: 'glass', mat: matGlassBldg, canShadow: false, receiveShadow: true, prefix: 'BuildingGlass' }
+    ];
+
+    function buildRoadsAndMarkingsStage() {
     // =========================================================
     // 1. ASPHALT ROADS & LEVEL RAIL CROSSINGS (y = -1.00)
     // =========================================================
@@ -311,7 +381,11 @@
     };
     addRoadMarkingsEW(southCrossZ0, southCrossZ1, DIST_X_MIN, DIST_X_MAX);
     addRoadMarkingsEW(northCrossZ0, northCrossZ1, DIST_X_MIN, DIST_X_MAX);
+    city._mergeAndRegisterBVH(bAsphalt, matAsphalt, false, true, 'CityRoads', true);
+    city._mergeAndRegisterBVH(bYellowMark, matMarkYellow, false, true, 'CityMarkingsYellow', false);
+    }
 
+    function buildSidewalksAndCurbsStage() {
     const addZebraCrosswalk = (cx, cz, span, isAlongX, ySurf) => {
       const yMark = (ySurf !== undefined ? ySurf : STREET_GROUND_Y) + 0.014;
       const stripePitch = 0.95;
@@ -416,39 +490,18 @@
     addSidewalkBlock(westInnerSwMinX, northCrossZ1, westInnerSwMaxX, DIST_Z_MAX, 2.6, true);
     addSidewalkBlock(eastInnerSwMinX, northCrossZ1, eastInnerSwMaxX, DIST_Z_MAX, 2.6, true);
 
-    // Define Urban City Superblocks (West & East sides divided by E-W streets at z=-74, -24, +24, +74)
-    const zSpans = [
-      [DIST_Z_MIN, southCrossZ0],
-      [southCrossZ1, midBranchA0],
-      [midBranchA1, midBranchB0],
-      [midBranchB1, northCrossZ0],
-      [northCrossZ1, DIST_Z_MAX]
-    ];
-    const innerWestBlocks = [];
-    const innerEastBlocks = [];
-    const outerWestBlocks = [];
-    const outerEastBlocks = [];
-
     for (let zi = 0; zi < zSpans.length; zi++) {
       const [bz0, bz1] = zSpans[zi];
       // Inner West block (between West Boulevard and West Collector)
       addSidewalkBlock(westColRoadMaxX, bz0, westOuterSwMaxX, bz1, 3.2, true);
-      innerWestBlocks.push({ x0: westColRoadMaxX, z0: bz0, x1: westOuterSwMaxX, z1: bz1, zi });
-
       // Inner East block (between East Boulevard and East Collector)
       addSidewalkBlock(eastOuterSwMinX, bz0, eastColRoadMinX, bz1, 3.2, true);
-      innerEastBlocks.push({ x0: eastOuterSwMinX, z0: bz0, x1: eastColRoadMinX, z1: bz1, zi });
-
       // Outer West & East skyline blocks
       addSidewalkBlock(DIST_X_MIN, bz0, westColRoadMinX, bz1, 3.0, true);
-      outerWestBlocks.push({ x0: DIST_X_MIN, z0: bz0, x1: westColRoadMinX, z1: bz1, zi });
       addSidewalkBlock(eastColRoadMaxX, bz0, DIST_X_MAX, bz1, 3.0, true);
-      outerEastBlocks.push({ x0: eastColRoadMaxX, z0: bz0, x1: DIST_X_MAX, z1: bz1, zi });
     }
 
     // Zebra Crosswalks & ADA Curb Ramps at all key pedestrian intersections!
-    const westRoadCX = (westRoadMinX + westRoadMaxX) * 0.5;
-    const eastRoadCX = (eastRoadMinX + eastRoadMaxX) * 0.5;
 
     // Crosswalks across Main West & East Boulevards at Concourse/Center (z = 0) & at Crossings (z = ±65.5, ±82.5)
     for (const cwZ of [-65.5, 0.0, 65.5, -82.5, 82.5]) {
@@ -491,15 +544,15 @@
       addAdaCurbRamp(eastOuterSwMinX + 2.5, bz - 5.55, 2.2, 1.15, 'z', -1);
       addAdaCurbRamp(eastOuterSwMinX + 2.5, bz + 5.55, 2.2, 1.15, 'z', 1);
     }
+    city._mergeAndRegisterBVH(bSidewalk, matSidewalk, false, true, 'CitySidewalks', true);
+    city._mergeAndRegisterBVH(bCurb, matCurb, false, true, 'CityCurbsAndCrossings', true);
+    city._mergeAndRegisterBVH(bTactile, matTactile, false, true, 'CityTactile', false);
+    city._mergeAndRegisterBVH(bWhiteMark, matMarkWhite, false, true, 'CityMarkingsWhite', false);
+    }
 
     // =========================================================
     // 4. NON-SQUARE EXTRUDED JAKARTA ARCHITECTURE (NO BORING BOXES!)
     // =========================================================
-    const self = city;
-    const fireEscapePlacements = [];
-    const airconPlacements = [];
-    const facadeModulePlacements = [];
-
     const addExtrudedTier = (sb, bucketKey, ptsXZ, yBot, height, tileM, emitCollider, tag, addToBvh) => {
       const ccw = ensureCCWShapeXZ(ptsXZ);
       const shape = makePolyShapeXZ(ccw);
@@ -894,6 +947,7 @@
       return isEast ? sectorBuckets.Sector_E_Near : sectorBuckets.Sector_W_Near;
     };
 
+    function buildInnerBlocksStage() {
     // Populate Inner West Blocks (facing West Boulevard)
     for (let i = 0; i < innerWestBlocks.length; i++) {
       const blk = innerWestBlocks[i];
@@ -943,7 +997,9 @@
         buildDiagonalCivic(sb, bx0 + 1.0, bz0 + 1.0, bx1 - 1.0, bz1 - 1.0, 18.0);
       }
     }
+    }
 
+    function buildOuterBlocksStage() {
     // Populate Outer West & East Jakarta CBD Skyline Blocks (tall non-square towers > 80m -> Far Sectors w/ LOD1!)
     const outerSets = [
       { blks: outerWestBlocks, sb: sectorBuckets.Sector_W_Far, openSide: 'east' },
@@ -965,29 +1021,12 @@
         else buildDiagonalCivic(sb, bx0, bz0, bx1, bz1, Math.min(h, 24));
       }
     }
+    }
 
+    function buildStreetInfraStage() {
     // =========================================================
     // 5. RAIL CORRIDOR CHAINLINK FENCES, UTILITY POLES & CATENARY CABLES
     // =========================================================
-    const fencePlacements = [];
-    const pole1Placements = [];
-    const pole2Placements = [];
-    const lampPlacements = [];
-    const carPlacements = [];
-    const barrierPlacements = [];
-    const hydrantPlacements = [];
-    const manholePlacements = [];
-    const powerBoxPlacements = [];
-    const trashCanPlacements = [];
-    const trashBagPlacements = [];
-    const seatingPlacements = [];
-    const planterPlacements = [];
-    const pachiraPlacements = [[], [], [], []]; // 4 variants
-    const shrub1Placements = [];
-    const shrub2Placements = [[], [], [], []];
-    const fernPlacements = [[], [], [], []];
-    const calatheaPlacements = [[], [], []];
-    const angsanaTransforms = [];
 
     // Rail right-of-way chainlink fences & concrete barriers guarding open track gaps (leaving z = ±74 level crossings & station plazas OPEN!)
     const fenceRuns = [
@@ -1058,23 +1097,38 @@
       }
     }
 
-    // Streetlamps along Boulevards & Level Crossings (2 Pooled PointLights + emissive bulbs on ALL poles!)
+    // Streetlamps along Boulevards, Station Promenade Portals & Level Crossings (3 Pooled PointLights + emissive bulbs on ALL poles!)
     const lampSpecs = [
+      // East inner promenade curb (along East Boulevard & station portals)
+      { x: eastInnerSwMaxX - 0.55, z: -88, ry: 0, lit: true },
       { x: eastInnerSwMaxX - 0.55, z: -66, ry: 0, lit: true },
+      { x: eastInnerSwMaxX - 0.55, z: -41, ry: 0, lit: true },
       { x: eastInnerSwMaxX - 0.55, z: -20, ry: 0, lit: true },
-      { x: eastInnerSwMaxX - 0.55, z: 0, ry: 0, lit: true },
-      { x: eastInnerSwMaxX - 0.55, z: 20, ry: 0, lit: true },
-      { x: eastInnerSwMaxX - 0.55, z: 66, ry: 0, lit: true },
+      { x: eastInnerSwMaxX - 0.55, z: 0,   ry: 0, lit: true },
+      { x: eastInnerSwMaxX - 0.55, z: 20,  ry: 0, lit: true },
+      { x: eastInnerSwMaxX - 0.55, z: 41,  ry: 0, lit: true },
+      { x: eastInnerSwMaxX - 0.55, z: 66,  ry: 0, lit: true },
+      { x: eastInnerSwMaxX - 0.55, z: 88,  ry: 0, lit: true },
+      // West inner promenade curb (along West Boulevard & platform edges)
+      { x: westInnerSwMinX + 0.55, z: -88, ry: Math.PI, lit: true },
       { x: westInnerSwMinX + 0.55, z: -66, ry: Math.PI, lit: true },
+      { x: westInnerSwMinX + 0.55, z: -41, ry: Math.PI, lit: true },
       { x: westInnerSwMinX + 0.55, z: -18, ry: Math.PI, lit: true },
-      { x: westInnerSwMinX + 0.55, z: 18, ry: Math.PI, lit: true },
-      { x: westInnerSwMinX + 0.55, z: 66, ry: Math.PI, lit: true },
-      { x: eastOuterSwMinX + 0.55, z: -42, ry: 0, lit: true },
-      { x: eastOuterSwMinX + 0.55, z: 42, ry: 0, lit: false },
-      { x: westOuterSwMaxX - 0.55, z: -42, ry: Math.PI, lit: false },
-      { x: westOuterSwMaxX - 0.55, z: 42, ry: Math.PI, lit: true },
-      { x: cMinX - 1.5, z: CROSSING_Z_SOUTH - 6.8, ry: -Math.PI * 0.5, lit: false },
-      { x: cMaxX + 1.5, z: CROSSING_Z_NORTH + 6.8, ry: Math.PI * 0.5, lit: false }
+      { x: westInnerSwMinX + 0.55, z: 0,   ry: Math.PI, lit: true },
+      { x: westInnerSwMinX + 0.55, z: 18,  ry: Math.PI, lit: true },
+      { x: westInnerSwMinX + 0.55, z: 41,  ry: Math.PI, lit: true },
+      { x: westInnerSwMinX + 0.55, z: 66,  ry: Math.PI, lit: true },
+      { x: westInnerSwMinX + 0.55, z: 88,  ry: Math.PI, lit: true },
+      // Outer boulevard curbs
+      { x: eastOuterSwMinX + 0.55, z: -42, ry: Math.PI, lit: true },
+      { x: eastOuterSwMinX + 0.55, z: 42,  ry: Math.PI, lit: true },
+      { x: westOuterSwMaxX - 0.55, z: -42, ry: 0, lit: true },
+      { x: westOuterSwMaxX - 0.55, z: 42,  ry: 0, lit: true },
+      // Level crossing flank lamps (z = ±74 crossings)
+      { x: cMinX - 2.2, z: CROSSING_Z_SOUTH - 6.8, ry: -Math.PI * 0.5, lit: true },
+      { x: cMaxX + 2.2, z: CROSSING_Z_SOUTH - 6.8, ry: -Math.PI * 0.5, lit: true },
+      { x: cMinX - 2.2, z: CROSSING_Z_NORTH + 6.8, ry: Math.PI * 0.5, lit: true },
+      { x: cMaxX + 2.2, z: CROSSING_Z_NORTH + 6.8, ry: Math.PI * 0.5, lit: true }
     ];
     for (let i = 0; i < lampSpecs.length; i++) {
       const ls = lampSpecs[i];
@@ -1087,25 +1141,31 @@
       if (ls.lit) {
         city.litLampPositions.push({
           x: headX,
-          y: SIDEWALK_Y + 4.35,
+          y: SIDEWALK_Y + 4.05,
           z: headZ,
           flicker: (i % 3 === 2)
         });
       }
     }
-    // Emit ONLY 2 pooled PointLights (repositioned dynamically near camPos in updateVisibility/update!)
-    const poolCount = Math.min(2, city.litLampPositions.length);
+    // Emit 3 persistent pooled streetlamp PointLights (attached to main scene so NUM_POINT_LIGHTS never shifts!)
+    const poolTargetScene = o.scene || (window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core && window.__LRT_INTERNAL__.core.scene) || root;
+    const poolCount = Math.min(3, city.litLampPositions.length);
+    const initialStreetFactor = Math.max(0, streetLampIntensity / 1.8);
+    const parentWorldZ = (root && root.parent && root.parent.position) ? (root.parent.position.z || 0) : 0;
     for (let pi = 0; pi < poolCount; pi++) {
       const lp = city.litLampPositions[pi];
-      const baseInt = 6.2 * tubeIntensity;
-      const ptLight = new THREE.PointLight(0xffa84c, baseInt, 38, 1.22);
-      ptLight.position.set(lp.x, lp.y, lp.z);
+      const baseInt = 16.0;
+      const initInt = city._isBuilding ? 0.0 : (baseInt * initialStreetFactor);
+      const ptLight = typeof city._acquirePooledLight === 'function'
+        ? city._acquirePooledLight(pi, poolTargetScene, 0xffa84c, initInt, 48, 1.05)
+        : new THREE.PointLight(0xffa84c, initInt, 48, 1.05);
+      ptLight.position.set(lp.x, lp.y, lp.z + parentWorldZ);
       ptLight.visible = true; // NEVER toggle visible! Control strictly via intensity.
       ptLight.castShadow = false;
-      root.add(ptLight);
+      if (typeof city._acquirePooledLight !== 'function') root.add(ptLight);
       city.streetLights.push({
         light: ptLight,
-        baseIntensity: 6.2,
+        baseIntensity: baseInt,
         kind: 'streetlamp',
         flicker: !!lp.flicker,
         _distScale: 1.0
@@ -1134,8 +1194,6 @@
 
     // 2) Abandoned Indonesian Sedans & MPVs (Avanza/Innova silhouette) in 5 muted urban colors
     const URBAN_CAR_COLORS = [0xb8bec6, 0x202328, 0x6b2228, 0x1e3554, 0xdadfe4];
-    const sedanPlacements = [];
-    const mpvAjarPlacements = [];
     const sedanMpvSpecs = [
       { x: eastRoadCX + 3.8, z: -50.0, ry: Math.PI - 0.08, ajar: false, col: 0 },
       { x: eastRoadCX + 3.6, z: -34.0, ry: Math.PI + 0.14, ajar: true,  col: 2 },
@@ -1157,7 +1215,6 @@
     }
 
     // 3) Blue Bird / JakLingko Angkot Minivans
-    const angkotPlacements = [];
     const angkotSpecs = [
       { x: eastRoadCX + 3.6, z: 34.0, ry: Math.PI + 0.08 },
       { x: eastRoadCX + 3.2, z: 90.0, ry: -0.18 },
@@ -1171,7 +1228,6 @@
     }
 
     // 4) TransJakarta BRT Bus Wrecks (dramatic tactical cover + BVH hulls, clear of crossings & navGraph spines!)
-    const busPlacements = [];
     const busSpecs = [
       { x: eastRoadCX + 3.8, z: -10.5, ry: Math.PI - 0.10 }, // Across from East Pocket Park & Plaza Lootbox
       { x: westRoadCX - 3.8, z: 38.0,  ry: 0.12 }            // West Boulevard north section
@@ -1183,7 +1239,6 @@
     }
 
     // 5) Abandoned Ojol Motorbikes clustered cleanly along outer-mid promenade curbs (clear of portals/ramps/nav nodes)
-    const ojolPlacements = [];
     const ojolSpecs = [
       { x: eastInnerSwMaxX - 1.15, z: -38.5, ry: -0.35 },
       { x: eastInnerSwMaxX - 1.25, z: -36.6, ry: -0.22 },
@@ -1203,7 +1258,6 @@
     }
 
     // 6) Jakarta Street Dressing: Gerobak Kaki Lima, Overhead Green Highway Gantries, Traffic Signal Poles
-    const gerobakPlacements = [];
     const gerobakSpecs = [
       { x: eastOuterSwMinX + 3.5, z: 7.2,   ry: Math.PI * 0.92 },
       { x: eastInnerSwMaxX - 1.45, z: 34.0, ry: Math.PI * 0.5 },
@@ -1242,8 +1296,8 @@
       bGantrySign.push(prepGeo(signGeo, false));
     }
 
-    // Traffic Signal Poles at crossing corners (0 PointLights, shader blinking amber!)
-    const trafficSignalPlacements = [];
+    // Traffic Signal Poles at crossing corners (1 Pooled amber PointLight + shader blinking amber!)
+    city.trafficSignalPositions = [];
     const sigSpecs = [
       { x: eastInnerSwMaxX - 0.50, z: southCrossZ0 - 0.85, ry: 0 },
       { x: eastOuterSwMinX + 0.50, z: southCrossZ1 + 0.85, ry: Math.PI },
@@ -1256,6 +1310,31 @@
       const ss = sigSpecs[si];
       trafficSignalPlacements.push({ x: ss.x, y: SIDEWALK_Y, z: ss.z, ry: ss.ry });
       city._addCollider(ss.x - 0.22, SIDEWALK_Y, ss.z - 0.22, ss.x + 0.22, SIDEWALK_Y + 4.9, ss.z + 0.22, 'metal', { blocksBullets: false });
+      city.trafficSignalPositions.push({
+        x: ss.x + Math.cos(ss.ry) * 2.45,
+        y: SIDEWALK_Y + 4.35,
+        z: ss.z - Math.sin(ss.ry) * 2.45
+      });
+    }
+    if (city.trafficSignalPositions.length > 0) {
+      const sp0 = city.trafficSignalPositions[0];
+      const sigLight = typeof city._acquirePooledLight === 'function'
+        ? city._acquirePooledLight(3, poolTargetScene, 0xff941a, 0, 26, 1.15)
+        : new THREE.PointLight(0xff941a, 0, 26, 1.15);
+      sigLight.position.set(sp0.x, sp0.y, sp0.z + parentWorldZ);
+      sigLight.visible = true; // NEVER toggle visible! Control strictly via intensity.
+      sigLight.castShadow = false;
+      if (typeof city._acquirePooledLight !== 'function') root.add(sigLight);
+      city.streetLights.push({
+        light: sigLight,
+        baseIntensity: 9.0,
+        kind: 'traffic',
+        flicker: false,
+        _distScale: 1.0,
+        _blinkScale: 0.0,
+        _worldX: sp0.x,
+        _worldZ: sp0.z + parentWorldZ
+      });
     }
 
     // Concrete Road Barriers (checkpoint roadblocks near intersections, leaving walkable paths open!)
@@ -1448,7 +1527,6 @@
     }
 
     // East Pocket Park Plaza (Block E3 front apron at z in [-14..+6], x = eastOuterSwMinX + 1.5..+7.5)
-    const parkX = eastOuterSwMinX + 4.2;
     for (const pz of [-9.5, -3.5, 3.5]) {
       seatingPlacements.push({ x: parkX, y: SIDEWALK_Y, z: pz, ry: -Math.PI * 0.5 });
       city._addCollider(parkX - 0.45, SIDEWALK_Y, pz - 0.95, parkX + 0.45, SIDEWALK_Y + 0.85, pz + 0.95, 'wood', { blocksBullets: false });
@@ -1481,37 +1559,25 @@
     for (const pz of [-8.0, -2.0, 2.0, 8.0]) {
       shrub1Placements.push({ x: eastOuterSwMinX + 0.9, y: SIDEWALK_Y, z: pz, ry: Math.PI * 0.5 });
     }
+    city._mergeAndRegisterBVH(bSteelDark, matSteelDark, false, true, 'CitySteelDark', true);
+    city._mergeAndRegisterBVH(bTruss, matTruss, false, true, 'CityTrimMetal', true);
+    city._mergeAndRegisterBVH(bGantryFrame, matSteelDark, true, true, 'CityGantryFrame', false);
+    city._mergeAndRegisterBVH(bGantrySign, P.getHighwaySignMaterial(), false, false, 'CityGantrySigns', false);
+    city._mergeAndRegisterBVH(bLampBulbs, P.getLampBulbMaterial(), false, false, 'CityLampBulbs', false);
+    city._mergeAndRegisterBVH(bAmber, matAmber, false, false, 'CityBeacons', false);
+    }
 
     // =========================================================
     // 6. MERGE STATIC BUCKETS, SPATIAL PERIMETER CHUNKS, LOD1 & BVH
     // =========================================================
-    city._mergeAndRegisterBVH(bAsphalt, matAsphalt, false, true, 'CityRoads', true);
-    city._mergeAndRegisterBVH(bSidewalk, matSidewalk, false, true, 'CitySidewalks', true);
-    city._mergeAndRegisterBVH(bCurb, matCurb, false, true, 'CityCurbsAndCrossings', true);
-    city._mergeAndRegisterBVH(bTactile, matTactile, false, true, 'CityTactile', false);
-    city._mergeAndRegisterBVH(bWhiteMark, matMarkWhite, false, true, 'CityMarkingsWhite', false);
-    city._mergeAndRegisterBVH(bYellowMark, matMarkYellow, false, true, 'CityMarkingsYellow', false);
+    function mergeBuildingCollStage() {
+      // Unified always-visible invisible BVH hull for all city buildings (never hidden by frustum/LOD culling!)
+      city._mergeAndRegisterBVH(bBuildingColl, matInvisColl, false, false, 'CityBuildingCollisionHull', true);
+    }
 
-    // Unified always-visible invisible BVH hull for all city buildings (never hidden by frustum/LOD culling!)
-    city._mergeAndRegisterBVH(bBuildingColl, matInvisColl, false, false, 'CityBuildingCollisionHull', true);
-
-    const sectorPartDefs = [
-      { key: 'facadeModern', mat: matFacadeModern, canShadow: true, receiveShadow: true, prefix: 'BuildingsModern' },
-      { key: 'facadePlaster', mat: matFacadePlaster, canShadow: true, receiveShadow: true, prefix: 'BuildingsPlaster' },
-      { key: 'brick', mat: matBrick, canShadow: true, receiveShadow: true, prefix: 'BuildingsBrick' },
-      { key: 'darkWood', mat: matDarkWood, canShadow: true, receiveShadow: true, prefix: 'RukoWood' },
-      { key: 'roofTerra', mat: matRoofTerra, canShadow: true, receiveShadow: true, prefix: 'RoofsTerra' },
-      { key: 'roofOchre', mat: matRoofOchre, canShadow: true, receiveShadow: true, prefix: 'RoofsOchre' },
-      { key: 'curb', mat: matCurb, canShadow: true, receiveShadow: true, prefix: 'BuildingCurb' },
-      { key: 'truss', mat: matTruss, canShadow: false, receiveShadow: true, prefix: 'BuildingTrim' },
-      { key: 'steelDark', mat: matSteelDark, canShadow: false, receiveShadow: true, prefix: 'BuildingSteel' },
-      { key: 'amber', mat: matAmber, canShadow: false, receiveShadow: false, prefix: 'BuildingBeacons' },
-      { key: 'glass', mat: matGlassBldg, canShadow: false, receiveShadow: true, prefix: 'BuildingGlass' }
-    ];
-
-    for (let si = 0; si < SECTOR_KEYS.length; si++) {
-      const sk = SECTOR_KEYS[si];
+    function mergeSectorStage(sk) {
       const sb = sectorBuckets[sk];
+      if (!sb) return;
       const sectorGroup = new THREE.Group();
       sectorGroup.name = sk;
       const localBox = new THREE.Box3();
@@ -1539,7 +1605,7 @@
 
       if (!hasGeo) {
         for (let li = 0; li < sb.lod.length; li++) sb.lod[li].dispose();
-        continue;
+        return;
       }
 
       root.add(sectorGroup);
@@ -1579,13 +1645,8 @@
       city.cullChunks.push(chunkEntry);
     }
 
-    city._mergeAndRegisterBVH(bSteelDark, matSteelDark, false, true, 'CitySteelDark', true);
-    city._mergeAndRegisterBVH(bTruss, matTruss, false, true, 'CityTrimMetal', true);
+    function mergeInfraAndTreesStage() {
     city._mergeAndRegisterBVH(bJpo, matJpo, true, true, 'CityCrossGates', true);
-    city._mergeAndRegisterBVH(bGantryFrame, matSteelDark, true, true, 'CityGantryFrame', false);
-    city._mergeAndRegisterBVH(bGantrySign, P.getHighwaySignMaterial(), false, false, 'CityGantrySigns', false);
-    city._mergeAndRegisterBVH(bLampBulbs, P.getLampBulbMaterial(), false, false, 'CityLampBulbs', false);
-    city._mergeAndRegisterBVH(bAmber, matAmber, false, false, 'CityBeacons', false);
     city._mergeAndRegisterBVH(bCables, matSteelDark, false, false, 'CityPowerCables', false);
     city._mergeAndRegisterBVH(bCollHull, matInvisColl, false, false, 'CityPropCollisionHull', true);
 
@@ -1639,7 +1700,9 @@
         emitTreeGroup(angsanaTransforms, root, '');
       }
     }
+    }
 
+    function buildSkylineAndPropsStage() {
     buildSkylineSilhouetteRing(city, cMinX, cMaxX, root);
 
     // =========================================================
@@ -1670,7 +1733,6 @@
     const protoFacadeMod = city._extractModelProto('modular_urban_apartments_facade', 4.0,
       (n) => /^(wall_door_centered_large_01|door_centered_large_01|dado_door_centered_large_01)$/.test(n.name || '')
     );
-    const protoCoffeeCart = city._extractModelProto('CoffeeCart_01', 1.85);
     const protoShrub1 = P.getFoliageCardProto(1.5, 0.72, 1);
 
     // Shadow casting pruned from minor props (lamps, poles, barriers, fences, trash, trees, etc.)
@@ -1691,6 +1753,10 @@
     city._emitInstancedProto(protoFireEscape, fireEscapePlacements, false, true, 'FireEscape');
     city._emitInstancedProto(protoFacadeMod, facadeModulePlacements, false, true, 'FacadeModule');
     city._emitInstancedProto(protoShrub1, shrub1Placements, false, true, 'ShrubHedge');
+    }
+
+    function finalizeVehiclesFoliageAndInteractablesStage() {
+    const protoCoffeeCart = city._extractModelProto('CoffeeCart_01', 1.85);
 
     // Procedural Jakarta Street Vehicles & Street Dressing (cached low-draw-call merged prototypes)
     city._emitInstancedProto(P.getSedanMpvProto('sedan_closed'), sedanPlacements, false, true, 'JakartaSedan');
@@ -1889,9 +1955,40 @@
         burst: false
       });
     }
+    }
+
+    let stage = 0;
+    return {
+      step: function () {
+        switch (stage) {
+          case 0: buildRoadsAndMarkingsStage(); stage = 1; return false;
+          case 1: buildSidewalksAndCurbsStage(); stage = 2; return false;
+          case 2: buildInnerBlocksStage(); stage = 3; return false;
+          case 3: buildOuterBlocksStage(); stage = 4; return false;
+          case 4: mergeBuildingCollStage(); stage = 5; return false;
+          case 5: mergeSectorStage(SECTOR_KEYS[0]); stage = 6; return false;
+          case 6: mergeSectorStage(SECTOR_KEYS[1]); stage = 7; return false;
+          case 7: mergeSectorStage(SECTOR_KEYS[2]); stage = 8; return false;
+          case 8: mergeSectorStage(SECTOR_KEYS[3]); stage = 9; return false;
+          case 9: mergeSectorStage(SECTOR_KEYS[4]); stage = 10; return false;
+          case 10: mergeSectorStage(SECTOR_KEYS[5]); stage = 11; return false;
+          case 11: buildStreetInfraStage(); stage = 12; return false;
+          case 12: mergeInfraAndTreesStage(); stage = 13; return false;
+          case 13: buildSkylineAndPropsStage(); stage = 14; return false;
+          case 14: finalizeVehiclesFoliageAndInteractablesStage(); stage = 15; return true;
+          default: return true;
+        }
+      }
+    };
+  }
+
+  function buildCityDistrict(city, arch, rng, root, o) {
+    const builder = createDistrictBuilder(city, arch, rng, root, o);
+    while (!builder.step()) {}
   }
 
   I.city = Object.assign(I.city || {}, {
+    createDistrictBuilder: createDistrictBuilder,
     buildDistrict: buildCityDistrict
   });
 })();
