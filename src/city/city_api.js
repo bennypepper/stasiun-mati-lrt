@@ -742,6 +742,10 @@
           LRT.Audio.play('breaker_throw', { gain: 0.72 });
         }
         this._plnRestored = true;
+        if (this._plnBeaconMat) {
+          this._plnBeaconMat.color.setHex(0x22c55e);
+          this._plnBeaconMat.emissive.setHex(0x22c55e);
+        }
         this.setLightingFactor(Math.max(this._lightingFactor, 1.35));
         it.used = true;
         it.label = '[E] Kotak Relai PLN Jalanan (Daya Aktif)';

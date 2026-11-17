@@ -453,7 +453,7 @@
       cStairX, cStairFootZ, cStairTopZ, eaveY, i2MinX
     } = ctx;
 
-    const { bTruss, bSteelDark, bStall, bSign } = buckets;
+    const { bTruss, bSteelDark, bStall, bSign, bConcrete } = buckets;
 
     // =========================================================
     // 6. COMMERCIAL STALLS, HERO ROTI'O KIOSK, TURNSTILES & AMENITIES
@@ -546,25 +546,132 @@
 
     let lkX = null, lkZ = null, shX = null, shZ = null;
     if (!isIsland) {
-      lkX = concMaxX - 1.35;
-      lkZ = concMinZ + 3.2;
-      addAtlasBox(bStall, 3.8, 2.7, 1.8, lkX, 1.35, lkZ, -Math.PI * 0.5, null, STALL_UV.loketWood);
-      addAtlasBox(bSign, 3.9, 0.65, 1.9, lkX, 2.75, lkZ, -Math.PI * 0.5, null, SIGN_UV.loketHeader);
-      addBox(bSteelDark, 0.36, 0.05, 1.40, lkX - 1.02, 0.99, lkZ);
-      station._addCollider(lkX - 1.0, 0, lkZ - 2.0, lkX + 1.0, 2.9, lkZ + 2.0, 'wood');
+      // Prominent glass-fronted LRT Ticket & Customer Service Pavilion (Loket / Layanan Penumpang)
+      // Placed cleanly in the front unpaid concourse plaza opposite the KAI Turnstile gates
+      lkX = Math.min(concMinX + 8.8, concMaxX - 5.2);
+      lkZ = concMidZ - 9.0;
+      const lkYaw = -Math.PI * 0.5;
+      const lkCos = Math.cos(lkYaw);
+      const lkSin = Math.sin(lkYaw);
+      const lkW = (lx, lz) => [lkX + lx * lkCos + lz * lkSin, lkZ - lx * lkSin + lz * lkCos];
+
+      // 1) Recessed dark-steel reveal plinth (0.00..0.12) & concrete interior slab (0.00..0.14)
+      addBox(bSteelDark, 3.74, 0.12, 1.88, lkX, 0.06, lkZ, 0, lkYaw, 0);
+      addBox(bConcrete, 3.44, 0.14, 1.62, lkX, 0.07, lkZ, 0, lkYaw, 0);
+
+      // 2) Hollow cabinet enclosure: front counter apron (0.12..0.96), rear solid backing wall, left/right paneled piers
+      const frontAp = lkW(0, 0.84);
+      addAtlasBox(bStall, 3.88, 0.84, 0.24, frontAp[0], 0.54, frontAp[1], lkYaw, null, STALL_UV.loketWood);
+      const backWall = lkW(0, -0.84);
+      addAtlasBox(bStall, 3.88, 2.34, 0.22, backWall[0], 1.29, backWall[1], lkYaw, null, STALL_UV.loketWood);
+      for (const sSide of [-1, 1]) {
+        const pCornerF = lkW(sSide * 1.80, 0.78);
+        const pCornerB = lkW(sSide * 1.80, -0.78);
+        addAtlasBox(bStall, 0.28, 2.34, 0.34, pCornerF[0], 1.29, pCornerF[1], lkYaw, null, STALL_UV.loketWood);
+        addAtlasBox(bStall, 0.28, 2.34, 0.34, pCornerB[0], 1.29, pCornerB[1], lkYaw, null, STALL_UV.loketWood);
+        const sideApron = lkW(sSide * 1.80, 0.0);
+        addAtlasBox(bStall, 0.22, 0.84, 1.32, sideApron[0], 0.54, sideApron[1], lkYaw, null, STALL_UV.loketWood);
+        // Side glass window panes between corner piers (world X span = 1.22m, Z thickness = 0.04m)
+        const sideWin = lkW(sSide * 1.80, 0.0);
+        const cSideG = station._addCollider(sideWin[0] - 0.62, 1.0, sideWin[1] - 0.14, sideWin[0] + 0.62, 2.34, sideWin[1] + 0.14, 'glass', { blocksWalk: false });
+        glassRecords.push({
+          cx: sideWin[0], cy: 1.67, cz: sideWin[1], w: 1.22, h: 1.28, d: 0.04,
+          ry: 0, hp: 18, isPsdDoor: false, psdDoorIdx: -1, slideSign: 0, colliderIdx: cSideG
+        });
+      }
+
+      // 3) Brushed stainless steel overhanging teller counter (y = 0.96..1.03) + dark interior desk (y = 0.74)
+      const ledgePos = lkW(0, 0.90);
+      addBox(bTruss, 3.98, 0.07, 0.60, ledgePos[0], 0.995, ledgePos[1], 0, lkYaw, 0);
+      const deskPos = lkW(0, 0.44);
+      addBox(bSteelDark, 3.24, 0.05, 0.52, deskPos[0], 0.74, deskPos[1], 0, lkYaw, 0);
+
+      // 4) Teller window mullions (center pier, horizontal transom, sill rail) & 2 glass teller screens with 0.12m pass-through slot
+      const midPier = lkW(0, 0.84);
+      addBox(bSteelDark, 0.16, 1.40, 0.14, midPier[0], 1.73, midPier[1], 0, lkYaw, 0);
+      const transBar = lkW(0, 0.84);
+      addBox(bSteelDark, 3.36, 0.07, 0.12, transBar[0], 2.04, transBar[1], 0, lkYaw, 0);
+      const headBar = lkW(0, 0.84);
+      addBox(bSteelDark, 3.36, 0.08, 0.14, headBar[0], 2.38, headBar[1], 0, lkYaw, 0);
+
+      for (const bayX of [-0.88, 0.88]) {
+        // Dark steel coin/document pass-through tray recessed on counter
+        const trayPos = lkW(bayX, 0.94);
+        addBox(bSteelDark, 0.52, 0.02, 0.34, trayPos[0], 1.035, trayPos[1], 0, lkYaw, 0);
+        // Tempered glass pane above 12cm pass-through slot
+        const winPos = lkW(bayX, 0.84);
+        const cBayG = station._addCollider(winPos[0] - 0.1, 1.15, winPos[1] - 0.78, winPos[0] + 0.1, 2.02, winPos[1] + 0.78, 'glass', { blocksWalk: false });
+        glassRecords.push({
+          cx: winPos[0], cy: 1.58, cz: winPos[1], w: 1.54, h: 0.88, d: 0.04,
+          ry: lkYaw, hp: 18, isPsdDoor: false, psdDoorIdx: -1, slideSign: 0, colliderIdx: cBayG
+        });
+        // Clerestory top glass transom (2.08..2.34)
+        const cTopG = station._addCollider(winPos[0] - 0.1, 2.08, winPos[1] - 0.78, winPos[0] + 0.1, 2.34, winPos[1] + 0.78, 'glass', { blocksWalk: false });
+        glassRecords.push({
+          cx: winPos[0], cy: 2.21, cz: winPos[1], w: 1.54, h: 0.25, d: 0.04,
+          ry: lkYaw, hp: 14, isPsdDoor: false, psdDoorIdx: -1, slideSign: 0, colliderIdx: cTopG
+        });
+        // Anodized acoustic intercom disc mounted on glass pane
+        const icomPos = lkW(bayX, 0.85);
+        addBox(bTruss, 0.16, 0.16, 0.07, icomPos[0], 1.58, icomPos[1], 0, lkYaw, 0);
+        addBox(bSteelDark, 0.10, 0.10, 0.08, icomPos[0], 1.58, icomPos[1], 0, lkYaw, 0);
+        // Furnished interior: POS monitor stand, screen, keyboard & swivel office chair
+        const monPos = lkW(bayX + 0.12, 0.36);
+        addBox(bSteelDark, 0.08, 0.14, 0.08, monPos[0], 0.83, monPos[1], 0, lkYaw, 0);
+        addBox(bSteelDark, 0.44, 0.28, 0.05, monPos[0], 1.00, monPos[1], 0, lkYaw, 0);
+        addAtlasBox(bStall, 0.38, 0.22, 0.055, monPos[0], 1.00, monPos[1], lkYaw, null, STALL_UV.jaklingko);
+        const kbPos = lkW(bayX + 0.12, 0.56);
+        addBox(bSteelDark, 0.34, 0.025, 0.14, kbPos[0], 0.775, kbPos[1], 0, lkYaw, 0);
+        const chPos = lkW(bayX, -0.22);
+        addBox(bSteelDark, 0.10, 0.34, 0.10, chPos[0], 0.31, chPos[1], 0, lkYaw, 0);
+        addBox(bSteelDark, 0.44, 0.06, 0.42, chPos[0], 0.49, chPos[1], 0, lkYaw, 0);
+        const chBack = lkW(bayX, -0.40);
+        addBox(bSteelDark, 0.42, 0.44, 0.06, chBack[0], 0.72, chBack[1], 0, lkYaw, 0);
+      }
+
+      // KUE / E-Money card tap pad on counter edge + warm interior ceiling diffuser + service map strip on rear interior wall
+      const tapPos = lkW(-0.22, 1.08);
+      addAtlasBox(bStall, 0.16, 0.05, 0.20, tapPos[0], 1.055, tapPos[1], lkYaw, null, STALL_UV.jaklingko);
+      const mapWall = lkW(0, -0.71);
+      addAtlasBox(bSign, 2.40, 0.72, 0.04, mapWall[0], 1.78, mapWall[1], lkYaw, { 4: SIGN_UV.routeMap, 5: SIGN_UV.routeMap }, SIGN_UV.loketHeader);
+      const ceilGlow = lkW(0, 0.08);
+      addBox(bTruss, 2.60, 0.04, 0.34, ceilGlow[0], 2.38, ceilGlow[1], 0, lkYaw, 0);
+
+      // 5) Overhanging LRT Canopy & Illuminated Loket Header Fascia (2.42..3.00m)
+      const roofPos = lkW(0, 0.12);
+      addBox(bSteelDark, 4.24, 0.10, 2.28, roofPos[0], 2.45, roofPos[1], 0, lkYaw, 0);
+      addBox(bTruss, 4.28, 0.04, 2.32, roofPos[0], 2.51, roofPos[1], 0, lkYaw, 0);
+      // Dark-navy backing band across booth roof + crisp centered non-stretched LOKET / TIKET lightboxes
+      addBox(bSteelDark, 4.02, 0.54, 1.92, lkX, 2.78, lkZ, 0, lkYaw, 0);
+      const fasciaF = lkW(0, 0.965);
+      addAtlasBox(bSign, 2.08, 0.52, 0.06, fasciaF[0], 2.78, fasciaF[1], lkYaw, null, SIGN_UV.loketHeader);
+      const fasciaB = lkW(0, -0.965);
+      addAtlasBox(bSign, 2.08, 0.52, 0.06, fasciaB[0], 2.78, fasciaB[1], lkYaw, null, SIGN_UV.loketHeader);
+
+      // Clean AABB collider around ticket booth envelope
+      station._addCollider(lkX - 1.15, 0, lkZ - 1.98, lkX + 1.15, 3.04, lkZ + 1.98, 'wood');
+
+      // Queue guidance matte dark-steel stanchions flanking teller front (zero bloom glare)
+      for (const qSide of [-1, 1]) {
+        const stP = lkW(qSide * 1.48, 1.88);
+        addBox(bSteelDark, 0.055, 0.88, 0.055, stP[0], 0.44, stP[1], 0, lkYaw, 0);
+        addBox(bSteelDark, 0.24, 0.03, 0.24, stP[0], 0.015, stP[1], 0, lkYaw, 0);
+      }
 
       const loketUsed = station._usedIds.has('loket_counter');
+      const notePos = lkW(-0.62, 0.98);
+      const interactPos = lkW(-0.45, 1.38);
       station.interactables.push({
         id: 'loket_counter',
         type: 'field_log',
-        x: lkX - 1.2,
-        y: 1.1,
-        z: lkZ,
+        x: interactPos[0],
+        y: 1.12,
+        z: interactPos[1],
         label: loketUsed ? '[E] Meja Loket Stasiun (Sudah Diperiksa)' : '[E] Periksa Buku Catatan Loket Tiket',
         prompt: loketUsed ? '[E] Meja Loket Stasiun (Sudah Diperiksa)' : '[E] Periksa Buku Catatan Loket Tiket',
         used: loketUsed
       });
-      placeFieldLogProp(station, ctx.root, 'loket_counter', lkX - 1.02, 1.02, lkZ + 0.16, -Math.PI * 0.5 + 0.14, loketUsed);
+      placeFieldLogProp(station, ctx.root, 'loket_counter', notePos[0], 1.055, notePos[1], lkYaw + 0.14, loketUsed);
 
       shX = concMinX + 7.8;
       shZ = concMaxZ - 1.45;
@@ -1272,7 +1379,7 @@
     const socketPool = [];
     if (!isIsland) {
       socketPool.push(
-        { id: 'sock_loket_corner', x: concMaxX - 2.6, y: 0.0, z: concMinZ + 1.25, ry: 0.0, riskLuck: 0.40, title: 'Peti Taktis Sudut Loket' },
+        { id: 'sock_loket_corner', x: concMaxX - 2.6, y: 0.0, z: concMinZ + 1.25, ry: 0.0, riskLuck: 0.40, title: 'Peti Taktis Sudut Selatan' },
         { id: 'sock_under_jpo_stair', x: p1MinX + 1.25, y: 0.0, z: jpoZ > 0 ? jpoNearZ - 1.4 : jpoNearZ + 1.4, ry: Math.PI * 0.5, riskLuck: 0.44, title: 'Peti Taktis Bawah JPO' },
         { id: 'sock_jpo_west_overlook', x: -9.8, y: UPPER_FLOOR_Y, z: jpoZ + (jpoZ > 0 ? 1.2 : -1.2), ry: 0.0, riskLuck: 0.52, title: 'Peti Taktis JPO Barat' },
         { id: 'sock_balcony_overlook', x: concMinX + 1.25, y: UPPER_FLOOR_Y, z: concMidZ - 4.2, ry: Math.PI * 0.5, riskLuck: 0.32, title: 'Peti Taktis Balkon Concourse' },
@@ -1625,6 +1732,10 @@
       { x: isIsland ? (p1MinX + p1Width * 0.5) : (concMinX + cw * 0.5), y: 3.65, z: concMidZ },
       { x: jpoCX, y: 6.35, z: jpoZ }
     ];
+    if (lkX !== null && lkZ !== null) {
+      addPooledLight(lkX - 0.15, 2.22, lkZ, 0xffd194, 4.6, 16, 'warm');
+      station._warmLightAnchors.push({ x: lkX - 0.15, y: 2.22, z: lkZ });
+    }
     if (jpo2Z !== null && ctx.jpo2CX !== null) {
       station._warmLightAnchors.push({ x: ctx.jpo2CX, y: 6.35, z: jpo2Z });
     }

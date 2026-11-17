@@ -360,6 +360,94 @@
       "binBytes": 551720,
       "totalBytes": 1864362,
       "files": 6
+    },
+    "plastic_monobloc_chair_01": {
+      "id": "plastic_monobloc_chair_01",
+      "category": "street",
+      "gltf": "assets/models/plastic_monobloc_chair_01/plastic_monobloc_chair_01_1k.gltf",
+      "binBytes": 46024,
+      "totalBytes": 170490,
+      "files": 5
+    },
+    "outdoor_table_chair_set_01": {
+      "id": "outdoor_table_chair_set_01",
+      "category": "street",
+      "gltf": "assets/models/outdoor_table_chair_set_01/outdoor_table_chair_set_01_1k.gltf",
+      "binBytes": 92564,
+      "totalBytes": 266088,
+      "files": 8
+    },
+    "standing_chalkboard_01": {
+      "id": "standing_chalkboard_01",
+      "category": "street",
+      "gltf": "assets/models/standing_chalkboard_01/standing_chalkboard_01_1k.gltf",
+      "binBytes": 24880,
+      "totalBytes": 147864,
+      "files": 8
+    },
+    "plastic_crate_02": {
+      "id": "plastic_crate_02",
+      "category": "street",
+      "gltf": "assets/models/plastic_crate_02/plastic_crate_02_1k.gltf",
+      "binBytes": 63552,
+      "totalBytes": 443166,
+      "files": 5
+    },
+    "wooden_military_crate": {
+      "id": "wooden_military_crate",
+      "category": "street",
+      "gltf": "assets/models/wooden_military_crate/wooden_military_crate_1k.gltf",
+      "binBytes": 80968,
+      "totalBytes": 203106,
+      "files": 5
+    },
+    "metal_jerrycan_green": {
+      "id": "metal_jerrycan_green",
+      "category": "street",
+      "gltf": "assets/models/metal_jerrycan_green/metal_jerrycan_green_1k.gltf",
+      "binBytes": 45276,
+      "totalBytes": 181904,
+      "files": 5
+    },
+    "barrel_03": {
+      "id": "barrel_03",
+      "category": "street",
+      "gltf": "assets/models/barrel_03/barrel_03_1k.gltf",
+      "binBytes": 22980,
+      "totalBytes": 125289,
+      "files": 5
+    },
+    "old_tyre": {
+      "id": "old_tyre",
+      "category": "street",
+      "gltf": "assets/models/old_tyre/old_tyre_1k.gltf",
+      "binBytes": 24636,
+      "totalBytes": 135812,
+      "files": 5
+    },
+    "cardboard_box_01": {
+      "id": "cardboard_box_01",
+      "category": "street",
+      "gltf": "assets/models/cardboard_box_01/cardboard_box_01_1k.gltf",
+      "binBytes": 25552,
+      "totalBytes": 121214,
+      "files": 5
+    },
+    "grass_bermuda_01": {
+      "id": "grass_bermuda_01",
+      "category": "foliage",
+      "gltf": "assets/models/grass_bermuda_01/grass_bermuda_01_1k.gltf",
+      "binBytes": 32260,
+      "totalBytes": 149884,
+      "files": 5
+    },
+    "hand_truck": {
+      "id": "hand_truck",
+      "category": "street",
+      "gltf": "assets/models/hand_truck/hand_truck_1k.gltf",
+      "binBytes": 72052,
+      "totalBytes": 205615,
+      "files": 5
     }
   },
   "skippedModels": {

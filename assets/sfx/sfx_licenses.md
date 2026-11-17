@@ -41,7 +41,7 @@ Each recording was trimmed to remove dead air, high-pass filtered against DC/sub
 | `impact_concrete` | `sfx/impact_concrete.mp3` | 0.449 s | 6,524 | 8,700 | `75-cc0-breaking-falling-hit-sfx/bfh1_hit_01.ogg` (`0.000s–0.450s`) | Lavenderdotpet CC0 archive | CC0 1.0 | https://github.com/Lavenderdotpet/CC0-Public-Domain-Sounds/blob/main/75-cc0-breaking-falling-hit-sfx/bfh1_hit_01.ogg |
 | `impact_metal` | `sfx/impact_metal.mp3` | 0.580 s | 8,252 | 11,004 | `METLImpt_MetalHitSurface_OS_01.ogg` (`0.000s–0.580s`) | Oculus VR, LLC | CC-BY 4.0 | https://developers.meta.com/vr/downloads/package/oculus-audio-pack-1/ |
 | `debris_crumble` | `sfx/debris_crumble.mp3` | 0.950 s | 12,572 | 16,764 | `75-cc0-breaking-falling-hit-sfx/bfh1_breaking_01.ogg` (`0.000s–0.950s`) | Lavenderdotpet CC0 archive | CC0 1.0 | https://github.com/Lavenderdotpet/CC0-Public-Domain-Sounds/blob/main/75-cc0-breaking-falling-hit-sfx/bfh1_breaking_01.ogg |
-| `turnstile_beep` | `sfx/turnstile_beep.mp3` | 0.147 s | 3,068 | 4,092 | `UIAlert_Notification_OS_01.ogg` (`0.000s–0.150s`) | Oculus VR, LLC | CC-BY 4.0 | https://developers.meta.com/vr/downloads/package/oculus-audio-pack-1/ |
+| `turnstile_beep` | `sfx/turnstile_beep.mp3` | 0.405 s | 6,092 | 8,124 | Layered RFID chirp (`UIAlert_Notification_OS_03.ogg` pitched 1.45x + `switch_01.ogg` card tap) + solenoid gate latch (`DOORHdwr_OfficeDoorLock_OS_01.ogg` + `MECHSwtch_SwitchSmallOn_OS_02.ogg`) | Oculus VR, LLC + Lavenderdotpet | CC-BY 4.0 / CC0 1.0 | https://developers.meta.com/vr/downloads/package/oculus-audio-pack-1/ |
 
 ### 3. Train & Station Transit (8 clips)
 

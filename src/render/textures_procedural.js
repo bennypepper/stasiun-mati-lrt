@@ -1141,16 +1141,28 @@
     etx.fill();
 
     // Loket Ticket Counter Header (768..1024)
-    ctx.fillStyle = '#16325C';
+    ctx.fillStyle = '#142C52';
     ctx.fillRect(768, 360, 256, 152);
+    ctx.fillStyle = '#E5B82E';
+    ctx.fillRect(768, 360, 256, 12);
+    ctx.fillRect(768, 500, 256, 12);
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 26px sans-serif';
-    ctx.fillText('Loket / Tickets', 790, 420);
-    ctx.fillStyle = '#C8D6EA';
-    ctx.font = 'italic 18px sans-serif';
-    ctx.fillText('Smart travel, live better', 790, 464);
-    etx.fillStyle = '#264470';
+    ctx.fillText('LOKET / TIKET', 792, 422);
+    ctx.fillStyle = '#FFE08A';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText('LAYANAN PENUMPANG LRT', 792, 462);
+
+    etx.fillStyle = '#1C3966';
     etx.fillRect(768, 360, 256, 152);
+    etx.fillStyle = '#D49B1A';
+    etx.fillRect(768, 360, 256, 10);
+    etx.fillStyle = '#FFF5D6';
+    etx.font = 'bold 26px sans-serif';
+    etx.fillText('LOKET / TIKET', 792, 422);
+    etx.fillStyle = '#FFE08A';
+    etx.font = 'bold 14px sans-serif';
+    etx.fillText('LAYANAN PENUMPANG LRT', 792, 462);
 
     return {
       map: finalizeCanvasTexture(cA, true, false, maxAniso),

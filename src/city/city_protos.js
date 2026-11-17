@@ -1076,18 +1076,24 @@
     return proto;
   }
 
-  // PLN Power Junction Cabinet (~28 tris vs 21,272-tri GLTF!)
+  // Grounded PLN Power Feeder Pillar on concrete plinth (~48 tris vs 21,272-tri GLTF!)
   function getPowerBoxProto() {
-    const cacheKey = 'proc_prop_power_box_v1';
+    const cacheKey = 'proc_prop_power_box_v2';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
     const bTrim = [];
-    addColoredBox(bTrim, 0.72, 0.92, 0.44, 0, 0, 0, 0, 0, 0, 0x525a65, 0.82);
-    addColoredBox(bTrim, 0.76, 0.07, 0.48, 0, 0.48, 0, 0, 0, 0, 0x3b424c, 0.88);
-    addColoredBox(bTrim, 0.16, 0.16, 0.02, 0.16, 0.14, 0.23, 0, 0, 0, 0xeab308, 0.94);
+    // Concrete foundation pedestal resting cleanly at y = 0
+    addColoredBox(bTrim, 0.84, 0.34, 0.56, 0, 0.17, 0, 0, 0, 0, 0x6b7280, 0.80);
+    // Steel relay cabinet housing + sloped rain hood
+    addColoredBox(bTrim, 0.76, 1.08, 0.46, 0, 0.88, 0, 0, 0, 0, 0x475569, 0.84);
+    addColoredBox(bTrim, 0.82, 0.08, 0.52, 0, 1.46, 0, 0, 0, 0, 0x334155, 0.90);
+    // Center door seam, handle & high-voltage yellow hazard diamond/plate on +Z front face
+    addColoredBox(bTrim, 0.03, 0.96, 0.02, 0, 0.88, 0.24, 0, 0, 0, 0x1e293b, 0.90);
+    addColoredBox(bTrim, 0.05, 0.14, 0.04, 0.08, 0.88, 0.24, 0, 0, 0, 0x1f2937, 0.92);
+    addColoredBox(bTrim, 0.18, 0.18, 0.02, 0.20, 1.10, 0.24, 0, 0, 0, 0xeab308, 0.96);
 
     const proto = {
       parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
-      size: { x: 0.76, y: 0.96, z: 0.48 }
+      size: { x: 0.84, y: 1.50, z: 0.56 }
     };
     _cityProtoCache.set(cacheKey, proto);
     return proto;
@@ -1502,7 +1508,7 @@
       const targetGroup = customGroup || city.rootGroup;
       targetGroup.add(inst);
 
-      const isClutter = /^(ManholeCover|TrashBag|TrashCan|Fern|Calathea|PowerBox|Shrub|Pachira|PlanterBox|AirconUnit|FireEscape|RoadBarrier|FireHydrant)/.test(namePrefix);
+      const isClutter = /^(ManholeCover|TrashBag|TrashCan|Fern|Calathea|PowerBox|Shrub|Pachira|PlanterBox|AirconUnit|FireEscape|RoadBarrier|FireHydrant|MonoblocChair|OutdoorTableSet|Chalkboard|PlasticCrate|MilitaryCrate|Jerrycan|FuelBarrel|OldTyre|CardboardBox|BermudaGrass|HandTruck)/.test(namePrefix);
       if (isClutter) {
         city.clutterMeshes.push(inst);
         const qMatch = namePrefix.match(/_(NW|NE|SW|SE)/);

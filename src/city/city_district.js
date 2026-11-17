@@ -303,6 +303,17 @@
     const ojolPlacements = [];
     const gerobakPlacements = [];
     const trafficSignalPlacements = [];
+    const monoblocChairPlacements = [];
+    const outdoorTablePlacements = [];
+    const chalkboardPlacements = [];
+    const plasticCratePlacements = [];
+    const militaryCratePlacements = [];
+    const jerrycanPlacements = [];
+    const fuelBarrelPlacements = [];
+    const oldTyrePlacements = [];
+    const cardboardBoxPlacements = [];
+    const bermudaGrassPlacements = [];
+    const handTruckPlacements = [];
 
     const sectorPartDefs = [
       { key: 'facadeModern', mat: matFacadeModern, canShadow: true, receiveShadow: true, prefix: 'BuildingsModern' },
@@ -1606,17 +1617,23 @@
       city.trackGates.push({ group: gateGroup, gateMesh, collider: col, z: gz });
     }
 
-    // Sidewalk Street Furniture & Details (Hydrants, Manholes, Power Boxes, Trash Cans, Trash Bags, Benches, Planters, CoffeeCart)
+    // Sidewalk Street Furniture & Details (Hydrants, Manholes, Grounded PLN Feeder Pillars, Trash Cans, Trash Bags)
     for (const hz of [-54, -14, 14, 54]) {
       hydrantPlacements.push({ x: eastOuterSwMinX + 0.7, y: SIDEWALK_Y, z: hz, ry: -Math.PI * 0.5 });
       hydrantPlacements.push({ x: westOuterSwMaxX - 0.7, y: SIDEWALK_Y, z: hz + 6, ry: Math.PI * 0.5 });
       manholePlacements.push({ x: eastRoadCX - 1.8, y: STREET_GROUND_Y + 0.01, z: hz + 4, ry: 0 });
       manholePlacements.push({ x: westRoadCX + 1.8, y: STREET_GROUND_Y + 0.01, z: hz - 4, ry: 0 });
-      powerBoxPlacements.push({ x: eastOuterSwMinX + 4.4, y: SIDEWALK_Y + 1.35, z: hz - 5, ry: -Math.PI * 0.5 });
       trashCanPlacements.push({ x: eastInnerSwMaxX - 0.85, y: SIDEWALK_Y, z: hz + 3, ry: 0 });
       trashCanPlacements.push({ x: westInnerSwMinX + 0.85, y: SIDEWALK_Y, z: hz - 3, ry: Math.PI });
       trashBagPlacements.push({ x: eastInnerSwMaxX - 1.45, y: SIDEWALK_Y, z: hz + 3.4, ry: rng() * 3 });
       trashBagPlacements.push({ x: eastOuterSwMinX + 1.2, y: SIDEWALK_Y, z: hz + 0.6, ry: rng() * 3 });
+    }
+    // Grounded outer-curb PLN feeder pillars well clear of food carts / gerobak
+    for (const pbZ of [-56, -34, 34, 56]) {
+      powerBoxPlacements.push({ x: eastOuterSwMinX + 1.35, y: SIDEWALK_Y, z: pbZ, ry: -Math.PI * 0.5 });
+      powerBoxPlacements.push({ x: westOuterSwMaxX - 1.35, y: SIDEWALK_Y, z: pbZ - 4, ry: Math.PI * 0.5 });
+      city._addCollider(eastOuterSwMinX + 1.05, SIDEWALK_Y, pbZ - 0.42, eastOuterSwMinX + 1.65, SIDEWALK_Y + 1.5, pbZ + 0.42, 'metal', { blocksBullets: false });
+      city._addCollider(westOuterSwMaxX - 1.65, SIDEWALK_Y, pbZ - 4.42, westOuterSwMaxX - 1.05, SIDEWALK_Y + 1.5, pbZ - 3.58, 'metal', { blocksBullets: false });
     }
 
     // East Pocket Park Plaza (Block E3 front apron at z in [-14..+6], x = eastOuterSwMinX + 1.5..+7.5)
@@ -1899,6 +1916,158 @@
     }
 
     // =========================================================
+    // POPULATE SPARSE EXTERIOR ZONES WITH BLENDER-DECIMATED POLY HAVEN PROPS
+    // =========================================================
+    const emitQuadrantClutter = (proto, list, baseName, collHalfW, collH, collMat) => {
+      if (!proto || !list || list.length === 0) return;
+      const byQ = { NW: [], NE: [], SW: [], SE: [] };
+      for (let i = 0; i < list.length; i++) {
+        const pl = list[i];
+        const qk = (pl.z < 0 ? 'N' : 'S') + (pl.x >= 0 ? 'E' : 'W');
+        byQ[qk].push(pl);
+        if (collHalfW && collH) {
+          city._addCollider(
+            pl.x - collHalfW, pl.y, pl.z - collHalfW,
+            pl.x + collHalfW, pl.y + collH, pl.z + collHalfW,
+            collMat || 'wood', { blocksBullets: false }
+          );
+        }
+      }
+      for (const qk of ['NW', 'NE', 'SW', 'SE']) {
+        if (byQ[qk].length > 0) {
+          city._emitInstancedProto(proto, byQ[qk], false, true, `${baseName}_${qk}`);
+        }
+      }
+    };
+
+    // 1) East Pocket Park, Gerobak Kaki Lima Seating, Ruko Arcades & West Promenade Coffee Nooks
+    for (const pz of [-9.2, -3.2, 2.2]) {
+      outdoorTablePlacements.push({ x: parkX + 2.2, y: SIDEWALK_Y, z: pz, ry: Math.PI * 0.5 + (rng() - 0.5) * 0.25 });
+    }
+    // Café Patio & Ruko Colonnade Dining Tables (East zi=1 & zi=3 + West zi=1 & zi=3)
+    for (const tz of [-56, -42, 42, 56]) {
+      outdoorTablePlacements.push({ x: eastOuterSwMinX + 2.75, y: SIDEWALK_Y, z: tz, ry: -Math.PI * 0.5 + (rng() - 0.5) * 0.2 });
+      outdoorTablePlacements.push({ x: westOuterSwMaxX - 2.75, y: SIDEWALK_Y, z: tz + 3.0, ry: Math.PI * 0.5 + (rng() - 0.5) * 0.2 });
+    }
+    // Monobloc warung plastic chairs clustered beside all 3 Gerobaks and along shopfronts
+    for (let gi = 0; gi < gerobakPlacements.length; gi++) {
+      const gs = gerobakPlacements[gi];
+      const offX = gi === 0 ? 1.85 : (gi === 1 ? -1.45 : 1.45);
+      monoblocChairPlacements.push({ x: gs.x + offX, y: SIDEWALK_Y, z: gs.z - 0.85, ry: gs.ry + 0.6 });
+      monoblocChairPlacements.push({ x: gs.x + offX, y: SIDEWALK_Y, z: gs.z + 0.95, ry: gs.ry + 2.2 });
+      plasticCratePlacements.push({ x: gs.x + offX * 0.65, y: SIDEWALK_Y, z: gs.z - 1.55, ry: 0.2 + gi });
+      plasticCratePlacements.push({ x: gs.x + offX * 0.65, y: SIDEWALK_Y + 0.25, z: gs.z - 1.55, ry: 0.35 + gi });
+    }
+    // Warung menu chalkboards outside Hero Ruko, CoffeeCart & Inner Ruko blocks
+    chalkboardPlacements.push({ x: eastOuterSwMinX + 2.6, y: SIDEWALK_Y, z: 9.2, ry: -Math.PI * 0.65 });
+    chalkboardPlacements.push({ x: eastInnerSwMinX + 4.3, y: SIDEWALK_Y, z: 8.2, ry: -Math.PI * 0.35 });
+    for (const cz of [-52, -38, 38, 52]) {
+      chalkboardPlacements.push({ x: eastOuterSwMinX + 2.1, y: SIDEWALK_Y, z: cz, ry: -Math.PI * 0.5 });
+      chalkboardPlacements.push({ x: westOuterSwMaxX - 2.1, y: SIDEWALK_Y, z: cz - 4.0, ry: Math.PI * 0.5 });
+      monoblocChairPlacements.push({ x: eastOuterSwMinX + 2.1, y: SIDEWALK_Y, z: cz + 2.2, ry: -Math.PI * 0.4 });
+      monoblocChairPlacements.push({ x: westOuterSwMaxX - 2.1, y: SIDEWALK_Y, z: cz + 2.0, ry: Math.PI * 0.45 });
+    }
+
+    // 2) West Promenade & East Inner Sidewalk Evacuation Luggage, Supply Boxes & Hand Trucks (breaks up long bare sidewalks!)
+    for (const wz of [-60, -48, -32, -12, 4, 14, 34, 48, 60]) {
+      cardboardBoxPlacements.push({ x: westInnerSwMaxX - 1.35, y: SIDEWALK_Y, z: wz, ry: rng() * Math.PI });
+      cardboardBoxPlacements.push({ x: westInnerSwMaxX - 1.85, y: SIDEWALK_Y, z: wz + 0.55, ry: rng() * Math.PI });
+      plasticCratePlacements.push({ x: westInnerSwMinX + 1.4, y: SIDEWALK_Y, z: wz + 2.2, ry: rng() * 1.5 });
+      if (Math.abs(wz) === 12 || Math.abs(wz) === 48) {
+        handTruckPlacements.push({ x: westInnerSwMaxX - 1.5, y: SIDEWALK_Y, z: wz - 1.4, ry: Math.PI * 0.35 + wz * 0.1 });
+        plasticCratePlacements.push({ x: eastInnerSwMaxX - 1.4, y: SIDEWALK_Y, z: wz + 1.1, ry: rng() * 2.0 });
+      }
+    }
+    // Near CoffeeCart & East Inner Sidewalk utility spots
+    plasticCratePlacements.push({ x: eastInnerSwMinX + 5.2, y: SIDEWALK_Y, z: 12.1, ry: 0.4 });
+    plasticCratePlacements.push({ x: eastInnerSwMinX + 5.2, y: SIDEWALK_Y + 0.25, z: 12.1, ry: 0.65 });
+    cardboardBoxPlacements.push({ x: eastInnerSwMinX + 4.9, y: SIDEWALK_Y, z: 12.7, ry: 0.2 });
+    handTruckPlacements.push({ x: eastInnerSwMinX + 5.5, y: SIDEWALK_Y, z: 11.4, ry: -Math.PI * 0.7 });
+
+    // 3) U-Shaped Courtyards & L-Tower Plazas + Collector Roads (evacuation supply stacks, barrels & tires)
+    const courtyardHubs = [
+      { x: eastOuterSwMinX + 6.5, z: -98.0, ry: -Math.PI * 0.5 },
+      { x: westOuterSwMaxX - 6.5, z: 48.0, ry: Math.PI * 0.5 },
+      { x: eastOuterSwMinX + 5.5, z: 2.0, ry: 0.0 },
+      { x: westOuterSwMaxX - 5.5, z: -98.0, ry: Math.PI * 0.25 },
+      { x: eastColRoadMinX + 1.6, z: -46.0, ry: 0.0 },
+      { x: westColRoadMaxX - 1.6, z: 46.0, ry: Math.PI },
+    ];
+    for (let hi = 0; hi < courtyardHubs.length; hi++) {
+      const h = courtyardHubs[hi];
+      const baseY = hi >= 4 ? STREET_GROUND_Y : SIDEWALK_Y;
+      militaryCratePlacements.push({ x: h.x, y: baseY, z: h.z, ry: h.ry });
+      fuelBarrelPlacements.push({ x: h.x + 1.15, y: baseY, z: h.z + 0.45, ry: rng() * 3 });
+      fuelBarrelPlacements.push({ x: h.x + 1.25, y: baseY, z: h.z - 0.35, ry: rng() * 3 });
+      jerrycanPlacements.push({ x: h.x - 0.85, y: baseY, z: h.z + 0.5, ry: rng() * 2 });
+      oldTyrePlacements.push({ x: h.x - 1.2, y: baseY, z: h.z - 0.75, ry: rng() * 2 });
+      oldTyrePlacements.push({ x: h.x - 1.2, y: baseY + 0.165, z: h.z - 0.75, ry: rng() * 2 });
+      handTruckPlacements.push({ x: h.x + 0.35, y: baseY, z: h.z - 1.05, ry: h.ry + 0.8 });
+    }
+
+    // 4) TNI Patrol Car staging & Quarantine Checkpoint Roadblocks (z = ±116.5 & Level Crossings)
+    militaryCratePlacements.push({ x: westRoadCX + 1.8, y: STREET_GROUND_Y, z: -47.8, ry: 0.35 });
+    jerrycanPlacements.push({ x: westRoadCX + 1.45, y: STREET_GROUND_Y, z: -46.9, ry: 0.9 });
+    fuelBarrelPlacements.push({ x: westRoadCX + 1.75, y: STREET_GROUND_Y, z: -44.2, ry: 0.2 });
+
+    for (const rz of [-112.4, 112.4]) {
+      for (const rx of [westRoadCX - 3.6, westRoadCX + 3.6, eastRoadCX - 3.6, eastRoadCX + 3.6]) {
+        militaryCratePlacements.push({ x: rx, y: STREET_GROUND_Y, z: rz, ry: (rng() - 0.5) * 0.4 });
+        fuelBarrelPlacements.push({ x: rx + (rx < 0 ? 1.1 : -1.1), y: STREET_GROUND_Y, z: rz + (rz < 0 ? 0.5 : -0.5), ry: rng() * 3 });
+        jerrycanPlacements.push({ x: rx - 0.55, y: STREET_GROUND_Y, z: rz - 0.65, ry: rng() * 2 });
+        oldTyrePlacements.push({ x: rx + 0.6, y: STREET_GROUND_Y, z: rz + (rz < 0 ? 1.1 : -1.1), ry: rng() * 3 });
+      }
+    }
+    // Level crossings (z = ±74) road shoulders: warning tires & sandbag/barrel stations cleanly clear of tracks & roadway
+    for (const cz of [CROSSING_Z_SOUTH, CROSSING_Z_NORTH]) {
+      for (const sideX of [westInnerSwMinX + 1.4, eastInnerSwMaxX - 1.4]) {
+        oldTyrePlacements.push({ x: sideX, y: SIDEWALK_Y, z: cz - 6.8, ry: rng() * 2 });
+        oldTyrePlacements.push({ x: sideX, y: SIDEWALK_Y + 0.165, z: cz - 6.8, ry: rng() * 2 });
+        fuelBarrelPlacements.push({ x: sideX, y: SIDEWALK_Y, z: cz + 6.8, ry: rng() * 2 });
+      }
+    }
+
+    // 5) Urban Tropical Curb Grass Tufts (grass_bermuda_01) across Promenades, Pocket Park, Crossings & Alley Curbs
+    for (let gz = -110; gz <= 110; gz += 7.5) {
+      if (Math.abs(Math.abs(gz) - 24) < 5.2 || Math.abs(Math.abs(gz) - 74) < 6.2) continue;
+      const j = (rng() - 0.5) * 2.2;
+      bermudaGrassPlacements.push({ x: westInnerSwMinX + 0.55, y: SIDEWALK_Y, z: gz + j, ry: rng() * Math.PI * 2, sx: 0.72, sy: 1.5, sz: 0.72 });
+      bermudaGrassPlacements.push({ x: eastInnerSwMaxX - 0.55, y: SIDEWALK_Y, z: gz - j, ry: rng() * Math.PI * 2, sx: 0.70, sy: 1.45, sz: 0.70 });
+      if (Math.abs(gz) > 18) {
+        bermudaGrassPlacements.push({ x: westOuterSwMaxX - 0.45, y: SIDEWALK_Y, z: gz + 1.8, ry: rng() * Math.PI * 2, sx: 0.65, sy: 1.35, sz: 0.65 });
+        bermudaGrassPlacements.push({ x: eastOuterSwMinX + 0.45, y: SIDEWALK_Y, z: gz - 1.8, ry: rng() * Math.PI * 2, sx: 0.65, sy: 1.35, sz: 0.65 });
+      }
+    }
+    for (let pz = -13.0; pz <= 5.0; pz += 3.0) {
+      bermudaGrassPlacements.push({ x: parkX + (rng() - 0.5) * 2.4, y: SIDEWALK_Y, z: pz, ry: rng() * Math.PI * 2, sx: 0.80, sy: 1.7, sz: 0.80 });
+    }
+
+    // Extract Blender-optimized GLTF protos & emit quadrant-culled InstancedMeshes
+    const pMonobloc = city._extractModelProto('plastic_monobloc_chair_01', 0.88);
+    const pTableSet = city._extractModelProto('outdoor_table_chair_set_01', 0.86);
+    const pChalk    = city._extractModelProto('standing_chalkboard_01', 1.46);
+    const pCrate2   = city._extractModelProto('plastic_crate_02', 0.28);
+    const pMilCrate = city._extractModelProto('wooden_military_crate', 0.50);
+    const pJerry    = city._extractModelProto('metal_jerrycan_green', 0.48);
+    const pBarrel   = city._extractModelProto('barrel_03', 0.92);
+    const pTyre     = city._extractModelProto('old_tyre', 0.17);
+    const pCardBox  = city._extractModelProto('cardboard_box_01', 0.44);
+    const pGrass    = city._extractModelProto('grass_bermuda_01', 0.24);
+    const pHandTrk  = city._extractModelProto('hand_truck', 1.36);
+
+    emitQuadrantClutter(pMonobloc, monoblocChairPlacements, 'MonoblocChair', 0.28, 0.85, 'wood');
+    emitQuadrantClutter(pTableSet, outdoorTablePlacements, 'OutdoorTableSet', 0.55, 0.82, 'wood');
+    emitQuadrantClutter(pChalk, chalkboardPlacements, 'Chalkboard', 0.30, 1.42, 'wood');
+    emitQuadrantClutter(pCrate2, plasticCratePlacements, 'PlasticCrate', 0.24, 0.52, 'wood');
+    emitQuadrantClutter(pMilCrate, militaryCratePlacements, 'MilitaryCrate', 0.52, 0.52, 'wood');
+    emitQuadrantClutter(pJerry, jerrycanPlacements, 'Jerrycan', 0.18, 0.48, 'metal');
+    emitQuadrantClutter(pBarrel, fuelBarrelPlacements, 'FuelBarrel', 0.32, 0.92, 'metal');
+    emitQuadrantClutter(pTyre, oldTyrePlacements, 'OldTyre', 0.28, 0.32, 'wood');
+    emitQuadrantClutter(pCardBox, cardboardBoxPlacements, 'CardboardBox', 0.22, 0.44, 'wood');
+    emitQuadrantClutter(pGrass, bermudaGrassPlacements, 'BermudaGrass', 0, 0, null);
+    emitQuadrantClutter(pHandTrk, handTruckPlacements, 'HandTruck', 0.28, 1.30, 'metal');
+
+    // =========================================================
     // 8. CITY STREET & PLAZA SPAWN NODES (FOR ROAMING ZOMBIES)
     // =========================================================
     city.spawnNodes = [
@@ -1935,12 +2104,45 @@
     placeCityFieldLogProp(city, root, 'city_coffee_cart', eastInnerSwMinX + 4.25, SIDEWALK_Y + 0.92, 10.25, -Math.PI * 0.5 + 0.16, coffeeCartUsed);
 
     const plnUsed = usedSet.has('city_pln_box') || city._plnRestored;
+    const plnX = eastOuterSwMinX + 2.45;
+    const plnZ = -16.2;
+    // Dedicated grounded PLN Substation Relay Cabinet (24m south of East Pocket Park Gerobak)
+    const plnGroup = new THREE.Group();
+    plnGroup.position.set(plnX, SIDEWALK_Y, plnZ);
+    const plnPadGeo = new THREE.BoxGeometry(0.92, 0.24, 1.38);
+    const plnBodyGeo = new THREE.BoxGeometry(0.64, 1.56, 1.16);
+    const plnRoofGeo = new THREE.BoxGeometry(0.74, 0.10, 1.26);
+    const plnStripeGeo = new THREE.BoxGeometry(0.66, 0.14, 1.18);
+    const plnLeverGeo = new THREE.BoxGeometry(0.10, 0.28, 0.18);
+    const plnBeaconGeo = new THREE.BoxGeometry(0.06, 0.14, 0.44);
+    const plnPadMat = city._getMat('cityPlnPad', null, { color: 0x6b7280, roughness: 0.9, metalness: 0.1 });
+    const plnBodyMat = city._getMat('cityPlnBody', null, { color: 0x334155, roughness: 0.55, metalness: 0.65 });
+    const plnHazardMat = city._getMat('cityPlnHazard', null, { color: 0xf59e0b, roughness: 0.45, metalness: 0.2 });
+    const plnBeaconMat = new THREE.MeshStandardMaterial({
+      color: plnUsed ? 0x22c55e : 0xef4444,
+      emissive: plnUsed ? 0x22c55e : 0xef4444,
+      emissiveIntensity: 1.4,
+      roughness: 0.3
+    });
+    city.disposableGeometries.push(plnPadGeo, plnBodyGeo, plnRoofGeo, plnStripeGeo, plnLeverGeo, plnBeaconGeo);
+    city.disposableMaterials.push(plnBeaconMat);
+    city._plnBeaconMat = plnBeaconMat;
+    const plnPadM = new THREE.Mesh(plnPadGeo, plnPadMat); plnPadM.position.set(0, 0.12, 0);
+    const plnBodyM = new THREE.Mesh(plnBodyGeo, plnBodyMat); plnBodyM.position.set(0, 1.02, 0);
+    const plnRoofM = new THREE.Mesh(plnRoofGeo, plnBodyMat); plnRoofM.position.set(0, 1.84, 0);
+    const plnStripeM = new THREE.Mesh(plnStripeGeo, plnHazardMat); plnStripeM.position.set(0, 1.48, 0);
+    const plnLeverM = new THREE.Mesh(plnLeverGeo, plnHazardMat); plnLeverM.position.set(-0.34, 1.06, 0.34);
+    const plnBeaconM = new THREE.Mesh(plnBeaconGeo, plnBeaconMat); plnBeaconM.position.set(-0.32, 1.66, 0);
+    plnGroup.add(plnPadM, plnBodyM, plnRoofM, plnStripeM, plnLeverM, plnBeaconM);
+    root.add(plnGroup);
+    city._addCollider(plnX - 0.46, SIDEWALK_Y, plnZ - 0.69, plnX + 0.46, SIDEWALK_Y + 1.92, plnZ + 0.69, 'metal');
+
     city.interactables.push({
       id: 'city_pln_box',
       type: 'power_box',
-      x: eastOuterSwMinX + 4.4,
-      y: SIDEWALK_Y + 1.35,
-      z: 9.0,
+      x: plnX - 0.35,
+      y: SIDEWALK_Y + 1.25,
+      z: plnZ,
       label: plnUsed ? '[E] Kotak Relai PLN Jalanan (Daya Aktif)' : '[E] Sakelar Utama PLN Jalanan (Pulihkan Penerangan Jalan)',
       prompt: plnUsed ? '[E] Kotak Relai PLN Jalanan (Daya Aktif)' : '[E] Sakelar Utama PLN Jalanan (Pulihkan Penerangan Jalan)',
       used: plnUsed
