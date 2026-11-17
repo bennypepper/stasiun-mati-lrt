@@ -776,9 +776,9 @@
           heal: fresh ? 15 : 0,
           healAmount: fresh ? 15 : 0,
           ammo: fresh ? { type: 'rifle', amount: 45 } : null,
-          logTitle: "MEMO KASIR ROTI'O & KOPI — RESEP ANTI-PANIK",
-          logBody: "Jumat, 16 Nov, 16:30 WIB. Di luar orang-orang mulai teriak dan mata mereka memerah aneh, tapi aroma kopi dan mentega vanila kita bikin suasana tetap tenang. Stok masih cukup sampai Senin. Jakarta udah sering banjir dan demo, masa kalah sama jamur? — Mas Budi",
-          message: fresh ? 'Gerobak Kopi Promenade: +45 Amunisi Senapan & +15 HP Kopi Hangat!' : 'Gerobak Kopi East Promenade sudah digeledah.'
+          logTitle: 'Catatan Pedagang Kopi Tepi Jalan',
+          logBody: 'Sore ini jalanan mulai kacau, banyak pengendara meninggalkan mobilnya begitu saja di tengah kemacetan.\n\nSaya terpaksa menutup gerobak lebih cepat dan meninggalkan sisa kopi hangat serta kotak perbekalan milik petugas patroli yang tadi sempat mampir. Semoga bermanfaat bagi siapa pun yang lewat.\n\nBudi',
+          message: fresh ? 'Gerobak Kopi Promenade: Amunisi Senapan dan Kopi Hangat ditemukan.' : 'Gerobak Kopi sudah digeledah.'
         };
       }
 
@@ -788,7 +788,7 @@
         }
         const fresh = !it.used;
         it.used = true;
-        it.label = '[E] Mobil Patroli TNI MT Haryono (Sudah Digeledah)';
+        it.label = 'Mobil Patroli MT Haryono (Sudah Digeledah)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(it.id);
         this._markFieldLogGlintUsed(it.id);
@@ -797,9 +797,9 @@
           type: 'street_stash',
           action: 'street_stash',
           ammo: fresh ? { type: 'shotgun', amount: 18 } : null,
-          logTitle: 'CATATAN PATROLI BARIKADE MT HARYONO',
-          logBody: 'Satgas Yonif Mekanis 201: Jalur tol dalam kota dan Jalan MT Haryono lumpuh total akibat tabrakan beruntun. Jangan biarkan infected mendekati depo minyak atau gardu listrik PLN. Amankan amunisi shotgun untuk pertempuran jarak dekat!',
-          message: fresh ? 'Bagasi Mobil Patroli: +18 Amunisi Shotgun 12G Ditemukan!' : 'Bagasi mobil patroli sudah kosong.'
+          logTitle: 'Catatan Regu Patroli Jalan Haryono',
+          logBody: 'Jalur tol dalam kota dan persimpangan Cawang sudah tertutup kendaraan yang bertabrakan.\n\nRegu kami diperintahkan naik ke peron stasiun untuk membantu pengamanan di atas. Di dalam bagasi mobil ini masih tersisa beberapa kotak peluru senapan laras pendek, gunakan seperlunya untuk menjaga jarak dari kerumunan.',
+          message: fresh ? 'Bagasi Mobil Patroli: Amunisi Shotgun ditemukan.' : 'Bagasi mobil patroli sudah kosong.'
         };
       }
 
@@ -809,7 +809,7 @@
         }
         const fresh = !it.used;
         it.used = true;
-        it.label = '[E] Peti Taktis Taman East Pocket (Sudah Digeledah)';
+        it.label = 'Peti Taktis Taman Kota (Sudah Digeledah)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(it.id);
         this._markFieldLogGlintUsed(it.id);
@@ -823,9 +823,9 @@
           heal: fresh ? 25 : 0,
           healAmount: fresh ? 25 : 0,
           ammo: fresh ? { type: 'rpg', amount: 1 } : null,
-          logTitle: 'CATATAN LOGISTIK TAMAN KOTA — MAS BUDI',
-          logBody: 'Peti darurat ditinggalkan oleh regu pengawal logistik sebelum mereka mundur ke arah Setiabudi. Terdapat satu roket RPG cadangan dan amunisi kaliber 5.56mm. Jika situasi memburuk, gunakan roket untuk menghancurkan barikade atau kawanan Brute!',
-          message: fresh ? 'Peti Taktis Taman: +1 Roket RPG, +30 Amunisi Senapan, dan Medkit +25 HP!' : 'Peti taktis taman sudah kosong.'
+          logTitle: 'Pesan Regu Logistik Taman Kota',
+          logBody: 'Peti perbekalan di sudut taman ini sengaja kami tinggalkan sebelum regu kami bergeser ke arah Setiabudi.\n\nDi dalamnya masih ada obat-obatan darurat dan pelontar roket untuk membuka jalan apabila barikade di Cikoko tertutup rapat.',
+          message: fresh ? 'Peti Taktis Taman: Roket, Amunisi Senapan, dan Medkit ditemukan.' : 'Peti taktis taman sudah kosong.'
         };
       }
 

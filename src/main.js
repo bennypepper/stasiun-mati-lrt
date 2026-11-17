@@ -484,6 +484,38 @@
     if (dom['btn-start-exploration']) {
       dom['btn-start-exploration'].addEventListener('click', () => startGame(MODES.EXPLORATION));
     }
+    if (dom['btn-exit-game']) {
+      dom['btn-exit-game'].addEventListener('click', () => {
+        if (!CORE.tutorialActive && CORE.gameMode === MODES.SURVIVAL && CORE.gameState === STATES.STATION_ACTIVE && typeof CORE.writeSave === 'function') {
+          CORE.writeSave();
+        }
+        if (LRT.PlayerUI && typeof LRT.PlayerUI.releaseLock === 'function') LRT.PlayerUI.releaseLock();
+        if (document.fullscreenElement && typeof document.exitFullscreen === 'function') {
+          try { document.exitFullscreen(); } catch (_) {}
+        }
+        if (LRT.Audio) {
+          if (typeof LRT.Audio.stopVoice === 'function') LRT.Audio.stopVoice();
+          LRT.Audio.stopAllLoops();
+        }
+        loopPaused = true;
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
+        try { window.close(); } catch (_) {}
+        const lo = document.getElementById('loading-overlay');
+        const st = document.getElementById('loading-status');
+        const bar = document.querySelector('#loading-overlay .loading-bar-track');
+        if (lo) {
+          if (bar) bar.style.display = 'none';
+          if (st) st.textContent = 'Terima kasih telah bermain. Anda dapat menutup tab ini.';
+          lo.classList.remove('fade-out');
+          lo.style.display = 'flex';
+          lo.style.opacity = '1';
+          lo.style.pointerEvents = 'auto';
+        }
+      });
+    }
     if (dom['btn-resume']) {
       dom['btn-resume'].addEventListener('click', () => resume());
     }
@@ -570,6 +602,15 @@
         }
         if (e.target.closest('#btn-menu-fps, #btn-pause-fps')) {
           if (typeof CORE.setFpsCounterEnabled === 'function') CORE.setFpsCounterEnabled(!CORE.fpsCounterEnabled);
+          return;
+        }
+        if (e.target.closest('#btn-menu-subtitles, #btn-pause-subtitles')) {
+          if (typeof CORE.setSubtitlesEnabled === 'function') CORE.setSubtitlesEnabled(!CORE.subtitlesEnabled);
+          return;
+        }
+        const subLangBtn = e.target.closest('[data-sublang]');
+        if (subLangBtn) {
+          if (typeof CORE.setSubtitleLang === 'function') CORE.setSubtitleLang(subLangBtn.dataset.sublang);
         }
       });
     });

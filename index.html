@@ -158,7 +158,7 @@
     <div id="hud-subtitle-box" class="hidden">
       <div id="subtitle-speaker" class="badge speaker-occ">Sarah</div>
       <div id="subtitle-text-id">Dialog Bahasa Indonesia</div>
-      <div id="subtitle-text-en">English subtitle translation</div>
+      <div id="subtitle-text-en" class="hidden"></div>
     </div>
 
     <!-- Cheat Console Bar (` key) -->
@@ -186,10 +186,10 @@
           <div class="armor-bar-track"><div id="armor-bar-fill"></div></div>
         </div>
         <div class="tool-pills">
-          <span class="pill-ind" id="pill-flashlight">[F] Senter: OFF</span>
-          <span class="pill-ind active" id="pill-lighting">[L] Light: DAY</span>
-          <span class="pill-ind active" id="pill-hud">[H] HUD</span>
-          <span class="pill-ind" id="pill-mute">[M] Audio</span>
+          <span class="pill-ind" id="pill-flashlight">F Senter</span>
+          <span class="pill-ind active" id="pill-lighting">L Cahaya</span>
+          <span class="pill-ind active" id="pill-hud">H Layar</span>
+          <span class="pill-ind" id="pill-mute">M Suara</span>
         </div>
       </div>
 
@@ -210,41 +210,41 @@
           <div id="ammo-readout"><span id="ammo-mag">15</span> <span id="ammo-reserve">/ INF</span></div>
         </div>
         <div id="weapon-slots">
-          <div class="w-slot active" data-slot="1">1 · G2</div>
-          <div class="w-slot" data-slot="2">2 · SS2</div>
-          <div class="w-slot" data-slot="3">3 · 12G</div>
-          <div class="w-slot" data-slot="4">4 · RPG</div>
+          <div class="w-slot active" data-slot="1">1 G2</div>
+          <div class="w-slot" data-slot="2">2 SS2</div>
+          <div class="w-slot" data-slot="3">3 12G</div>
+          <div class="w-slot" data-slot="4">4 RPG</div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Resident Evil-Style Physical Paper Document Viewer Modal -->
+  <!-- Physical Paper Note / Letter Viewer Modal -->
   <div id="document-viewer-modal" class="doc-viewer-modal hidden" role="dialog" aria-modal="true" aria-labelledby="doc-viewer-title">
     <div class="doc-sheet" id="doc-viewer-sheet">
       <div class="doc-fold-crease" aria-hidden="true"></div>
       <div class="doc-paper-stain" aria-hidden="true"></div>
 
-      <div class="doc-header">
+      <div class="doc-header hidden">
         <div class="doc-header-meta">
-          <div class="doc-classification" id="doc-viewer-kicker">Catatan #01</div>
+          <div class="doc-classification" id="doc-viewer-kicker">Catatan</div>
           <div class="doc-submeta" id="doc-viewer-submeta">Dukuh Atas BSI</div>
         </div>
-        <div class="doc-stamp" id="doc-viewer-stamp">#01</div>
-        <button class="doc-close-x" id="btn-doc-close-x" type="button" aria-label="Tutup Dokumen">&times;</button>
+        <div class="doc-stamp" id="doc-viewer-stamp"></div>
+        <button class="doc-close-x" id="btn-doc-close-x" type="button" aria-label="Tutup Dokumen">Tutup</button>
       </div>
 
-      <div class="doc-rule"></div>
-      <h2 class="doc-title" id="doc-viewer-title">Catatan Lapangan</h2>
+      <div class="doc-rule hidden"></div>
+      <h2 class="doc-title" id="doc-viewer-title">Catatan</h2>
 
       <div class="doc-body-wrap">
         <div class="doc-body" id="doc-viewer-body"></div>
       </div>
+    </div>
 
-      <div class="doc-footer">
-        <span class="doc-footer-hint">[E] / [Esc] Tutup</span>
-        <button class="doc-close-btn" id="btn-doc-close" type="button">Tutup</button>
-      </div>
+    <div class="doc-footer">
+      <span class="doc-footer-hint hidden">Tekan E atau Esc untuk menutup</span>
+      <button class="doc-close-btn" id="btn-doc-close" type="button">Tutup</button>
     </div>
   </div>
 
@@ -287,6 +287,11 @@
           <span class="zenith-item-title">CONTROLS</span>
           <span class="zenith-item-sub">Operator keybinds &amp; tactical inputs</span>
         </button>
+
+        <button class="zenith-item" id="btn-exit-game" type="button">
+          <span class="zenith-item-title">EXIT</span>
+          <span class="zenith-item-sub">Save progress &amp; close game</span>
+        </button>
       </nav>
     </div>
 
@@ -299,7 +304,7 @@
           <div class="setting-row">
             <div class="setting-info">
               <span class="setting-label">DIFFICULTY</span>
-              <span class="setting-desc">How many infected spawn, how hard they hit, and how scarce ammo &amp; health drops are.</span>
+              <span class="setting-desc">Controls enemy count, damage, and supply scarcity.</span>
             </div>
             <div class="zenith-tabs" id="menu-difficulty-group">
               <button class="zenith-tab" data-difficulty="easy" type="button">EASY</button>
@@ -311,7 +316,7 @@
           <div class="setting-row">
             <div class="setting-info">
               <span class="setting-label">TIME CYCLE</span>
-              <span class="setting-desc">NIGHT HORROR: dark blackout stations. DAYLIGHT&ndash;SUNSET: bright day-to-sunset, but infected are faster and spot you from farther.</span>
+              <span class="setting-desc">Choose dark night horror or bright daytime-to-sunset with faster enemies.</span>
             </div>
             <div class="zenith-tabs" id="menu-atmosphere-group">
               <button class="zenith-tab active" data-atmosphere="night_horror" type="button">NIGHT HORROR</button>
@@ -325,7 +330,7 @@
           <div class="setting-row">
             <div class="setting-info">
               <span class="setting-label">LIGHTING PRESET</span>
-              <span class="setting-desc">Cycles the sky &amp; light mood in-game (also [L]). Does not change difficulty.</span>
+              <span class="setting-desc">Cycles the sky and atmosphere mood in-game.</span>
             </div>
             <button class="zenith-toggle" id="btn-menu-lighting" type="button">DAYLIGHT</button>
           </div>
@@ -333,9 +338,9 @@
             <div class="setting-head">
               <div class="setting-info">
                 <span class="setting-label">BRIGHTNESS</span>
-                <span class="setting-desc">Scales overall scene exposure. Raise it if dark areas are hard to read.</span>
+                <span class="setting-desc">Adjusts overall scene exposure for dark stations.</span>
               </div>
-              <span class="setting-readout" id="brightness-readout">100% &middot; DARK HORROR</span>
+              <span class="setting-readout" id="brightness-readout">100% DARK HORROR</span>
             </div>
             <input type="range" id="brightness-slider" class="zenith-slider" min="0.4" max="1.8" step="0.05" value="1.0" aria-label="Atmosphere Brightness">
           </div>
@@ -346,18 +351,18 @@
           <div class="setting-row">
             <div class="setting-info">
               <span class="setting-label">QUALITY PRESET</span>
-              <span class="setting-desc">HIGH: sharper image, 1024 shadows, bloom (heaviest). BALANCED: 720p floor, soft shadows, no post-FX (best FPS). POTATO: no shadows, bloom or street clutter.</span>
+              <span class="setting-desc">Overall visual fidelity and performance balance from Low to High.</span>
             </div>
             <div class="zenith-tabs" id="menu-quality-group">
+              <button class="zenith-tab" data-quality="potato" type="button">LOW</button>
+              <button class="zenith-tab active" data-quality="balanced" type="button">MEDIUM</button>
               <button class="zenith-tab" data-quality="high" type="button">HIGH</button>
-              <button class="zenith-tab active" data-quality="balanced" type="button">BALANCED</button>
-              <button class="zenith-tab" data-quality="potato" type="button">POTATO</button>
             </div>
           </div>
           <div class="setting-row">
             <div class="setting-info">
               <span class="setting-label">RENDER SCALE</span>
-              <span class="setting-desc">Internal resolution. Lower = more FPS but softer image; higher = sharper but costs GPU. [GPU: Low-High]</span>
+              <span class="setting-desc">Internal 3D rendering resolution.</span>
             </div>
             <div class="zenith-tabs" id="menu-resscale-group">
               <button class="zenith-tab active" data-resscale="floor_720" type="button">720P</button>
@@ -369,21 +374,21 @@
           <div class="setting-row">
             <div class="setting-info">
               <span class="setting-label">SHADOWS</span>
-              <span class="setting-desc">Sun shadows from props, pillars and infected. [GPU: Medium]</span>
+              <span class="setting-desc">Dynamic directional shadows from pillars and enemies.</span>
             </div>
             <button class="zenith-toggle" id="btn-menu-shadows" type="button">ON</button>
           </div>
           <div class="setting-row">
             <div class="setting-info">
               <span class="setting-label">BLOOM</span>
-              <span class="setting-desc">Soft glow on lights and muzzle flashes. Enables a post-process pass. [GPU: Medium-High]</span>
+              <span class="setting-desc">Soft light glow on lamps and muzzle flashes.</span>
             </div>
             <button class="zenith-toggle" id="btn-menu-bloom" type="button">ON</button>
           </div>
           <div class="setting-row">
             <div class="setting-info">
               <span class="setting-label">AMBIENT OCCLUSION</span>
-              <span class="setting-desc">Contact shadows in corners and under objects. HALF is cheaper than FULL. [GPU: High]</span>
+              <span class="setting-desc">Contact shading in corners and beneath objects.</span>
             </div>
             <div class="zenith-tabs" id="menu-ao-group">
               <button class="zenith-tab active" data-ao="off" type="button">OFF</button>
@@ -394,20 +399,37 @@
           <div class="setting-row">
             <div class="setting-info">
               <span class="setting-label">FPS COUNTER</span>
-              <span class="setting-desc">Shows frames per second in the corner (also [F3]).</span>
+              <span class="setting-desc">Displays frame rate in the top-right corner.</span>
             </div>
             <button class="zenith-toggle is-off" id="btn-menu-fps" type="button">OFF</button>
           </div>
       </div>
 
       <div class="setting-group">
-        <div class="setting-group-title">AUDIO</div>
+        <div class="setting-group-title">AUDIO &amp; SUBTITLES</div>
           <div class="setting-row">
             <div class="setting-info">
               <span class="setting-label">SOUND</span>
-              <span class="setting-desc">Master mute for effects, music and Sarah's radio voice (also [M]).</span>
+              <span class="setting-desc">Master audio for sound effects, ambience, and voiceover.</span>
             </div>
             <button class="zenith-toggle" id="btn-menu-mute" type="button">ON</button>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">SUBTITLES</span>
+              <span class="setting-desc">Show or hide voiceover subtitles at the bottom of the screen.</span>
+            </div>
+            <button class="zenith-toggle" id="btn-menu-subtitles" type="button">ON</button>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">SUBTITLE LANGUAGE</span>
+              <span class="setting-desc">Display subtitles in either Indonesian or English.</span>
+            </div>
+            <div class="zenith-tabs" id="menu-sublang-group">
+              <button class="zenith-tab active" data-sublang="id" type="button">INDONESIAN</button>
+              <button class="zenith-tab" data-sublang="en" type="button">ENGLISH</button>
+            </div>
           </div>
       </div>
     </div>
@@ -438,7 +460,7 @@
   <div id="pause-overlay" class="overlay-screen menu-asymmetric hidden">
     <div class="zenith-column">
       <div class="zenith-header">
-        <div class="zenith-kicker">SIMULATION PAUSED // STANDBY</div>
+        <div class="zenith-kicker">JEDA PERMAINAN</div>
         <h1 class="zenith-title">PAUSED</h1>
         <div class="zenith-subtitle">STASIUN MATI</div>
       </div>
@@ -489,9 +511,9 @@
         <div class="setting-row">
           <span class="setting-label">QUALITY</span>
           <div class="zenith-tabs" id="pause-quality-group">
+            <button class="zenith-tab" data-quality="potato" type="button">LOW</button>
+            <button class="zenith-tab active" data-quality="balanced" type="button">MEDIUM</button>
             <button class="zenith-tab" data-quality="high" type="button">HIGH</button>
-            <button class="zenith-tab active" data-quality="balanced" type="button">BALANCED</button>
-            <button class="zenith-tab" data-quality="potato" type="button">POTATO</button>
           </div>
         </div>
 
@@ -533,15 +555,28 @@
           <span class="setting-label">AUDIO</span>
           <button class="zenith-toggle" id="btn-pause-mute" type="button">ON</button>
         </div>
+
+        <div class="setting-row">
+          <span class="setting-label">SUBTITLES</span>
+          <button class="zenith-toggle" id="btn-pause-subtitles" type="button">ON</button>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-label">SUBTITLE LANGUAGE</span>
+          <div class="zenith-tabs" id="pause-sublang-group">
+            <button class="zenith-tab active" data-sublang="id" type="button">INDONESIAN</button>
+            <button class="zenith-tab" data-sublang="en" type="button">ENGLISH</button>
+          </div>
+        </div>
       </div>
 
       <div class="zenith-subpanel pause-logs-panel">
         <div class="setting-head">
-          <span class="setting-label">ARSIP LOG // FIELD NOTES</span>
-          <span class="setting-readout" id="pause-logs-count">0 LOGS</span>
+          <span class="setting-label">CATATAN DITEMUKAN</span>
+          <span class="setting-readout" id="pause-logs-count">0 CATATAN</span>
         </div>
         <div class="pause-logs-list" id="pause-field-logs-list">
-          <div class="pause-log-empty">No field logs recovered yet.</div>
+          <div class="pause-log-empty">Belum ada catatan yang ditemukan.</div>
         </div>
       </div>
 
@@ -558,9 +593,9 @@
   <div id="gameover-overlay" class="overlay-screen menu-asymmetric hidden">
     <div class="zenith-column gameover-summary-col">
       <div class="zenith-header">
-        <div class="zenith-kicker kicker-alert">SIGNAL LOST // JALUR TERPUTUS</div>
+        <div class="zenith-kicker kicker-alert">JALUR TERPUTUS</div>
         <h1 class="zenith-title">OVERRUN AT STATION</h1>
-        <div class="zenith-subtitle gameover-readout" id="gameover-stats">Stations Cleared: 0 | Kills: 0</div>
+        <div class="zenith-subtitle gameover-readout" id="gameover-stats">Stations Cleared: 0, Kills: 0</div>
       </div>
 
       <nav class="zenith-nav" aria-label="Game Over Menu">
@@ -578,7 +613,7 @@
     <!-- Victory Rolling Credits Stage (shown ONLY on EXTRACTION COMPLETE) -->
     <section id="victory-credits" class="victory-credits hidden" aria-label="End Credits">
       <div class="credits-toolbar">
-        <div class="credits-toolbar-label">EVACUATION ARCHIVE // CREDITS</div>
+        <div class="credits-toolbar-label">DAFTAR KREDIT</div>
         <div class="credits-toolbar-actions">
           <button class="zenith-tab" id="btn-credits-pause" type="button">PAUSE</button>
           <button class="zenith-tab" id="btn-credits-skip" type="button">SKIP</button>
@@ -591,9 +626,9 @@
           <div class="credits-lead-spacer"></div>
 
           <div class="credits-hero">
-            <div class="credits-kicker">PROTOKOL EVAKUASI 114-OMEGA // CORRIDOR CB–BK</div>
+            <div class="credits-kicker">KORIDOR SELATAN JAKARTA</div>
             <h2 class="credits-game-title">STASIUN MATI</h2>
-            <div class="credits-game-sub">HYDROGEN-SUBWAY · JAKARTA LRT SURVIVAL FPS</div>
+            <div class="credits-game-sub">JAKARTA LRT SURVIVAL</div>
           </div>
 
           <div class="credits-section credits-featured">
@@ -675,7 +710,7 @@
           <div class="credits-rule"></div>
 
           <div class="credits-finale">
-            <div class="credits-finale-kicker">INKA iE203 TRAINSET #04 // HYDROGEN-SUBWAY</div>
+            <div class="credits-finale-kicker">KERETA DARURAT JALUR SELATAN</div>
             <div class="credits-finale-msg">THANK YOU FOR SURVIVING THE CORRIDOR</div>
             <div class="credits-finale-dev">Created by Benny Pepper</div>
           </div>

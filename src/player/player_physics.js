@@ -128,7 +128,7 @@
     }
     const dom = PL.dom;
     if (dom && dom['pill-flashlight']) {
-      dom['pill-flashlight'].textContent = `[F] Senter: ${state.flashlightOn ? 'ON' : 'OFF'}`;
+      dom['pill-flashlight'].textContent = 'F Senter';
       dom['pill-flashlight'].classList.toggle('active', state.flashlightOn);
     }
     if (LRT.Audio) LRT.Audio.play('flashlight_click', { gain: 0.65, pitchVar: 0.05 });

@@ -31,6 +31,8 @@
   CORE.bloomEnabled = true;
   CORE.aoMode = 'off';
   CORE.fpsCounterEnabled = false;
+  CORE.subtitlesEnabled = true;
+  CORE.subtitleLang = 'id';
   CORE.difficultyKey = 'medium';
   CORE.currentLightingKey = 'DAYLIGHT_CLEAR';
   CORE.lightingLockedByUser = false;
@@ -117,6 +119,12 @@
       if (typeof parsed.fpsCounterEnabled === 'boolean') {
         CORE.fpsCounterEnabled = parsed.fpsCounterEnabled;
       }
+      if (typeof parsed.subtitlesEnabled === 'boolean') {
+        CORE.subtitlesEnabled = parsed.subtitlesEnabled;
+      }
+      if (parsed.subtitleLang === 'id' || parsed.subtitleLang === 'en') {
+        CORE.subtitleLang = parsed.subtitleLang;
+      }
       if (parsed.difficultyKey && C.DIFFICULTY_TIERS && (parsed.difficultyKey in C.DIFFICULTY_TIERS)) {
         CORE.difficultyKey = parsed.difficultyKey;
       }
@@ -136,6 +144,8 @@
         bloomEnabled: CORE.bloomEnabled,
         aoMode: CORE.aoMode,
         fpsCounterEnabled: CORE.fpsCounterEnabled,
+        subtitlesEnabled: CORE.subtitlesEnabled,
+        subtitleLang: CORE.subtitleLang,
         difficultyKey: CORE.difficultyKey,
         brightness: CORE.currentBrightness
       }));
@@ -150,6 +160,8 @@
       bloomEnabled: CORE.bloomEnabled,
       aoMode: CORE.aoMode,
       fpsCounterEnabled: CORE.fpsCounterEnabled,
+      subtitlesEnabled: CORE.subtitlesEnabled,
+      subtitleLang: CORE.subtitleLang,
       difficultyKey: CORE.difficultyKey,
       brightness: CORE.currentBrightness
     };
@@ -347,6 +359,20 @@
     saveSettings();
     syncSettingsUi();
     return CORE.fpsCounterEnabled;
+  }
+
+  function setSubtitlesEnabled(flag) {
+    CORE.subtitlesEnabled = !!flag;
+    saveSettings();
+    syncSettingsUi();
+    return CORE.subtitlesEnabled;
+  }
+
+  function setSubtitleLang(lang) {
+    CORE.subtitleLang = (lang === 'en') ? 'en' : 'id';
+    saveSettings();
+    syncSettingsUi();
+    return CORE.subtitleLang;
   }
 
   function setDifficulty(key) {
@@ -1106,6 +1132,8 @@
   CORE.setBloomEnabled = setBloomEnabled;
   CORE.setAoMode = setAoMode;
   CORE.setFpsCounterEnabled = setFpsCounterEnabled;
+  CORE.setSubtitlesEnabled = setSubtitlesEnabled;
+  CORE.setSubtitleLang = setSubtitleLang;
   CORE.setDifficulty = setDifficulty;
   CORE.getSettings = getSettings;
   CORE.saveSettings = saveSettings;

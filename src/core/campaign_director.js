@@ -193,7 +193,7 @@
     if (ov) {
       const kicker = ov.querySelector('.zenith-kicker');
       const title = ov.querySelector('.zenith-title');
-      if (kicker) kicker.textContent = 'SIGNAL LOST // JALUR TERPUTUS';
+      if (kicker) kicker.textContent = 'JALUR TERPUTUS';
       if (title) title.textContent = 'OVERRUN AT STATION';
     }
   }
@@ -223,9 +223,9 @@
         const kicker = ov.querySelector('.zenith-kicker');
         const title = ov.querySelector('.zenith-title');
         const stats = dom ? dom['gameover-stats'] : document.getElementById('gameover-stats');
-        if (kicker) kicker.textContent = 'EVACUATION PROTOCOL 114-OMEGA // PROTOKOL SELESAI';
+        if (kicker) kicker.textContent = 'EVAKUASI BERHASIL';
         if (title) title.textContent = 'EXTRACTION COMPLETE';
-        if (stats) stats.textContent = `All 6 Stations Cleared | Spore Vaccine Secured | Infected Eliminated: ${CORE.totalKills}`;
+        if (stats) stats.textContent = `All 6 Stations Cleared, Spore Vaccine Secured, Infected Eliminated: ${CORE.totalKills}`;
       }
       LRT.PlayerUI.showScreen('gameover');
     }

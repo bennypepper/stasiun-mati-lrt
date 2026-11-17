@@ -8,6 +8,8 @@
 
   const dom = {};
   let subtitleTimer = 0;
+  let lastSubtitleId = '';
+  let lastSubtitleEn = '';
   let logTimer = 0;
   let currentBrightness = 1.0;
   let pausedByDocViewer = false;
@@ -104,13 +106,14 @@
       'pill-mute', 'weapon-name', 'weapon-skin-tag', 'ammo-mag', 'ammo-reserve', 'weapon-slots',
       'menu-overlay', 'pause-overlay', 'gameover-overlay', 'gameover-stats',
       'victory-credits', 'credits-viewport', 'btn-credits-pause', 'btn-credits-skip', 'btn-credits-toggle',
-      'btn-start-survival', 'btn-start-exploration', 'btn-menu-settings', 'btn-menu-controls',
+      'btn-start-survival', 'btn-start-exploration', 'btn-menu-settings', 'btn-menu-controls', 'btn-exit-game',
       'btn-continue', 'continue-sub', 'btn-start-tutorial', 'new-game-title',
       'btn-menu-lighting', 'btn-pause-lighting',
       'menu-settings-panel', 'menu-controls-panel', 'brightness-slider', 'brightness-readout',
       'pause-brightness-slider', 'pause-brightness-readout',
       'btn-resume', 'btn-restart-mode', 'btn-back-menu', 'btn-retry', 'btn-gameover-menu',
       'btn-menu-mute', 'btn-pause-mute',
+      'btn-menu-subtitles', 'btn-pause-subtitles', 'menu-sublang-group', 'pause-sublang-group',
       'menu-difficulty-group', 'pause-difficulty-group',
       'menu-atmosphere-group', 'pause-atmosphere-group',
       'menu-quality-group', 'pause-quality-group',
@@ -133,7 +136,7 @@
     else if (val <= 1.05) tag = 'DARK HORROR';
     else if (val <= 1.35) tag = 'ELEVATED';
     else tag = 'BRIGHT';
-    return `${pct}% · ${tag}`;
+    return `${pct}% ${tag}`;
   }
 
   function syncBrightnessUi(val) {
@@ -182,6 +185,15 @@
       speaker = entry.speaker;
     }
 
+    lastSubtitleId = textId || '';
+    lastSubtitleEn = textEn || '';
+
+    const subOn = (I.core && typeof I.core.subtitlesEnabled === 'boolean') ? I.core.subtitlesEnabled : true;
+    if (!subOn) {
+      hideSubtitle();
+      return;
+    }
+
     const box = dom['hud-subtitle-box'];
     if (!box) return;
 
@@ -204,13 +216,16 @@
       spEl.className = `badge ${badgeClass}`;
     }
 
+    const subLang = (I.core && I.core.subtitleLang === 'en') ? 'en' : 'id';
+    const activeText = subLang === 'en' ? (lastSubtitleEn || lastSubtitleId) : (lastSubtitleId || lastSubtitleEn);
+
     if (dom['subtitle-text-id']) {
-      dom['subtitle-text-id'].textContent = textId || '';
+      dom['subtitle-text-id'].textContent = activeText;
     }
 
     if (dom['subtitle-text-en']) {
-      dom['subtitle-text-en'].textContent = textEn || '';
-      dom['subtitle-text-en'].classList.toggle('hidden', !textEn);
+      dom['subtitle-text-en'].textContent = '';
+      dom['subtitle-text-en'].classList.add('hidden');
     }
 
     box.classList.remove('hidden');
@@ -235,13 +250,13 @@
       ? I.core.campaignState.collectedLogs
       : [];
     if (countEl) {
-      countEl.textContent = `${logs.length} ${logs.length === 1 ? 'LOG' : 'LOGS'}`;
+      countEl.textContent = `${logs.length} Catatan`;
     }
     listEl.innerHTML = '';
     if (logs.length === 0) {
       const emptyEl = document.createElement('div');
       emptyEl.className = 'pause-log-empty';
-      emptyEl.textContent = 'No field logs recovered yet.';
+      emptyEl.textContent = 'Belum ada catatan yang ditemukan.';
       listEl.appendChild(emptyEl);
       return;
     }
@@ -256,10 +271,10 @@
       head.className = 'pause-log-head';
       const tEl = document.createElement('span');
       tEl.className = 'pause-log-title';
-      tEl.textContent = `#${String(fileNum).padStart(2, '0')} · ${item.title || 'FIELD NOTE'}`;
+      tEl.textContent = item.title || 'Catatan';
       const openEl = document.createElement('span');
       openEl.className = 'pause-log-open';
-      openEl.textContent = '[BACA]';
+      openEl.textContent = 'Baca';
       head.appendChild(tEl);
       head.appendChild(openEl);
 
@@ -326,16 +341,16 @@
 
     const meta = resolveDocFileMeta(title, o);
     if (dom['doc-viewer-kicker']) {
-      dom['doc-viewer-kicker'].textContent = `Catatan #${meta.fileLabel}`;
+      dom['doc-viewer-kicker'].textContent = 'Catatan';
     }
     if (dom['doc-viewer-submeta']) {
       dom['doc-viewer-submeta'].textContent = `${meta.stationLabel}`;
     }
     if (dom['doc-viewer-stamp']) {
-      dom['doc-viewer-stamp'].textContent = `#${meta.fileLabel}`;
+      dom['doc-viewer-stamp'].textContent = '';
     }
     if (dom['doc-viewer-title']) {
-      dom['doc-viewer-title'].textContent = title || 'Catatan Lapangan';
+      dom['doc-viewer-title'].textContent = title || 'Catatan';
     }
     if (dom['doc-viewer-body']) {
       dom['doc-viewer-body'].textContent = body || '';
@@ -392,7 +407,7 @@
       I.core.recordFieldLog(title, body);
     }
     if (dom['log-title']) {
-      dom['log-title'].textContent = title || 'CATATAN LAPANGAN // FIELD NOTE';
+      dom['log-title'].textContent = title || 'Catatan';
     }
     if (dom['log-body']) {
       dom['log-body'].textContent = body || '';
@@ -448,7 +463,7 @@
     if (dom['btn-menu-lighting']) dom['btn-menu-lighting'].textContent = btnText;
     if (dom['btn-pause-lighting']) dom['btn-pause-lighting'].textContent = btnText;
     if (dom['pill-lighting']) {
-      dom['pill-lighting'].textContent = `[L] Light: ${pillShort}`;
+      dom['pill-lighting'].textContent = `L Cahaya`;
       dom['pill-lighting'].classList.toggle('active', isDay);
     }
   }
@@ -482,7 +497,7 @@
     const isMuted = LRT.Audio ? LRT.Audio.isMuted() : false;
     syncToggleButtons([dom['btn-menu-mute'], dom['btn-pause-mute']], !isMuted, 'ON', 'OFF', 'is-muted');
     if (dom['pill-mute']) {
-      dom['pill-mute'].textContent = `[M] ${isMuted ? 'Muted' : 'Audio'}`;
+      dom['pill-mute'].textContent = `M Suara`;
       dom['pill-mute'].classList.toggle('active', !isMuted);
     }
   }
@@ -524,6 +539,22 @@
     }
   }
 
+  function syncSubtitlesUi(enabled) {
+    const isOn = enabled !== undefined ? !!enabled : true;
+    syncToggleButtons([dom['btn-menu-subtitles'], dom['btn-pause-subtitles']], isOn, 'ON', 'OFF', 'is-off');
+    if (!isOn) {
+      hideSubtitle();
+    }
+  }
+
+  function syncSubtitleLangUi(lang) {
+    const val = lang === 'en' ? 'en' : 'id';
+    syncTabGroup([dom['menu-sublang-group'], dom['pause-sublang-group']], 'sublang', val);
+    if (subtitleTimer > 0 && dom['subtitle-text-id']) {
+      dom['subtitle-text-id'].textContent = val === 'en' ? (lastSubtitleEn || lastSubtitleId) : (lastSubtitleId || lastSubtitleEn);
+    }
+  }
+
   function syncAllSettingsUi(settings) {
     const s = settings || {};
     syncDifficultyUi(s.difficultyKey || s.difficulty || 'medium');
@@ -534,6 +565,8 @@
     syncBloomUi(s.bloomEnabled !== undefined ? s.bloomEnabled : (s.bloom !== undefined ? s.bloom : true));
     syncAoUi(s.aoMode || s.ao || 'off');
     syncFpsUi(s.fpsCounterEnabled !== undefined ? s.fpsCounterEnabled : false);
+    syncSubtitlesUi(s.subtitlesEnabled !== undefined ? s.subtitlesEnabled : true);
+    syncSubtitleLangUi(s.subtitleLang || 'id');
     if (typeof s.brightness === 'number') {
       syncBrightnessUi(s.brightness);
     } else if (LRT.Main && typeof LRT.Main.getBrightness === 'function') {
@@ -1363,6 +1396,8 @@
     syncBloomUi,
     syncAoUi,
     syncFpsUi,
+    syncSubtitlesUi,
+    syncSubtitleLangUi,
     syncAllSettingsUi,
     syncBrightnessUi,
     syncLightingUi,

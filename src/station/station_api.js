@@ -1844,16 +1844,16 @@
           type: 'derelict_fuse',
           action: 'derelict_fuse',
           ammo: fresh ? { type: 'shotgun', amount: 18 } : null,
-          logTitle: 'KOTAK HITAM INKA #08 — CAWANG',
-          logBody: 'Hendra di sini! Seluruh tim mundur ke Peron Empat! Kereta dari Bekasi anjlok menabrak wesel pemindah jalur. Jangan biarkan mereka mendekati tangki hidrogen tambahan! Budi, bawa perisai antihuru-hara! Mereka bukan komuter biasa... mereka kebal peluru karet! Kalau kamu dengar rekaman ini, potong kabel relai sinyal sebelum seluruh flyover ini meledak!',
-          message: fresh ? 'Sekring Bypass & Shotgun 12G Ditemukan!' : 'Kabin bangkai LRT Cawang sudah digeledah.'
+          logTitle: 'Catatan Masinis Kereta Rangkaian Delapan',
+          logBody: '16 November, pukul 18.40 WIB.\n\nKereta dari arah Bekasi anjlok menabrak wesel pemindah jalur di Cawang. Seluruh petugas stasiun sudah mundur ke Peron Empat. Jangan biarkan orang-orang yang terinfeksi itu mendekati tangki hidrogen cadangan.\n\nPeluru karet sama sekali tidak mempan terhadap mereka. Bagi siapa pun yang menemukan catatan ini di kabin, segera ambil sekring di bawah meja kendali dan nyalakan kembali aliran listrik peron sebelum terlambat.\n\nHendra, Masinis Utama',
+          message: fresh ? 'Sekring Bypass dan Shotgun ditemukan' : 'Kabin bangkai kereta Cawang sudah digeledah.'
         };
       }
 
       if (it.type === 'field_log' || it.id === 'loket_counter') {
         if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('paper_rustle', { gain: 0.72 });
         it.used = true;
-        it.label = '[E] Meja Loket Stasiun (Sudah Diperiksa)';
+        it.label = 'Meja Loket Stasiun (Sudah Diperiksa)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
@@ -1861,16 +1861,16 @@
           ok: true,
           type: 'field_log',
           action: 'field_log',
-          logTitle: 'CATATAN BUKU PIKET LOKET DUKUH ATAS',
-          logBody: 'Pukul 17:15 WIB: Panggilan darurat dari OCC Halim. Seluruh operator GoA 3 ditarik dari kabin stasiun. Sistem driverless otomatis kehilangan sinyal interlocking di petak Cawang–Cikoko. Kami diinstruksikan menahan penumpang di dalam concourse, tapi pintu kaca selatan mulai retak dihantam orang-orang yang melompat dari flyover Sudirman. Mereka tidak berbicara... hanya menggeram seperti hewan buas.',
-          message: 'Buku Catatan Piket Loket ditemukan — Arsip Log #3 Terbaca.'
+          logTitle: 'Buku Piket Loket Dukuh Atas',
+          logBody: '16 November, pukul 17.15 WIB.\n\nKami baru saja menerima panggilan darurat dari pusat kendali di Halim. Seluruh petugas stasiun diminta segera meninggalkan ruang loket karena kereta kehilangan sinyal kendali otomatis di jalur Cawang sampai Cikoko.\n\nKami sempat mengunci pintu kaca di lantai bawah untuk menahan penumpang yang berlarian dari arah jalan raya Sudirman, tetapi kaca itu mulai retak dihantam dari luar. Orang-orang di luar sana sudah tidak bisa diajak bicara. Mata mereka memerah dan mereka menyerang siapa saja yang bergerak.\n\nRizal, Petugas Loket Sore',
+          message: 'Buku Catatan Piket Loket ditemukan.'
         };
       }
 
       if (it.type === 'relay' || it.id === 'setiabudi_jpo_switch') {
         if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('breaker_throw', { gain: 0.85 });
         it.used = true;
-        it.label = '[E] Sakelar Relai Sinyal Master JPO Setiabudi (Terhubung)';
+        it.label = 'Sakelar Relai Sinyal JPO Setiabudi (Terhubung)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
@@ -1882,9 +1882,9 @@
           type: 'relay',
           action: 'relay',
           lurePos: { x: it.x, y: it.y, z: it.z },
-          logTitle: 'TELEMETRI SINYAL DARURAT SETIABUDI',
-          logBody: 'Transmisi Data Dr. Rina terhubung ke OCC Bekasi dan RSPAD Gatot Soebroto. Frekuensi akustik klakson LRT Jabodebek diverifikasi melumpuhkan spora CB-9. Gerbang evakuasi militer utara bersiap dibuka!',
-          message: 'Relai Sinyal JPO Terhubung — Data Vaksin Ditransmisikan ke OCC!'
+          logTitle: 'Pesan Radio Darurat Stasiun Setiabudi',
+          logBody: 'Kepada regu penyelamat di jalur selatan,\n\nSambungan pemancar dari atap Setiabudi akhirnya berhasil terhubung ke pusat komando Bekasi dan Rumah Sakit Gatot Soebroto. Catatan penelitian Dokter Rina sudah kami teruskan.\n\nSuara klakson frekuensi rendah dari kereta terbukti mampu mengganggu saraf mereka untuk sementara waktu. Begitu ketiga pemancar di stasiun ini menyala, gerbang evakuasi di ujung utara peron akan segera dibuka.',
+          message: 'Relai Sinyal JPO terhubung, data dikirim ke pusat komando.'
         };
       }
 
@@ -1894,17 +1894,17 @@
         }
         const heal = it.used ? 0 : 25;
         it.used = true;
-        it.label = "[E] Etalase Roti'O Coffee Bun (Kosong)";
+        it.label = "Etalase Roti'O Coffee Bun (Kosong)";
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
         const res = {
           ok: true, type: 'rotio', heal: heal, healAmount: heal,
-          message: heal > 0 ? "Roti'O Coffee Bun hangat ditemukan! (+25 HP) — Bahkan kiamat pun nggak bisa ngalahin aroma oven Roti'O." : "Etalase Roti'O sudah diambil."
+          message: heal > 0 ? "Roti'O Coffee Bun hangat ditemukan (+25 HP)" : "Etalase Roti'O sudah diambil."
         };
         if (this._archetype && this._archetype.id === 'dukuh_atas' && heal > 0) {
-          res.logTitle = "MEMO KASIR ROTI'O — RESEP ANTI-PANIK";
-          res.logBody = "Jumat, 16 Nov, 16:30 WIB. Mas Doni, kalau listrik padam lagi, jangan matikan oven gas. Di luar orang-orang mulai teriak dan mata mereka memerah aneh, tapi aroma kopi dan mentega vanila kita bikin suasana tetap tenang. Tadi ada petugas KAI minta sepuluh roti buat dibagiin ke anak-anak di peron dua. Katanya kereta GoA 3 mogok mendadak. Tenang aja, stok tepung kita masih cukup sampai Senin. Jakarta udah sering banjir dan demo, masa kalah sama jamur? — Mas Budi";
+          res.logTitle = 'Pesan untuk Shift Malam Gerai Roti';
+          res.logBody = 'Jumat sore, pukul 16.30.\n\nMas Doni, kalau nanti malam listrik stasiun mati lagi, tolong oven gas jangan langsung dimatikan. Dari tadi di luar banyak orang berlarian dan berteriak, tapi wangi kopi dan mentega dari kedai kita lumayan bikin anak-anak yang mengungsi di peron dua jadi sedikit lebih tenang.\n\nTadi petugas stasiun sempat minta sepuluh bungkus roti hangat karena kereta tujuan Harjamukti berhenti mendadak di tengah jalur. Persediaan tepung kita masih cukup sampai hari Senin. Jaga diri baik-baik ya.\n\nSalam,\nBudi';
         }
         return res;
       }
@@ -1913,13 +1913,13 @@
         if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('water_pour', { gain: 0.72 });
         const heal = it.used ? 0 : 15;
         it.used = true;
-        it.label = '[E] Dispenser Coway (Sudah Minum)';
+        it.label = 'Dispenser Coway (Sudah Minum)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
         return {
           ok: true, type: 'coway', heal: heal, healAmount: heal,
-          message: heal > 0 ? 'Air mineral steril Coway menyegarkan! (+15 HP)' : 'Air Coway sudah diminum di stasiun ini.'
+          message: heal > 0 ? 'Air mineral steril Coway menyegarkan (+15 HP)' : 'Air Coway sudah diminum di stasiun ini.'
         };
       }
 
@@ -1927,18 +1927,18 @@
         if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('electric_box_open', { gain: 0.7 });
         const bonus = it.used ? 0 : 1;
         it.used = true;
-        it.label = '[E] Terminal JakLingko (Sudah Diambil)';
+        it.label = 'Terminal JakLingko (Sudah Diambil)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
         const res = {
           ok: true, type: 'jaklingko',
           ammo: bonus > 0 ? { type: 'rifle', amount: 30 } : null, ammoBonus: bonus,
-          message: bonus > 0 ? 'Menemukan suplai amunisi darurat di loker JakLingko!' : 'Terminal JakLingko kosong.'
+          message: bonus > 0 ? 'Menemukan suplai amunisi darurat di loker JakLingko.' : 'Terminal JakLingko kosong.'
         };
         if (bonus > 0) {
-          res.logTitle = 'SLIP KARTU JAKLINGKO — SALDO TIDAK CUKUP';
-          res.logBody = '[STRUK TRANSAKSI GAGAL — KONSORSIUM JAKLINGKO] ID KARTU: 0892-4411-9021-004. SISA SALDO: Rp 1.500,- (MINIMUM Rp 5.000,- UNTUK BUKA GATE). Coretan spidol di bawah struk: Pintu gerbang otomatis sialan! Di belakang kami ratusan orang panik karena kabut spora masuk lewat tangga feeder, dan mesin ini masih nolak kartu gara-gara kurang seribu perak!';
+          res.logTitle = 'Catatan di Atas Mesin Tiket';
+          res.logBody = 'Mesin gerbang tiket otomatis ini sudah tidak berguna. Ketika kabut mulai naik dari tangga jalan raya dan ratusan penumpang panik mendorong dari belakang, palang besi ini tetap terkunci hanya karena saldo kartu kurang beberapa ribu rupiah.\n\nSaya tinggalkan sisa amunisi cadangan di dalam laci mesin ini untuk petugas keamanan yang masih bertahan di peron. Kalau gerbang macet, lompati saja palangnya.';
         }
         return res;
       }
@@ -1957,15 +1957,15 @@
           heal: fresh ? 25 : 0, healAmount: fresh ? 25 : 0,
           ammo: fresh ? (it.id === 'depot_supply' ? { type: 'rpg', amount: 3 } : { type: 'all', amount: 30 }) : null,
           ammoBonus: fresh ? 1 : 0,
-          message: fresh ? (it.id === 'garden_supply' ? 'Kotak Medis Kebun Atap: Antiviral Serum & Amunisi Diamankan!' : (it.id === 'depot_supply' ? 'Loker Taktis Depot: RPG-7 & Amunisi Diambil!' : 'Loker Taktis: +30 Amunisi & +25 HP!')) : 'Loker persediaan sudah diambil.'
+          message: fresh ? (it.id === 'garden_supply' ? 'Kotak Medis Kebun Atap: Antiviral Serum dan Amunisi diamankan.' : (it.id === 'depot_supply' ? 'Loker Taktis Depot: Pelontar Roket dan Amunisi diambil.' : 'Loker Taktis: Amunisi dan Medkit diambil.')) : 'Loker persediaan sudah diambil.'
         };
         if (fresh) {
           if (it.id === 'garden_supply') {
-            res.logTitle = 'JURNAL LABORATORIUM DR. RINA: SPESIMEN CB-9';
-            res.logBody = 'Hari ke-4 Uji Spora Tanaman — Dr. Rina Wulandari. Fasilitas Cibubur keliru. Ini bukan penyakit tanaman hortikultura biasa. Hifa jamur ini mengonsumsi seng sulfat dari pelat rel dan menyerap muatan listrik statis dari catenary LRT. Spora ini menyukai kegelapan malam, namun membran selnya mengalami resonansi destruktif jika terpapar gelombang akustik frekuensi rendah (75–85 desibel)—sama persis dengan klakson pneumatik kereta INKA! Jika operator kereta membunyikan klakson darurat, sistem saraf infected akan lumpuh sesaat.';
+            res.logTitle = 'Catatan Penelitian Dokter Rina Wulandari';
+            res.logBody = 'Hari keempat pengamatan di kebun atap Harjamukti.\n\nDugaan awal kami di laboratorium Cibubur ternyata keliru. Spora ini bukan sekadar jamur tanaman biasa. Jaringannya menyerap karat besi dari rel kereta dan berkembang jauh lebih cepat di tempat yang gelap dan lembap.\n\nNamun ada satu kelemahan yang baru saya temukan sore ini. Saat kereta di jalur uji membunyikan klakson panjang, getaran suara rendahnya membuat mereka langsung terhuyung dan kehilangan arah. Jangan sampai catatan ini hilang, tim medis di pusat kota sangat membutuhkannya.\n\nDokter Rina Wulandari';
           } else if (it.id === 'depot_supply') {
-            res.logTitle = 'MEMO PERAWATAN DEPO HARJAMUKTI — TANGKI HIDROGEN';
-            res.logBody = 'Untuk Teknisi Shift Malam: Kereta Rangkaian 04 adalah prototipe sel bahan bakar hidrogen pertama yang disuplai langsung oleh PT Pindad dan PT INKA. Rangkaian ini tidak bergantung pada pasokan listrik kawat atas PLN. Bila gardu traksi padam, putar tuas bypass merah di bawah kabin masinis. Selama katup hidrogen di atap tidak tertembak peluru, kereta ini mampu berjalan menembus enam stasiun tanpa berhenti.';
+            res.logTitle = 'Surat Tugas Teknisi Depo Harjamukti';
+            res.logBody = 'Untuk rekan teknisi jaga malam,\n\nKereta rangkaian keempat yang parkir di jalur timur adalah kereta cadangan berbahan bakar hidrogen. Kereta ini tetap bisa berjalan meskipun aliran listrik dari gardu induk padam sepenuhnya.\n\nJika kalian harus keluar dari Harjamukti malam ini, nyalakan lebih dulu sakelar cadangan di ruang mesin, lalu panggil kereta dari ujung peron. Selama tabung bahan bakar di bagian atap tidak bocor terkena tembakan, kereta ini sanggup membawa kalian menembus jalur selatan sampai ke titik penjemputan.';
             if (LRT.Weapons && typeof LRT.Weapons.addAmmo === 'function') {
               LRT.Weapons.addAmmo('rifle', 30);
             }
@@ -2044,14 +2044,14 @@
         const arch = this._archetype || {};
         const res = {
           ok: true, type: 'info',
-          message: (arch.name || 'LRT') + ' (' + (arch.code || 'CB/BK') + ') — ' + (arch.destinationHint || 'LRT Jabodebek')
+          message: (arch.name || 'Stasiun') + ' ' + (arch.destinationHint || 'LRT Jabodebek')
         };
         if (arch.id === 'setiabudi') {
-          res.logTitle = 'PERINTAH TEMBAK DI TEMPAT — SATGAS SETIABUDI (YONIF 201)';
-          res.logBody = 'OPERATIONAL ORDER — KODAM JAYA / SATGAS PENGAMANAN PERIMETER V. Dilarang keras meloloskan kendaraan atau pejalan kaki dari arah Selatan Rasuna Said melewati batas Stasiun Setiabudi. Seluruh subjek yang memperlihatkan gejala mata merah, batuk berdarah, atau calcifikasi kulit dianggap infected. Hanya rangkaian kereta LRT resmi berbendera Merah Putih dari arah Dukuh Atas yang diizinkan melintasi pintu gerbang utara menuju Monas.';
+          res.logTitle = 'Surat Perintah Penjagaan Stasiun Setiabudi';
+          res.logBody = 'Kepada seluruh anggota regu jaga di jalur Rasuna Said,\n\nSeluruh akses jalan raya di bawah stasiun telah ditutup karena tumpukan kendaraan yang ditinggalkan pemiliknya. Anggota yang berjaga di jembatan penyeberangan wajib menahan siapa pun yang menunjukkan gejala mata memerah atau perilaku agresif.\n\nJangan tinggalkan pos sebelum kereta evakuasi terakhir dari arah Dukuh Atas tiba di peron. Nyalakan ketiga pemancar darurat di sekitar stasiun agar helikopter penjemput dapat mengenali posisi kita.';
         } else {
-          res.logTitle = 'PETA RUTE KORIDOR CB/BK LRT JABODEBEK';
-          res.logBody = 'Koridor Utama: Dukuh Atas BSI (CB01/BK01) — Cawang (CB08/BK08) — Harjamukti (CB12) — Kuningan (CB04) — Cikoko (CB06) — Setiabudi (CB02). Sistem GoA 3 Terisolasi karena pemadaman total gardu induk Cawang 500kV.';
+          res.logTitle = 'Pemberitahuan Gangguan Perjalanan Kereta';
+          res.logBody = 'Diberitahukan kepada seluruh penumpang bahwa perjalanan kereta jalur selatan yang melewati Dukuh Atas, Cawang, Harjamukti, Kuningan, Cikoko, hingga Setiabudi saat ini mengalami gangguan akibat pemadaman gardu induk.\n\nPara penumpang diharapkan tetap tenang dan mengikuti arahan petugas menuju peron keberangkatan darurat.';
         }
         return res;
       }
