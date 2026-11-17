@@ -21,7 +21,7 @@
   CORE.sunLight = null;
 
   const SETTINGS_STORAGE_KEY = 'lrt_settings_v1';
-  const SHADOW_DYNAMIC_INTERVAL = 1 / 8; // max ~8 Hz dynamic shadow refresh while moving/in combat
+  const SHADOW_DYNAMIC_INTERVAL = 1 / 4; // max ~4 Hz dynamic shadow refresh while moving/in combat (each refresh re-renders the whole shadow map)
   const SHADOW_SHIFT_SQ = 9.0; // 3.0m^2 sun target shift threshold
 
   CORE.gameState = CORE.gameState || STATES.MENU;
@@ -288,8 +288,8 @@
       } else if (mode === 'half' || CORE.isSoftwareRenderer) {
         CORE.n8aoPass.enabled = true;
         CORE.n8aoPass.configuration.halfRes = true;
-        CORE.n8aoPass.configuration.aoSamples = CORE.isSoftwareRenderer ? 6 : 8;
-        CORE.n8aoPass.configuration.denoiseSamples = CORE.isSoftwareRenderer ? 3 : 4;
+        CORE.n8aoPass.configuration.aoSamples = CORE.isSoftwareRenderer ? 4 : 6;
+        CORE.n8aoPass.configuration.denoiseSamples = CORE.isSoftwareRenderer ? 2 : 3;
       } else {
         CORE.n8aoPass.enabled = true;
         CORE.n8aoPass.configuration.halfRes = false;

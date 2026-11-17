@@ -102,6 +102,27 @@
       bevelSegments: 2
     });
     cabBodyGeo.translate(0, 0.055, -0.105);
+    cabBodyGeo.computeVertexNormals();
+    {
+      const posAttr = cabBodyGeo.attributes.position;
+      const normAttr = cabBodyGeo.attributes.normal;
+      const uvAttr = cabBodyGeo.attributes.uv;
+      if (posAttr && normAttr && uvAttr) {
+        for (let i = 0; i < posAttr.count; i++) {
+          const vx = posAttr.getX(i);
+          const vy = posAttr.getY(i);
+          const nz = normAttr.getZ(i);
+          const v = Math.max(0.02, Math.min(0.98, (vy - 0.055) / 0.90));
+          if (Math.abs(nz) > 0.65) {
+            const u = Math.max(0.02, Math.min(0.98, ((nz > 0 ? vx : -vx) / 1.26) + 0.5));
+            uvAttr.setXY(i, u, v);
+          } else {
+            uvAttr.setXY(i, 0.04, v);
+          }
+        }
+        uvAttr.needsUpdate = true;
+      }
+    }
 
     const plinthGeo = new THREE.BoxGeometry(1.32, 0.055, 0.27);
     const topBezelGeo = new THREE.BoxGeometry(0.92, 0.032, 0.245);

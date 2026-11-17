@@ -88,6 +88,7 @@ REQUIRED_SRC_MODULES = [
     "player/player_hud.js",
     "core/render_pipeline.js",
     "core/campaign_director.js",
+    "core/tutorial_director.js",
     "main.js",
     "boot.js",
 ]
@@ -98,48 +99,61 @@ HEAD_EXTRA_STYLES = """  <style id="loading-overlay-styles">
       inset: 0;
       z-index: 60;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: radial-gradient(circle at 50% 42%, rgba(18, 24, 34, 0.96) 0%, rgba(4, 6, 10, 0.99) 72%);
-      color: #f2f0ea;
+      background: #040507;
+      color: #e8e5df;
       font-family: 'Segoe UI', 'Helvetica Neue', system-ui, -apple-system, sans-serif;
     }
     #loading-overlay .loading-panel {
-      width: min(440px, 86vw);
-      padding: 28px 30px;
-      background: rgba(8, 10, 14, 0.78);
-      border: 1px solid rgba(225, 222, 214, 0.16);
-      border-left: 2px solid #c2a062;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 18px;
+      padding: 0;
+      background: transparent;
+      border: none;
+    }
+    #loading-overlay .loading-emblem {
+      width: 28px;
+      height: 28px;
+      opacity: 0.62;
+      animation: lrt-spin 3.6s linear infinite;
+    }
+    @keyframes lrt-spin {
+      to { transform: rotate(360deg); }
     }
     #loading-overlay .loading-title {
-      margin: 6px 0 18px;
-      font-size: 24px;
+      margin: 0;
+      font-size: 19px;
       font-weight: 300;
-      letter-spacing: 0.22em;
+      letter-spacing: 0.38em;
       text-transform: uppercase;
-      color: #f2f0ea;
+      color: rgba(242, 240, 234, 0.88);
     }
     #loading-overlay .loading-bar-track {
-      width: 100%;
-      height: 4px;
-      background: rgba(225, 222, 214, 0.12);
+      width: 200px;
+      height: 1px;
+      background: rgba(242, 240, 234, 0.12);
       overflow: hidden;
-      margin-bottom: 12px;
     }
     #loading-overlay #loading-bar-fill {
       width: 0%;
       height: 100%;
-      background: linear-gradient(90deg, #c2a062 0%, #f2f0ea 100%);
-      transition: width 0.12s ease-out;
+      background: rgba(242, 240, 234, 0.78);
+      transition: width 0.16s ease-out;
     }
     #loading-overlay #loading-status {
-      font-family: 'Cascadia Mono', 'Consolas', 'SFMono-Regular', monospace;
-      font-size: 11px;
-      letter-spacing: 0.08em;
-      color: rgba(212, 208, 198, 0.78);
+      font-size: 10.5px;
+      font-weight: 300;
+      letter-spacing: 0.14em;
+      color: rgba(212, 208, 198, 0.42);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      max-width: 320px;
     }
     .tool-pills {
       flex-wrap: wrap;
@@ -160,13 +174,16 @@ IMPORTMAP_JSON = """{
 BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
   <div id="damage-vignette"></div>
 
-  <!-- Asset & Shader Preload Overlay -->
+  <!-- Minimalist Loading Screen -->
   <div id="loading-overlay">
     <div class="loading-panel">
-      <div class="zenith-kicker">LRT JABODEBEK // ASSET PIPELINE</div>
+      <svg class="loading-emblem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" stroke-opacity="0.22"/>
+        <path d="M12 3a9 9 0 0 1 9 9" stroke-linecap="round"/>
+      </svg>
       <h2 class="loading-title">STASIUN MATI</h2>
       <div class="loading-bar-track"><div id="loading-bar-fill"></div></div>
-      <div id="loading-status">Initializing WebGL modules...</div>
+      <div id="loading-status">Memuat stasiun...</div>
     </div>
   </div>
 
@@ -174,8 +191,9 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
     <div id="hud-top">
       <div class="transit-card">
         <div class="transit-badges">
-          <span class="badge badge-cb">CB</span>
-          <span class="badge badge-bk">BK</span>
+          <svg class="hud-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M8 1.8a4.4 4.4 0 0 0-4.4 4.4c0 3.2 4.4 8 4.4 8s4.4-4.8 4.4-8A4.4 4.4 0 0 0 8 1.8zm0 6a1.6 1.6 0 1 1 0-3.2 1.6 1.6 0 0 1 0 3.2z"/></svg>
+          <span class="badge badge-cb hidden">CB</span>
+          <span class="badge badge-bk hidden">BK</span>
           <span class="badge badge-mode" id="hud-mode-badge">SURVIVAL</span>
           <span id="hud-station-code">CB01 / BK01</span>
         </div>
@@ -189,8 +207,10 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
       </div>
 
       <div id="objective-pill">
-        <div class="obj-kicker">MISSION DIRECTIVE</div>
-        <div id="objective-title">WAVE 1</div>
+        <div class="obj-row">
+          <svg class="hud-icon obj-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M8 2L14 8L8 14L2 8Z"/></svg>
+          <div id="objective-title">WAVE 1</div>
+        </div>
         <div id="objective-detail">Clear Platform Infected</div>
         <div id="fps-readout" class="hidden">FPS: -- | Calls: --</div>
       </div>
@@ -215,35 +235,39 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
 
     <!-- Field Note / Dispatch Log Card Banner -->
     <div id="hud-log-banner" class="hidden">
-      <div class="log-kicker">ARSIP DOKUMEN // FIELD LOG</div>
+      <div class="log-kicker">Catatan Lapangan</div>
       <div id="log-title">LOG ENTRY</div>
       <div id="log-body">Log content details...</div>
     </div>
 
-    <!-- Voiceover Subtitle HUD Overlay -->
+    <!-- Cinema-Style Voiceover Subtitles (Borderless & Transparent) -->
     <div id="hud-subtitle-box" class="hidden">
-      <div id="subtitle-speaker" class="badge speaker-occ">OCC BEKASI // SARAH</div>
+      <div id="subtitle-speaker" class="badge speaker-occ">Sarah</div>
       <div id="subtitle-text-id">Dialog Bahasa Indonesia</div>
       <div id="subtitle-text-en">English subtitle translation</div>
     </div>
 
-    <!-- GTA-style Cheat Console Bar (Toggle with ` key) -->
+    <!-- Cheat Console Bar (` key) -->
     <div id="cheat-console" class="hidden" role="dialog" aria-label="Cheat Console">
       <span class="cheat-prompt">&gt;</span>
-      <input id="cheat-input" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="ENTER CHEAT CODE..." aria-label="Cheat Code Input">
-      <button id="btn-cheat-apply" type="button">APPLY</button>
-      <span class="cheat-hint">[ENTER] APPLY · [` / ESC] CLOSE</span>
+      <input id="cheat-input" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="Cheat code..." aria-label="Cheat Code Input">
+      <button id="btn-cheat-apply" type="button">Apply</button>
+      <span class="cheat-hint">[Enter] · [Esc]</span>
     </div>
 
     <div id="hud-bottom">
       <div id="vitals-card">
         <div class="vital-row">
-          <span class="vital-label">VITALS // HP</span>
+          <span class="vital-label" aria-label="Health">
+            <svg class="hud-icon ecg-icon" viewBox="0 0 24 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 8h5l2.2-5.5 3.6 11 2.4-5.5H23"/></svg>
+          </span>
           <span id="hp-value">100</span>
         </div>
         <div class="hp-bar-track"><div id="hp-bar-fill"></div></div>
         <div class="armor-row hidden" id="armor-row">
-          <span class="armor-label">ARMOR</span>
+          <span class="armor-label" aria-label="Armor">
+            <svg class="hud-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 1.8l5 2v4.2c0 3.3-2.1 5.6-5 6.4-2.9-.8-5-3.1-5-6.4V3.8l5-2z"/></svg>
+          </span>
           <span id="armor-value">0</span>
           <div class="armor-bar-track"><div id="armor-bar-fill"></div></div>
         </div>
@@ -259,12 +283,12 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
         <div class="cheat-status-row hidden" id="cheat-status-row">
           <div class="cheat-pill cheat-pill-god hidden" id="cheat-pill-god">
             <div class="cheat-pill-header">
-              <span class="cheat-pill-label">PAINKILLER</span>
+              <span class="cheat-pill-label">Painkiller</span>
               <span class="cheat-pill-timer" id="cheat-god-timer">05:00</span>
             </div>
             <div class="cheat-bar-track"><div class="cheat-bar-fill" id="cheat-god-bar"></div></div>
           </div>
-          <div class="cheat-pill cheat-pill-sprint hidden" id="cheat-pill-sprint">CATCHME // SPRINT</div>
+          <div class="cheat-pill cheat-pill-sprint hidden" id="cheat-pill-sprint">Fast Sprint</div>
         </div>
         <div id="ammo-card">
           <div id="weapon-name">Pindad G2 9mm</div>
@@ -272,10 +296,10 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
           <div id="ammo-readout"><span id="ammo-mag">15</span> <span id="ammo-reserve">/ INF</span></div>
         </div>
         <div id="weapon-slots">
-          <div class="w-slot active" data-slot="1">[1] G2</div>
-          <div class="w-slot" data-slot="2">[2] SS2-V5</div>
-          <div class="w-slot" data-slot="3">[3] 12G</div>
-          <div class="w-slot" data-slot="4">[4] RPG-7</div>
+          <div class="w-slot active" data-slot="1">1 · G2</div>
+          <div class="w-slot" data-slot="2">2 · SS2</div>
+          <div class="w-slot" data-slot="3">3 · 12G</div>
+          <div class="w-slot" data-slot="4">4 · RPG</div>
         </div>
       </div>
     </div>
@@ -289,23 +313,23 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
 
       <div class="doc-header">
         <div class="doc-header-meta">
-          <div class="doc-classification" id="doc-viewer-kicker">ARSIP DOKUMEN // FILE #01</div>
-          <div class="doc-submeta" id="doc-viewer-submeta">LRT JABODEBEK · INTERNAL DISPATCH</div>
+          <div class="doc-classification" id="doc-viewer-kicker">Catatan #01</div>
+          <div class="doc-submeta" id="doc-viewer-submeta">Dukuh Atas BSI</div>
         </div>
-        <div class="doc-stamp" id="doc-viewer-stamp">TERCATAT // ARSIP</div>
-        <button class="doc-close-x" id="btn-doc-close-x" type="button" aria-label="Tutup Dokumen">[X]</button>
+        <div class="doc-stamp" id="doc-viewer-stamp">#01</div>
+        <button class="doc-close-x" id="btn-doc-close-x" type="button" aria-label="Tutup Dokumen">&times;</button>
       </div>
 
       <div class="doc-rule"></div>
-      <h2 class="doc-title" id="doc-viewer-title">CATATAN LAPANGAN</h2>
+      <h2 class="doc-title" id="doc-viewer-title">Catatan Lapangan</h2>
 
       <div class="doc-body-wrap">
         <div class="doc-body" id="doc-viewer-body"></div>
       </div>
 
       <div class="doc-footer">
-        <span class="doc-footer-hint">[E] / [SPACE] / [ESC] TUTUP</span>
-        <button class="doc-close-btn" id="btn-doc-close" type="button">TUTUP DOKUMEN</button>
+        <span class="doc-footer-hint">[E] / [Esc] Tutup</span>
+        <button class="doc-close-btn" id="btn-doc-close" type="button">Tutup</button>
       </div>
     </div>
   </div>
@@ -314,15 +338,25 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
   <div id="menu-overlay" class="overlay-screen menu-asymmetric">
     <div class="menu-dock zenith-column">
       <div class="zenith-header">
-        <div class="zenith-kicker">LRT JABODEBEK // SEKTOR SELATAN</div>
+        <div class="zenith-kicker">JAKARTA LRT</div>
         <h1 class="zenith-title">STASIUN MATI</h1>
-        <div class="zenith-subtitle">JAKARTA LRT</div>
+        <div class="zenith-subtitle">SEKTOR SELATAN</div>
       </div>
 
       <nav class="zenith-nav" aria-label="Main Menu">
+        <button class="zenith-item hidden" id="btn-continue" type="button">
+          <span class="zenith-item-title">CONTINUE</span>
+          <span class="zenith-item-sub" id="continue-sub">Resume your last checkpoint</span>
+        </button>
+
         <button class="zenith-item" id="btn-start-survival" type="button">
-          <span class="zenith-item-title">SURVIVAL</span>
-          <span class="zenith-item-sub">Clear waves &amp; board the INKA iE203</span>
+          <span class="zenith-item-title" id="new-game-title">NEW GAME</span>
+          <span class="zenith-item-sub">Survival campaign &mdash; clear waves &amp; board the INKA iE203</span>
+        </button>
+
+        <button class="zenith-item" id="btn-start-tutorial" type="button">
+          <span class="zenith-item-title">BRIEFING</span>
+          <span class="zenith-item-sub">Guided training: controls, combat &amp; objectives</span>
         </button>
 
         <button class="zenith-item" id="btn-start-exploration" type="button">
@@ -332,13 +366,27 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
 
         <button class="zenith-item" id="btn-menu-settings" type="button">
           <span class="zenith-item-title">SETTINGS</span>
-          <span class="zenith-item-sub">Atmosphere lighting, brightness, render quality &amp; audio</span>
+          <span class="zenith-item-sub">Gameplay, display, graphics &amp; audio</span>
         </button>
 
-        <!-- Collapsible Settings Panel (Directly under SETTINGS) -->
-        <div id="menu-settings-panel" class="zenith-subpanel hidden">
+        <button class="zenith-item" id="btn-menu-controls" type="button">
+          <span class="zenith-item-title">CONTROLS</span>
+          <span class="zenith-item-sub">Operator keybinds &amp; tactical inputs</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Right-side detail column: Settings / Controls expand here (not inside the left nav) -->
+    <div id="menu-settings-panel" class="menu-detail-panel hidden">
+      <div class="detail-title">SETTINGS</div>
+
+      <div class="setting-group">
+        <div class="setting-group-title">GAMEPLAY</div>
           <div class="setting-row">
-            <span class="setting-label">DIFFICULTY</span>
+            <div class="setting-info">
+              <span class="setting-label">DIFFICULTY</span>
+              <span class="setting-desc">How many infected spawn, how hard they hit, and how scarce ammo &amp; health drops are.</span>
+            </div>
             <div class="zenith-tabs" id="menu-difficulty-group">
               <button class="zenith-tab" data-difficulty="easy" type="button">EASY</button>
               <button class="zenith-tab active" data-difficulty="medium" type="button">MEDIUM</button>
@@ -346,39 +394,57 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
               <button class="zenith-tab" data-difficulty="nightmare" type="button">NIGHTMARE</button>
             </div>
           </div>
-
           <div class="setting-row">
-            <span class="setting-label" title="DAYLIGHT–SUNSET keeps daytime-to-sunset visibility with faster, sharper outbreak infected">TIME CYCLE</span>
+            <div class="setting-info">
+              <span class="setting-label">TIME CYCLE</span>
+              <span class="setting-desc">NIGHT HORROR: dark blackout stations. DAYLIGHT&ndash;SUNSET: bright day-to-sunset, but infected are faster and spot you from farther.</span>
+            </div>
             <div class="zenith-tabs" id="menu-atmosphere-group">
-              <button class="zenith-tab active" data-atmosphere="night_horror" type="button" title="Classic dark horror progression">NIGHT HORROR</button>
-              <button class="zenith-tab" data-atmosphere="daylight_outbreak" type="button" title="Bright daytime-to-sunset lighting with faster outbreak infected">DAYLIGHT–SUNSET</button>
+              <button class="zenith-tab active" data-atmosphere="night_horror" type="button">NIGHT HORROR</button>
+              <button class="zenith-tab" data-atmosphere="daylight_outbreak" type="button">DAYLIGHT&ndash;SUNSET</button>
             </div>
           </div>
+      </div>
 
+      <div class="setting-group">
+        <div class="setting-group-title">DISPLAY</div>
           <div class="setting-row">
-            <span class="setting-label">ATMOSPHERE / LIGHTING</span>
+            <div class="setting-info">
+              <span class="setting-label">LIGHTING PRESET</span>
+              <span class="setting-desc">Cycles the sky &amp; light mood in-game (also [L]). Does not change difficulty.</span>
+            </div>
             <button class="zenith-toggle" id="btn-menu-lighting" type="button">DAYLIGHT</button>
           </div>
-
           <div class="setting-block">
             <div class="setting-head">
-              <span class="setting-label">ATMOSPHERE BRIGHTNESS</span>
-              <span class="setting-readout" id="brightness-readout">100% · DARK HORROR</span>
+              <div class="setting-info">
+                <span class="setting-label">BRIGHTNESS</span>
+                <span class="setting-desc">Scales overall scene exposure. Raise it if dark areas are hard to read.</span>
+              </div>
+              <span class="setting-readout" id="brightness-readout">100% &middot; DARK HORROR</span>
             </div>
             <input type="range" id="brightness-slider" class="zenith-slider" min="0.4" max="1.8" step="0.05" value="1.0" aria-label="Atmosphere Brightness">
           </div>
+      </div>
 
+      <div class="setting-group">
+        <div class="setting-group-title">GRAPHICS</div>
           <div class="setting-row">
-            <span class="setting-label">RENDER QUALITY</span>
+            <div class="setting-info">
+              <span class="setting-label">QUALITY PRESET</span>
+              <span class="setting-desc">HIGH: sharper image, 1024 shadows, bloom (heaviest). BALANCED: 720p floor, soft shadows, no post-FX (best FPS). POTATO: no shadows, bloom or street clutter.</span>
+            </div>
             <div class="zenith-tabs" id="menu-quality-group">
               <button class="zenith-tab" data-quality="high" type="button">HIGH</button>
               <button class="zenith-tab active" data-quality="balanced" type="button">BALANCED</button>
               <button class="zenith-tab" data-quality="potato" type="button">POTATO</button>
             </div>
           </div>
-
           <div class="setting-row">
-            <span class="setting-label">RENDER SCALE</span>
+            <div class="setting-info">
+              <span class="setting-label">RENDER SCALE</span>
+              <span class="setting-desc">Internal resolution. Lower = more FPS but softer image; higher = sharper but costs GPU. [GPU: Low-High]</span>
+            </div>
             <div class="zenith-tabs" id="menu-resscale-group">
               <button class="zenith-tab active" data-resscale="floor_720" type="button">720P</button>
               <button class="zenith-tab" data-resscale="native" type="button">NATIVE</button>
@@ -386,62 +452,71 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
               <button class="zenith-tab" data-resscale="scale_150" type="button">1.5X</button>
             </div>
           </div>
-
           <div class="setting-row">
-            <span class="setting-label">SHADOWS</span>
+            <div class="setting-info">
+              <span class="setting-label">SHADOWS</span>
+              <span class="setting-desc">Sun shadows from props, pillars and infected. [GPU: Medium]</span>
+            </div>
             <button class="zenith-toggle" id="btn-menu-shadows" type="button">ON</button>
           </div>
-
           <div class="setting-row">
-            <span class="setting-label">BLOOM</span>
+            <div class="setting-info">
+              <span class="setting-label">BLOOM</span>
+              <span class="setting-desc">Soft glow on lights and muzzle flashes. Enables a post-process pass. [GPU: Medium-High]</span>
+            </div>
             <button class="zenith-toggle" id="btn-menu-bloom" type="button">ON</button>
           </div>
-
           <div class="setting-row">
-            <span class="setting-label">AO (N8AO)</span>
+            <div class="setting-info">
+              <span class="setting-label">AMBIENT OCCLUSION</span>
+              <span class="setting-desc">Contact shadows in corners and under objects. HALF is cheaper than FULL. [GPU: High]</span>
+            </div>
             <div class="zenith-tabs" id="menu-ao-group">
               <button class="zenith-tab active" data-ao="off" type="button">OFF</button>
               <button class="zenith-tab" data-ao="half" type="button">HALF</button>
               <button class="zenith-tab" data-ao="full" type="button">FULL</button>
             </div>
           </div>
-
           <div class="setting-row">
-            <span class="setting-label">FPS COUNTER</span>
+            <div class="setting-info">
+              <span class="setting-label">FPS COUNTER</span>
+              <span class="setting-desc">Shows frames per second in the corner (also [F3]).</span>
+            </div>
             <button class="zenith-toggle is-off" id="btn-menu-fps" type="button">OFF</button>
           </div>
+      </div>
 
+      <div class="setting-group">
+        <div class="setting-group-title">AUDIO</div>
           <div class="setting-row">
-            <span class="setting-label">AUDIO</span>
+            <div class="setting-info">
+              <span class="setting-label">SOUND</span>
+              <span class="setting-desc">Master mute for effects, music and Sarah's radio voice (also [M]).</span>
+            </div>
             <button class="zenith-toggle" id="btn-menu-mute" type="button">ON</button>
           </div>
-        </div>
+      </div>
+    </div>
 
-        <button class="zenith-item" id="btn-menu-controls" type="button">
-          <span class="zenith-item-title">CONTROLS</span>
-          <span class="zenith-item-sub">Operator keybinds &amp; tactical inputs</span>
-        </button>
-
-        <!-- Collapsible Controls Panel (Directly under CONTROLS) -->
-        <div id="menu-controls-panel" class="zenith-subpanel hidden">
-          <div class="controls-list">
-            <div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-desc">Move</span></div>
-            <div class="ctrl-row"><span class="ctrl-key">SPACE</span><span class="ctrl-desc">Jump</span></div>
-            <div class="ctrl-row"><span class="ctrl-key">SHIFT / CTRL</span><span class="ctrl-desc">Sprint / Crouch</span></div>
-            <div class="ctrl-row"><span class="ctrl-key">LMB / RMB</span><span class="ctrl-desc">Fire / Aim (ADS)</span></div>
-            <div class="ctrl-row"><span class="ctrl-key">1-4 / WHEEL</span><span class="ctrl-desc">Switch Weapon</span></div>
-            <div class="ctrl-row"><span class="ctrl-key">R</span><span class="ctrl-desc">Reload</span></div>
-            <div class="ctrl-row"><span class="ctrl-key">E</span><span class="ctrl-desc">Interact / Tap Kartu</span></div>
-            <div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-desc">Flashlight</span></div>
-            <div class="ctrl-row"><span class="ctrl-key">L</span><span class="ctrl-desc">Cycle Lighting</span></div>
-            <div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-desc">Summon / Depart LRT</span></div>
-            <div class="ctrl-row"><span class="ctrl-key">F3</span><span class="ctrl-desc">FPS Telemetry</span></div>
-            <div class="ctrl-row"><span class="ctrl-key">H</span><span class="ctrl-desc">Toggle HUD</span></div>
-            <div class="ctrl-row"><span class="ctrl-key">M</span><span class="ctrl-desc">Mute Audio</span></div>
-            <div class="ctrl-row"><span class="ctrl-key">` / ~</span><span class="ctrl-desc">Cheat Console</span></div>
-          </div>
-        </div>
-      </nav>
+    <div id="menu-controls-panel" class="menu-detail-panel hidden">
+      <div class="detail-title">CONTROLS</div>
+      <div class="controls-list">
+        <div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-desc">Move</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">SPACE</span><span class="ctrl-desc">Jump</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">SHIFT / CTRL</span><span class="ctrl-desc">Sprint / Crouch</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">LMB / RMB</span><span class="ctrl-desc">Fire / Aim (ADS)</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">1-4 / WHEEL</span><span class="ctrl-desc">Switch Weapon</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">R</span><span class="ctrl-desc">Reload</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-desc">Melee Shove</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">E</span><span class="ctrl-desc">Interact / Tap Kartu</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-desc">Flashlight</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">L</span><span class="ctrl-desc">Cycle Lighting</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-desc">Summon / Depart LRT</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">F3</span><span class="ctrl-desc">FPS Telemetry</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">H</span><span class="ctrl-desc">Toggle HUD</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">M</span><span class="ctrl-desc">Mute Audio</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">` / ~</span><span class="ctrl-desc">Cheat Console</span></div>
+      </div>
     </div>
   </div>
 

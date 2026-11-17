@@ -105,6 +105,7 @@
       'menu-overlay', 'pause-overlay', 'gameover-overlay', 'gameover-stats',
       'victory-credits', 'credits-viewport', 'btn-credits-pause', 'btn-credits-skip', 'btn-credits-toggle',
       'btn-start-survival', 'btn-start-exploration', 'btn-menu-settings', 'btn-menu-controls',
+      'btn-continue', 'continue-sub', 'btn-start-tutorial', 'new-game-title',
       'btn-menu-lighting', 'btn-pause-lighting',
       'menu-settings-panel', 'menu-controls-panel', 'brightness-slider', 'brightness-readout',
       'pause-brightness-slider', 'pause-brightness-readout',
@@ -190,13 +191,13 @@
       let badgeText = sp;
       let badgeClass = 'speaker-occ';
       if (sp.includes('OCC') || sp.includes('DISPATCH') || sp === 'SARAH') {
-        badgeText = 'OCC BEKASI // SARAH';
+        badgeText = 'Sarah';
         badgeClass = 'speaker-occ';
       } else if (sp.includes('PLAYER') || sp.includes('GAGAK') || sp.includes('G2') || sp === 'ARYA') {
-        badgeText = 'GAGAK-03 // ARYA';
+        badgeText = 'Arya';
         badgeClass = 'speaker-player';
       } else if (sp.includes('SYSTEM') || sp.includes('ANN') || sp.includes('PA') || sp.includes('LRT')) {
-        badgeText = 'LRT PA SYSTEM';
+        badgeText = 'PA Stasiun';
         badgeClass = 'speaker-ann';
       }
       spEl.textContent = badgeText;
@@ -325,16 +326,16 @@
 
     const meta = resolveDocFileMeta(title, o);
     if (dom['doc-viewer-kicker']) {
-      dom['doc-viewer-kicker'].textContent = `ARSIP DOKUMEN // FILE #${meta.fileLabel}`;
+      dom['doc-viewer-kicker'].textContent = `Catatan #${meta.fileLabel}`;
     }
     if (dom['doc-viewer-submeta']) {
-      dom['doc-viewer-submeta'].textContent = `${meta.stationLabel} · CATATAN LAPANGAN`;
+      dom['doc-viewer-submeta'].textContent = `${meta.stationLabel}`;
     }
     if (dom['doc-viewer-stamp']) {
-      dom['doc-viewer-stamp'].textContent = docViewerFromPause ? 'ARSIP LOG // SALINAN' : 'TERCATAT // ARSIP';
+      dom['doc-viewer-stamp'].textContent = `#${meta.fileLabel}`;
     }
     if (dom['doc-viewer-title']) {
-      dom['doc-viewer-title'].textContent = title || 'CATATAN LAPANGAN // FIELD NOTE';
+      dom['doc-viewer-title'].textContent = title || 'Catatan Lapangan';
     }
     if (dom['doc-viewer-body']) {
       dom['doc-viewer-body'].textContent = body || '';
@@ -348,6 +349,9 @@
 
     PL.state.docViewerOpen = true;
     modal.classList.remove('hidden');
+    if (I.core && typeof I.core.onTutorialEvent === 'function') {
+      I.core.onTutorialEvent('doc');
+    }
     return true;
   }
 
@@ -1234,6 +1238,23 @@
       if (screenName === 'pause') {
         renderPauseFieldLogs();
       }
+      if (screenName === 'menu') {
+        refreshContinueButton();
+      }
+    }
+  }
+
+  // Shows CONTINUE (with save details) only when a valid checkpoint exists; relabels NEW GAME accordingly.
+  function refreshContinueButton() {
+    const core = I.core;
+    const summary = (core && typeof core.getSaveSummary === 'function') ? core.getSaveSummary() : null;
+    if (dom['btn-continue']) dom['btn-continue'].classList.toggle('hidden', !summary);
+    if (dom['new-game-title']) dom['new-game-title'].textContent = summary ? 'NEW GAME (OVERWRITE SAVE)' : 'NEW GAME';
+    if (summary && dom['continue-sub']) {
+      const tier = C.DIFFICULTY_TIERS && C.DIFFICULTY_TIERS[summary.difficultyKey];
+      const diff = tier ? tier.label : String(summary.difficultyKey || '').toUpperCase();
+      const atmo = summary.atmosphereMode === 'daylight_outbreak' ? 'Daylight–Sunset' : 'Night Horror';
+      dom['continue-sub'].textContent = `Station ${summary.stationIndex + 1} · ${summary.stationName} · ${diff} · ${atmo}`;
     }
   }
 
@@ -1303,6 +1324,11 @@
     if (dom['weapon-skin-tag']) {
       dom['weapon-skin-tag'].textContent = '';
       dom['weapon-skin-tag'].classList.add('hidden');
+    }
+    if (PL.state) PL.state.noticeTimer = 0;
+    if (dom['hud-notice']) {
+      dom['hud-notice'].style.opacity = '0';
+      dom['hud-notice'].textContent = '';
     }
     hideWaypoints();
   }

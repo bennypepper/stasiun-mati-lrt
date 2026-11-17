@@ -78,6 +78,7 @@ const SCRIPT_ORDER = [
   { path: 'src/player/player_hud.js', file: 'player/player_hud.js', optional: false },
   { path: 'src/core/render_pipeline.js', file: 'core/render_pipeline.js', optional: false },
   { path: 'src/core/campaign_director.js', file: 'core/campaign_director.js', optional: false },
+  { path: 'src/core/tutorial_director.js', file: 'core/tutorial_director.js', optional: false },
   { path: 'src/main.js', file: 'main.js', optional: false },
 ];
 

@@ -150,6 +150,7 @@
   }
 
   function requestLock() {
+    if (flags.paused || !flags.allowActionInput || state.cheatOpen || state.docViewerOpen) return;
     const canvas = refs.canvas;
     if (!canvas || typeof canvas.requestPointerLock !== 'function') return;
     try {
@@ -159,8 +160,11 @@
   }
 
   function releaseLock() {
-    if (document.pointerLockElement && typeof document.exitPointerLock === 'function') {
-      try { document.exitPointerLock(); } catch (_) {}
+    if (typeof document.exitPointerLock === 'function') {
+      try {
+        const res = document.exitPointerLock();
+        if (res && typeof res.catch === 'function') res.catch(() => {});
+      } catch (_) {}
     }
   }
 
@@ -615,6 +619,10 @@
       const nowLocked = document.pointerLockElement === canvas;
       flags.pointerLocked = nowLocked;
       if (nowLocked) {
+        if (flags.paused || !flags.allowActionInput || state.cheatOpen || state.docViewerOpen) {
+          releaseLock();
+          return;
+        }
         pendingRelock = false;
         suppressPauseUntil = 0;
         return;

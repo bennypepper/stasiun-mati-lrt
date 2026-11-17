@@ -238,5 +238,75 @@
     "subtitle_en": "Train doors are closing. Please take care. Mind the closing doors.",
     "duration_sec": 5.18,
     "priority": "HIGH"
+  },
+  "TUT_01_WELCOME": {
+    "id": "TUT_01_WELCOME",
+    "speaker": "OCC_DISPATCH",
+    "trigger_event": "Tutorial step 1: movement",
+    "file": "assets/voice/TUT_01_WELCOME.mp3",
+    "subtitle_id": "Gagak-03, ini Sarah di OCC Bekasi. Kita mulai latihan singkat. Coba bergerak maju dan periksa sekelilingmu.",
+    "subtitle_en": "Gagak-03, this is Sarah at OCC Bekasi. Let's run a quick briefing. Move forward and check your surroundings.",
+    "duration_sec": 7.88,
+    "priority": "HIGH"
+  },
+  "TUT_02_INTERACT": {
+    "id": "TUT_02_INTERACT",
+    "speaker": "OCC_DISPATCH",
+    "trigger_event": "Tutorial step 3: turnstiles & notes",
+    "file": "assets/voice/TUT_02_INTERACT.mp3",
+    "subtitle_id": "Bagus. Dekati gerbang tiket Access by KAI, lalu tekan E untuk membuka jalur dan memeriksa catatan di loket.",
+    "subtitle_en": "Good. Approach the Access by KAI faregates and press E to open the lane and inspect the ticket booth logbook.",
+    "duration_sec": 8.6,
+    "priority": "HIGH"
+  },
+  "TUT_03_COMBAT": {
+    "id": "TUT_03_COMBAT",
+    "speaker": "OCC_DISPATCH",
+    "trigger_event": "Tutorial step 5: shooting & reload",
+    "file": "assets/voice/TUT_03_COMBAT.mp3",
+    "subtitle_id": "Sekarang uji senjatamu. Tahan klik kanan untuk membidik, klik kiri untuk menembak tiga kali, lalu tekan R untuk isi ulang.",
+    "subtitle_en": "Now test your weapon. Hold right-click to aim, left-click to fire three shots, then press R to reload.",
+    "duration_sec": 9.28,
+    "priority": "HIGH"
+  },
+  "TUT_04_INFECTED": {
+    "id": "TUT_04_INFECTED",
+    "speaker": "OCC_DISPATCH",
+    "trigger_event": "Tutorial step 7: practice walkers",
+    "file": "assets/voice/TUT_04_INFECTED.mp3",
+    "subtitle_id": "Dua infected mendekat! Incar kepala untuk daya rusak maksimal, atau tekan V untuk mendorong mereka mundur.",
+    "subtitle_en": "Two infected approaching! Aim for the head for maximum damage, or press V to shove them back.",
+    "duration_sec": 6.28,
+    "priority": "HIGH"
+  },
+  "TUT_05_OBJECTIVE": {
+    "id": "TUT_05_OBJECTIVE",
+    "speaker": "OCC_DISPATCH",
+    "trigger_event": "Tutorial step 8: generator objective",
+    "file": "assets/voice/TUT_05_OBJECTIVE.mp3",
+    "subtitle_id": "Di tiap stasiun, kamu wajib menyelesaikan objektif utama dulu. Ikuti penanda menuju generator darurat dan tekan E.",
+    "subtitle_en": "At every station, you must complete the primary objective first. Follow the marker to the emergency generator and press E.",
+    "duration_sec": 8.0,
+    "priority": "HIGH"
+  },
+  "TUT_06_CALL_TRAIN": {
+    "id": "TUT_06_CALL_TRAIN",
+    "speaker": "OCC_DISPATCH",
+    "trigger_event": "Tutorial step 9: call train",
+    "file": "assets/voice/TUT_06_CALL_TRAIN.mp3",
+    "subtitle_id": "Listrik menyala! Sekarang naik ke Peron Satu dan panggil kereta darurat.",
+    "subtitle_en": "Power restored! Now head up to Platform 1 and summon the emergency train.",
+    "duration_sec": 4.88,
+    "priority": "HIGH"
+  },
+  "TUT_07_DEPART": {
+    "id": "TUT_07_DEPART",
+    "speaker": "OCC_DISPATCH",
+    "trigger_event": "Tutorial step 11: depart train",
+    "file": "assets/voice/TUT_07_DEPART.mp3",
+    "subtitle_id": "Kereta sudah merapat. Segera masuk ke kabin depan dan tutup pintu sebelum infected menyusul masuk. Semoga berhasil, Arya!",
+    "subtitle_en": "The train has docked. Step into the front cab and close the doors before infected follow you inside. Good luck, Arya!",
+    "duration_sec": 7.64,
+    "priority": "HIGH"
   }
 }

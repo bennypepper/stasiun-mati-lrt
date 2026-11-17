@@ -586,8 +586,8 @@
       const isPotato = qKey === 'potato';
       const isBalanced = qKey === 'balanced';
 
-      let bldgMaxDist = isPotato ? 95 : (isBalanced ? 135 : 200);
-      const clutterMaxDist = isPotato ? 0 : (isBalanced ? 65 : 95);
+      let bldgMaxDist = isPotato ? 95 : (isBalanced ? 105 : 160);
+      const clutterMaxDist = isPotato ? 0 : (isBalanced ? 45 : 75);
 
       const ctx = playerContext || null;
       const trainCruising = !!(ctx && ctx.trainCruising);

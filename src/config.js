@@ -608,14 +608,16 @@
   };
 
   const QUALITY_TIERS = {
-    high: { label: 'High', resScale: 'native', dprCap: 1.5, shadows: true, shadowSize: 1024, bloom: true, ao: 'half', maxAniso: 8 },
-    balanced: { label: 'Balanced', resScale: 'floor_720', dprCap: 1.0, shadows: true, shadowSize: 512, bloom: true, ao: 'off', maxAniso: 2 },
+    // Perf notes: bloom/AO force the HalfFloat EffectComposer path (many full-screen passes), so Balanced renders
+    // straight to the backbuffer (no composer). High keeps bloom + cheap half-res AO at a capped pixel ratio.
+    high: { label: 'High', resScale: 'native', dprCap: 1.25, shadows: true, shadowSize: 1024, bloom: true, ao: 'off', maxAniso: 8 },
+    balanced: { label: 'Balanced', resScale: 'floor_720', dprCap: 1.0, shadows: true, shadowSize: 512, bloom: false, ao: 'off', maxAniso: 2 },
     potato: { label: 'Potato', resScale: 'floor_720', dprCap: 1.0, shadows: false, shadowSize: 512, bloom: false, ao: 'off', maxAniso: 1 }
   };
 
   const RES_SCALE_MODES = {
     floor_720: { id: 'floor_720', label: '720P FLOOR', mult: 1.0, useDpr: false, dprCap: 1.0, minHeight: 720 },
-    native: { id: 'native', label: 'NATIVE', mult: 1.0, useDpr: true, dprCap: 1.5, minHeight: 720 },
+    native: { id: 'native', label: 'NATIVE', mult: 1.0, useDpr: true, dprCap: 1.25, minHeight: 720 },
     scale_125: { id: 'scale_125', label: '1.25X', mult: 1.25, useDpr: true, dprCap: 1.5, minHeight: 720 },
     scale_150: { id: 'scale_150', label: '1.50X', mult: 1.50, useDpr: true, dprCap: 1.5, minHeight: 720 }
   };

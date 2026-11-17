@@ -109,6 +109,9 @@
     if (typeof CORE.onStationBuilt === 'function') {
       CORE.onStationBuilt(idx, offsetZ || 0, st);
     }
+    if (!offsetZ && !CORE.tutorialActive && CORE.gameMode === MODES.SURVIVAL && CORE.gameState !== STATES.MENU && typeof CORE.writeSave === 'function') {
+      CORE.writeSave();
+    }
     return st;
   }
 
@@ -148,7 +151,13 @@
   CORE.finishBuildStation = finishBuildStation;
   CORE.buildStation = buildStation;
 
-  function startGame(mode) {
+  function startGame(mode, opts) {
+    const o = opts || {};
+    const isTutorial = !!(o.tutorial || mode === 'tutorial');
+    const isResume = !!(o.resume || mode === 'continue');
+    if (CORE.tutorialActive && typeof CORE.endTutorial === 'function') {
+      CORE.endTutorial('abort');
+    }
     CORE.gameMode = mode === MODES.EXPLORATION ? MODES.EXPLORATION : MODES.SURVIVAL;
     CORE.lightingLockedByUser = false;
     CORE.isMoodLerping = false;
@@ -161,8 +170,18 @@
       if (typeof LRT.Audio.stopAllLoops === 'function') LRT.Audio.stopAllLoops();
     }
 
+    const savedData = (isResume && typeof CORE.readSave === 'function') ? CORE.readSave() : null;
+    if (!isResume && !isTutorial && CORE.gameMode === MODES.SURVIVAL && typeof CORE.clearSave === 'function') {
+      CORE.clearSave();
+    }
+
     CORE.resetGameOverDom();
     CORE.resetCampaignState();
+
+    if (savedData) {
+      if (savedData.difficultyKey) applyDifficultySetting(savedData.difficultyKey, false);
+      if (savedData.atmosphereMode) applyAtmosphereSetting(savedData.atmosphereMode, false);
+    }
 
     if (LRT.Station && LRT.Station.dispose) LRT.Station.dispose(CORE.scene);
     if (LRT.Enemies && LRT.Enemies.reset) LRT.Enemies.reset();
@@ -185,27 +204,54 @@
     CORE.enemySightTimer = 0;
     CORE.victoryCruiseTimer = 0;
 
+    if (savedData && typeof CORE.applySaveData === 'function') {
+      CORE.applySaveData(savedData);
+    }
+
     CORE.gameState = STATES.STATION_ACTIVE;
-    if (CORE.gameMode === MODES.EXPLORATION) {
+    if (CORE.gameMode === MODES.EXPLORATION || isTutorial) {
       CORE.currentLightingKey = 'DAYLIGHT_CLEAR';
+      if (isTutorial) CORE.lightingLockedByUser = true;
     }
     CORE.syncMenuLights();
     const stats = buildStation(CORE.stationIndex, 0);
     const spawnPos = (stats && stats.spawnPos) || CORE.pickPlayerSpawnPos();
-    LRT.PlayerUI.reset(spawnPos, CORE.gameMode === MODES.EXPLORATION, CORE.gameMode);
+    LRT.PlayerUI.reset(spawnPos, CORE.gameMode === MODES.EXPLORATION || isTutorial, CORE.gameMode);
+
+    if (savedData) {
+      const p = LRT.PlayerUI.getState();
+      if (p) {
+        if (typeof savedData.health === 'number') p.health = Math.max(10, Math.min(p.maxHealth || 100, savedData.health));
+        if (typeof savedData.maxArmor === 'number') p.maxArmor = Math.max(100, savedData.maxArmor);
+        if (typeof savedData.armor === 'number') p.armor = Math.max(0, Math.min(p.maxArmor, savedData.armor));
+      }
+      if (savedData.weapons && LRT.Weapons && typeof LRT.Weapons.loadSaveState === 'function') {
+        LRT.Weapons.loadSaveState(savedData.weapons);
+      }
+    }
+
     updateCityVisibility(LRT.PlayerUI.getState());
     LRT.PlayerUI.setPaused(false, true);
     LRT.PlayerUI.showScreen('play');
     LRT.PlayerUI.requestLock();
 
+    if (isTutorial) {
+      if (typeof CORE.beginTutorial === 'function') CORE.beginTutorial();
+      return;
+    }
+
     if (CORE.gameMode === MODES.SURVIVAL) {
-      CORE.spawnCurrentWave();
-      if (!CORE.campaignState.voTriggered.has('VO_01_INTRO')) {
+      const alreadyCleared = CORE.campaignState && CORE.campaignState.clearedStations && CORE.campaignState.clearedStations.has(CORE.stationIndex);
+      if (!alreadyCleared) {
+        CORE.spawnCurrentWave();
+      }
+      if (CORE.stationIndex === 0 && !CORE.campaignState.voTriggered.has('VO_01_INTRO')) {
         CORE.campaignState.voTriggered.add('VO_01_INTRO');
         if (LRT.Audio && typeof LRT.Audio.playVoice === 'function') {
           LRT.Audio.playVoice('VO_01_INTRO');
         }
       }
+      if (typeof CORE.writeSave === 'function') CORE.writeSave();
     } else {
       LRT.PlayerUI.setNotice('EXPLORATION MODE — TEKAN [T] UNTUK PANGGIL LRT', '#e0b422');
       if (LRT.Weapons && LRT.Weapons.addAmmo) {
@@ -296,6 +342,10 @@
     }
 
     CORE.updateSurvivalAndVoChecks(dt, pState, stationGrid, trainCols, enemyOpts);
+    if (CORE.tutorialActive && typeof CORE.tutorialUpdate === 'function') {
+      CORE.tutorialUpdate(dt, pState);
+      if (!CORE.tutorialActive) return;
+    }
 
     const alive = LRT.Enemies && LRT.Enemies.getAliveCount ? LRT.Enemies.getAliveCount() : 0;
     const isTrainCruise = CORE.gameState === STATES.TRAIN_CRUISE || tState === 'CRUISE';
@@ -313,12 +363,23 @@
         LRT.Station.setActiveObjectiveIds(activeIds);
       }
     }
-    if (LRT.PlayerUI && typeof LRT.PlayerUI.updateWaypoints === 'function' && LRT.Station && typeof LRT.Station.getObjectiveMarkers === 'function') {
-      const markers = LRT.Station.getObjectiveMarkers();
-      LRT.PlayerUI.updateWaypoints(markers, activeIds, CORE.camera);
+    if (LRT.PlayerUI && typeof LRT.PlayerUI.updateWaypoints === 'function') {
+      if (CORE.tutorialActive && typeof CORE.getTutorialMarkers === 'function') {
+        LRT.PlayerUI.updateWaypoints(CORE.getTutorialMarkers(), null, CORE.camera);
+      } else if (LRT.Station && typeof LRT.Station.getObjectiveMarkers === 'function') {
+        const markers = LRT.Station.getObjectiveMarkers();
+        LRT.PlayerUI.updateWaypoints(markers, activeIds, CORE.camera);
+      }
     }
 
     const info = CORE.buildObjectiveInfo(stStats, stAtmos);
+    if (CORE.tutorialActive && typeof CORE.getTutorialInfo === 'function') {
+      const tInfo = CORE.getTutorialInfo();
+      if (tInfo) {
+        info.objectiveTitle = tInfo.title;
+        info.objectiveDetail = tInfo.detail;
+      }
+    }
     info.fps = currentFps;
     info.drawCalls = CORE.lastDrawCalls || (CORE.renderer ? CORE.renderer.info.render.calls : 0);
     LRT.PlayerUI.updateHud(info);
@@ -411,8 +472,14 @@
   function bindUiButtons() {
     const dom = LRT.PlayerUI.getDom();
 
+    if (dom['btn-continue']) {
+      dom['btn-continue'].addEventListener('click', () => startGame(MODES.SURVIVAL, { resume: true }));
+    }
     if (dom['btn-start-survival']) {
       dom['btn-start-survival'].addEventListener('click', () => startGame(MODES.SURVIVAL));
+    }
+    if (dom['btn-start-tutorial']) {
+      dom['btn-start-tutorial'].addEventListener('click', () => startGame(MODES.SURVIVAL, { tutorial: true }));
     }
     if (dom['btn-start-exploration']) {
       dom['btn-start-exploration'].addEventListener('click', () => startGame(MODES.EXPLORATION));
@@ -427,6 +494,13 @@
       dom['btn-retry'].addEventListener('click', () => startGame(MODES.SURVIVAL));
     }
     const backToMenu = () => {
+      if (CORE.tutorialActive && typeof CORE.endTutorial === 'function') {
+        CORE.endTutorial('abort');
+        return;
+      }
+      if (!CORE.tutorialActive && CORE.gameMode === MODES.SURVIVAL && CORE.gameState === STATES.STATION_ACTIVE && typeof CORE.writeSave === 'function') {
+        CORE.writeSave();
+      }
       CORE.gameState = STATES.MENU;
       LRT.PlayerUI.setPaused(true, false);
       LRT.PlayerUI.releaseLock();
@@ -439,6 +513,7 @@
       CORE.updateMenuCamera(simTime);
       LRT.PlayerUI.showScreen('menu');
     };
+    CORE.backToMenu = backToMenu;
     if (dom['btn-back-menu']) dom['btn-back-menu'].addEventListener('click', backToMenu);
     if (dom['btn-gameover-menu']) dom['btn-gameover-menu'].addEventListener('click', backToMenu);
 
@@ -745,7 +820,12 @@
           campaignVictory: CORE.campaignState.campaignVictory,
           stationUsedIds: Array.from(CORE.campaignState.stationUsedIds.entries()).map(([k, v]) => [k, Array.from(v)])
         }),
-        startMode: (m) => startGame(m),
+        startMode: (m, opts) => startGame(m, opts),
+        continueGame: () => startGame(MODES.SURVIVAL, { resume: true }),
+        startTutorial: () => startGame(MODES.SURVIVAL, { tutorial: true }),
+        writeSave: () => (typeof CORE.writeSave === 'function' ? CORE.writeSave() : false),
+        hasSave: () => (typeof CORE.hasSave === 'function' ? CORE.hasSave() : false),
+        getSaveSummary: () => (typeof CORE.getSaveSummary === 'function' ? CORE.getSaveSummary() : null),
         setBrightness: CORE.setBrightness,
         getBrightness: CORE.getBrightness,
         setLightingMode: CORE.setLightingMode,

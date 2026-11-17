@@ -2167,9 +2167,51 @@
     return { hitCount: hits };
   }
 
+  // Checkpoint save/restore of per-weapon progression (unlocks, ammo, upgrades). Plain data only.
+  function getSaveState() {
+    const out = { active: W._activeIdx | 0, weapons: [] };
+    for (let i = 0; i < W._weaponStates.length; i++) {
+      const ws = W._weaponStates[i];
+      if (!ws) continue;
+      out.weapons.push({
+        id: ws.id,
+        unlocked: !!ws.unlocked,
+        mag: ws.mag | 0,
+        reserve: Number.isFinite(ws.reserve) ? ws.reserve : 0,
+        magBonus: ws.magBonus || 0,
+        dmgMult: ws.dmgMult || 1,
+        reloadMult: ws.reloadMult || 1,
+        skinId: ws.skinId || null
+      });
+    }
+    return out;
+  }
+
+  function loadSaveState(data) {
+    if (!data || !Array.isArray(data.weapons)) return false;
+    for (let k = 0; k < data.weapons.length; k++) {
+      const s = data.weapons[k];
+      for (let i = 0; i < W._weaponStates.length; i++) {
+        const ws = W._weaponStates[i];
+        if (!ws || ws.id !== s.id) continue;
+        ws.unlocked = !!s.unlocked || i === 0;
+        ws.magBonus = s.magBonus || 0;
+        ws.dmgMult = s.dmgMult || 1;
+        ws.reloadMult = s.reloadMult || 1;
+        if (s.skinId) ws.skinId = s.skinId;
+        ws.mag = Math.max(0, s.mag | 0);
+        ws.reserve = Math.max(0, +s.reserve || 0);
+        break;
+      }
+    }
+    return true;
+  }
+
   const Weapons = {
     init,
     reset,
+    getSaveState,
+    loadSaveState,
     setVisible: W.setVisible,
     setWarmupMode: W.setWarmupMode,
     switchWeapon: W.switchWeapon,
