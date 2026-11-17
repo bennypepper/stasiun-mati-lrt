@@ -7,6 +7,14 @@
 
   const _tmpWorldOffset = new THREE.Vector3();
   const _tmpLocalCam = new THREE.Vector3();
+  const _chosenLampIdx = [-1, -1, -1];
+  const _chosenLampDSq = [Infinity, Infinity, Infinity];
+
+  function evalTrafficBlink(worldX, worldZ, t) {
+    return typeof P.evalTrafficSignalBlink === 'function'
+      ? P.evalTrafficSignalBlink(worldX, worldZ, t)
+      : 1.0;
+  }
 
   const City = {
     rootGroup: null,
@@ -15,6 +23,7 @@
     clutterByQuadrant: null,
     cullChunks: [],
     litLampPositions: [],
+    trafficSignalPositions: [],
     _lootboxGlows: null,
     _lootboxVisuals: null,
     destructibleProps: null,
@@ -171,6 +180,7 @@
       this.clutterByQuadrant = null;
       this.cullChunks = [];
       this.litLampPositions = [];
+      this.trafficSignalPositions = [];
       this._lootboxGlows = null;
       this._lootboxVisuals = null;
       this.destructibleProps = null;
@@ -230,6 +240,7 @@
       this.clutterByQuadrant = { NW: [], NE: [], SW: [], SE: [] };
       this.cullChunks = [];
       this.litLampPositions = [];
+      this.trafficSignalPositions = [];
       this._lootboxGlows = {};
       this._lootboxVisuals = [];
       this.destructibleProps = [];
@@ -253,7 +264,15 @@
         const sl = this.streetLights[i];
         const distScale = sl._distScale !== undefined ? sl._distScale : 1.0;
         sl.light.visible = true;
-        sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale;
+        if (sl.kind === 'traffic') {
+          const blinkScale = sl._blinkScale !== undefined
+            ? sl._blinkScale
+            : evalTrafficBlink(sl._worldX, sl._worldZ, this._timeAccum);
+          sl._blinkScale = blinkScale;
+          sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale * blinkScale;
+        } else {
+          sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale;
+        }
       }
     },
 
@@ -296,10 +315,9 @@
     },
 
     _repositionPooledLights: function (camPos, suppressLights) {
-      if (!this.streetLights || this.streetLights.length === 0 || !this.litLampPositions || this.litLampPositions.length === 0) {
+      if (!this.streetLights || this.streetLights.length === 0 || !camPos || !this.rootGroup) {
         return;
       }
-      if (!camPos) return;
       this.rootGroup.getWorldPosition(_tmpWorldOffset);
       _tmpLocalCam.set(
         camPos.x - _tmpWorldOffset.x,
@@ -307,42 +325,93 @@
         camPos.z - _tmpWorldOffset.z
       );
 
-      // Find the 2 closest lit streetlamps to camPos in local space
+      // Find the 3 closest lit streetlamps to camPos in local space
+      const lamps = this.litLampPositions;
       let best0 = -1, bestD0 = Infinity;
       let best1 = -1, bestD1 = Infinity;
-      const lamps = this.litLampPositions;
-      for (let i = 0; i < lamps.length; i++) {
-        const lp = lamps[i];
-        const dx = lp.x - _tmpLocalCam.x;
-        const dy = lp.y - _tmpLocalCam.y;
-        const dz = lp.z - _tmpLocalCam.z;
-        const dSq = dx * dx + dy * dy + dz * dz;
-        if (dSq < bestD0) {
-          bestD1 = bestD0;
-          best1 = best0;
-          bestD0 = dSq;
-          best0 = i;
-        } else if (dSq < bestD1) {
-          bestD1 = dSq;
-          best1 = i;
+      let best2 = -1, bestD2 = Infinity;
+      if (lamps && lamps.length > 0) {
+        for (let i = 0; i < lamps.length; i++) {
+          const lp = lamps[i];
+          const dx = lp.x - _tmpLocalCam.x;
+          const dy = lp.y - _tmpLocalCam.y;
+          const dz = lp.z - _tmpLocalCam.z;
+          const dSq = dx * dx + dy * dy + dz * dz;
+          if (dSq < bestD0) {
+            bestD2 = bestD1; best2 = best1;
+            bestD1 = bestD0; best1 = best0;
+            bestD0 = dSq; best0 = i;
+          } else if (dSq < bestD1) {
+            bestD2 = bestD1; best2 = best1;
+            bestD1 = dSq; best1 = i;
+          } else if (dSq < bestD2) {
+            bestD2 = dSq; best2 = i;
+          }
+        }
+      }
+      _chosenLampIdx[0] = best0;
+      _chosenLampIdx[1] = best1 >= 0 ? best1 : best0;
+      _chosenLampIdx[2] = best2 >= 0 ? best2 : _chosenLampIdx[1];
+      _chosenLampDSq[0] = bestD0;
+      _chosenLampDSq[1] = best1 >= 0 ? bestD1 : bestD0;
+      _chosenLampDSq[2] = best2 >= 0 ? bestD2 : _chosenLampDSq[1];
+
+      // Find the closest traffic signal pole to camPos in local space
+      const sigs = this.trafficSignalPositions;
+      let bestSig = -1, bestSigDSq = Infinity;
+      if (sigs && sigs.length > 0) {
+        for (let i = 0; i < sigs.length; i++) {
+          const sp = sigs[i];
+          const dx = sp.x - _tmpLocalCam.x;
+          const dy = sp.y - _tmpLocalCam.y;
+          const dz = sp.z - _tmpLocalCam.z;
+          const dSq = dx * dx + dy * dy + dz * dz;
+          if (dSq < bestSigDSq) {
+            bestSigDSq = dSq;
+            bestSig = i;
+          }
         }
       }
 
-      const chosen = [best0, best1 >= 0 ? best1 : best0];
-      const chosenDSq = [bestD0, best1 >= 0 ? bestD1 : bestD0];
+      let lampSlot = 0;
       for (let i = 0; i < this.streetLights.length; i++) {
         const sl = this.streetLights[i];
-        const idx = chosen[i % chosen.length];
-        if (idx < 0) continue;
+        sl.light.visible = true; // NEVER toggle visible!
+
+        if (sl.kind === 'traffic') {
+          if (bestSig >= 0) {
+            const sp = sigs[bestSig];
+            sl.light.position.set(sp.x, sp.y, sp.z);
+            sl._worldX = sp.x + _tmpWorldOffset.x;
+            sl._worldZ = sp.z + _tmpWorldOffset.z;
+            if (suppressLights) {
+              sl._distScale = 0.0;
+            } else {
+              const dist = Math.sqrt(bestSigDSq);
+              sl._distScale = dist <= 50 ? 1.0 : (dist >= 88 ? 0.0 : (1.0 - (dist - 50) / 38.0));
+            }
+            sl._blinkScale = evalTrafficBlink(sl._worldX, sl._worldZ, this._timeAccum);
+            sl.light.intensity = sl.baseIntensity * this._lightingFactor * sl._distScale * sl._blinkScale;
+          } else {
+            sl._distScale = 0.0;
+            sl._blinkScale = 0.0;
+            sl.light.intensity = 0.0;
+          }
+          continue;
+        }
+
+        const slotIdx = lampSlot % 3;
+        lampSlot++;
+        const idx = _chosenLampIdx[slotIdx];
+        if (idx < 0 || !lamps) continue;
         const lp = lamps[idx];
         sl.light.position.set(lp.x, lp.y, lp.z);
-        sl.light.visible = true; // NEVER toggle visible!
         sl.flicker = !!lp.flicker;
         if (suppressLights) {
           sl._distScale = 0.0;
         } else {
-          const dist = Math.sqrt(chosenDSq[i % chosen.length]);
-          sl._distScale = dist <= 40 ? 1.0 : (dist >= 72 ? 0.0 : (1.0 - (dist - 40) / 32.0));
+          const dist = Math.sqrt(_chosenLampDSq[slotIdx]);
+          sl._distScale = dist <= 50 ? 1.0 : (dist >= 88 ? 0.0 : (1.0 - (dist - 50) / 38.0));
         }
         if (!sl.flicker) {
           sl.light.intensity = sl.baseIntensity * this._lightingFactor * sl._distScale;
@@ -360,14 +429,21 @@
         const oz = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
         P.updateLootboxVisuals(this._lootboxVisuals, dt, this._timeAccum, camPos, camForward, difficultyKey, oz);
       }
-      if (this._lastCamPos) {
-        this._repositionPooledLights(this._lastCamPos, this._suppressPooledLights);
+      const focusPos = camPos || this._lastCamPos;
+      if (focusPos) {
+        this._repositionPooledLights(focusPos, this._suppressPooledLights);
       }
       for (let i = 0; i < this.streetLights.length; i++) {
         const sl = this.streetLights[i];
+        const distScale = sl._distScale !== undefined ? sl._distScale : 1.0;
+        if (sl.kind === 'traffic') {
+          sl._blinkScale = evalTrafficBlink(sl._worldX, sl._worldZ, this._timeAccum);
+          sl.light.visible = true;
+          sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale * sl._blinkScale;
+          continue;
+        }
         if (!sl.flicker) continue;
         // Subtle sodium-vapor streetlamp buzz (NEVER toggles visible!)
-        const distScale = sl._distScale !== undefined ? sl._distScale : 1.0;
         const pulse = 0.85 + 0.15 * Math.sin(this._timeAccum * 17.0 + i * 3.1) * Math.sin(this._timeAccum * 4.3);
         sl.light.visible = true;
         sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale * pulse;

@@ -477,7 +477,10 @@
       }
     };
 
-    const streetFactor = Math.max(0, val / 2.2);
+    const isNight = !!(baseMood && !baseMood.isDaylight);
+    const streetFactor = isNight
+      ? Math.max(0.25, val / 1.8)
+      : Math.max(0, val / 1.8);
     if (LRT.Station) {
       const isMenu = CORE.gameState === STATES.MENU;
       const tubeInt = (baseMood && baseMood.tubeIntensity !== undefined) ? baseMood.tubeIntensity : 0.72;
@@ -609,7 +612,7 @@
     }
     const localLampScale = baseMood.isDaylight
       ? (b <= 1.0 ? (0.30 + 0.70 * b) : 1.0)
-      : (b <= 1.0 ? (0.78 + 0.22 * b) : 1.0 + over * 0.20);
+      : (b <= 1.0 ? Math.max(0.95, 0.92 + 0.08 * b) : 1.0 + over * 0.20);
     applyStreetLightsIntensity(baseMood.streetLampIntensity * localLampScale);
     if (LRT.Materials && LRT.Materials.mats) {
       const m = LRT.Materials.mats;
@@ -727,6 +730,9 @@
     _hasShadowTarget = false;
     markShadowDirty();
 
+    if (LRT.Station && typeof LRT.Station.setMood === 'function') {
+      LRT.Station.setMood(moodKey);
+    }
     if (LRT.PlayerUI && typeof LRT.PlayerUI.syncLightingUi === 'function') {
       LRT.PlayerUI.syncLightingUi(moodKey, m);
     }

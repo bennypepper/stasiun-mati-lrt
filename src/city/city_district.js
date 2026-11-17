@@ -36,6 +36,7 @@
     const platMaxZ = o.platMaxZ !== undefined ? o.platMaxZ : 62.0;
     const trackXs = Array.isArray(o.trackXs) && o.trackXs.length > 0 ? o.trackXs : [0.0, -4.70];
     const tubeIntensity = o.tubeIntensity !== undefined ? o.tubeIntensity : 0.85;
+    const streetLampIntensity = o.streetLampIntensity !== undefined ? o.streetLampIntensity : tubeIntensity;
 
     // Resolve Poly Haven PBR materials (using LRT.Materials.mats when present, AssetLoader PBR fallback otherwise)
     const matAsphalt = city._getMat('asphaltRoad', 'asphalt_road', { color: 0x3b3d42, roughness: 0.82, metalness: 0.04 });
@@ -1058,23 +1059,38 @@
       }
     }
 
-    // Streetlamps along Boulevards & Level Crossings (2 Pooled PointLights + emissive bulbs on ALL poles!)
+    // Streetlamps along Boulevards, Station Promenade Portals & Level Crossings (3 Pooled PointLights + emissive bulbs on ALL poles!)
     const lampSpecs = [
+      // East inner promenade curb (along East Boulevard & station portals)
+      { x: eastInnerSwMaxX - 0.55, z: -88, ry: 0, lit: true },
       { x: eastInnerSwMaxX - 0.55, z: -66, ry: 0, lit: true },
+      { x: eastInnerSwMaxX - 0.55, z: -41, ry: 0, lit: true },
       { x: eastInnerSwMaxX - 0.55, z: -20, ry: 0, lit: true },
-      { x: eastInnerSwMaxX - 0.55, z: 0, ry: 0, lit: true },
-      { x: eastInnerSwMaxX - 0.55, z: 20, ry: 0, lit: true },
-      { x: eastInnerSwMaxX - 0.55, z: 66, ry: 0, lit: true },
+      { x: eastInnerSwMaxX - 0.55, z: 0,   ry: 0, lit: true },
+      { x: eastInnerSwMaxX - 0.55, z: 20,  ry: 0, lit: true },
+      { x: eastInnerSwMaxX - 0.55, z: 41,  ry: 0, lit: true },
+      { x: eastInnerSwMaxX - 0.55, z: 66,  ry: 0, lit: true },
+      { x: eastInnerSwMaxX - 0.55, z: 88,  ry: 0, lit: true },
+      // West inner promenade curb (along West Boulevard & platform edges)
+      { x: westInnerSwMinX + 0.55, z: -88, ry: Math.PI, lit: true },
       { x: westInnerSwMinX + 0.55, z: -66, ry: Math.PI, lit: true },
+      { x: westInnerSwMinX + 0.55, z: -41, ry: Math.PI, lit: true },
       { x: westInnerSwMinX + 0.55, z: -18, ry: Math.PI, lit: true },
-      { x: westInnerSwMinX + 0.55, z: 18, ry: Math.PI, lit: true },
-      { x: westInnerSwMinX + 0.55, z: 66, ry: Math.PI, lit: true },
-      { x: eastOuterSwMinX + 0.55, z: -42, ry: 0, lit: true },
-      { x: eastOuterSwMinX + 0.55, z: 42, ry: 0, lit: false },
-      { x: westOuterSwMaxX - 0.55, z: -42, ry: Math.PI, lit: false },
-      { x: westOuterSwMaxX - 0.55, z: 42, ry: Math.PI, lit: true },
-      { x: cMinX - 1.5, z: CROSSING_Z_SOUTH - 6.8, ry: -Math.PI * 0.5, lit: false },
-      { x: cMaxX + 1.5, z: CROSSING_Z_NORTH + 6.8, ry: Math.PI * 0.5, lit: false }
+      { x: westInnerSwMinX + 0.55, z: 0,   ry: Math.PI, lit: true },
+      { x: westInnerSwMinX + 0.55, z: 18,  ry: Math.PI, lit: true },
+      { x: westInnerSwMinX + 0.55, z: 41,  ry: Math.PI, lit: true },
+      { x: westInnerSwMinX + 0.55, z: 66,  ry: Math.PI, lit: true },
+      { x: westInnerSwMinX + 0.55, z: 88,  ry: Math.PI, lit: true },
+      // Outer boulevard curbs
+      { x: eastOuterSwMinX + 0.55, z: -42, ry: Math.PI, lit: true },
+      { x: eastOuterSwMinX + 0.55, z: 42,  ry: Math.PI, lit: true },
+      { x: westOuterSwMaxX - 0.55, z: -42, ry: 0, lit: true },
+      { x: westOuterSwMaxX - 0.55, z: 42,  ry: 0, lit: true },
+      // Level crossing flank lamps (z = ±74 crossings)
+      { x: cMinX - 2.2, z: CROSSING_Z_SOUTH - 6.8, ry: -Math.PI * 0.5, lit: true },
+      { x: cMaxX + 2.2, z: CROSSING_Z_SOUTH - 6.8, ry: -Math.PI * 0.5, lit: true },
+      { x: cMinX - 2.2, z: CROSSING_Z_NORTH + 6.8, ry: Math.PI * 0.5, lit: true },
+      { x: cMaxX + 2.2, z: CROSSING_Z_NORTH + 6.8, ry: Math.PI * 0.5, lit: true }
     ];
     for (let i = 0; i < lampSpecs.length; i++) {
       const ls = lampSpecs[i];
@@ -1087,25 +1103,26 @@
       if (ls.lit) {
         city.litLampPositions.push({
           x: headX,
-          y: SIDEWALK_Y + 4.35,
+          y: SIDEWALK_Y + 4.05,
           z: headZ,
           flicker: (i % 3 === 2)
         });
       }
     }
-    // Emit ONLY 2 pooled PointLights (repositioned dynamically near camPos in updateVisibility/update!)
-    const poolCount = Math.min(2, city.litLampPositions.length);
+    // Emit 3 pooled streetlamp PointLights (repositioned dynamically near camPos in updateVisibility/update!)
+    const poolCount = Math.min(3, city.litLampPositions.length);
+    const initialStreetFactor = Math.max(0, streetLampIntensity / 1.8);
     for (let pi = 0; pi < poolCount; pi++) {
       const lp = city.litLampPositions[pi];
-      const baseInt = 6.2 * tubeIntensity;
-      const ptLight = new THREE.PointLight(0xffa84c, baseInt, 38, 1.22);
+      const baseInt = 16.0;
+      const ptLight = new THREE.PointLight(0xffa84c, baseInt * initialStreetFactor, 48, 1.05);
       ptLight.position.set(lp.x, lp.y, lp.z);
       ptLight.visible = true; // NEVER toggle visible! Control strictly via intensity.
       ptLight.castShadow = false;
       root.add(ptLight);
       city.streetLights.push({
         light: ptLight,
-        baseIntensity: 6.2,
+        baseIntensity: baseInt,
         kind: 'streetlamp',
         flicker: !!lp.flicker,
         _distScale: 1.0
@@ -1242,8 +1259,9 @@
       bGantrySign.push(prepGeo(signGeo, false));
     }
 
-    // Traffic Signal Poles at crossing corners (0 PointLights, shader blinking amber!)
+    // Traffic Signal Poles at crossing corners (1 Pooled amber PointLight + shader blinking amber!)
     const trafficSignalPlacements = [];
+    city.trafficSignalPositions = [];
     const sigSpecs = [
       { x: eastInnerSwMaxX - 0.50, z: southCrossZ0 - 0.85, ry: 0 },
       { x: eastOuterSwMinX + 0.50, z: southCrossZ1 + 0.85, ry: Math.PI },
@@ -1256,6 +1274,29 @@
       const ss = sigSpecs[si];
       trafficSignalPlacements.push({ x: ss.x, y: SIDEWALK_Y, z: ss.z, ry: ss.ry });
       city._addCollider(ss.x - 0.22, SIDEWALK_Y, ss.z - 0.22, ss.x + 0.22, SIDEWALK_Y + 4.9, ss.z + 0.22, 'metal', { blocksBullets: false });
+      city.trafficSignalPositions.push({
+        x: ss.x + Math.cos(ss.ry) * 2.45,
+        y: SIDEWALK_Y + 4.35,
+        z: ss.z - Math.sin(ss.ry) * 2.45
+      });
+    }
+    if (city.trafficSignalPositions.length > 0) {
+      const sp0 = city.trafficSignalPositions[0];
+      const sigLight = new THREE.PointLight(0xff941a, 0, 26, 1.15);
+      sigLight.position.set(sp0.x, sp0.y, sp0.z);
+      sigLight.visible = true; // NEVER toggle visible! Control strictly via intensity.
+      sigLight.castShadow = false;
+      root.add(sigLight);
+      city.streetLights.push({
+        light: sigLight,
+        baseIntensity: 9.0,
+        kind: 'traffic',
+        flicker: false,
+        _distScale: 1.0,
+        _blinkScale: 0.0,
+        _worldX: sp0.x,
+        _worldZ: sp0.z
+      });
     }
 
     // Concrete Road Barriers (checkpoint roadblocks near intersections, leaving walkable paths open!)

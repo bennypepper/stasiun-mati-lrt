@@ -24,12 +24,12 @@
   CORE.prevTrainState = 'AWAY';
 
   const CAMPAIGN_MOODS = [
-    'GOLDEN_DUSK',          // 0: Dukuh Atas BSI
-    'TOXIC_SMOG',           // 1: Cawang Interchange
-    'BLACKOUT_EMERGENCY',   // 2: Harjamukti
-    'MONSOON_OVERCAST',     // 3: Kuningan
-    'HAZY_DUSK',            // 4: Cikoko
-    'CRIMSON_BLOOD_MOON'    // 5: Setiabudi
+    'GOLDEN_DUSK',          // 0: Dukuh Atas BSI (Sunset)
+    'HAZY_DUSK',            // 1: Cawang Interchange (Blue-Hour Twilight)
+    'BLACKOUT_EMERGENCY',   // 2: Harjamukti (Blackout Night)
+    'MONSOON_OVERCAST',     // 3: Kuningan (Monsoon Night)
+    'TOXIC_SMOG',           // 4: Cikoko (Toxic Spore Night)
+    'CRIMSON_BLOOD_MOON'    // 5: Setiabudi (Crimson Blood Moon)
   ];
 
   const campaignState = {

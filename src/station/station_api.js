@@ -271,9 +271,11 @@
       const rng = mulberry32((stIdx + 1) * 7919 + ((seed || 1337) | 0));
 
       const moodKeys = Object.keys(moods);
-      const chosenMoodKey = sectorLoop === 0 && moods[arch.moodBias]
-        ? arch.moodBias
-        : moodKeys[Math.floor(rng() * moodKeys.length)];
+      const chosenMoodKey = (o.moodKey && moods[o.moodKey])
+        ? o.moodKey
+        : (sectorLoop === 0 && moods[arch.moodBias]
+          ? arch.moodBias
+          : moodKeys[Math.floor(rng() * moodKeys.length)]);
       const mood = moods[chosenMoodKey];
 
       this._stationIndex = stIdx;
@@ -471,6 +473,13 @@
       if (this._glassInst) this._glassInst.instanceMatrix.needsUpdate = true;
     },
 
+    setMood: function (moodKey) {
+      const moods = (LRT.Config && LRT.Config.MOODS) || null;
+      if (!moods || !moodKey || !moods[moodKey]) return;
+      this._moodKey = moodKey;
+      this._mood = moods[moodKey];
+    },
+
     setLightingFactor: function (factor) {
       this._lightingFactor = Math.max(0, factor !== undefined ? factor : 1.0);
       const tubeInt = this._mood && this._mood.tubeIntensity !== undefined ? this._mood.tubeIntensity : 0.85;
@@ -478,9 +487,6 @@
       for (let i = 0; i < this.stationLights.length; i++) {
         const sl = this.stationLights[i];
         sl.light.intensity = sl.baseIntensity * tubeInt * this._lightingFactor * pwr;
-      }
-      if (LRT.City && typeof LRT.City.setLightingFactor === 'function') {
-        LRT.City.setLightingFactor(this._lightingFactor);
       }
     },
 

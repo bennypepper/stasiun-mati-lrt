@@ -853,6 +853,7 @@
         isCawang: isCawang,
         moodKey: chosenMoodKey,
         tubeIntensity: tubeInt,
+        streetLampIntensity: mood && mood.streetLampIntensity !== undefined ? mood.streetLampIntensity : (mood && mood.isDaylight ? 0.0 : 2.0),
         usedIds: station._usedIds
       });
       const cityCols = LRT.City.getColliders ? LRT.City.getColliders() : [];

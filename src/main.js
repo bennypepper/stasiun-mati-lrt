@@ -73,7 +73,11 @@
       const savedUsed = CORE.campaignState.stationUsedIds ? CORE.campaignState.stationUsedIds.get(idx) : null;
       const usedIds = savedUsed ? new Set(savedUsed) : new Set();
       const powerRestored = (idx > 0) || !!(CORE.campaignState.stationObjectives && CORE.campaignState.stationObjectives[0] && CORE.campaignState.stationObjectives[0].genOn);
-      LRT.Station.build(idx, seed, CORE.gameMode, CORE.scene, offsetZ || 0, { usedIds, powerRestored });
+      LRT.Station.build(idx, seed, CORE.gameMode, CORE.scene, offsetZ || 0, {
+        usedIds,
+        powerRestored,
+        moodKey: CORE.currentLightingKey
+      });
       const st = LRT.Station.getStats ? LRT.Station.getStats() : null;
       CORE.applyMoodLighting(st, { moodKey: CORE.currentLightingKey });
       _lastActiveObjKey = null;
@@ -130,6 +134,7 @@
     const stats = buildStation(CORE.stationIndex, 0);
     const spawnPos = (stats && stats.spawnPos) || CORE.pickPlayerSpawnPos();
     LRT.PlayerUI.reset(spawnPos, CORE.gameMode === MODES.EXPLORATION, CORE.gameMode);
+    updateCityVisibility(LRT.PlayerUI.getState());
     LRT.PlayerUI.setPaused(false, true);
     LRT.PlayerUI.showScreen('play');
     LRT.PlayerUI.requestLock();
@@ -687,6 +692,7 @@
           const st = buildStation(CORE.stationIndex, 0);
           const sp = (st && st.spawnPos) || CORE.pickPlayerSpawnPos();
           LRT.PlayerUI.reset(sp, CORE.gameMode === MODES.EXPLORATION, CORE.gameMode);
+          updateCityVisibility(LRT.PlayerUI.getState());
           CORE.updateSunTracking(sp.x, sp.z);
           CORE.renderFrame();
           return st;
