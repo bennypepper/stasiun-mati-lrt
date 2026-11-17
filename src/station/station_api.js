@@ -62,6 +62,9 @@
     _cawangHazardRing: null,
     _lootboxGlows: null,
     _lootboxVisuals: null,
+    _turnstileGates: [],
+    _fieldLogGlints: [],
+    _fieldLogPropAssets: null,
     _activeObjectiveIds: new Set(),
     _objectiveBeacons: [],
     _beaconMats: null,
@@ -231,6 +234,9 @@
       this._cawangHazardRing = null;
       this._lootboxGlows = null;
       this._lootboxVisuals = null;
+      this._turnstileGates = [];
+      this._fieldLogGlints = [];
+      this._fieldLogPropAssets = null;
       this._activeObjectiveIds = new Set();
       this._objectiveBeacons = [];
       this._beaconMats = null;
@@ -896,6 +902,45 @@
       if (paintDirty && this._propsPaintInst) this._propsPaintInst.instanceMatrix.needsUpdate = true;
       if (metalDirty && this._propsMetalInst) this._propsMetalInst.instanceMatrix.needsUpdate = true;
       if (barricadeDirty && this._barricadeInst) this._barricadeInst.instanceMatrix.needsUpdate = true;
+
+      // Access by KAI tripod turnstile smooth 120-deg ease-out rotation & LED flash
+      if (this._turnstileGates && this._turnstileGates.length > 0) {
+        for (let i = 0; i < this._turnstileGates.length; i++) {
+          const tg = this._turnstileGates[i];
+          if (tg.animating && tg.rotorSpinGroup) {
+            tg.animElapsed += dt;
+            const rawT = tg.animDuration > 0 ? Math.min(1, tg.animElapsed / tg.animDuration) : 1;
+            const inv = 1 - rawT;
+            const ease = 1 - inv * inv * inv;
+            tg.rotorSpinGroup.rotation.z = tg.startAngle + (tg.targetAngle - tg.startAngle) * ease;
+            if (rawT >= 1) {
+              tg.rotorSpinGroup.rotation.z = tg.targetAngle;
+              tg.baseAngle = tg.targetAngle;
+              tg.animating = false;
+            }
+          }
+          if (tg.ledTimer > 0 && tg.ledMat) {
+            tg.ledTimer = Math.max(0, tg.ledTimer - dt);
+            if (tg.ledTimer > 0) {
+              tg.ledMat.emissiveIntensity = 1.6 + 0.8 * (tg.ledTimer / tg.ledDuration);
+            } else {
+              tg.ledMat.color.setHex(0x22d3ee);
+              tg.ledMat.emissive.setHex(0xf59e0b);
+              tg.ledMat.emissiveIntensity = 1.35;
+            }
+          }
+        }
+      }
+
+      // Subtle warm glint pulse on unread 3D field log folders
+      if (this._fieldLogGlints && this._fieldLogGlints.length > 0) {
+        const t = this._timeAccum;
+        for (let i = 0; i < this._fieldLogGlints.length; i++) {
+          const fg = this._fieldLogGlints[i];
+          if (fg.used || !fg.mesh || !fg.mesh.visible) continue;
+          if (fg.mat) fg.mat.opacity = 0.22 + 0.14 * Math.sin(t * 2.8 + i * 1.1);
+        }
+      }
 
       // Ground enemy drop pickup rotation & proximity auto-collect
       if (this._groundPickups && this._groundPickups.length > 0) {
@@ -1703,6 +1748,17 @@
       return best;
     },
 
+    _markFieldLogGlintUsed: function (id) {
+      if (!this._fieldLogGlints || !this._fieldLogGlints.length) return;
+      for (let i = 0; i < this._fieldLogGlints.length; i++) {
+        const fg = this._fieldLogGlints[i];
+        if (fg.id === id) {
+          fg.used = true;
+          if (fg.mesh) fg.mesh.visible = false;
+        }
+      }
+    },
+
     interact: function (id) {
       const it = this.interactables.find((x) => x.id === id);
       if (!it) return { ok: false };
@@ -1725,9 +1781,21 @@
 
       if (it.type === 'turnstile') {
         if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('turnstile_beep', { gain: 0.7 });
-        for (let i = 0; i < this.dynamicProps.length; i++) {
-          if (this.dynamicProps[i].interactId === id) {
-            this.dynamicProps[i].spinTimer = 0.65;
+        if (this._turnstileGates) {
+          for (let i = 0; i < this._turnstileGates.length; i++) {
+            const tg = this._turnstileGates[i];
+            if (tg.id === id) {
+              tg.startAngle = tg.rotorSpinGroup ? tg.rotorSpinGroup.rotation.z : tg.targetAngle;
+              tg.targetAngle = tg.targetAngle + (Math.PI * 2) / 3;
+              tg.animElapsed = 0;
+              tg.animating = true;
+              tg.ledTimer = tg.ledDuration || 1.2;
+              if (tg.ledMat) {
+                tg.ledMat.color.setHex(0x10b981);
+                tg.ledMat.emissive.setHex(0x10b981);
+                tg.ledMat.emissiveIntensity = 2.4;
+              }
+            }
           }
         }
         return {
@@ -1747,6 +1815,7 @@
         it.label = '[E] Generator Darurat (Aktif)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
+        this._markFieldLogGlintUsed(id);
         if (LRT.Enemies && LRT.Enemies.alertAllTo) {
           LRT.Enemies.alertAllTo({ x: it.x, y: it.y, z: it.z }, 45.0);
         }
@@ -1769,6 +1838,7 @@
         it.label = '[E] Kabin Bangkai LRT Cawang (Sudah Digeledah)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
+        this._markFieldLogGlintUsed(id);
         return {
           ok: true,
           type: 'derelict_fuse',
@@ -1786,6 +1856,7 @@
         it.label = '[E] Meja Loket Stasiun (Sudah Diperiksa)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
+        this._markFieldLogGlintUsed(id);
         return {
           ok: true,
           type: 'field_log',
@@ -1802,6 +1873,7 @@
         it.label = '[E] Sakelar Relai Sinyal Master JPO Setiabudi (Terhubung)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
+        this._markFieldLogGlintUsed(id);
         if (LRT.Enemies && LRT.Enemies.alertAllTo) {
           LRT.Enemies.alertAllTo({ x: it.x, y: it.y, z: it.z }, 45.0);
         }
@@ -1825,6 +1897,7 @@
         it.label = "[E] Etalase Roti'O Coffee Bun (Kosong)";
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
+        this._markFieldLogGlintUsed(id);
         const res = {
           ok: true, type: 'rotio', heal: heal, healAmount: heal,
           message: heal > 0 ? "Roti'O Coffee Bun hangat ditemukan! (+25 HP) — Bahkan kiamat pun nggak bisa ngalahin aroma oven Roti'O." : "Etalase Roti'O sudah diambil."
@@ -1843,6 +1916,7 @@
         it.label = '[E] Dispenser Coway (Sudah Minum)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
+        this._markFieldLogGlintUsed(id);
         return {
           ok: true, type: 'coway', heal: heal, healAmount: heal,
           message: heal > 0 ? 'Air mineral steril Coway menyegarkan! (+15 HP)' : 'Air Coway sudah diminum di stasiun ini.'
@@ -1856,6 +1930,7 @@
         it.label = '[E] Terminal JakLingko (Sudah Diambil)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
+        this._markFieldLogGlintUsed(id);
         const res = {
           ok: true, type: 'jaklingko',
           ammo: bonus > 0 ? { type: 'rifle', amount: 30 } : null, ammoBonus: bonus,
@@ -1876,6 +1951,7 @@
         if (!it.label.includes('(Sudah Diambil)')) it.label += ' (Sudah Diambil)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
+        this._markFieldLogGlintUsed(id);
         const res = {
           ok: true, type: 'balcony_supply',
           heal: fresh ? 25 : 0, healAmount: fresh ? 25 : 0,
@@ -1924,6 +2000,7 @@
         if (!it.label.includes('(Sudah Dibuka)')) it.label += ' (Sudah Dibuka)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
+        this._markFieldLogGlintUsed(id);
         if (this._lootboxGlows && this._lootboxGlows.has(id)) {
           const gm = this._lootboxGlows.get(id);
           if (gm) gm.visible = false;
@@ -1963,6 +2040,7 @@
 
       if (it.type === 'info') {
         if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('station_chime', { gain: 0.5 });
+        this._markFieldLogGlintUsed(id);
         const arch = this._archetype || {};
         const res = {
           ok: true, type: 'info',

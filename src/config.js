@@ -263,6 +263,32 @@
       bloomStrength: 0.36,
       wetness: 0.55
     },
+    AMBER_SUNSET: {
+      name: 'Jakarta Amber Sunset',
+      hdri: 'golden_dusk',
+      isDaylight: true,
+      skyTop: '#3e5372',
+      skyHorizon: '#f29a49',
+      fogColor: 0x6b4733,
+      fogDensity: 0.0065,
+      sunColor: 0xffa64d,
+      sunIntensity: 1.55,
+      sunElevation: 8,
+      sunAzimuth: 228,
+      skyTurbidity: 6.8,
+      skyRayleigh: 2.6,
+      skyMie: 0.007,
+      skyMieG: 0.86,
+      hemiSky: 0xf4b67e,
+      hemiGround: 0x453429,
+      hemiIntensity: 0.55,
+      envIntensity: 0.68,
+      exposure: 1.0,
+      tubeIntensity: 0.55,
+      streetLampIntensity: 1.2,
+      bloomStrength: 0.32,
+      wetness: 0.38
+    },
     HAZY_DUSK: {
       name: 'Ash-Choked Twilight',
       hdri: 'night_station',
@@ -384,6 +410,24 @@
     'BLACKOUT_EMERGENCY',
     'CRIMSON_BLOOD_MOON'
   ];
+
+  const CAMPAIGN_MOODS_DAYLIGHT = [
+    'DAYLIGHT_CLEAR',
+    'DAYLIGHT_OVERCAST',
+    'DAYLIGHT_CLEAR',
+    'DAYLIGHT_OVERCAST',
+    'GOLDEN_DUSK',
+    'AMBER_SUNSET'
+  ];
+
+  const DAYLIGHT_OUTBREAK_MODS = {
+    speedMult: 1.22,
+    sightRangeMult: 1.40,
+    fovDegBoost: 35,
+    alertDelayMult: 0.65,
+    gunshotAlertMult: 1.35,
+    windupMult: 0.85
+  };
 
   const PLAYER_CFG = {
     eyeHeight: 1.52,
@@ -936,6 +980,8 @@
     ARCHETYPES,
     MOODS,
     LIGHTING_CYCLE,
+    CAMPAIGN_MOODS_DAYLIGHT,
+    DAYLIGHT_OUTBREAK_MODS,
     PLAYER_CFG,
     WEAPONS,
     ENEMY_TYPES,

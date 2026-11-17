@@ -158,6 +158,15 @@
   const _tryBack = [0, 0, 0];
   const _tryAngles3 = [0, 0, 0];
   const _tryAngles5 = [0, 0, 0, 0, 0];
+  const MAX_BOARDING_ZOMBIES = 6;
+  const MAX_PER_DOOR_FUNNEL = 2;
+  const _closestDoorIdx = new Int8Array(3);
+  const _closestDoorDist = new Float32Array(3);
+  const _doorAssignCount = new Int8Array(9);
+  const _candSlotIdx = new Int16Array(MAX_ENEMIES);
+  const _candDist = new Float32Array(MAX_ENEMIES);
+  const _candPicked = new Uint8Array(MAX_ENEMIES);
+  const _zombieDoorAssign = new Int8Array(MAX_ENEMIES);
 
   const _sfxGroanFew = { refDist: 8.5, maxDist: 92.0 };
   const _sfxGroanNorm = { refDist: 6.0, maxDist: 92.0 };
@@ -169,6 +178,32 @@
   let _cachedConfigTiersRef = null;
 
   let _difficultyKey = 'medium';
+  let _atmosphereMode = 'night_horror';
+  const FALLBACK_DAYLIGHT_MODS = {
+    speedMult: 1.22,
+    sightRangeMult: 1.40,
+    fovDegBoost: 35,
+    alertDelayMult: 0.65,
+    gunshotAlertMult: 1.35,
+    windupMult: 0.85
+  };
+
+  function getDaylightMods() {
+    return (LRT.Config && LRT.Config.DAYLIGHT_OUTBREAK_MODS) || FALLBACK_DAYLIGHT_MODS;
+  }
+
+  function isDaylightOutbreak() {
+    return _atmosphereMode === 'daylight_outbreak';
+  }
+
+  function setAtmosphereMode(mode) {
+    _atmosphereMode = (mode === 'daylight_outbreak') ? 'daylight_outbreak' : 'night_horror';
+    return _atmosphereMode;
+  }
+
+  function getAtmosphereMode() {
+    return _atmosphereMode;
+  }
   let _waveNum = 0;
   let _stationIndex = 0;
   let _waveTotalCount = 0;
@@ -1210,40 +1245,55 @@
 
   function evaluatePerception(z, playerPos, pdx, pdy, pdz, distHoriz, dist3D, tier, isDaylight, flashlightOn) {
     const mode = tier.perceptionMode;
+    const daylightOutbreak = isDaylightOutbreak();
+    const mods = daylightOutbreak ? getDaylightMods() : null;
+    const sightMult = mods ? (mods.sightRangeMult || 1.40) : 1.0;
+
+    if (daylightOutbreak && (z.variant === 'screamer' || z.variant === 'spitter')) {
+      if (dist3D <= 32.0 * sightMult && hasLineOfSightToPlayer(z, playerPos)) {
+        return true;
+      }
+    }
 
     if (mode === 'RADIAL_SHORT') {
-      if (dist3D > tier.proxRadius) return false;
-      return Math.abs(pdy) <= 2.5 || distHoriz <= 12.0;
+      if (dist3D > tier.proxRadius * sightMult) return false;
+      return Math.abs(pdy) <= 2.5 || distHoriz <= 12.0 * sightMult;
     }
 
     if (mode === 'RADIAL_MEDIUM') {
       const onOpenStreet = z.y < -0.35 || Math.abs(z.x) > 22.0;
-      const effRad = onOpenStreet ? 20.0 : tier.proxRadius;
+      const effRad = (onOpenStreet ? 20.0 : tier.proxRadius) * sightMult;
       if (dist3D > effRad) return false;
       return Math.abs(pdy) <= 4.8 || hasLineOfSightToPlayer(z, playerPos);
     }
 
     // FOV_CONE_LOS (hard) & FOV_CONE_SOUND (nightmare)
-    if (dist3D <= tier.proxRadius && (Math.abs(pdy) <= 4.8 || hasLineOfSightToPlayer(z, playerPos))) {
+    if (dist3D <= tier.proxRadius * sightMult && (Math.abs(pdy) <= 4.8 || hasLineOfSightToPlayer(z, playerPos))) {
       return true;
     }
 
-    let effFovRange = tier.fovRange;
-    if (!isDaylight) {
+    let effFovRange = tier.fovRange * sightMult;
+    if (!isDaylight && !daylightOutbreak) {
       effFovRange *= flashlightOn ? 1.15 : 0.78;
     }
     if (dist3D > effFovRange) return false;
+
+    let effCosHalfFov = tier.cosHalfFov;
+    if (mods && tier.fovDeg > 0) {
+      const boostedDeg = tier.fovDeg + (mods.fovDegBoost || 35);
+      effCosHalfFov = boostedDeg >= 358 ? -1.0 : Math.cos((boostedDeg * 0.5 * Math.PI) / 180);
+    }
 
     if (distHoriz > 0.05) {
       const fwdX = Math.sin(z.yaw);
       const fwdZ = Math.cos(z.yaw);
       const dotXZ = (pdx * fwdX + pdz * fwdZ) / distHoriz;
-      if (dotXZ < tier.cosHalfFov) return false;
+      if (dotXZ < effCosHalfFov) return false;
     }
     return hasLineOfSightToPlayer(z, playerPos);
   }
 
-  function steerAndMove(z, idx, goalX, goalZ, moveSpd, moveStep, isBackpedaling, dist3D, distHoriz, pdx, pdz) {
+  function steerAndMove(z, idx, goalX, goalZ, moveSpd, moveStep, isBackpedaling, dist3D, distHoriz, pdx, pdz, directLine) {
     let baseAng = Math.atan2(goalX - z.x, goalZ - z.z);
     if (z.chargeTimer > 0) {
       baseAng = Math.atan2(z.chargeDirX, z.chargeDirZ);
@@ -1251,7 +1301,7 @@
     } else if (isBackpedaling) {
       baseAng = z._backpedalAng;
       z.yaw = Math.atan2(pdx, pdz);
-    } else if (z.aggroState === 'CHASE') {
+    } else if (z.aggroState === 'CHASE' && !directLine) {
       if (z.variant === 'walker') {
         if (dist3D >= 3.2) {
           baseAng += Math.sin(z.animPhase * 0.7 + z.seed) * 0.04 * z.limbBias;
@@ -1506,6 +1556,113 @@
       : ((LRT.Train && typeof LRT.Train.getColliders === 'function') ? LRT.Train.getColliders() : null);
     const navGraph = (LRT.Station && typeof LRT.Station.getNavGraph === 'function') ? LRT.Station.getNavGraph() : null;
 
+    // Pre-pass: assign nearest few zombies to funnel through up to 3 closest open train doors during BOARDED_WAIT
+    const trainState = (LRT.Train && typeof LRT.Train.getState === 'function') ? LRT.Train.getState() : 'AWAY';
+    const trainBounds = (LRT.Train && typeof LRT.Train.getInteriorBounds === 'function') ? LRT.Train.getInteriorBounds() : null;
+    const playerInTrain = !!(trainState === 'BOARDED_WAIT' && playerPos && LRT.Train && typeof LRT.Train.isPlayerInside === 'function' && LRT.Train.isPlayerInside(playerPos));
+    const openDoors = (playerInTrain && typeof LRT.Train.getOpenDoorways === 'function') ? LRT.Train.getOpenDoorways() : null;
+    const hasOpenDoors = !!(openDoors && openDoors.length > 0 && trainBounds && trainBounds.active);
+    let topDoorCount = 0;
+
+    for (let i = 0; i < E.activeHighWater; i++) _zombieDoorAssign[i] = -1;
+    for (let d = 0; d < 9; d++) _doorAssignCount[d] = 0;
+
+    if (playerInTrain && trainBounds && trainBounds.active) {
+      let insideCount = 0;
+      let candCount = 0;
+      const tX = trainBounds.trackX;
+      const tZ = trainBounds.trainZ;
+      const tDir = trainBounds.travelDir;
+
+      if (hasOpenDoors) {
+        const doorTotal = openDoors.length;
+        const maxTop = Math.min(3, doorTotal);
+        for (let k = 0; k < maxTop; k++) {
+          _closestDoorIdx[k] = -1;
+          _closestDoorDist[k] = 1e9;
+        }
+        for (let d = 0; d < doorTotal; d++) {
+          const dr = openDoors[d];
+          const dd = Math.hypot(dr.doorX - playerPos.x, dr.z - playerPos.z);
+          for (let k = 0; k < maxTop; k++) {
+            if (dd < _closestDoorDist[k]) {
+              for (let s = maxTop - 1; s > k; s--) {
+                _closestDoorIdx[s] = _closestDoorIdx[s - 1];
+                _closestDoorDist[s] = _closestDoorDist[s - 1];
+              }
+              _closestDoorIdx[k] = d;
+              _closestDoorDist[k] = dd;
+              break;
+            }
+          }
+        }
+        topDoorCount = maxTop;
+      }
+
+      for (let i = 0; i < E.activeHighWater; i++) {
+        const z = E.zombies[i];
+        if (!z.active || z.dead) continue;
+        const lx = (z.x - tX) * tDir;
+        const lz = (z.z - tZ) * tDir;
+        if (Math.abs(lx) <= 1.12 && Math.abs(lz) <= trainBounds.lengthHalf && z.y >= -0.35 && z.y <= 2.2) {
+          _zombieDoorAssign[i] = -2;
+          insideCount++;
+        } else if (hasOpenDoors && z.aggroState === 'CHASE' && z.lureTimer <= 0) {
+          let bestD = 1e9;
+          for (let k = 0; k < topDoorCount; k++) {
+            const dr = openDoors[_closestDoorIdx[k]];
+            const dd = Math.hypot(dr.thresholdX - z.x, dr.z - z.z);
+            if (dd < bestD) bestD = dd;
+          }
+          // Prioritize zombies already lined up in the doorway threshold so they finish stepping inside
+          if (lx >= 0.85 && lx <= 1.85 && Math.abs(lz) <= trainBounds.lengthHalf) {
+            bestD -= 100.0;
+          }
+          _candSlotIdx[candCount] = i;
+          _candDist[candCount] = bestD + Math.abs(z.y) * 2.5;
+          _candPicked[candCount] = 0;
+          candCount++;
+        }
+      }
+
+      if (hasOpenDoors && topDoorCount > 0) {
+        const slotsAvail = Math.max(0, MAX_BOARDING_ZOMBIES - insideCount);
+        const picks = Math.min(slotsAvail, candCount);
+        for (let p = 0; p < picks; p++) {
+          let bestCand = -1;
+          let bestScore = 1e9;
+          for (let c = 0; c < candCount; c++) {
+            if (_candPicked[c]) continue;
+            if (_candDist[c] < bestScore) {
+              bestScore = _candDist[c];
+              bestCand = c;
+            }
+          }
+          if (bestCand < 0) break;
+          _candPicked[bestCand] = 1;
+          const zIdx = _candSlotIdx[bestCand];
+          const z = E.zombies[zIdx];
+
+          let chosenDoor = -1;
+          let chosenDoorDist = 1e9;
+          for (let k = 0; k < topDoorCount; k++) {
+            const dIdx = _closestDoorIdx[k];
+            if (dIdx < 0 || _doorAssignCount[dIdx] >= MAX_PER_DOOR_FUNNEL) continue;
+            const dr = openDoors[dIdx];
+            const dd = Math.hypot(dr.thresholdX - z.x, dr.z - z.z);
+            if (dd < chosenDoorDist) {
+              chosenDoorDist = dd;
+              chosenDoor = dIdx;
+            }
+          }
+          if (chosenDoor >= 0) {
+            _zombieDoorAssign[zIdx] = chosenDoor;
+            _doorAssignCount[chosenDoor]++;
+          }
+        }
+      }
+    }
+
     for (let i = 0; i < E.activeHighWater; i++) {
       const z = E.zombies[i];
       if (!z.active) continue;
@@ -1605,7 +1762,7 @@
             z.lastKnownZ = playerPos.z;
             z.navTimer = 0;
             if (wasUnaware) {
-              z.alertDelay = tier.alertDelay;
+              z.alertDelay = tier.alertDelay * (isDaylightOutbreak() ? (getDaylightMods().alertDelayMult || 0.65) : 1.0);
             }
           }
         } else if (z.isRoamer) {
@@ -1704,7 +1861,7 @@
 
           if (z.alertDelay <= 0) {
             E.gatherNearbyColliders(z.x, z.z, 2.6, spatialGrid, tc);
-            const invSpd = z.speed * (z.staggerTimer > 0 ? 0.22 : 0.85);
+            const invSpd = z.speed * (z.staggerTimer > 0 ? 0.22 : 0.85) * (isDaylightOutbreak() ? (getDaylightMods().speedMult || 1.22) : 1.0);
             steerAndMove(z, i, goalX, goalZ, invSpd, moveStep, false, dist3D, distHoriz, pdx, pdz);
             E.resolveCollisions(z, 0.38 * z.scale, moveStep);
             z.groundedOnce = true;
@@ -1717,13 +1874,13 @@
         // CHASE state (full combat & multi-level pursuit)
         const hasTarget = !!(playerPos || hasLure);
         if (hasTarget) {
-          const targetX = hasLure ? z.lurePosX : playerPos.x;
-          const targetY = hasLure ? z.lurePosY : (playerPos.y || 0);
-          const targetZ = hasLure ? z.lurePosZ : playerPos.z;
+          const rawTargetX = hasLure ? z.lurePosX : playerPos.x;
+          const rawTargetY = hasLure ? z.lurePosY : (playerPos.y || 0);
+          const rawTargetZ = hasLure ? z.lurePosZ : playerPos.z;
 
-          const pdx = targetX - z.x;
-          const pdy = targetY - z.y;
-          const pdz = targetZ - z.z;
+          const pdx = rawTargetX - z.x;
+          const pdy = rawTargetY - z.y;
+          const pdz = rawTargetZ - z.z;
           const distHoriz = Math.sqrt(pdx * pdx + pdz * pdz);
           const dist3D = Math.sqrt(pdx * pdx + pdy * pdy + pdz * pdz);
 
@@ -1731,17 +1888,56 @@
             z.lureTimer = 0;
           }
 
-          // Refresh multi-level/street A* waypoint on arrival or periodic interval (stagger periodic checks when throttled)
-          z.navTimer -= moveStep;
-          const reachedWp = z.hasNavWp && Math.hypot(z.wpX - z.x, z.wpZ - z.z) < 1.25 && Math.abs(z.wpY - z.y) < 0.85;
-          const activelyClimbing = z.hasNavWp && (z.wpY - z.y) > 0.25 && Math.hypot(z.wpX - z.x, z.wpZ - z.z) < 6.5;
-          if (reachedWp || (z.navTimer <= 0 && !activelyClimbing && isTickFrame)) {
-            z.navTimer = 0.36 + (i % 5) * 0.04;
-            E.solveNavWaypoint(z, targetX, targetY, targetZ, spatialGrid);
+          let targetX = rawTargetX;
+          let targetY = rawTargetY;
+          let targetZ = rawTargetZ;
+          const doorAssign = (!hasLure && playerInTrain) ? _zombieDoorAssign[i] : -1;
+          let isDoorCrossing = false;
+          let isInsideCabin = false;
+
+          if (doorAssign === -2 && trainBounds) {
+            isInsideCabin = true;
+            z.hasNavWp = false;
+            const zLocalZ = (z.z - trainBounds.trainZ) * trainBounds.travelDir;
+            const pLocalX = (playerPos.x - trainBounds.trackX) * trainBounds.travelDir;
+            const pLocalZ = (playerPos.z - trainBounds.trainZ) * trainBounds.travelDir;
+            if (Math.abs(zLocalZ - pLocalZ) > 1.65) {
+              const aisleLocalX = Math.max(-0.42, Math.min(0.42, pLocalX));
+              targetX = trainBounds.trackX + aisleLocalX * trainBounds.travelDir;
+              targetY = trainBounds.floorY;
+              targetZ = playerPos.z;
+            }
+          } else if (doorAssign >= 0 && hasOpenDoors && trainBounds) {
+            const door = openDoors[doorAssign];
+            const zLocalX = (z.x - trainBounds.trackX) * trainBounds.travelDir;
+            const distToThresh = Math.hypot(door.thresholdX - z.x, door.z - z.z);
+            const inDoorwayLane = Math.abs(z.z - door.z) <= 0.55 && zLocalX >= 0.65 && zLocalX <= 2.35 && Math.abs(z.y - door.y) <= 0.65;
+            if (inDoorwayLane || (distToThresh <= 1.25 && Math.abs(z.y - door.y) <= 0.65)) {
+              z.hasNavWp = false;
+              isDoorCrossing = true;
+              targetX = door.aisleX;
+              targetY = door.y;
+              targetZ = door.z;
+            } else {
+              targetX = door.thresholdX;
+              targetY = 0.0;
+              targetZ = door.z;
+            }
           }
 
-          const goalX = z.hasNavWp ? z.wpX : targetX;
-          const goalZ = z.hasNavWp ? z.wpZ : targetZ;
+          // Refresh multi-level/street A* waypoint on arrival or periodic interval (stagger periodic checks when throttled)
+          if (!isInsideCabin && !isDoorCrossing) {
+            z.navTimer -= moveStep;
+            const reachedWp = z.hasNavWp && Math.hypot(z.wpX - z.x, z.wpZ - z.z) < 1.25 && Math.abs(z.wpY - z.y) < 0.85;
+            const activelyClimbing = z.hasNavWp && (z.wpY - z.y) > 0.25 && Math.hypot(z.wpX - z.x, z.wpZ - z.z) < 6.5;
+            if (reachedWp || (z.navTimer <= 0 && !activelyClimbing && isTickFrame)) {
+              z.navTimer = 0.36 + (i % 5) * 0.04;
+              E.solveNavWaypoint(z, targetX, targetY, targetZ, spatialGrid, tc);
+            }
+          }
+
+          const goalX = (!isInsideCabin && !isDoorCrossing && z.hasNavWp) ? z.wpX : targetX;
+          const goalZ = (!isInsideCabin && !isDoorCrossing && z.hasNavWp) ? z.wpZ : targetZ;
           const dx = goalX - z.x;
           const dz = goalZ - z.z;
 
@@ -1756,7 +1952,8 @@
           }
 
           // 1. Screamer shriek & frenzy buff
-          if (z.variant === 'screamer' && playerPos && z.screamTimer <= 0 && z.shriekTimer <= 0 && z.staggerTimer <= 0 && dist3D <= 22.0) {
+          const shriekRange = isDaylightOutbreak() ? (22.0 * (getDaylightMods().sightRangeMult || 1.40)) : 22.0;
+          if (z.variant === 'screamer' && playerPos && z.screamTimer <= 0 && z.shriekTimer <= 0 && z.staggerTimer <= 0 && dist3D <= shriekRange) {
             _v1.set(z.x, z.y + 1.45 * z.scale, z.z);
             _v2.set(playerPos.x - _v1.x, ((playerPos.y || 0) + 1.2) - _v1.y, playerPos.z - _v1.z).normalize();
             let losBlocked = false;
@@ -1765,11 +1962,12 @@
               if (hit) losBlocked = true;
             }
             if (!losBlocked) {
-              z.shriekTimer = 0.55;
+              z.shriekTimer = 0.55 * (isDaylightOutbreak() ? (getDaylightMods().windupMult || 0.85) : 1.0);
               const cfg = E.getEnemyCfg('screamer');
               z.screamTimer = (cfg && cfg.screamCooldown) ? cfg.screamCooldown : 7.5;
               E.play3D('zombie_groan_2', _v1, 0.04, 1.0, _sfxScream);
               const screamRad = tier.screamRadius || (cfg && cfg.screamRadius) || 24.0;
+              const screamAlertDelay = tier.alertDelay * (isDaylightOutbreak() ? (getDaylightMods().alertDelayMult || 0.65) : 1.0);
               for (let k = 0; k < E.activeHighWater; k++) {
                 const other = E.zombies[k];
                 if (!other.active || other.dead) continue;
@@ -1778,7 +1976,7 @@
                   other.buffTimer = Math.max(other.buffTimer || 0, 4.5);
                   if (other.aggroState !== 'CHASE') {
                     other.aggroState = 'CHASE';
-                    other.alertDelay = tier.alertDelay;
+                    other.alertDelay = screamAlertDelay;
                     other.chaseLoseTimer = 0;
                     other.lastKnownX = playerPos.x;
                     other.lastKnownY = playerPos.y || 0;
@@ -1790,7 +1988,7 @@
           }
 
           // 2. Brute telegraphed charge windup
-          if (z.variant === 'brute' && !z.dead && z.staggerTimer <= 0 && z.chargeWindup <= 0 && z.chargeTimer <= 0 && z.chargeCooldown <= 0 && !z.hasNavWp && playerPos) {
+          if (z.variant === 'brute' && !z.dead && z.staggerTimer <= 0 && z.chargeWindup <= 0 && z.chargeTimer <= 0 && z.chargeCooldown <= 0 && !z.hasNavWp && !isDoorCrossing && playerPos) {
             if (distHoriz >= 5.0 && distHoriz <= 14.0 && Math.abs(pdy) <= 0.85) {
               _v1.set(z.x, z.y + 1.35 * z.scale, z.z);
               _v2.set(playerPos.x - _v1.x, ((playerPos.y || 0) + 1.2) - _v1.y, playerPos.z - _v1.z).normalize();
@@ -1800,7 +1998,7 @@
                 if (hit) losBlocked = true;
               }
               if (!losBlocked) {
-                z.chargeWindup = tier.bruteChargeWindup;
+                z.chargeWindup = tier.bruteChargeWindup * (isDaylightOutbreak() ? (getDaylightMods().windupMult || 0.85) : 1.0);
                 z.chargeCooldown = tier.bruteChargeCooldown + Math.random() * 2.0;
                 z.chargeDirX = pdx / distHoriz;
                 z.chargeDirZ = pdz / distHoriz;
@@ -1823,14 +2021,15 @@
 
           // 3. Movement speed with buffs & distant straggler catch-up
           let moveSpd = z.staggerTimer > 0 ? z.speed * 0.22 : z.speed;
+          if (isDaylightOutbreak()) moveSpd *= (getDaylightMods().speedMult || 1.22);
           if (z.buffTimer > 0) moveSpd *= tier.screamerBuffMult;
           if (isStraggler && dist3D > 22.0) moveSpd *= 1.25;
-          if (z.chargeTimer > 0) moveSpd = z.speed * tier.bruteChargeMult;
+          if (z.chargeTimer > 0) moveSpd = z.speed * tier.bruteChargeMult * (isDaylightOutbreak() ? (getDaylightMods().speedMult || 1.22) : 1.0);
           if (z.shriekTimer > 0 || z.chargeWindup > 0) moveSpd = 0;
 
           // 4. Spitter active backpedaling when player pushes inside 5.5m
           let isBackpedaling = false;
-          if (z.variant === 'spitter' && !z.hasNavWp && dist3D < 5.5 && Math.abs(pdy) <= 0.85 && z.staggerTimer <= 0 && playerPos) {
+          if (z.variant === 'spitter' && !z.hasNavWp && !isDoorCrossing && !isInsideCabin && dist3D < 5.5 && Math.abs(pdy) <= 0.85 && z.staggerTimer <= 0 && playerPos) {
             _v1.set(z.x, z.y + 1.45 * z.scale, z.z);
             _v2.set(playerPos.x - _v1.x, ((playerPos.y || 0) + 1.2) - _v1.y, playerPos.z - _v1.z).normalize();
             let losBlocked = false;
@@ -1858,12 +2057,16 @@
           }
 
           const meleeRange = z.variant === 'spitter' ? 1.75 : z.attackRange;
-          const stopDist = (z.variant === 'spitter' && !z.hasNavWp && Math.abs(pdy) <= 1.2 && !z.spitBlocked && distHoriz <= 13.5)
+          const stopDist = (z.variant === 'spitter' && !z.hasNavWp && !isDoorCrossing && !isInsideCabin && Math.abs(pdy) <= 1.2 && !z.spitBlocked && distHoriz <= 13.5)
             ? 7.5
             : (meleeRange * 0.82);
 
-          if ((dist3D > stopDist || isBackpedaling || z.chargeTimer > 0) && z.alertDelay <= 0 && z.shriekTimer <= 0 && z.chargeWindup <= 0) {
-            steerAndMove(z, i, goalX, goalZ, moveSpd, moveStep, isBackpedaling, dist3D, distHoriz, pdx, pdz);
+          const isEnteringDoor = doorAssign >= 0;
+          const moveCheckDist = isEnteringDoor ? Math.hypot(goalX - z.x, goalZ - z.z) : dist3D;
+          const effStopDist = isEnteringDoor ? 0.22 : stopDist;
+
+          if ((moveCheckDist > effStopDist || isBackpedaling || z.chargeTimer > 0) && z.alertDelay <= 0 && z.shriekTimer <= 0 && z.chargeWindup <= 0) {
+            steerAndMove(z, i, goalX, goalZ, moveSpd, moveStep, isBackpedaling, dist3D, distHoriz, pdx, pdz, isDoorCrossing || isInsideCabin);
           } else {
             z.animPhase += moveStep * 2.2;
           }
@@ -1871,15 +2074,16 @@
           if (z.alertDelay <= 0) {
             E.resolveCollisions(z, 0.38 * z.scale, moveStep);
             z.groundedOnce = true;
-            E.updateStuckRecovery(z, moveStep, dist3D, stopDist);
+            E.updateStuckRecovery(z, moveStep, moveCheckDist, effStopDist);
           } else if (!z.groundedOnce) {
             E.gatherNearbyColliders(z.x, z.z, 2.0, spatialGrid, tc);
             E.resolveCollisions(z, 0.38 * z.scale, moveStep);
             z.groundedOnce = true;
           }
 
-          if (dist3D <= meleeRange && Math.abs(pdy) <= 1.8 && z.attackTimer <= 0 && z.staggerTimer <= 0 && z.shriekTimer <= 0 && z.chargeWindup <= 0 && z.alertDelay <= 0) {
-            z.attackTimer = z.attackCooldown;
+          const canMelee = !playerInTrain || isInsideCabin || (isDoorCrossing && trainBounds && Math.abs((z.x - trainBounds.trackX) * trainBounds.travelDir) <= 1.40);
+          if (canMelee && dist3D <= meleeRange && Math.abs(pdy) <= 1.8 && z.attackTimer <= 0 && z.staggerTimer <= 0 && z.shriekTimer <= 0 && z.chargeWindup <= 0 && z.alertDelay <= 0) {
+            z.attackTimer = z.attackCooldown * (isDaylightOutbreak() ? (getDaylightMods().windupMult || 0.85) : 1.0);
             const isChargingHit = z.chargeTimer > 0;
             if (isChargingHit) z.chargeTimer = 0;
             _v1.set(z.x, z.y + 1.3, z.z);
@@ -1890,32 +2094,29 @@
             }
           }
 
-          // Train siege during TRAIN_BOARDING: zombies batter train doors/hull if player is boarded
-          if (LRT.Train && typeof LRT.Train.getState === 'function' && LRT.Train.getState() === 'BOARDED_WAIT') {
-            const playerInTrain = (typeof LRT.Train.isPlayerInside === 'function' && playerPos && LRT.Train.isPlayerInside(playerPos));
-            if (playerInTrain && z.attackTimer <= 0 && z.staggerTimer <= 0) {
-              let distToTrain = 999;
-              if (tc && tc.length > 0) {
-                for (let c = 0; c < tc.length; c++) {
-                  const b = tc[c];
-                  if (!b) continue;
-                  const minX = b.min ? b.min.x : b.minX;
-                  const maxX = b.max ? b.max.x : b.maxX;
-                  const minZ = b.min ? b.min.z : b.minZ;
-                  const maxZ = b.max ? b.max.z : b.maxZ;
-                  const cx = Math.max(minX, Math.min(z.x, maxX));
-                  const cz = Math.max(minZ, Math.min(z.z, maxZ));
-                  const d = Math.hypot(z.x - cx, z.z - cz);
-                  if (d < distToTrain) distToTrain = d;
-                }
+          // Train siege during TRAIN_BOARDING: overflow / closed-door exterior zombies batter train doors/hull
+          if (playerInTrain && doorAssign === -1 && z.attackTimer <= 0 && z.staggerTimer <= 0) {
+            let distToTrain = 999;
+            if (tc && tc.length > 0) {
+              for (let c = 0; c < tc.length; c++) {
+                const b = tc[c];
+                if (!b) continue;
+                const minX = b.min ? b.min.x : b.minX;
+                const maxX = b.max ? b.max.x : b.maxX;
+                const minZ = b.min ? b.min.z : b.minZ;
+                const maxZ = b.max ? b.max.z : b.maxZ;
+                const cx = Math.max(minX, Math.min(z.x, maxX));
+                const cz = Math.max(minZ, Math.min(z.z, maxZ));
+                const d = Math.hypot(z.x - cx, z.z - cz);
+                if (d < distToTrain) distToTrain = d;
               }
-              if (distToTrain <= 2.2) {
-                z.attackTimer = z.attackCooldown;
-                _v1.set(z.x, z.y + 1.25, z.z);
-                E.play3D('zombie_attack', _v1, 0.14, 0.95);
-                if (typeof LRT.Train.applyDamage === 'function') {
-                  LRT.Train.applyDamage(_v1, 1.2, z.damage * 1.4, 4.0);
-                }
+            }
+            if (distToTrain <= 2.2) {
+              z.attackTimer = z.attackCooldown;
+              _v1.set(z.x, z.y + 1.25, z.z);
+              E.play3D('zombie_attack', _v1, 0.14, 0.95);
+              if (typeof LRT.Train.applyDamage === 'function') {
+                LRT.Train.applyDamage(_v1, 1.2, z.damage * 1.4, 4.0);
               }
             }
           }
@@ -1957,7 +2158,7 @@
             if (!blocked) {
               z.yaw = Math.atan2(pdx, pdz);
               z.spitBlocked = false;
-              z.spitTimer = 3.2 + Math.random() * 1.0;
+              z.spitTimer = (3.2 + Math.random() * 1.0) * (isDaylightOutbreak() ? (getDaylightMods().windupMult || 0.85) : 1.0);
               E.spawnBileProjectile(z, playerPos);
             } else {
               z.spitBlocked = true;
@@ -2069,8 +2270,11 @@
   function emitSoundImpulse(pos, baseRadius, sourceTag) {
     if (!pos) return 0;
     const tier = getDifficultyTier();
+    const daylightOutbreak = isDaylightOutbreak();
+    const mods = daylightOutbreak ? getDaylightMods() : null;
     const baseRad = baseRadius !== undefined ? baseRadius : 28.0;
-    const effRadius = baseRad * tier.soundMult;
+    const effRadius = baseRad * tier.soundMult * (mods ? (mods.gunshotAlertMult || 1.35) : 1.0);
+    const effAlertDelay = tier.alertDelay * (mods ? (mods.alertDelayMult || 0.65) : 1.0);
     const py = pos.y !== undefined ? pos.y : 0.0;
     const tag = String(sourceTag || '').toLowerCase();
     const isHeavy = tag === 'shotgun' || tag === 'rpg' || tag === 'explosion' || tag === 'barrel' || tag === 'screamer';
@@ -2105,7 +2309,7 @@
       if (isHeavy || d < effRadius * 0.5) {
         if (z.aggroState !== 'CHASE') {
           z.aggroState = 'CHASE';
-          z.alertDelay = tier.alertDelay;
+          z.alertDelay = effAlertDelay;
           z.chaseLoseTimer = 0;
           z.aggroTimer = 0;
         } else {
@@ -2120,7 +2324,7 @@
         z.aggroTimer = 0;
         if (d < effRadius * 0.65) {
           z.aggroState = 'CHASE';
-          z.alertDelay = tier.alertDelay;
+          z.alertDelay = effAlertDelay;
           z.chaseLoseTimer = 0;
         }
         alerted++;
@@ -2131,7 +2335,8 @@
 
   function alertAllTo(targetPos, radius) {
     if (!targetPos) return;
-    const rad = radius !== undefined ? radius : 45.0;
+    const mult = isDaylightOutbreak() ? (getDaylightMods().gunshotAlertMult || 1.35) : 1.0;
+    const rad = (radius !== undefined ? radius : 45.0) * mult;
     for (let i = 0; i < MAX_ENEMIES; i++) {
       const z = E.zombies[i];
       if (!z.active || z.dead) continue;
@@ -2198,6 +2403,60 @@
     }
   }
 
+  function ejectFromTrain(bounds) {
+    const b = bounds || (LRT.Train && typeof LRT.Train.getInteriorBounds === 'function' ? LRT.Train.getInteriorBounds() : null);
+    if (!b || !b.active) return 0;
+    const tX = b.trackX || 0;
+    const tZ = b.trainZ || 0;
+    const tDir = b.travelDir === -1 ? -1 : 1;
+    const sideSign = b.platformSideSign || tDir;
+    const halfW = (b.halfWidth || 1.325) + 0.30;
+    const halfLen = (b.lengthHalf || 25.35) + 0.35;
+    const exitX = b.platformExitX !== undefined ? b.platformExitX : (tX + sideSign * 2.20);
+
+    let ejected = 0;
+    for (let i = 0; i < E.activeHighWater; i++) {
+      const z = E.zombies[i];
+      if (!z.active) continue;
+      const lx = (z.x - tX) * tDir;
+      const lz = (z.z - tZ) * tDir;
+      if (Math.abs(lx) <= halfW && Math.abs(lz) <= halfLen) {
+        z.x = exitX + sideSign * (0.08 + Math.random() * 0.22);
+        z.y = 0.0;
+        z.vy = 0;
+        z.vx = sideSign * 3.4;
+        z.vz = (Math.random() - 0.5) * 0.8;
+        z.staggerTimer = Math.max(z.staggerTimer || 0, 0.70);
+        z.hasNavWp = false;
+        z.chargeTimer = 0;
+        z.chargeWindup = 0;
+        z.lastProgX = z.x;
+        z.lastProgZ = z.z;
+        E.updateZombieMatrices(z, _elapsed);
+        z.matrixInit = true;
+        ejected++;
+      }
+    }
+
+    if (ejected > 0) {
+      let highWater = 0;
+      let hasBruteArmor = false;
+      let hasBio = false;
+      let hasRag = false;
+      for (let i = 0; i < MAX_ENEMIES; i++) {
+        const z = E.zombies[i];
+        if (z.active || z.dead) {
+          highWater = i + 1;
+          if (z.variant === 'brute' && z.hasArmor && !z.dead) hasBruteArmor = true;
+          if ((z.variant === 'spitter' || z.variant === 'screamer') && !z.dead) hasBio = true;
+          if ((z.variant === 'walker' || z.variant === 'runner') && !z.dead) hasRag = true;
+        }
+      }
+      E.updateOverlayVisibilityAndCounts(highWater, hasBruteArmor, hasBio, hasRag, true);
+    }
+    return ejected;
+  }
+
   const Enemies = {
     init,
     reset,
@@ -2205,6 +2464,8 @@
     setDifficulty,
     getDifficulty,
     getDifficultyConfig,
+    setAtmosphereMode,
+    getAtmosphereMode,
     getDropRoll,
     spawnWave,
     spawnRoamers,
@@ -2219,6 +2480,7 @@
     alertAllTo,
     stunByHorn,
     applyHydrantKnockback,
+    ejectFromTrain,
     getAliveCount,
     getWaveRemainingCount,
     getTotalCount,

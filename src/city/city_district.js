@@ -4,6 +4,99 @@
   const I = (window.__LRT_INTERNAL__ = window.__LRT_INTERNAL__ || {});
   const P = I.city || {};
 
+  function placeCityFieldLogProp(city, root, id, x, y, z, ry, used) {
+    if (!root) return;
+    if (!city._fieldLogPropAssets) {
+      const folderGeo = new THREE.BoxGeometry(0.26, 0.012, 0.33);
+      const tabGeo = new THREE.BoxGeometry(0.08, 0.012, 0.032);
+      const paperGeo = new THREE.BoxGeometry(0.22, 0.010, 0.29);
+      const lineGeo = new THREE.BoxGeometry(0.145, 0.004, 0.012);
+      const stampGeo = new THREE.BoxGeometry(0.044, 0.004, 0.026);
+      const glintGeo = new THREE.PlaneGeometry(0.46, 0.46);
+      glintGeo.rotateX(-Math.PI * 0.5);
+
+      const folderMat = new THREE.MeshStandardMaterial({ color: 0xd4ab6a, roughness: 0.72, metalness: 0.04 });
+      const paperMat = new THREE.MeshStandardMaterial({
+        color: 0xf7efd8,
+        emissive: 0x3b2a10,
+        emissiveIntensity: 0.24,
+        roughness: 0.82,
+        metalness: 0.02
+      });
+      const inkMat = new THREE.MeshStandardMaterial({ color: 0x292524, roughness: 0.90, metalness: 0.0 });
+      const stampMat = new THREE.MeshStandardMaterial({
+        color: 0x991b1b,
+        emissive: 0x450a0a,
+        emissiveIntensity: 0.25,
+        roughness: 0.65,
+        metalness: 0.0
+      });
+
+      city.disposableGeometries.push(folderGeo, tabGeo, paperGeo, lineGeo, stampGeo, glintGeo);
+      city.disposableMaterials.push(folderMat, paperMat, inkMat, stampMat);
+      city._fieldLogPropAssets = {
+        folderGeo, tabGeo, paperGeo, lineGeo, stampGeo, glintGeo,
+        folderMat, paperMat, inkMat, stampMat
+      };
+    }
+
+    const a = city._fieldLogPropAssets;
+    city._fieldLogGlints = city._fieldLogGlints || [];
+
+    const grp = new THREE.Group();
+    grp.name = 'CityFieldLogProp_' + id;
+    grp.position.set(x, y, z);
+    if (ry) grp.rotation.y = ry;
+    root.add(grp);
+
+    const folder = new THREE.Mesh(a.folderGeo, a.folderMat);
+    folder.position.set(0, 0.006, 0);
+    folder.receiveShadow = true;
+    grp.add(folder);
+
+    const tab = new THREE.Mesh(a.tabGeo, a.folderMat);
+    tab.position.set(0.08, 0.006, -0.175);
+    grp.add(tab);
+
+    const paper = new THREE.Mesh(a.paperGeo, a.paperMat);
+    paper.position.set(0.01, 0.016, 0.012);
+    paper.rotation.y = 0.14;
+    grp.add(paper);
+
+    for (let li = 0; li < 3; li++) {
+      const ln = new THREE.Mesh(a.lineGeo, a.inkMat);
+      ln.position.set(0.01, 0.022, -0.05 + li * 0.042);
+      ln.rotation.y = 0.14;
+      grp.add(ln);
+    }
+
+    const stamp = new THREE.Mesh(a.stampGeo, a.stampMat);
+    stamp.position.set(0.055, 0.022, 0.095);
+    stamp.rotation.y = 0.24;
+    grp.add(stamp);
+
+    const glintMat = new THREE.MeshBasicMaterial({
+      color: 0xffd27d,
+      transparent: true,
+      opacity: 0.30,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    city.disposableMaterials.push(glintMat);
+    const glint = new THREE.Mesh(a.glintGeo, glintMat);
+    glint.position.set(0, 0.004, 0);
+    glint.visible = !used;
+    grp.add(glint);
+
+    city._fieldLogGlints.push({
+      id: id,
+      mesh: glint,
+      mat: glintMat,
+      used: !!used
+    });
+  }
+
   function createDistrictBuilder(city, arch, rng, root, o) {
     const {
       STREET_GROUND_Y,
@@ -1839,6 +1932,7 @@
       prompt: coffeeCartUsed ? '[E] Gerobak Kopi East Promenade (Sudah Digeledah)' : '[E] Geledah Gerobak Kopi East Promenade (+Amunisi SS2 & Kopi Hangat)',
       used: coffeeCartUsed
     });
+    placeCityFieldLogProp(city, root, 'city_coffee_cart', eastInnerSwMinX + 4.25, SIDEWALK_Y + 0.92, 10.25, -Math.PI * 0.5 + 0.16, coffeeCartUsed);
 
     const plnUsed = usedSet.has('city_pln_box') || city._plnRestored;
     city.interactables.push({
@@ -1863,8 +1957,18 @@
       prompt: convoyUsed ? '[E] Mobil Patroli TNI MT Haryono (Sudah Digeledah)' : '[E] Buka Bagasi Mobil Patroli TNI (+18 Shotgun Shells)',
       used: convoyUsed
     });
+    placeCityFieldLogProp(city, root, 'city_convoy_car', westRoadCX + 3.5, STREET_GROUND_Y + 0.88, -47.25, 0.20, convoyUsed);
 
     const parkUsed = usedSet.has('city_pocket_park');
+    const parkCrateGeo = new THREE.BoxGeometry(0.56, 0.42, 0.40);
+    const parkCrateMat = new THREE.MeshStandardMaterial({ color: 0x3f4739, roughness: 0.72, metalness: 0.25 });
+    city.disposableGeometries.push(parkCrateGeo);
+    city.disposableMaterials.push(parkCrateMat);
+    const parkCrateMesh = new THREE.Mesh(parkCrateGeo, parkCrateMat);
+    parkCrateMesh.position.set(parkX, SIDEWALK_Y + 0.21, 0.0);
+    parkCrateMesh.receiveShadow = true;
+    root.add(parkCrateMesh);
+    city._addCollider(parkX - 0.30, SIDEWALK_Y, -0.22, parkX + 0.30, SIDEWALK_Y + 0.44, 0.22, 'wood', { blocksBullets: false });
     city.interactables.push({
       id: 'city_pocket_park',
       type: 'street_stash',
@@ -1875,6 +1979,7 @@
       prompt: parkUsed ? '[E] Peti Taktis Taman East Pocket (Sudah Digeledah)' : '[E] Buka Peti Taktis Taman East Pocket (+RPG, +Senapan, +25 HP)',
       used: parkUsed
     });
+    placeCityFieldLogProp(city, root, 'city_pocket_park', parkX, SIDEWALK_Y + 0.425, 0.0, -Math.PI * 0.5 + 0.14, parkUsed);
 
     // Sittable East Pocket Park Benches
     for (let si = 0; si < seatingPlacements.length; si++) {
@@ -1893,7 +1998,7 @@
       });
     }
 
-    // 2 Tactical Street Lootboxes (detailed hinged crate + difficulty-scaled yellow halo!)
+    // Tactical Street Lootboxes (detailed hinged crate + difficulty-scaled yellow halo!)
     city._lootboxVisuals = city._lootboxVisuals || [];
     const lootboxSpecs = [
       {
@@ -1917,6 +2022,18 @@
         labelUsed: '[E] Peti Taktis Taman & Busway (Sudah Diambil)'
       }
     ];
+    if (rng() < 0.5) {
+      lootboxSpecs.push({
+        id: 'city_west_plaza_lootbox',
+        x: westInnerSwMaxX - 2.4,
+        y: SIDEWALK_Y,
+        z: 18.0,
+        ry: Math.PI * 0.5,
+        riskLuck: 0.45,
+        labelOpen: '[E / Klik] Buka Peti Suplai Trotoar Barat (+Amunisi & Medkit)',
+        labelUsed: '[E] Peti Suplai Trotoar Barat (Sudah Diambil)'
+      });
+    }
     const bLootColl = [];
     for (let li = 0; li < lootboxSpecs.length; li++) {
       const lb = lootboxSpecs[li];

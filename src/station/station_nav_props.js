@@ -5,6 +5,421 @@
   const S = (window.__LRT_INTERNAL__.station = window.__LRT_INTERNAL__.station || {});
   const _pooledStationLights = [];
 
+  function createKaiCabinetTexture() {
+    const c = document.createElement('canvas');
+    c.width = 128;
+    c.height = 256;
+    const ctx = c.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 256);
+    grad.addColorStop(0, '#a3287b');
+    grad.addColorStop(0.45, '#7c2988');
+    grad.addColorStop(1, '#51206b');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 128, 256);
+    ctx.fillStyle = 'rgba(255,255,255,0.14)';
+    ctx.fillRect(0, 0, 128, 10);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Access', 64, 72);
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillStyle = '#f3d8f7';
+    ctx.fillText('by KAI', 64, 92);
+    ctx.fillStyle = 'rgba(255,255,255,0.20)';
+    ctx.fillRect(18, 108, 92, 3);
+    ctx.fillStyle = 'rgba(20,24,34,0.38)';
+    for (let y = 148; y < 224; y += 12) {
+      ctx.fillRect(24, y, 80, 5);
+    }
+    const tex = new THREE.CanvasTexture(c);
+    if ('colorSpace' in tex && THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  function buildKaiTurnstileBank(station, ctx, gateBaseX, gateZStart, numGates, isIsland) {
+    const { root, isInStairExclusion } = ctx;
+    if (!root) return [];
+    station._turnstileGates = station._turnstileGates || [];
+
+    const kaiTex = createKaiCabinetTexture();
+    station.disposableTextures.push(kaiTex);
+
+    const kaiBodyMat = new THREE.MeshStandardMaterial({
+      map: kaiTex,
+      roughness: 0.34,
+      metalness: 0.24
+    });
+    const stainlessMat = new THREE.MeshStandardMaterial({
+      color: 0xd8dde3,
+      roughness: 0.22,
+      metalness: 0.88
+    });
+    const darkTrimMat = new THREE.MeshStandardMaterial({
+      color: 0x1e2430,
+      roughness: 0.42,
+      metalness: 0.55
+    });
+    const readerGlassMat = new THREE.MeshStandardMaterial({
+      color: 0x0b1524,
+      roughness: 0.12,
+      metalness: 0.40,
+      emissive: 0x0891b2,
+      emissiveIntensity: 0.55
+    });
+    const rubberMat = new THREE.MeshStandardMaterial({
+      color: 0x18181b,
+      roughness: 0.85,
+      metalness: 0.05
+    });
+    const guardGlassMat = new THREE.MeshStandardMaterial({
+      color: 0xb6e3ff,
+      roughness: 0.10,
+      metalness: 0.16,
+      transparent: true,
+      opacity: 0.28,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    station.disposableMaterials.push(kaiBodyMat, stainlessMat, darkTrimMat, readerGlassMat, rubberMat, guardGlassMat);
+
+    // Chamfered cabinet profile (length 1.26m along X, height 0.90m above plinth)
+    const cabShape = new THREE.Shape();
+    cabShape.moveTo(-0.63, 0.0);
+    cabShape.lineTo(0.63, 0.0);
+    cabShape.lineTo(0.63, 0.72);
+    cabShape.lineTo(0.45, 0.90);
+    cabShape.lineTo(-0.45, 0.90);
+    cabShape.lineTo(-0.63, 0.72);
+    cabShape.closePath();
+
+    const cabBodyGeo = new THREE.ExtrudeGeometry(cabShape, {
+      depth: 0.21,
+      bevelEnabled: true,
+      bevelThickness: 0.012,
+      bevelSize: 0.010,
+      bevelSegments: 2
+    });
+    cabBodyGeo.translate(0, 0.055, -0.105);
+
+    const plinthGeo = new THREE.BoxGeometry(1.32, 0.055, 0.27);
+    const topBezelGeo = new THREE.BoxGeometry(0.92, 0.032, 0.245);
+    const sideTrimGeo = new THREE.BoxGeometry(0.25, 0.022, 0.245);
+    const readerBezelGeo = new THREE.BoxGeometry(0.22, 0.022, 0.205);
+    const readerGlassGeo = new THREE.BoxGeometry(0.165, 0.014, 0.155);
+    const bossGeo = new THREE.CylinderGeometry(0.088, 0.102, 0.048, 16);
+    bossGeo.rotateX(Math.PI * 0.5);
+    const hubGeo = new THREE.CylinderGeometry(0.068, 0.088, 0.082, 16);
+    hubGeo.rotateX(Math.PI * 0.5);
+    const hubCapGeo = new THREE.CylinderGeometry(0.046, 0.046, 0.022, 14);
+    hubCapGeo.rotateX(Math.PI * 0.5);
+    const armGeo = new THREE.CylinderGeometry(0.016, 0.018, 0.50, 10);
+    const tipGeo = new THREE.CylinderGeometry(0.020, 0.019, 0.048, 10);
+    const ledFaceGeo = new THREE.BoxGeometry(0.014, 0.095, 0.095);
+    const ledArrowBarGeo = new THREE.BoxGeometry(0.018, 0.052, 0.016);
+    const ledStripGeo = new THREE.BoxGeometry(0.145, 0.010, 0.024);
+
+    const railPostGeo = new THREE.CylinderGeometry(0.026, 0.028, 0.96, 10);
+    const railBarGeo = new THREE.CylinderGeometry(0.020, 0.020, 1.24, 10);
+    railBarGeo.rotateZ(Math.PI * 0.5);
+    const railGlassGeo = new THREE.BoxGeometry(1.16, 0.68, 0.016);
+
+    station.disposableGeometries.push(
+      cabBodyGeo, plinthGeo, topBezelGeo, sideTrimGeo, readerBezelGeo, readerGlassGeo,
+      bossGeo, hubGeo, hubCapGeo, armGeo, tipGeo, ledFaceGeo, ledArrowBarGeo, ledStripGeo,
+      railPostGeo, railBarGeo, railGlassGeo
+    );
+
+    const bankGroup = new THREE.Group();
+    bankGroup.name = 'AccessByKaiTurnstileBank';
+    root.add(bankGroup);
+
+    const yaw = isIsland ? Math.PI * 0.5 : 0;
+    const step = 1.05;
+    const turnstileList = [];
+
+    for (let g = 0; g < numGates; g++) {
+      const gz = gateZStart + g * step;
+      const gx = isIsland ? gateBaseX + g * step : gateBaseX;
+      const tz = isIsland ? 2.5 : gz;
+
+      station._addCollider(
+        gx - (isIsland ? 0.14 : 0.65), 0, tz - (isIsland ? 0.65 : 0.14),
+        gx + (isIsland ? 0.14 : 0.65), 1.05, tz + (isIsland ? 0.65 : 0.14), 'metal'
+      );
+
+      const cab = new THREE.Group();
+      cab.position.set(gx, 0, tz);
+      cab.rotation.y = yaw;
+      bankGroup.add(cab);
+
+      const plinth = new THREE.Mesh(plinthGeo, stainlessMat);
+      plinth.position.y = 0.0275;
+      plinth.receiveShadow = true;
+      cab.add(plinth);
+
+      const body = new THREE.Mesh(cabBodyGeo, kaiBodyMat);
+      body.castShadow = true;
+      body.receiveShadow = true;
+      cab.add(body);
+
+      const topDeck = new THREE.Mesh(topBezelGeo, stainlessMat);
+      topDeck.position.y = 0.965;
+      cab.add(topDeck);
+
+      for (const sgn of [-1, 1]) {
+        const slopeTrim = new THREE.Mesh(sideTrimGeo, stainlessMat);
+        slopeTrim.position.set(sgn * 0.54, 0.865, 0);
+        slopeTrim.rotation.z = -sgn * Math.PI * 0.25;
+        cab.add(slopeTrim);
+
+        const rBezel = new THREE.Mesh(readerBezelGeo, darkTrimMat);
+        rBezel.position.set(sgn * 0.535, 0.882, 0);
+        rBezel.rotation.z = -sgn * Math.PI * 0.25;
+        cab.add(rBezel);
+
+        const rGlass = new THREE.Mesh(readerGlassGeo, readerGlassMat);
+        rGlass.position.set(sgn * 0.542, 0.889, 0);
+        rGlass.rotation.z = -sgn * Math.PI * 0.25;
+        cab.add(rGlass);
+      }
+
+      if (g < numGates - 1) {
+        const lx = isIsland ? gx + 0.52 : gx;
+        const lz = isIsland ? tz : tz + 0.52;
+        const tid = 'turnstile_' + g;
+
+        // Per-gate LED material (amber-cyan ready -> emerald green on tap)
+        const ledMat = new THREE.MeshStandardMaterial({
+          color: 0x22d3ee,
+          emissive: 0xf59e0b,
+          emissiveIntensity: 1.35,
+          roughness: 0.22,
+          metalness: 0.15
+        });
+        station.disposableMaterials.push(ledMat);
+
+        for (const sgn of [-1, 1]) {
+          const panelBack = new THREE.Mesh(ledFaceGeo, darkTrimMat);
+          panelBack.position.set(sgn * 0.635, 0.63, 0);
+          cab.add(panelBack);
+
+          // Glowing status chevron arrow + reader strip
+          const barA = new THREE.Mesh(ledArrowBarGeo, ledMat);
+          barA.position.set(sgn * 0.642, 0.642, -0.015);
+          barA.rotation.x = Math.PI * 0.25;
+          cab.add(barA);
+
+          const barB = new THREE.Mesh(ledArrowBarGeo, ledMat);
+          barB.position.set(sgn * 0.642, 0.642, 0.015);
+          barB.rotation.x = -Math.PI * 0.25;
+          cab.add(barB);
+
+          const topStrip = new THREE.Mesh(ledStripGeo, ledMat);
+          topStrip.position.set(sgn * 0.48, 0.945, 0);
+          topStrip.rotation.z = -sgn * Math.PI * 0.25;
+          cab.add(topStrip);
+        }
+
+        // Side mounting flange & tilted 3-arm chrome tripod rotor (+Z lane side)
+        const boss = new THREE.Mesh(bossGeo, stainlessMat);
+        boss.position.set(0, 0.75, 0.125);
+        cab.add(boss);
+
+        const rotorPivot = new THREE.Group();
+        rotorPivot.position.set(0, 0.75, 0.155);
+        rotorPivot.rotation.x = Math.PI * 0.25;
+        cab.add(rotorPivot);
+
+        const rotorSpinGroup = new THREE.Group();
+        rotorSpinGroup.name = tid + '_Rotor';
+        rotorPivot.add(rotorSpinGroup);
+
+        const hub = new THREE.Mesh(hubGeo, stainlessMat);
+        rotorSpinGroup.add(hub);
+        const cap = new THREE.Mesh(hubCapGeo, darkTrimMat);
+        cap.position.z = 0.045;
+        rotorSpinGroup.add(cap);
+
+        const invSqrt2 = Math.SQRT1_2;
+        for (let a = 0; a < 3; a++) {
+          const armSlot = new THREE.Group();
+          armSlot.rotation.z = a * ((Math.PI * 2) / 3);
+          rotorSpinGroup.add(armSlot);
+
+          const arm = new THREE.Mesh(armGeo, stainlessMat);
+          arm.position.set(0, 0.25 * invSqrt2, 0.25 * invSqrt2);
+          arm.rotation.x = Math.PI * 0.25;
+          armSlot.add(arm);
+
+          const tip = new THREE.Mesh(tipGeo, rubberMat);
+          tip.position.set(0, 0.505 * invSqrt2, 0.505 * invSqrt2);
+          tip.rotation.x = Math.PI * 0.25;
+          armSlot.add(tip);
+        }
+
+        station._turnstileGates.push({
+          id: tid,
+          rotorSpinGroup: rotorSpinGroup,
+          baseAngle: 0,
+          startAngle: 0,
+          targetAngle: 0,
+          animElapsed: 0,
+          animDuration: 0.42,
+          animating: false,
+          ledMat: ledMat,
+          ledTimer: 0,
+          ledDuration: 1.2
+        });
+
+        turnstileList.push({ x: lx, z: lz, id: tid, yaw: yaw });
+        station.interactables.push({
+          id: tid, type: 'turnstile', x: lx, y: 0.9, z: lz,
+          label: '[E] Tap Kartu Elektronik (Access by KAI)',
+          prompt: '[E] Tap Kartu Elektronik (Access by KAI)', used: false
+        });
+      }
+    }
+
+    // Sleek stainless-steel & tempered glass end-guardrails flanking both ends of the turnstile bank
+    const addEndGuardrail = (endSign) => {
+      const endGateIdx = endSign < 0 ? 0 : (numGates - 1);
+      const baseGX = isIsland ? (gateBaseX + endGateIdx * step) : gateBaseX;
+      const baseTZ = isIsland ? 2.5 : (gateZStart + endGateIdx * step);
+      const off = endSign * 0.74;
+      const rx = isIsland ? baseGX + off : baseGX;
+      const rz = isIsland ? baseTZ : baseTZ + off;
+      if (isInStairExclusion && isInStairExclusion(rx, rz, 0.5, 0.5)) return;
+
+      const railGrp = new THREE.Group();
+      railGrp.position.set(rx, 0, rz);
+      // Align railing length along the bank line (Z for !isIsland, X for isIsland)
+      railGrp.rotation.y = isIsland ? 0 : Math.PI * 0.5;
+      bankGroup.add(railGrp);
+
+      for (const px of [-0.58, 0.58]) {
+        const post = new THREE.Mesh(railPostGeo, stainlessMat);
+        post.position.set(px, 0.48, 0);
+        railGrp.add(post);
+      }
+      const topRail = new THREE.Mesh(railBarGeo, stainlessMat);
+      topRail.position.set(0, 0.95, 0);
+      railGrp.add(topRail);
+      const botRail = new THREE.Mesh(railBarGeo, stainlessMat);
+      botRail.position.set(0, 0.16, 0);
+      railGrp.add(botRail);
+      const glassPane = new THREE.Mesh(railGlassGeo, guardGlassMat);
+      glassPane.position.set(0, 0.55, 0);
+      railGrp.add(glassPane);
+
+      station._addCollider(
+        rx - (isIsland ? 0.62 : 0.10), 0, rz - (isIsland ? 0.10 : 0.62),
+        rx + (isIsland ? 0.62 : 0.10), 1.02, rz + (isIsland ? 0.10 : 0.62), 'metal', { blocksBullets: false }
+      );
+    };
+    addEndGuardrail(-1);
+    addEndGuardrail(1);
+
+    return turnstileList;
+  }
+
+  function getFieldLogPropAssets(station) {
+    if (station._fieldLogPropAssets) return station._fieldLogPropAssets;
+    const folderGeo = new THREE.BoxGeometry(0.26, 0.012, 0.33);
+    const tabGeo = new THREE.BoxGeometry(0.08, 0.012, 0.032);
+    const paperGeo = new THREE.BoxGeometry(0.22, 0.010, 0.29);
+    const lineGeo = new THREE.BoxGeometry(0.145, 0.004, 0.012);
+    const stampGeo = new THREE.BoxGeometry(0.044, 0.004, 0.026);
+    const glintGeo = new THREE.PlaneGeometry(0.46, 0.46);
+    glintGeo.rotateX(-Math.PI * 0.5);
+
+    const folderMat = new THREE.MeshStandardMaterial({ color: 0xd4ab6a, roughness: 0.72, metalness: 0.04 });
+    const paperMat = new THREE.MeshStandardMaterial({
+      color: 0xf7efd8,
+      emissive: 0x3b2a10,
+      emissiveIntensity: 0.24,
+      roughness: 0.82,
+      metalness: 0.02
+    });
+    const inkMat = new THREE.MeshStandardMaterial({ color: 0x292524, roughness: 0.90, metalness: 0.0 });
+    const stampMat = new THREE.MeshStandardMaterial({
+      color: 0x991b1b,
+      emissive: 0x450a0a,
+      emissiveIntensity: 0.25,
+      roughness: 0.65,
+      metalness: 0.0
+    });
+
+    station.disposableGeometries.push(folderGeo, tabGeo, paperGeo, lineGeo, stampGeo, glintGeo);
+    station.disposableMaterials.push(folderMat, paperMat, inkMat, stampMat);
+
+    station._fieldLogPropAssets = {
+      folderGeo, tabGeo, paperGeo, lineGeo, stampGeo, glintGeo,
+      folderMat, paperMat, inkMat, stampMat
+    };
+    return station._fieldLogPropAssets;
+  }
+
+  function placeFieldLogProp(station, root, id, x, y, z, ry, used) {
+    if (!root) return;
+    const a = getFieldLogPropAssets(station);
+    station._fieldLogGlints = station._fieldLogGlints || [];
+
+    const grp = new THREE.Group();
+    grp.name = 'FieldLogProp_' + id;
+    grp.position.set(x, y, z);
+    if (ry) grp.rotation.y = ry;
+    root.add(grp);
+
+    const folder = new THREE.Mesh(a.folderGeo, a.folderMat);
+    folder.position.set(0, 0.006, 0);
+    folder.receiveShadow = true;
+    grp.add(folder);
+
+    const tab = new THREE.Mesh(a.tabGeo, a.folderMat);
+    tab.position.set(0.08, 0.006, -0.175);
+    grp.add(tab);
+
+    const paper = new THREE.Mesh(a.paperGeo, a.paperMat);
+    paper.position.set(0.01, 0.016, 0.012);
+    paper.rotation.y = 0.14;
+    grp.add(paper);
+
+    for (let li = 0; li < 3; li++) {
+      const ln = new THREE.Mesh(a.lineGeo, a.inkMat);
+      ln.position.set(0.01, 0.022, -0.05 + li * 0.042);
+      ln.rotation.y = 0.14;
+      grp.add(ln);
+    }
+
+    const stamp = new THREE.Mesh(a.stampGeo, a.stampMat);
+    stamp.position.set(0.055, 0.022, 0.095);
+    stamp.rotation.y = 0.24;
+    grp.add(stamp);
+
+    const glintMat = new THREE.MeshBasicMaterial({
+      color: 0xffd27d,
+      transparent: true,
+      opacity: 0.30,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    station.disposableMaterials.push(glintMat);
+    const glint = new THREE.Mesh(a.glintGeo, glintMat);
+    glint.position.set(0, 0.004, 0);
+    glint.visible = !used;
+    grp.add(glint);
+
+    station._fieldLogGlints.push({
+      id: id,
+      mesh: glint,
+      mat: glintMat,
+      used: !!used
+    });
+  }
+
   function buildStallsAndTubes(station, ctx) {
     const { UPPER_FLOOR_Y } = S.CONST;
     const { addBox, addAtlasBox, addAtlasQuad } = S;
@@ -71,6 +486,10 @@
         prompt: rotioUsed ? "[E] Etalase Roti'O Coffee Bun (Kosong)" : "[E] Ambil Roti'O Coffee Bun Hangat (+25 HP)",
         used: rotioUsed
       });
+      if (arch.id === 'dukuh_atas') {
+        const pNote = toWorld(0.15, 0.95);
+        placeFieldLogProp(station, ctx.root, 'rotio_counter', pNote[0], 0.995, pNote[1], yaw + 0.16, rotioUsed);
+      }
     };
 
     buildRotioKiosk(rotioX, rotioZ, rotioYaw);
@@ -98,35 +517,19 @@
       });
     }
 
-    // Access by KAI Turnstiles
+    // Access by KAI Turnstiles (chamfered purple cabinets, brushed stainless plinth/bezel, angled RFID reader, 3-arm chrome tripod)
     const gateBaseX = isIsland ? (p1MinX + 2.2) : (concMinX + 2.2);
     const gateZStart = isIsland ? 2.0 : (concMidZ - 6.5);
     const numGates = isIsland ? 4 : 6;
-    const turnstileList = [];
-    for (let g = 0; g < numGates; g++) {
-      const gz = gateZStart + g * 1.05;
-      const gx = isIsland ? gateBaseX + g * 1.05 : gateBaseX;
-      const tz = isIsland ? 2.5 : gz;
-      addAtlasBox(bStall, 1.25, 1.00, 0.24, gx, 0.50, tz, isIsland ? Math.PI * 0.5 : 0, null, STALL_UV.turnstilePurple);
-      station._addCollider(gx - (isIsland ? 0.14 : 0.65), 0, tz - (isIsland ? 0.65 : 0.14),
-        gx + (isIsland ? 0.14 : 0.65), 1.05, tz + (isIsland ? 0.65 : 0.14), 'metal');
-      if (g < numGates - 1) {
-        const lx = isIsland ? gx + 0.52 : gx;
-        const lz = isIsland ? tz : tz + 0.52;
-        turnstileList.push({ x: lx, z: lz, id: 'turnstile_' + g, yaw: isIsland ? Math.PI * 0.5 : 0 });
-        station.interactables.push({
-          id: 'turnstile_' + g, type: 'turnstile', x: lx, y: 0.9, z: lz,
-          label: '[E] Tap Kartu Elektronik (Access by KAI)',
-          prompt: '[E] Tap Kartu Elektronik (Access by KAI)', used: false
-        });
-      }
-    }
+    const turnstileList = buildKaiTurnstileBank(station, ctx, gateBaseX, gateZStart, numGates, isIsland);
 
+    let lkX = null, lkZ = null, shX = null, shZ = null;
     if (!isIsland) {
-      const lkX = concMaxX - 1.35;
-      const lkZ = concMinZ + 3.2;
+      lkX = concMaxX - 1.35;
+      lkZ = concMinZ + 3.2;
       addAtlasBox(bStall, 3.8, 2.7, 1.8, lkX, 1.35, lkZ, -Math.PI * 0.5, null, STALL_UV.loketWood);
       addAtlasBox(bSign, 3.9, 0.65, 1.9, lkX, 2.75, lkZ, -Math.PI * 0.5, null, SIGN_UV.loketHeader);
+      addBox(bSteelDark, 0.36, 0.05, 1.40, lkX - 1.02, 0.99, lkZ);
       station._addCollider(lkX - 1.0, 0, lkZ - 2.0, lkX + 1.0, 2.9, lkZ + 2.0, 'wood');
 
       const loketUsed = station._usedIds.has('loket_counter');
@@ -140,9 +543,10 @@
         prompt: loketUsed ? '[E] Meja Loket Stasiun (Sudah Diperiksa)' : '[E] Periksa Buku Catatan Loket Tiket',
         used: loketUsed
       });
+      placeFieldLogProp(station, ctx.root, 'loket_counter', lkX - 1.02, 1.02, lkZ + 0.16, -Math.PI * 0.5 + 0.14, loketUsed);
 
-      const shX = concMinX + 7.8;
-      const shZ = concMaxZ - 1.45;
+      shX = concMinX + 7.8;
+      shZ = concMaxZ - 1.45;
       addAtlasBox(bStall, 2.4, 2.55, 2.1, shX, 1.28, shZ, 0, null, STALL_UV.shutter260);
       station._addCollider(shX - 1.2, 0, shZ - 1.1, shX + 1.2, 2.6, shZ + 1.1, 'metal');
     }
@@ -150,6 +554,8 @@
     const jakX = isIsland ? p1MaxX - 2.0 : concMinX + 3.8;
     const jakZ = isIsland ? -16.0 : concMaxZ - 1.8;
     addAtlasBox(bStall, 0.85, 2.05, 0.65, jakX, 1.02, jakZ, 0, null, STALL_UV.jaklingko);
+    const jakTrayZ = isIsland ? (jakZ + 0.44) : (jakZ - 0.44);
+    addBox(bSteelDark, 0.56, 0.04, 0.30, jakX, 1.02, jakTrayZ);
     station._addCollider(jakX - 0.45, 0, jakZ - 0.35, jakX + 0.45, 2.05, jakZ + 0.35, 'metal');
     const jakUsed = station._usedIds.has('jaklingko_kiosk');
     station.interactables.push({
@@ -158,6 +564,7 @@
       prompt: jakUsed ? '[E] Terminal JakLingko (Sudah Diambil)' : '[E] Top-Up KUE / JakLingko Terminal (+1 Magazin)',
       used: jakUsed
     });
+    placeFieldLogProp(station, ctx.root, 'jaklingko_kiosk', jakX, 1.045, jakTrayZ, isIsland ? 0.12 : Math.PI + 0.12, jakUsed);
 
     const cowX = isIsland ? p1MaxX - 2.0 : concMinX + 5.4;
     const cowZ = isIsland ? -13.5 : concMaxZ - 1.8;
@@ -233,12 +640,14 @@
     addBox(bSteelDark, 1.62, 0.58, 0.14, totemX, 1.54, totemZ);
     addAtlasQuad(bSign, 1.52, 0.48, totemX, 1.54, totemZ + 0.075, 0, 0, 0, SIGN_UV.routeMap);
     addAtlasQuad(bSign, 1.52, 0.48, totemX, 1.54, totemZ - 0.075, 0, Math.PI, 0, SIGN_UV.routeMap);
+    addBox(bSteelDark, 0.56, 0.05, 0.32, totemX, 1.04, totemZ - 0.16);
     station._addCollider(totemX - 0.86, 0, totemZ - 0.16, totemX + 0.86, 1.92, totemZ + 0.16, 'metal');
     station.interactables.push({
       id: 'route_totem', type: 'info', x: totemX, y: 1.2, z: totemZ,
       label: '[E] Periksa Peta Rute LRT Jabodebek',
       prompt: '[E] Periksa Peta Rute LRT Jabodebek', used: false
     });
+    placeFieldLogProp(station, ctx.root, 'route_totem', totemX, 1.07, totemZ - 0.16, Math.PI + 0.10, station._usedIds.has('route_totem'));
 
     for (let hz = -38; hz <= 38; hz += 38) {
       if (!isIsland && hz > concMinZ && hz < concMaxZ) continue;
@@ -326,6 +735,12 @@
 
     ctx.rotioX = rotioX;
     ctx.rotioZ = rotioZ;
+    ctx.indoX = indoX;
+    ctx.indoZ = indoZ;
+    ctx.lkX = lkX;
+    ctx.lkZ = lkZ;
+    ctx.shX = shX;
+    ctx.shZ = shZ;
     ctx.turnstileList = turnstileList;
     ctx.tubeCoords = tubeCoords;
   }
@@ -355,8 +770,10 @@
       concMinX, concMaxX, concMinZ, concMaxZ, concMidZ, cw,
       canopyMinX, canopySpanX, segs, getCanopyArchY,
       corridorMinX, corridorMaxX, depotMaxX, gardenMaxX,
-      jpoZ, jpoSpanMinX, jpoSpanMaxX, jpoCX, jpo2Z,
-      supX, supZ, rotioX, rotioZ, turnstileList, tubeCoords
+      jpoZ, jpoNearZ, jpoSpanMinX, jpoSpanMaxX, jpoCX, jpo2Z,
+      stairX, stairFootZ, cStairX, cStairFootZ, cStairTopZ,
+      supX, supZ, rotioX, rotioZ, indoX, indoZ, lkX, lkZ, shX, shZ,
+      turnstileList, tubeCoords
     } = ctx;
 
     if (doDestruct) {
@@ -539,10 +956,6 @@
       const brX = p1MinX + 2.8 + (k % 2) * 1.1;
       if (isInStairExclusion(brX, brZ, 0.8, 0.8)) continue;
       barricadePropSpecs.push({ x: brX, y: 0.39, z: brZ, sx: 1.20, sy: 0.78, sz: 0.20, rx: 0, ry: (rng() - 0.5) * 0.4, rz: 0, color: 0xffffff, halfH: 0.39, dynamic: true });
-    }
-    for (let t = 0; t < turnstileList.length; t++) {
-      const ts = turnstileList[t];
-      metalPropSpecs.push({ x: ts.x, y: 0.72, z: ts.z, sx: 0.46, sy: 0.14, sz: 0.46, rx: 0, ry: ts.yaw, rz: 0, color: 0xd6dade, halfH: 0.12, dynamic: false, interactId: ts.id });
     }
 
     const propBoxGeo = new THREE.BoxGeometry(1, 1, 1);
@@ -732,8 +1145,40 @@
 
     station._placeNormalizedModel('ammo_box', supX + 0.85, UPPER_FLOOR_Y, supZ, 0.25, 0.26);
 
+    // 3D Physical Field Log Paper / Manila Folder Props at Station Note Counters
+    if (isCawang && ctx.cawangWreckX !== undefined) {
+      const cabBoxGeo = new THREE.BoxGeometry(0.38, 0.42, 0.34);
+      const cabBoxMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.55, metalness: 0.6 });
+      station.disposableGeometries.push(cabBoxGeo);
+      station.disposableMaterials.push(cabBoxMat);
+      const cabBox = new THREE.Mesh(cabBoxGeo, cabBoxMat);
+      cabBox.position.set(ctx.cawangWreckX - 1.58, 0.21, -10.5);
+      cabBox.receiveShadow = true;
+      root.add(cabBox);
+      placeFieldLogProp(station, root, 'cawang_derelict_cab', ctx.cawangWreckX - 1.58, 0.425, -10.5, 0.22, station._usedIds.has('cawang_derelict_cab'));
+    }
+    if (arch.hasGardenTerrace) {
+      const gCX = (track2X + 1.85 + gardenMaxX) * 0.5;
+      placeFieldLogProp(station, root, 'garden_supply', gCX, 0.855, -47.8, 0.12, station._usedIds.has('garden_supply'));
+    }
+    if (arch.hasDepotShed) {
+      placeFieldLogProp(station, root, 'depot_supply', depotMaxX - 1.2, 1.16, 54.0, -Math.PI * 0.5 + 0.14, station._usedIds.has('depot_supply'));
+    }
+    if (arch.id === 'setiabudi') {
+      const relBoxGeo = new THREE.BoxGeometry(0.46, 0.82, 0.40);
+      const relBoxMat = new THREE.MeshStandardMaterial({ color: 0x2a3340, roughness: 0.48, metalness: 0.65 });
+      station.disposableGeometries.push(relBoxGeo);
+      station.disposableMaterials.push(relBoxMat);
+      const relBox = new THREE.Mesh(relBoxGeo, relBoxMat);
+      relBox.position.set(supX + 1.8, UPPER_FLOOR_Y + 0.41, supZ);
+      relBox.receiveShadow = true;
+      root.add(relBox);
+      station._addCollider(supX + 1.55, UPPER_FLOOR_Y, supZ - 0.22, supX + 2.05, UPPER_FLOOR_Y + 0.85, supZ + 0.22, 'metal');
+      placeFieldLogProp(station, root, 'setiabudi_jpo_switch', supX + 1.8, UPPER_FLOOR_Y + 0.825, supZ, 0.15, station._usedIds.has('setiabudi_jpo_switch'));
+    }
+
     // =========================================================
-    // 9B. TACTICAL LOOTBOX CRATES (2 PER STATION — Hinged Lid & Yellow Halo)
+    // 9B. CURATED STRATEGIC TACTICAL LOOTBOX CRATES (2-3 PER STATION)
     // =========================================================
     station._lootboxGlows = new Map();
     station._lootboxVisuals = [];
@@ -769,16 +1214,126 @@
       });
     };
 
-    const balLootX = isIsland ? (jpoCX - 1.8) : (concMinX + 1.2);
-    const balLootZ = isIsland ? (jpoZ + 1.2) : (concMidZ - 4.0);
-    placeLootbox('station_balcony_lootbox', balLootX, UPPER_FLOOR_Y, balLootZ, isIsland ? 0.0 : Math.PI * 0.5, 0.30, 'Peti Taktis Balkon');
+    const isLootboxSocketValid = (lx, ly, lz) => {
+      if (ly < UPPER_FLOOR_Y - 0.5 && isInStairExclusion(lx, lz, 0.75, 0.75)) return false;
+      for (let i = 0; i < station.interactables.length; i++) {
+        const it = station.interactables[i];
+        if (!it) continue;
+        if (Math.abs((it.y || 0) - (ly + 0.55)) < 1.2 && Math.hypot(it.x - lx, it.z - lz) < 1.55) {
+          return false;
+        }
+      }
+      let hasFloor = false;
+      for (let i = 0; i < station.colliders.length; i++) {
+        const c = station.colliders[i];
+        if (!c || c.disabled) continue;
+        if (c.isFloor || c.tag === 'floor') {
+          if (lx - 0.45 >= c.minX && lx + 0.45 <= c.maxX && lz - 0.45 >= c.minZ && lz + 0.45 <= c.maxZ) {
+            if (Math.abs(c.maxY - ly) <= 0.15) hasFloor = true;
+          }
+          continue;
+        }
+        if (c.isRamp || c.tag === 'ramp') {
+          if (lx + 0.65 > c.minX && lx - 0.65 < c.maxX && lz + 0.65 > c.minZ && lz - 0.65 < c.maxZ) {
+            if (c.maxY > ly + 0.05 && c.minY < ly + 1.5) return false;
+          }
+          continue;
+        }
+        if (!c.blocksWalk || c.tag === 'interact') continue;
+        if (c.maxY <= ly + 0.06 || c.minY >= ly + 1.25) continue;
+        if (lx + 0.62 > c.minX && lx - 0.62 < c.maxX && lz + 0.62 > c.minZ && lz - 0.62 < c.maxZ) {
+          return false;
+        }
+      }
+      return hasFloor;
+    };
 
-    const farLootX = arch.hasDepotShed ? (depotMaxX - 1.6)
-      : (isCawang ? (i2MaxX - 2.0) : (isIsland ? (p1MaxX - 2.2) : (p2MinX + 1.8)));
-    const farLootZ = arch.hasDepotShed ? 58.2
-      : (isCawang ? -46.0 : (isIsland ? 52.0 : -52.0));
-    const farLootRy = (!isIsland && !arch.hasDepotShed) ? Math.PI * 0.5 : -Math.PI * 0.5;
-    placeLootbox('station_far_lootbox', farLootX, 0.0, farLootZ, farLootRy, 0.65, arch.hasDepotShed ? 'Peti Taktis Depot' : 'Peti Taktis Peron 2');
+    const socketPool = [];
+    if (!isIsland) {
+      socketPool.push(
+        { id: 'sock_loket_corner', x: concMaxX - 2.6, y: 0.0, z: concMinZ + 1.25, ry: 0.0, riskLuck: 0.40, title: 'Peti Taktis Sudut Loket' },
+        { id: 'sock_under_jpo_stair', x: p1MinX + 1.25, y: 0.0, z: jpoZ > 0 ? jpoNearZ - 1.4 : jpoNearZ + 1.4, ry: Math.PI * 0.5, riskLuck: 0.44, title: 'Peti Taktis Bawah JPO' },
+        { id: 'sock_jpo_west_overlook', x: -9.8, y: UPPER_FLOOR_Y, z: jpoZ + (jpoZ > 0 ? 1.2 : -1.2), ry: 0.0, riskLuck: 0.52, title: 'Peti Taktis JPO Barat' },
+        { id: 'sock_balcony_overlook', x: concMinX + 1.25, y: UPPER_FLOOR_Y, z: concMidZ - 4.2, ry: Math.PI * 0.5, riskLuck: 0.32, title: 'Peti Taktis Balkon Concourse' },
+        { id: 'sock_p2_far_south', x: p2MinX + 1.4, y: 0.0, z: platMinZ + 9.5, ry: Math.PI * 0.5, riskLuck: 0.70, title: 'Peti Taktis Ujung Peron 2' },
+        { id: 'sock_p2_far_north', x: p2MinX + 1.4, y: 0.0, z: platMaxZ - 11.5, ry: Math.PI * 0.5, riskLuck: 0.64, title: 'Peti Taktis Peron 2 Utara' },
+        { id: 'sock_concourse_shutter', x: concMinX + 1.4, y: 0.0, z: concMaxZ - 2.4, ry: Math.PI * 0.5, riskLuck: 0.36, title: 'Peti Taktis Sudut Concourse' }
+      );
+      if (arch.id === 'cikoko' || arch.hasTollOverpass) {
+        socketPool.push({ id: 'sock_cikoko_skywalk', x: p1MaxX - 1.3, y: 0.0, z: platMinZ + 9.0, ry: -Math.PI * 0.5, riskLuck: 0.74, title: 'Peti Taktis Sayap Cikoko' });
+      } else if (jpo2Z !== null) {
+        socketPool.push({ id: 'sock_jpo2_span', x: -5.2, y: UPPER_FLOOR_Y, z: jpo2Z, ry: 0.0, riskLuck: 0.60, title: 'Peti Taktis JPO Sekunder' });
+      }
+    } else if (isCawang) {
+      socketPool.push(
+        { id: 'sock_cawang_i1_alcove', x: p1MaxX - 1.8, y: 0.0, z: -48.0, ry: -Math.PI * 0.5, riskLuck: 0.52, title: 'Peti Taktis Peron 1 Cawang' },
+        { id: 'sock_cawang_i1_north', x: p1MinX + 2.2, y: 0.0, z: platMaxZ - 10.0, ry: Math.PI * 0.5, riskLuck: 0.56, title: 'Peti Taktis Ujung Utara Cawang' },
+        { id: 'sock_cawang_jpo_mezz', x: jpoCX + 2.0, y: UPPER_FLOOR_Y, z: jpoZ + 5.5, ry: Math.PI, riskLuck: 0.40, title: 'Peti Taktis Mezzanine JPO Cawang' },
+        { id: 'sock_cawang_jpo_east', x: i2MinX + 2.2, y: UPPER_FLOOR_Y, z: jpoZ - 6.0, ry: 0.0, riskLuck: 0.48, title: 'Peti Taktis Skybridge Cawang' },
+        { id: 'sock_cawang_wreck_near', x: i2MaxX - 2.0, y: 0.0, z: -12.0, ry: -Math.PI * 0.5, riskLuck: 0.74, title: 'Peti Taktis Bangkai Kereta Cawang' },
+        { id: 'sock_cawang_wreck_opp', x: i2MaxX - 2.0, y: 0.0, z: -48.0, ry: -Math.PI * 0.5, riskLuck: 0.68, title: 'Peti Taktis Ujung Peron 4 Cawang' },
+        { id: 'sock_cawang_i2_north', x: i2MinX + 2.2, y: 0.0, z: 48.0, ry: Math.PI * 0.5, riskLuck: 0.62, title: 'Peti Taktis Peron 4 Utara Cawang' }
+      );
+    } else if (arch.hasDepotShed) {
+      socketPool.push(
+        { id: 'sock_harja_depot_deep', x: depotMaxX - 2.5, y: 0.0, z: 58.5, ry: -Math.PI * 0.5, riskLuck: 0.78, title: 'Peti Taktis Gudang Depo' },
+        { id: 'sock_harja_depot_west', x: -4.2, y: 0.0, z: 45.0, ry: Math.PI * 0.5, riskLuck: 0.64, title: 'Peti Taktis Jalur Barat Depo' },
+        { id: 'sock_harja_garden_corner', x: gardenMaxX - 2.4, y: 0.0, z: -48.5, ry: -Math.PI * 0.5, riskLuck: 0.72, title: 'Peti Taktis Sudut Kebun Atap' },
+        { id: 'sock_harja_garden_north', x: track2X + 4.2, y: 0.0, z: -18.5, ry: Math.PI, riskLuck: 0.54, title: 'Peti Taktis Teras Kebun Utara' },
+        { id: 'sock_harja_south_term', x: (p1MinX + p1MaxX) * 0.5, y: 0.0, z: platMinZ + 9.0, ry: 0.0, riskLuck: 0.58, title: 'Peti Taktis Terminus Harjamukti' },
+        { id: 'sock_harja_jpo_deck', x: jpoCX - 1.8, y: UPPER_FLOOR_Y, z: jpoZ + 1.2, ry: 0.0, riskLuck: 0.36, title: 'Peti Taktis JPO Harjamukti' },
+        { id: 'sock_harja_rotio_back', x: (p1MinX + p1MaxX) * 0.5, y: 0.0, z: rotioZ - 2.35, ry: Math.PI, riskLuck: 0.40, title: 'Peti Taktis Kios Harjamukti' }
+      );
+    } else {
+      // ISLAND_CENTRAL (Setiabudi)
+      socketPool.push(
+        { id: 'sock_island_rotio_spine', x: (p1MinX + p1MaxX) * 0.5, y: 0.0, z: rotioZ - 2.35, ry: Math.PI, riskLuck: 0.36, title: "Peti Taktis Belakang Roti'O" },
+        { id: 'sock_island_indo_spine', x: p1MinX + 2.2, y: 0.0, z: indoZ + 1.5, ry: Math.PI * 0.5, riskLuck: 0.42, title: 'Peti Taktis Sayap Indomaret' },
+        { id: 'sock_island_south_bay', x: (p1MinX + p1MaxX) * 0.5, y: 0.0, z: platMinZ + 8.5, ry: 0.0, riskLuck: 0.68, title: 'Peti Taktis Ujung Selatan Setiabudi' },
+        { id: 'sock_island_north_bay', x: p1MaxX - 2.0, y: 0.0, z: platMaxZ - 9.5, ry: -Math.PI * 0.5, riskLuck: 0.64, title: 'Peti Taktis Ujung Utara Setiabudi' },
+        { id: 'sock_island_jpo_relay', x: jpoCX - 2.0, y: UPPER_FLOOR_Y, z: jpoZ + 1.2, ry: 0.0, riskLuck: 0.46, title: 'Peti Taktis Relai JPO Setiabudi' },
+        { id: 'sock_island_mid_east', x: p1MaxX - 1.7, y: 0.0, z: -26.0, ry: -Math.PI * 0.5, riskLuck: 0.50, title: 'Peti Taktis Peron Timur Setiabudi' }
+      );
+      if (jpo2Z !== null) {
+        socketPool.push({ id: 'sock_island_jpo2', x: p1MinX + 2.4, y: UPPER_FLOOR_Y, z: jpo2Z, ry: Math.PI * 0.5, riskLuck: 0.58, title: 'Peti Taktis JPO Selatan' });
+      }
+    }
+
+    const validSockets = [];
+    for (let i = 0; i < socketPool.length; i++) {
+      const sk = socketPool[i];
+      if (isLootboxSocketValid(sk.x, sk.y, sk.z)) validSockets.push(sk);
+    }
+    // Deterministic Fisher-Yates shuffle seeded by station rng
+    for (let i = validSockets.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      const tmpSk = validSockets[i];
+      validSockets[i] = validSockets[j];
+      validSockets[j] = tmpSk;
+    }
+
+    const crateTarget = rng() < 0.45 ? 3 : 2;
+    const chosenSockets = [];
+    const lowRiskPick = validSockets.find((s) => s.riskLuck < 0.52);
+    const highRiskPick = validSockets.find((s) => s.riskLuck >= 0.52 && s !== lowRiskPick);
+    if (lowRiskPick) chosenSockets.push(lowRiskPick);
+    if (highRiskPick && chosenSockets.length < crateTarget) chosenSockets.push(highRiskPick);
+    for (let i = 0; i < validSockets.length && chosenSockets.length < crateTarget; i++) {
+      const cand = validSockets[i];
+      if (chosenSockets.indexOf(cand) >= 0) continue;
+      const tooClose = chosenSockets.some((sel) => Math.hypot(sel.x - cand.x, sel.z - cand.z) < 8.0 && Math.abs(sel.y - cand.y) < 1.5);
+      if (!tooClose) chosenSockets.push(cand);
+    }
+    if (chosenSockets.length > 0) {
+      for (let i = 0; i < chosenSockets.length; i++) {
+        const sk = chosenSockets[i];
+        placeLootbox('station_' + sk.id, sk.x, sk.y, sk.z, sk.ry, sk.riskLuck, sk.title);
+      }
+    } else {
+      const balLootX = isIsland ? (jpoCX - 1.8) : (concMinX + 1.2);
+      const balLootZ = isIsland ? (jpoZ + 1.2) : (concMidZ - 4.0);
+      placeLootbox('station_balcony_lootbox', balLootX, UPPER_FLOOR_Y, balLootZ, isIsland ? 0.0 : Math.PI * 0.5, 0.30, 'Peti Taktis Balkon');
+    }
 
     station.explosiveBarrels = [];
     station._barrelCueVisual = null;
@@ -1122,8 +1677,50 @@
     station._buildSpatialGrid();
 
     // =========================================================
-    // 12. GENERATE ZOMBIE SPAWN NODES (STATION + CITY STREETS)
+    // 12. GENERATE ZOMBIE SPAWN NODES (STATION + CONCEALED POCKETS + CITY STREETS)
     // =========================================================
+    const isNavPointClear = (nx, ny, nz) => {
+      if (!station.spatialGrid) return true;
+      const near = station.spatialGrid.queryPoint(nx, nz, 0.55);
+      let hasFloor = false;
+      const rad = 0.36;
+      for (let k = 0; k < near.length; k++) {
+        const c = near[k];
+        if (!c || c.broken || c.disabled || c.blocksWalk === false || c.isTrigger) continue;
+        const tag = c.tag || '';
+        const floorLike = c.isFloor || c.isRamp || tag === 'floor' || tag === 'ramp' || tag === 'stair' || tag === 'stairs';
+        if (floorLike) {
+          if (nx >= c.minX - 0.15 && nx <= c.maxX + 0.15 && nz >= c.minZ - 0.15 && nz <= c.maxZ + 0.15) {
+            if (c.maxY >= ny - 0.65 && c.minY <= ny + 0.55) hasFloor = true;
+          }
+          continue;
+        }
+        if (tag === 'interact') continue;
+        if (c.maxY <= ny + 0.42 || c.minY >= ny + 1.55) continue;
+        const cx = Math.max(c.minX, Math.min(nx, c.maxX));
+        const cz = Math.max(c.minZ, Math.min(nz, c.maxZ));
+        if ((nx - cx) * (nx - cx) + (nz - cz) * (nz - cz) < rad * rad) return false;
+      }
+      return hasFloor;
+    };
+
+    const isConcealedPocketClear = (nx, ny, nz) => {
+      if (ny < UPPER_FLOOR_Y - 0.5 && isInStairExclusion(nx, nz, 0.45, 0.45)) return false;
+      if (!isNavPointClear(nx, ny, nz)) return false;
+      if (!station.spatialGrid) return true;
+      const near = station.spatialGrid.queryPoint(nx, nz, 0.65);
+      for (let k = 0; k < near.length; k++) {
+        const c = near[k];
+        if (!c || c.disabled) continue;
+        if (c.isRamp || c.tag === 'ramp') {
+          if (nx + 0.5 > c.minX && nx - 0.5 < c.maxX && nz + 0.5 > c.minZ && nz - 0.5 < c.maxZ) {
+            if (c.maxY > ny + 0.05 && c.minY < ny + 1.6) return false;
+          }
+        }
+      }
+      return true;
+    };
+
     station.spawnNodes = [];
     const candidateZones = [
       { x: p1MinX + 2.5, z: platMinZ + 8, zone: 'platform_south' },
@@ -1167,6 +1764,86 @@
     }
     if (jpo2Z !== null) candidateZones.push({ x: p1MinX + 2.8, z: jpo2Z, y: UPPER_FLOOR_Y, zone: 'jpo2' });
 
+    // Curated Concealed Close Station Spawn Pockets (14m-32m from platform center)
+    const concealedCandidates = [
+      // Behind far platform pillars & under JPO blind spots
+      { x: p1MaxX - 1.35, y: 0.0, z: -22.0, zone: 'concealed_station' },
+      { x: p1MaxX - 1.35, y: 0.0, z: 22.0, zone: 'concealed_station' },
+      { x: p1MinX + 1.85, y: 0.0, z: -28.0, zone: 'concealed_station' },
+      { x: p1MinX + 1.85, y: 0.0, z: 28.0, zone: 'concealed_station' },
+      { x: p1MinX + 1.65, y: 0.0, z: jpoZ, zone: 'stairwell_pocket' },
+      { x: jpoCX, y: UPPER_FLOOR_Y, z: jpoZ, zone: 'stairwell_pocket' }
+    ];
+    if (jpo2Z !== null) {
+      concealedCandidates.push(
+        { x: p1MinX + 2.2, y: 0.0, z: jpo2Z, zone: 'concealed_station' },
+        { x: p1MaxX - 1.5, y: 0.0, z: jpo2Z, zone: 'concealed_station' }
+      );
+    }
+    if (!isIsland) {
+      // Behind Roti'O / Indomaret service wings, concourse corners/shutters & beneath stairwell landings
+      concealedCandidates.push(
+        { x: rotioX + 3.0, y: 0.0, z: rotioZ + 1.2, zone: 'concourse' },
+        { x: concMinX + 1.8, y: 0.0, z: rotioZ + 2.6, zone: 'concealed_station' },
+        { x: indoX - 2.6, y: 0.0, z: indoZ - 2.2, zone: 'concourse' },
+        { x: shX - 2.4, y: 0.0, z: shZ - 1.8, zone: 'concealed_station' },
+        { x: concMinX + 1.6, y: 0.0, z: concMaxZ - 2.2, zone: 'concealed_station' },
+        { x: concMaxX - 2.6, y: 0.0, z: concMinZ + 1.4, zone: 'concourse' },
+        { x: concMaxX - 4.8, y: 0.0, z: cStairFootZ, zone: 'stairwell_pocket' },
+        { x: concMaxX - 4.8, y: 0.0, z: cStairTopZ, zone: 'stairwell_pocket' },
+        { x: p1MinX + 1.4, y: 0.0, z: stairFootZ + (jpoZ >= 0 ? -2.2 : 2.2), zone: 'stairwell_pocket' },
+        { x: (p2MinX + p2MaxX) * 0.5, y: 0.0, z: -22.0, zone: 'concealed_station' },
+        { x: (p2MinX + p2MaxX) * 0.5, y: 0.0, z: 22.0, zone: 'concealed_station' },
+        { x: p2MinX + 1.4, y: 0.0, z: -15.0, zone: 'concealed_station' },
+        { x: p2MinX + 1.4, y: 0.0, z: 15.0, zone: 'concealed_station' }
+      );
+    } else {
+      // Behind Roti'O / Indomaret spine & stairwell pockets on Island platforms
+      concealedCandidates.push(
+        { x: rotioX - 2.8, y: 0.0, z: rotioZ - 2.0, zone: 'concealed_station' },
+        { x: rotioX + 2.8, y: 0.0, z: rotioZ - 2.0, zone: 'concealed_station' },
+        { x: indoX - 3.0, y: 0.0, z: indoZ + 2.2, zone: 'concealed_station' },
+        { x: indoX + 3.0, y: 0.0, z: indoZ + 2.2, zone: 'concealed_station' },
+        { x: p1MaxX - 1.6, y: 0.0, z: -16.0, zone: 'concealed_station' },
+        { x: p1MaxX - 1.6, y: 0.0, z: 16.0, zone: 'concealed_station' },
+        { x: p1MinX + 2.0, y: 0.0, z: stairFootZ + (jpoZ >= 0 ? -2.2 : 2.2), zone: 'stairwell_pocket' }
+      );
+      if (isCawang) {
+        concealedCandidates.push(
+          { x: i2MaxX - 1.8, y: 0.0, z: -22.0, zone: 'concealed_station' },
+          { x: i2MaxX - 1.8, y: 0.0, z: 26.0, zone: 'concealed_station' },
+          { x: i2MinX + 2.0, y: 0.0, z: -18.0, zone: 'concealed_station' },
+          { x: i2MinX + 2.0, y: 0.0, z: 20.0, zone: 'concealed_station' }
+        );
+      }
+      if (arch.hasDepotShed) {
+        concealedCandidates.push(
+          { x: track2X + 3.6, y: 0.0, z: 38.0, zone: 'concealed_station' },
+          { x: -4.0, y: 0.0, z: 40.0, zone: 'concealed_station' }
+        );
+      }
+      if (arch.hasGardenTerrace) {
+        concealedCandidates.push(
+          { x: track2X + 5.2, y: 0.0, z: -28.0, zone: 'concealed_station' },
+          { x: track2X + 7.2, y: 0.0, z: -22.0, zone: 'concealed_station' }
+        );
+      }
+    }
+
+    const jitterOffsets = [[0, 0], [0.85, 0], [-0.85, 0], [0, 0.85], [0, -0.85]];
+    for (let ci = 0; ci < concealedCandidates.length; ci++) {
+      const cc = concealedCandidates[ci];
+      const cy = cc.y !== undefined ? cc.y : 0.0;
+      for (let oi = 0; oi < jitterOffsets.length; oi++) {
+        const tx = cc.x + jitterOffsets[oi][0];
+        const tz = cc.z + jitterOffsets[oi][1];
+        if (isConcealedPocketClear(tx, cy, tz)) {
+          candidateZones.push({ x: tx, y: cy, z: tz, zone: cc.zone, _validated: true });
+          break;
+        }
+      }
+    }
+
     if (LRT.City && typeof LRT.City.getSpawnNodes === 'function') {
       const citySpawns = LRT.City.getSpawnNodes();
       for (let i = 0; i < citySpawns.length; i++) candidateZones.push(citySpawns[i]);
@@ -1175,6 +1852,10 @@
     for (let i = 0; i < candidateZones.length; i++) {
       const n = candidateZones[i];
       const ny = n.y !== undefined ? n.y : 0.0;
+      if (n._validated) {
+        station.spawnNodes.push({ x: n.x, y: ny, z: n.z, zone: n.zone });
+        continue;
+      }
       const nearby = station.spatialGrid.queryPoint(n.x, n.z, 0.55);
       let blocked = false;
       for (let j = 0; j < nearby.length; j++) {
@@ -1192,30 +1873,6 @@
     // =========================================================
     // 13. MULTI-LEVEL & OPEN-STREET WAYPOINT NAVGRAPH (A* READY)
     // =========================================================
-    const isNavPointClear = (nx, ny, nz) => {
-      if (!station.spatialGrid) return true;
-      const near = station.spatialGrid.queryPoint(nx, nz, 0.55);
-      let hasFloor = false;
-      const rad = 0.36;
-      for (let k = 0; k < near.length; k++) {
-        const c = near[k];
-        if (!c || c.broken || c.disabled || c.blocksWalk === false || c.isTrigger) continue;
-        const tag = c.tag || '';
-        const floorLike = c.isFloor || c.isRamp || tag === 'floor' || tag === 'ramp' || tag === 'stair' || tag === 'stairs';
-        if (floorLike) {
-          if (nx >= c.minX - 0.15 && nx <= c.maxX + 0.15 && nz >= c.minZ - 0.15 && nz <= c.maxZ + 0.15) {
-            if (c.maxY >= ny - 0.65 && c.minY <= ny + 0.55) hasFloor = true;
-          }
-          continue;
-        }
-        if (tag === 'interact') continue;
-        if (c.maxY <= ny + 0.42 || c.minY >= ny + 1.55) continue;
-        const cx = Math.max(c.minX, Math.min(nx, c.maxX));
-        const cz = Math.max(c.minZ, Math.min(nz, c.maxZ));
-        if ((nx - cx) * (nx - cx) + (nz - cz) * (nz - cz) < rad * rad) return false;
-      }
-      return hasFloor;
-    };
     const addSafeNavNode = (x, y, z, tag, tol) => {
       if (isNavPointClear(x, y, z)) return addNavNode(x, y, z, tag, tol);
       const offsets = [[0.9, 0], [-0.9, 0], [0, 0.9], [0, -0.9], [1.4, 0], [-1.4, 0]];

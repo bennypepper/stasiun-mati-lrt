@@ -10,6 +10,8 @@
   let subtitleTimer = 0;
   let logTimer = 0;
   let currentBrightness = 1.0;
+  let pausedByDocViewer = false;
+  let docViewerFromPause = false;
 
   let creditsRafId = 0;
   let creditsLastTs = 0;
@@ -93,8 +95,11 @@
       'fps-readout', 'crosshair', 'hitmarker', 'hud-notice', 'interact-prompt',
       'interact-label', 'hud-subtitle-box', 'subtitle-speaker', 'subtitle-text-id', 'subtitle-text-en',
       'hud-log-banner', 'log-title', 'log-body',
+      'document-viewer-modal', 'doc-viewer-sheet', 'doc-viewer-kicker', 'doc-viewer-submeta',
+      'doc-viewer-stamp', 'doc-viewer-title', 'doc-viewer-body', 'btn-doc-close-x', 'btn-doc-close',
       'vitals-card', 'hp-value', 'hp-bar-fill', 'armor-row', 'armor-value', 'armor-bar-fill',
-      'cheat-console', 'cheat-input', 'cheat-status-row', 'cheat-pill-god', 'cheat-pill-sprint',
+      'cheat-console', 'cheat-input', 'btn-cheat-apply', 'cheat-status-row',
+      'cheat-pill-god', 'cheat-god-timer', 'cheat-god-bar', 'cheat-pill-sprint',
       'pill-flashlight', 'pill-lighting', 'pill-hud',
       'pill-mute', 'weapon-name', 'weapon-skin-tag', 'ammo-mag', 'ammo-reserve', 'weapon-slots',
       'menu-overlay', 'pause-overlay', 'gameover-overlay', 'gameover-stats',
@@ -106,6 +111,7 @@
       'btn-resume', 'btn-restart-mode', 'btn-back-menu', 'btn-retry', 'btn-gameover-menu',
       'btn-menu-mute', 'btn-pause-mute',
       'menu-difficulty-group', 'pause-difficulty-group',
+      'menu-atmosphere-group', 'pause-atmosphere-group',
       'menu-quality-group', 'pause-quality-group',
       'menu-resscale-group', 'pause-resscale-group',
       'btn-menu-shadows', 'btn-pause-shadows',
@@ -240,35 +246,162 @@
     }
     for (let i = logs.length - 1; i >= 0; i--) {
       const item = logs[i];
-      const row = document.createElement('div');
+      const fileNum = i + 1;
+      const row = document.createElement('button');
+      row.type = 'button';
       row.className = 'pause-log-entry';
-      const tEl = document.createElement('div');
+
+      const head = document.createElement('div');
+      head.className = 'pause-log-head';
+      const tEl = document.createElement('span');
       tEl.className = 'pause-log-title';
-      tEl.textContent = item.title || 'FIELD NOTE';
+      tEl.textContent = `#${String(fileNum).padStart(2, '0')} · ${item.title || 'FIELD NOTE'}`;
+      const openEl = document.createElement('span');
+      openEl.className = 'pause-log-open';
+      openEl.textContent = '[BACA]';
+      head.appendChild(tEl);
+      head.appendChild(openEl);
+
       const bEl = document.createElement('div');
       bEl.className = 'pause-log-body';
       bEl.textContent = item.body || '';
-      row.appendChild(tEl);
+
+      row.appendChild(head);
       row.appendChild(bEl);
+      row.addEventListener('click', () => {
+        openDocViewer(item.title, item.body, {
+          fromPause: true,
+          fileNum,
+          stationIndex: item.stationIndex
+        });
+      });
       listEl.appendChild(row);
     }
   }
 
-  function showFieldLog(title, body, durationSec) {
+  function resolveDocFileMeta(title, opts) {
+    const o = opts || {};
+    const logs = (I.core && I.core.campaignState && Array.isArray(I.core.campaignState.collectedLogs))
+      ? I.core.campaignState.collectedLogs
+      : [];
+    let fileNum = typeof o.fileNum === 'number' && o.fileNum > 0 ? o.fileNum : 0;
+    if (!fileNum && title) {
+      const idx = logs.findIndex((l) => l && l.title === title);
+      if (idx >= 0) fileNum = idx + 1;
+    }
+    if (!fileNum) fileNum = Math.max(1, logs.length || 1);
+
+    let stationLabel = o.stationName || '';
+    if (!stationLabel && typeof o.stationIndex === 'number' && Array.isArray(C.STATIONS) && C.STATIONS[o.stationIndex]) {
+      stationLabel = C.STATIONS[o.stationIndex].name || '';
+    }
+    if (!stationLabel && dom['hud-station-name']) {
+      stationLabel = dom['hud-station-name'].textContent || '';
+    }
+    return {
+      fileLabel: String(fileNum).padStart(2, '0'),
+      stationLabel: stationLabel ? stationLabel.toUpperCase() : 'LRT JABODEBEK'
+    };
+  }
+
+  function openDocViewer(title, body, opts) {
+    const o = opts || {};
+    const modal = dom['document-viewer-modal'];
+    if (!modal) return false;
+
+    hideFieldLog();
+    if (PL.closeCheatConsole) PL.closeCheatConsole(false);
+
+    docViewerFromPause = !!o.fromPause;
+    if (!docViewerFromPause) {
+      pausedByDocViewer = !PL.flags.paused;
+      if (PL.suppressPauseAfterUnlock) PL.suppressPauseAfterUnlock(900);
+      LRT.PlayerUI.setPaused(true, false);
+      if (PL.callbacks && PL.callbacks.onWeaponShootUp) PL.callbacks.onWeaponShootUp();
+      if (PL.releaseLock) PL.releaseLock();
+    } else {
+      pausedByDocViewer = false;
+    }
+
+    const meta = resolveDocFileMeta(title, o);
+    if (dom['doc-viewer-kicker']) {
+      dom['doc-viewer-kicker'].textContent = `ARSIP DOKUMEN // FILE #${meta.fileLabel}`;
+    }
+    if (dom['doc-viewer-submeta']) {
+      dom['doc-viewer-submeta'].textContent = `${meta.stationLabel} · CATATAN LAPANGAN`;
+    }
+    if (dom['doc-viewer-stamp']) {
+      dom['doc-viewer-stamp'].textContent = docViewerFromPause ? 'ARSIP LOG // SALINAN' : 'TERCATAT // ARSIP';
+    }
+    if (dom['doc-viewer-title']) {
+      dom['doc-viewer-title'].textContent = title || 'CATATAN LAPANGAN // FIELD NOTE';
+    }
+    if (dom['doc-viewer-body']) {
+      dom['doc-viewer-body'].textContent = body || '';
+    }
+    const bodyWrap = modal.querySelector('.doc-body-wrap');
+    if (bodyWrap) bodyWrap.scrollTop = 0;
+
+    if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+      LRT.Audio.play('paper_rustle', { gain: 0.78, pitchVar: 0.04 });
+    }
+
+    PL.state.docViewerOpen = true;
+    modal.classList.remove('hidden');
+    return true;
+  }
+
+  function closeDocViewer(refocusGame, silent) {
+    const modal = dom['document-viewer-modal'];
+    const wasOpen = !!(PL.state && PL.state.docViewerOpen);
+    if (PL.state) PL.state.docViewerOpen = false;
+    if (modal) modal.classList.add('hidden');
+
+    const fromPause = docViewerFromPause;
+    const shouldUnpause = pausedByDocViewer;
+    docViewerFromPause = false;
+    pausedByDocViewer = false;
+
+    if (!wasOpen) return false;
+
+    if (!silent && LRT.Audio && typeof LRT.Audio.play === 'function') {
+      LRT.Audio.play('paper_rustle', { gain: 0.66, pitchVar: 0.06 });
+    }
+    for (const k of Object.keys(PL.keys)) PL.keys[k] = false;
+
+    if (!fromPause) {
+      if (shouldUnpause) {
+        if (PL.suppressPauseAfterUnlock) PL.suppressPauseAfterUnlock(900);
+        LRT.PlayerUI.setPaused(false, true);
+      }
+      if (refocusGame !== false && PL.flags.allowActionInput && !PL.flags.paused) {
+        if (PL.relockAfterOverlay) PL.relockAfterOverlay();
+        else if (PL.requestLock) PL.requestLock();
+      }
+    }
+    return true;
+  }
+
+  function showFieldLog(title, body, opts) {
+    const o = (typeof opts === 'number') ? { durationSec: opts } : (opts || {});
     if (I.core && typeof I.core.recordFieldLog === 'function') {
       I.core.recordFieldLog(title, body);
     }
-    const banner = dom['hud-log-banner'];
-    if (!banner) return;
     if (dom['log-title']) {
       dom['log-title'].textContent = title || 'CATATAN LAPANGAN // FIELD NOTE';
     }
     if (dom['log-body']) {
       dom['log-body'].textContent = body || '';
     }
-    banner.classList.remove('hidden');
-    banner.style.opacity = '1';
-    logTimer = Math.max(2.0, typeof durationSec === 'number' ? durationSec : 8.0);
+    if (o.noModal) {
+      const banner = dom['hud-log-banner'];
+      if (!banner) return;
+      banner.classList.remove('hidden');
+      banner.style.opacity = '1';
+      logTimer = Math.max(2.0, typeof o.durationSec === 'number' ? o.durationSec : 8.0);
+      return;
+    }
+    openDocViewer(title, body, o);
   }
 
   function hideFieldLog() {
@@ -286,6 +419,7 @@
       DAYLIGHT_CLEAR: 'DAYLIGHT',
       DAYLIGHT_OVERCAST: 'OVERCAST',
       GOLDEN_DUSK: 'GOLDEN HOUR',
+      AMBER_SUNSET: 'AMBER SUNSET',
       BLACKOUT_EMERGENCY: 'NIGHT BLACKOUT',
       CRIMSON_BLOOD_MOON: 'BLOOD MOON',
       MONSOON_OVERCAST: 'MONSOON NIGHT',
@@ -296,6 +430,7 @@
       DAYLIGHT_CLEAR: 'DAY',
       DAYLIGHT_OVERCAST: 'CLOUD',
       GOLDEN_DUSK: 'DUSK',
+      AMBER_SUNSET: 'SUNSET',
       BLACKOUT_EMERGENCY: 'NIGHT',
       CRIMSON_BLOOD_MOON: 'BLOOD',
       MONSOON_OVERCAST: 'STORM',
@@ -304,7 +439,7 @@
     };
     const btnText = labelMap[key] || (moodObj && moodObj.name) || key;
     const pillShort = shortMap[key] || 'DAY';
-    const isDay = moodObj ? !!moodObj.isDaylight : (key.startsWith('DAY') || key.startsWith('GOLD'));
+    const isDay = moodObj ? !!moodObj.isDaylight : (key.startsWith('DAY') || key.startsWith('GOLD') || key.startsWith('AMBER'));
 
     if (dom['btn-menu-lighting']) dom['btn-menu-lighting'].textContent = btnText;
     if (dom['btn-pause-lighting']) dom['btn-pause-lighting'].textContent = btnText;
@@ -356,6 +491,11 @@
     syncTabGroup([dom['menu-difficulty-group'], dom['pause-difficulty-group']], 'difficulty', diffKey || 'medium');
   }
 
+  function syncAtmosphereUi(mode) {
+    const val = mode === 'daylight_outbreak' ? 'daylight_outbreak' : 'night_horror';
+    syncTabGroup([dom['menu-atmosphere-group'], dom['pause-atmosphere-group']], 'atmosphere', val);
+  }
+
   function syncResScaleUi(resKey) {
     syncTabGroup([dom['menu-resscale-group'], dom['pause-resscale-group']], 'resscale', resKey || 'floor_720');
   }
@@ -383,6 +523,7 @@
   function syncAllSettingsUi(settings) {
     const s = settings || {};
     syncDifficultyUi(s.difficultyKey || s.difficulty || 'medium');
+    syncAtmosphereUi(s.atmosphereMode || 'night_horror');
     syncQualityUi(s.qualityKey || s.quality || 'balanced');
     syncResScaleUi(s.resScaleMode || s.resScale || 'floor_720');
     syncShadowsUi(s.shadowsEnabled !== undefined ? s.shadowsEnabled : (s.shadows !== undefined ? s.shadows : true));
@@ -571,6 +712,32 @@
         }
       }, { passive: true });
     }
+    if (dom['cheat-input']) {
+      dom['cheat-input'].addEventListener('input', () => {
+        if (PL.stripCheatInputNoise) PL.stripCheatInputNoise(dom['cheat-input']);
+      });
+    }
+    if (dom['btn-cheat-apply']) {
+      dom['btn-cheat-apply'].addEventListener('click', () => {
+        const input = dom['cheat-input'];
+        const raw = PL.stripCheatInputNoise ? PL.stripCheatInputNoise(input) : (input ? input.value : '');
+        if (PL.closeCheatConsole) PL.closeCheatConsole(true);
+        if (raw && raw.trim() && PL.executeCheat) PL.executeCheat(raw);
+      });
+    }
+    if (dom['btn-doc-close-x']) {
+      dom['btn-doc-close-x'].addEventListener('click', () => closeDocViewer(true));
+    }
+    if (dom['btn-doc-close']) {
+      dom['btn-doc-close'].addEventListener('click', () => closeDocViewer(true));
+    }
+    if (dom['document-viewer-modal']) {
+      dom['document-viewer-modal'].addEventListener('click', (e) => {
+        if (e.target === dom['document-viewer-modal']) {
+          closeDocViewer(true);
+        }
+      });
+    }
   }
 
   function update(dt, worldCtx) {
@@ -629,6 +796,7 @@
     chPx: null,
     chAds: null,
     godText: null,
+    godPct: null,
     sprintActive: null
   };
 
@@ -863,23 +1031,33 @@
       if (dom['armor-bar-fill']) dom['armor-bar-fill'].style.width = `${armorPct}%`;
     }
 
-    const godRem = Math.ceil(state.invulnCheatTimer || 0);
+    const godTimerSec = Math.max(0, state.invulnCheatTimer || 0);
+    const godRem = Math.ceil(godTimerSec);
     const godText = godRem > 0
-      ? `PAINKILLER ${String(Math.floor(godRem / 60)).padStart(2, '0')}:${String(godRem % 60).padStart(2, '0')}`
+      ? `${String(Math.floor(godRem / 60)).padStart(2, '0')}:${String(godRem % 60).padStart(2, '0')}`
       : '';
+    const godPct = godRem > 0 ? Math.round(Math.max(0, Math.min(100, (godTimerSec / 300) * 100)) * 2) / 2 : 0;
     const sprintActive = !!state.fastSprint;
     if (_hudCache.godText !== godText || _hudCache.sprintActive !== sprintActive) {
       _hudCache.godText = godText;
       _hudCache.sprintActive = sprintActive;
       if (dom['cheat-pill-god']) {
         dom['cheat-pill-god'].classList.toggle('hidden', !godText);
-        if (godText) dom['cheat-pill-god'].textContent = godText;
+      }
+      if (dom['cheat-god-timer'] && godText) {
+        dom['cheat-god-timer'].textContent = godText;
       }
       if (dom['cheat-pill-sprint']) {
         dom['cheat-pill-sprint'].classList.toggle('hidden', !sprintActive);
       }
       if (dom['cheat-status-row']) {
         dom['cheat-status-row'].classList.toggle('hidden', !godText && !sprintActive);
+      }
+    }
+    if (_hudCache.godPct !== godPct) {
+      _hudCache.godPct = godPct;
+      if (dom['cheat-god-bar']) {
+        dom['cheat-god-bar'].style.width = `${godPct}%`;
       }
     }
 
@@ -1027,6 +1205,9 @@
     if (screenName !== 'play' && PL.closeCheatConsole) {
       PL.closeCheatConsole(false);
     }
+    if (screenName !== 'play' && screenName !== 'pause') {
+      closeDocViewer(false, true);
+    }
     if (screenName !== 'menu') {
       setMenuSubpanel(null);
     }
@@ -1102,6 +1283,7 @@
   }
 
   function reset(spawnPos, invulnerable, mode) {
+    closeDocViewer(false, true);
     PL.resetPhysics(spawnPos, invulnerable, mode);
     _hudCache.armorVal = null;
     _hudCache.armorPct = null;
@@ -1111,9 +1293,11 @@
     _hudCache.skinIdAttr = null;
     _hudCache.slotKey = null;
     _hudCache.godText = null;
+    _hudCache.godPct = null;
     _hudCache.sprintActive = null;
     if (dom['cheat-status-row']) dom['cheat-status-row'].classList.add('hidden');
     if (dom['cheat-pill-god']) dom['cheat-pill-god'].classList.add('hidden');
+    if (dom['cheat-god-bar']) dom['cheat-god-bar'].style.width = '100%';
     if (dom['cheat-pill-sprint']) dom['cheat-pill-sprint'].classList.add('hidden');
     if (dom['armor-row']) dom['armor-row'].classList.add('hidden');
     if (dom['weapon-skin-tag']) {
@@ -1125,8 +1309,11 @@
 
   PL.setNotice = setNotice;
   PL.showFieldLog = showFieldLog;
+  PL.openDocViewer = openDocViewer;
+  PL.closeDocViewer = closeDocViewer;
   PL.toggleHud = toggleHud;
   PL.syncMuteUi = syncMuteUi;
+  PL.syncAtmosphereUi = syncAtmosphereUi;
 
   LRT.PlayerUI = {
     init,
@@ -1144,6 +1331,7 @@
     syncMuteUi,
     syncQualityUi,
     syncDifficultyUi,
+    syncAtmosphereUi,
     syncResScaleUi,
     syncShadowsUi,
     syncBloomUi,
@@ -1159,12 +1347,15 @@
     hideSubtitle,
     showFieldLog,
     hideFieldLog,
+    openDocViewer,
+    closeDocViewer,
     setOnInteractResult: (fn) => { PL.callbacks.onInteractResult = fn; },
     setPaused: (flag, allowInput) => {
       PL.flags.paused = !!flag;
       PL.flags.allowActionInput = allowInput !== undefined ? !!allowInput : !PL.flags.paused;
       if (PL.flags.paused) {
         if (PL.closeCheatConsole) PL.closeCheatConsole(false);
+        if (PL.state && PL.state.docViewerOpen) closeDocViewer(false, true);
         for (const k of Object.keys(PL.keys)) PL.keys[k] = false;
         PL.state.ads = false;
         if (LRT.Weapons) LRT.Weapons.setADS(false);

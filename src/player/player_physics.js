@@ -58,6 +58,7 @@
     invulnCheatTimer: 0,
     fastSprint: false,
     cheatOpen: false,
+    docViewerOpen: false,
     kills: 0,
     lastSafePos: new THREE.Vector3(4.0, 0.05, 6.0),
     bobPhase: 0,
@@ -131,6 +132,21 @@
       dom['pill-flashlight'].classList.toggle('active', state.flashlightOn);
     }
     if (LRT.Audio) LRT.Audio.play('flashlight_click', { gain: 0.65, pitchVar: 0.05 });
+  }
+
+  const CHEAT_CODES = ['PAINKILLER', 'TURTLE', 'TOOLUP', 'CATCHME'];
+  let directCheatBuffer = '';
+  let suppressPauseUntil = 0;
+  let pendingRelock = false;
+
+  function suppressPauseAfterUnlock(ms) {
+    suppressPauseUntil = Math.max(suppressPauseUntil, performance.now() + (ms || 900));
+  }
+
+  function relockAfterOverlay() {
+    suppressPauseAfterUnlock(900);
+    pendingRelock = true;
+    requestLock();
   }
 
   function requestLock() {
@@ -266,7 +282,7 @@
         callbacks.onSummonTrain(res.direction || (res.action === 'call_train_prev' ? -1 : 1));
       }
       if (res.logTitle && res.logBody && PL.showFieldLog) {
-        PL.showFieldLog(res.logTitle, res.logBody, 9.0);
+        PL.showFieldLog(res.logTitle, res.logBody);
       }
       if (callbacks.onInteractResult) {
         try {
@@ -278,21 +294,37 @@
     }
   }
 
+  function stripCheatInputNoise(input) {
+    if (!input) return '';
+    const cleaned = String(input.value || '').replace(/[`~´^¨]/g, '');
+    if (cleaned !== input.value) {
+      input.value = cleaned;
+    }
+    return cleaned;
+  }
+
   function openCheatConsole() {
-    if (!flags.allowActionInput || flags.paused) return false;
+    if (!flags.allowActionInput || flags.paused || state.docViewerOpen) return false;
     const dom = PL.dom;
     const panel = dom && dom['cheat-console'];
     const input = dom && dom['cheat-input'];
     state.cheatOpen = true;
+    directCheatBuffer = '';
     for (const k of Object.keys(keys)) keys[k] = false;
     state.ads = false;
     if (LRT.Weapons) LRT.Weapons.setADS(false);
     if (callbacks.onWeaponShootUp) callbacks.onWeaponShootUp();
+    suppressPauseAfterUnlock(900);
     releaseLock();
     if (panel) panel.classList.remove('hidden');
     if (input) {
       input.value = '';
       input.focus();
+      if (typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() => {
+          if (state.cheatOpen && input) stripCheatInputNoise(input);
+        });
+      }
     }
     return true;
   }
@@ -302,20 +334,22 @@
     const panel = dom && dom['cheat-console'];
     const input = dom && dom['cheat-input'];
     const wasOpen = !!state.cheatOpen;
+    suppressPauseAfterUnlock(900);
     state.cheatOpen = false;
+    directCheatBuffer = '';
     for (const k of Object.keys(keys)) keys[k] = false;
     if (panel) panel.classList.add('hidden');
     if (input) {
       input.value = '';
       if (document.activeElement === input) input.blur();
     }
-    if (wasOpen && refocusGame && flags.allowActionInput && !flags.paused) {
-      requestLock();
+    if (wasOpen && refocusGame && flags.allowActionInput && !flags.paused && !state.docViewerOpen) {
+      relockAfterOverlay();
     }
   }
 
   function executeCheat(rawCode) {
-    const code = String(rawCode || '').trim().toUpperCase().replace(/\s+/g, '');
+    const code = String(rawCode || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!code) return { ok: false, code: '' };
 
     if (code === 'PAINKILLER') {
@@ -326,6 +360,7 @@
       } else {
         state.invulnCheatTimer = 300;
         state.invulnerable = true;
+        state.vignetteAlpha = 0;
         if (state.heartbeatActive && LRT.Audio) {
           state.heartbeatActive = false;
           LRT.Audio.stopLoop('player_heartbeat', 0.2);
@@ -385,7 +420,21 @@
     const canvas = refs.canvas;
 
     window.addEventListener('keydown', (e) => {
-      const isBackquote = (e.code === 'Backquote' || e.key === '`' || e.key === '~')
+      if (state.docViewerOpen) {
+        if (e.code === 'Escape' || e.key === 'Escape' || e.code === 'KeyE' || e.code === 'Space' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!e.repeat && PL.closeDocViewer) {
+            PL.closeDocViewer(true);
+          }
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      const isBackquote = (e.code === 'Backquote' || e.code === 'IntlBackslash' || e.key === '`' || e.key === '~')
         && !e.ctrlKey && !e.altKey && !e.metaKey;
       if (isBackquote) {
         if (state.cheatOpen) {
@@ -411,7 +460,7 @@
           e.preventDefault();
           e.stopPropagation();
           const input = PL.dom && PL.dom['cheat-input'];
-          const raw = input ? input.value : '';
+          const raw = stripCheatInputNoise(input);
           closeCheatConsole(true);
           if (raw.trim()) executeCheat(raw);
         }
@@ -421,6 +470,21 @@
       keys[e.code] = true;
       if (e.code === 'F3') e.preventDefault();
       if (!flags.allowActionInput || flags.paused) return;
+
+      // GTA V-style rolling 16-char direct typing cheat buffer during gameplay
+      if (!e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey && e.key && e.key.length === 1) {
+        const ch = e.key.toUpperCase();
+        if ((ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')) {
+          directCheatBuffer = (directCheatBuffer + ch).slice(-16);
+          for (let i = 0; i < CHEAT_CODES.length; i++) {
+            if (directCheatBuffer.endsWith(CHEAT_CODES[i])) {
+              directCheatBuffer = '';
+              executeCheat(CHEAT_CODES[i]);
+              break;
+            }
+          }
+        }
+      }
 
       if (e.code === 'Digit1') LRT.Weapons && LRT.Weapons.switchWeapon(1);
       else if (e.code === 'Digit2') LRT.Weapons && LRT.Weapons.switchWeapon(2);
@@ -469,7 +533,7 @@
         }
         e.preventDefault();
       }
-    });
+    }, true);
 
     window.addEventListener('keyup', (e) => {
       keys[e.code] = false;
@@ -477,13 +541,14 @@
 
     window.addEventListener('blur', () => {
       for (const k of Object.keys(keys)) keys[k] = false;
+      directCheatBuffer = '';
       state.ads = false;
       if (LRT.Weapons) LRT.Weapons.setADS(false);
       if (callbacks.onWeaponShootUp) callbacks.onWeaponShootUp();
     });
 
     document.addEventListener('mousemove', (e) => {
-      if (flags.paused || !flags.allowActionInput || state.cheatOpen) return;
+      if (flags.paused || !flags.allowActionInput || state.cheatOpen || state.docViewerOpen) return;
       if (document.pointerLockElement !== canvas) return;
       // Chromium pointer lock spike guard
       if (Math.abs(e.movementX) > 180 || Math.abs(e.movementY) > 180) return;
@@ -493,13 +558,16 @@
     });
 
     canvas.addEventListener('mousedown', (e) => {
-      if (flags.paused || !flags.allowActionInput) return;
+      if (flags.paused || !flags.allowActionInput || state.docViewerOpen) return;
       if (state.cheatOpen) {
         closeCheatConsole(true);
         return;
       }
       if (document.pointerLockElement !== canvas) {
+        const wasPending = pendingRelock;
+        pendingRelock = false;
         requestLock();
+        if (wasPending) return;
       }
       if (e.button === 0) {
         if (state.activeInteractable && state.activeInteractable.type === 'lootbox' && !state.activeInteractable.used && !state.ads) {
@@ -527,7 +595,7 @@
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
     window.addEventListener('wheel', (e) => {
-      if (flags.paused || !flags.allowActionInput || state.cheatOpen || !LRT.Weapons) return;
+      if (flags.paused || !flags.allowActionInput || state.cheatOpen || state.docViewerOpen || !LRT.Weapons) return;
       const dir = e.deltaY > 0 ? 1 : -1;
       if (typeof LRT.Weapons.cycleWeapon === 'function') {
         LRT.Weapons.cycleWeapon(dir);
@@ -543,10 +611,21 @@
     }, { passive: true });
 
     document.addEventListener('pointerlockchange', () => {
-      flags.pointerLocked = document.pointerLockElement === canvas;
-      if (!flags.pointerLocked && flags.allowActionInput && !flags.paused && !state.cheatOpen && callbacks.onPause) {
+      const wasLocked = !!flags.pointerLocked;
+      const nowLocked = document.pointerLockElement === canvas;
+      flags.pointerLocked = nowLocked;
+      if (nowLocked) {
+        pendingRelock = false;
+        suppressPauseUntil = 0;
+        return;
+      }
+      if (wasLocked && flags.allowActionInput && !flags.paused && !state.cheatOpen && !state.docViewerOpen && performance.now() > suppressPauseUntil && callbacks.onPause) {
         callbacks.onPause();
       }
+    });
+
+    document.addEventListener('pointerlockerror', () => {
+      flags.pointerLocked = document.pointerLockElement === canvas;
     });
   }
 
@@ -897,8 +976,10 @@
       state.vignetteAlpha = Math.max(0, state.vignetteAlpha - dt * 1.8);
     }
     if (dom && dom['damage-vignette']) {
-      const lowHpPulse = state.health < 30 ? (0.18 + 0.12 * Math.sin(performance.now() * 0.008)) : 0;
-      dom['damage-vignette'].style.opacity = String(Math.min(0.95, Math.max(state.vignetteAlpha, lowHpPulse)));
+      const invulnActive = !!(state.invulnerable || state.invulnCheatTimer > 0);
+      const lowHpPulse = (state.health < 30 && !invulnActive) ? (0.18 + 0.12 * Math.sin(performance.now() * 0.008)) : 0;
+      const alpha = invulnActive ? 0 : Math.min(0.95, Math.max(state.vignetteAlpha, lowHpPulse));
+      dom['damage-vignette'].style.opacity = String(alpha);
     }
 
     if (flags.paused) return;
@@ -1136,7 +1217,7 @@
 
     // Low HP heartbeat audio
     if (LRT.Audio) {
-      if (state.health > 0 && state.health < 30 && !state.invulnerable) {
+      if (state.health > 0 && state.health < 30 && !state.invulnerable && state.invulnCheatTimer <= 0) {
         if (!state.heartbeatActive) {
           state.heartbeatActive = true;
           LRT.Audio.startLoop('player_heartbeat', 0.55, 0.4, 1.0);
@@ -1149,7 +1230,7 @@
   }
 
   function takeDamage(dmg, srcPos) {
-    if (state.invulnerable || state.health <= 0 || dmg <= 0) return false;
+    if (state.invulnerable || state.invulnCheatTimer > 0 || state.health <= 0 || dmg <= 0) return false;
     const prev = state.health;
     let hpDmg = dmg;
     if (state.armor > 0) {
@@ -1195,6 +1276,10 @@
     state.invulnerable = !!invulnerable;
     state.invulnCheatTimer = 0;
     state.fastSprint = false;
+    state.docViewerOpen = false;
+    directCheatBuffer = '';
+    pendingRelock = false;
+    suppressPauseUntil = 0;
     closeCheatConsole(false);
     state.isInsideTrain = false;
     state.isSitting = false;
@@ -1224,6 +1309,9 @@
   PL.toggleFlashlight = toggleFlashlight;
   PL.requestLock = requestLock;
   PL.releaseLock = releaseLock;
+  PL.suppressPauseAfterUnlock = suppressPauseAfterUnlock;
+  PL.relockAfterOverlay = relockAfterOverlay;
+  PL.stripCheatInputNoise = stripCheatInputNoise;
   PL.sitInTrain = sitInTrain;
   PL.standFromSeat = standFromSeat;
   PL.triggerInteract = triggerInteract;

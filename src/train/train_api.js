@@ -26,6 +26,49 @@
   const activeColliders = T.activeColliders;
   const localInteractables = T.localInteractables;
 
+  const EMPTY_DOORWAYS = [];
+  const _openDoorwaysPool = [];
+  for (let i = 0; i < DOOR_WORLDS_Z.length; i++) {
+    _openDoorwaysPool.push({
+      index: i,
+      localZ: DOOR_WORLDS_Z[i],
+      thresholdX: 0,
+      doorX: 0,
+      aisleX: 0,
+      z: DOOR_WORLDS_Z[i],
+      y: TD.cabinFloorY,
+      clearHalfWidth: TD.doorClearWidth * 0.5,
+      doorOpen: 0
+    });
+  }
+
+  const _interiorBoundsOut = {
+    active: false,
+    trackX: 0,
+    trainZ: 0,
+    travelDir: 1,
+    halfWidth: TD.halfWidth,
+    interiorHalfWidth: TD.interiorHalfWidth,
+    aisleHalfWidth: 0.72,
+    floorY: TD.cabinFloorY,
+    lengthHalf: 25.35,
+    minX: -TD.interiorHalfWidth,
+    maxX: TD.interiorHalfWidth,
+    minZ: -25.35,
+    maxZ: 25.35,
+    platformSideSign: 1,
+    platformExitX: TD.halfWidth + 0.88
+  };
+
+  const _ejectInfoOut = {
+    ejectedCount: 0,
+    platformExitX: TD.halfWidth + 0.88,
+    trackX: 0,
+    travelDir: 1,
+    minZ: -25.65,
+    maxZ: 25.65
+  };
+
   // Register pre-allocated static & doorway local AABBs + interactables + projectile raycast boxes
   function initCollidersAndInteractables() {
     staticLocalColliders.length = 0;
@@ -460,6 +503,62 @@
     T.safeAudioPlay('train_horn', { gain: 0.7 });
   }
 
+  function getInteriorBounds() {
+    const active = !!(T.initialized && T.trainGroup && T.trainGroup.visible && T.state !== 'AWAY');
+    const dir = T.travelDir === -1 ? -1 : 1;
+    _interiorBoundsOut.active = active;
+    _interiorBoundsOut.trackX = T.activeTrackX || 0;
+    _interiorBoundsOut.trainZ = T.trainZ || 0;
+    _interiorBoundsOut.travelDir = dir;
+    _interiorBoundsOut.halfWidth = TD.halfWidth;
+    _interiorBoundsOut.interiorHalfWidth = TD.interiorHalfWidth;
+    _interiorBoundsOut.aisleHalfWidth = 0.72;
+    _interiorBoundsOut.floorY = TD.cabinFloorY;
+    _interiorBoundsOut.lengthHalf = 25.35;
+    _interiorBoundsOut.minX = _interiorBoundsOut.trackX - TD.interiorHalfWidth;
+    _interiorBoundsOut.maxX = _interiorBoundsOut.trackX + TD.interiorHalfWidth;
+    _interiorBoundsOut.minZ = _interiorBoundsOut.trainZ - 25.35;
+    _interiorBoundsOut.maxZ = _interiorBoundsOut.trainZ + 25.35;
+    _interiorBoundsOut.platformSideSign = dir;
+    _interiorBoundsOut.platformExitX = T.localXToWorld(TD.halfWidth + 0.88);
+    return _interiorBoundsOut;
+  }
+
+  function getOpenDoorways() {
+    if (!T.initialized || !T.trainGroup || !T.trainGroup.visible) return EMPTY_DOORWAYS;
+    if (T.state !== 'BOARDED_WAIT' || T.doorOpen < 0.70 || T.pendingDepart || T.doorsTarget < 0.5) {
+      return EMPTY_DOORWAYS;
+    }
+    const thresholdWorldX = T.localXToWorld(TD.halfWidth + 0.62);
+    const doorWorldX = T.localXToWorld(TD.halfWidth);
+    const aisleWorldX = T.localXToWorld(0.0);
+    for (let i = 0; i < DOOR_WORLDS_Z.length; i++) {
+      const entry = _openDoorwaysPool[i];
+      entry.localZ = DOOR_WORLDS_Z[i];
+      entry.thresholdX = thresholdWorldX;
+      entry.doorX = doorWorldX;
+      entry.aisleX = aisleWorldX;
+      entry.z = T.localZToWorld(DOOR_WORLDS_Z[i]);
+      entry.y = TD.cabinFloorY;
+      entry.doorOpen = T.doorOpen;
+    }
+    return _openDoorwaysPool;
+  }
+
+  function ejectExteriorEntities() {
+    const bounds = getInteriorBounds();
+    _ejectInfoOut.platformExitX = bounds.platformExitX;
+    _ejectInfoOut.trackX = bounds.trackX;
+    _ejectInfoOut.travelDir = bounds.travelDir;
+    _ejectInfoOut.minZ = bounds.trainZ - 25.65;
+    _ejectInfoOut.maxZ = bounds.trainZ + 25.65;
+    _ejectInfoOut.ejectedCount = 0;
+    if (bounds.active && LRT.Enemies && typeof LRT.Enemies.ejectFromTrain === 'function') {
+      _ejectInfoOut.ejectedCount = LRT.Enemies.ejectFromTrain(bounds) || 0;
+    }
+    return _ejectInfoOut;
+  }
+
   function openDoors() {
     if (T.doorsTarget < 0.5) {
       T.doorsTarget = 1.0;
@@ -474,6 +573,9 @@
       T.safeAudioPlay('door_chime', { gain: 0.85 });
       T.safeAudioPlay('door_close', { gain: 0.85 });
     }
+    if (T.state === 'BOARDED_WAIT') {
+      ejectExteriorEntities();
+    }
   }
 
   function departNow() {
@@ -481,6 +583,7 @@
     if (T.state === 'APPROACHING') return false;
     T.pendingDepart = true;
     if (T.doorsTarget > 0.5) closeDoors();
+    else ejectExteriorEntities();
     return true;
   }
 
@@ -890,6 +993,9 @@
     localToWorld: T.localToWorld,
     createStaticLrtConsist: T.createStaticLrtConsist,
     isPlayerInside,
+    getOpenDoorways,
+    getInteriorBounds,
+    ejectExteriorEntities,
     getColliders,
     raycastTrain: T.raycastTrain,
     applyDamage: T.applyDamage,

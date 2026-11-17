@@ -231,6 +231,7 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
     <div id="cheat-console" class="hidden" role="dialog" aria-label="Cheat Console">
       <span class="cheat-prompt">&gt;</span>
       <input id="cheat-input" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="ENTER CHEAT CODE..." aria-label="Cheat Code Input">
+      <button id="btn-cheat-apply" type="button">APPLY</button>
       <span class="cheat-hint">[ENTER] APPLY · [` / ESC] CLOSE</span>
     </div>
 
@@ -246,10 +247,6 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
           <span id="armor-value">0</span>
           <div class="armor-bar-track"><div id="armor-bar-fill"></div></div>
         </div>
-        <div class="cheat-status-row hidden" id="cheat-status-row">
-          <span class="cheat-pill hidden" id="cheat-pill-god">PAINKILLER 05:00</span>
-          <span class="cheat-pill hidden" id="cheat-pill-sprint">CATCHME // FAST SPRINT</span>
-        </div>
         <div class="tool-pills">
           <span class="pill-ind" id="pill-flashlight">[F] Senter: OFF</span>
           <span class="pill-ind active" id="pill-lighting">[L] Light: DAY</span>
@@ -259,6 +256,16 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
       </div>
 
       <div id="weapon-panel">
+        <div class="cheat-status-row hidden" id="cheat-status-row">
+          <div class="cheat-pill cheat-pill-god hidden" id="cheat-pill-god">
+            <div class="cheat-pill-header">
+              <span class="cheat-pill-label">PAINKILLER</span>
+              <span class="cheat-pill-timer" id="cheat-god-timer">05:00</span>
+            </div>
+            <div class="cheat-bar-track"><div class="cheat-bar-fill" id="cheat-god-bar"></div></div>
+          </div>
+          <div class="cheat-pill cheat-pill-sprint hidden" id="cheat-pill-sprint">CATCHME // SPRINT</div>
+        </div>
         <div id="ammo-card">
           <div id="weapon-name">Pindad G2 9mm</div>
           <div id="weapon-skin-tag" class="hidden"></div>
@@ -270,6 +277,35 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
           <div class="w-slot" data-slot="3">[3] 12G</div>
           <div class="w-slot" data-slot="4">[4] RPG-7</div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resident Evil-Style Physical Paper Document Viewer Modal -->
+  <div id="document-viewer-modal" class="doc-viewer-modal hidden" role="dialog" aria-modal="true" aria-labelledby="doc-viewer-title">
+    <div class="doc-sheet" id="doc-viewer-sheet">
+      <div class="doc-fold-crease" aria-hidden="true"></div>
+      <div class="doc-paper-stain" aria-hidden="true"></div>
+
+      <div class="doc-header">
+        <div class="doc-header-meta">
+          <div class="doc-classification" id="doc-viewer-kicker">ARSIP DOKUMEN // FILE #01</div>
+          <div class="doc-submeta" id="doc-viewer-submeta">LRT JABODEBEK · INTERNAL DISPATCH</div>
+        </div>
+        <div class="doc-stamp" id="doc-viewer-stamp">TERCATAT // ARSIP</div>
+        <button class="doc-close-x" id="btn-doc-close-x" type="button" aria-label="Tutup Dokumen">[X]</button>
+      </div>
+
+      <div class="doc-rule"></div>
+      <h2 class="doc-title" id="doc-viewer-title">CATATAN LAPANGAN</h2>
+
+      <div class="doc-body-wrap">
+        <div class="doc-body" id="doc-viewer-body"></div>
+      </div>
+
+      <div class="doc-footer">
+        <span class="doc-footer-hint">[E] / [SPACE] / [ESC] TUTUP</span>
+        <button class="doc-close-btn" id="btn-doc-close" type="button">TUTUP DOKUMEN</button>
       </div>
     </div>
   </div>
@@ -308,6 +344,14 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
               <button class="zenith-tab active" data-difficulty="medium" type="button">MEDIUM</button>
               <button class="zenith-tab" data-difficulty="hard" type="button">HARD</button>
               <button class="zenith-tab" data-difficulty="nightmare" type="button">NIGHTMARE</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <span class="setting-label" title="DAYLIGHT–SUNSET keeps daytime-to-sunset visibility with faster, sharper outbreak infected">TIME CYCLE</span>
+            <div class="zenith-tabs" id="menu-atmosphere-group">
+              <button class="zenith-tab active" data-atmosphere="night_horror" type="button" title="Classic dark horror progression">NIGHT HORROR</button>
+              <button class="zenith-tab" data-atmosphere="daylight_outbreak" type="button" title="Bright daytime-to-sunset lighting with faster outbreak infected">DAYLIGHT–SUNSET</button>
             </div>
           </div>
 
@@ -433,6 +477,14 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
         </div>
 
         <div class="setting-row">
+          <span class="setting-label" title="DAYLIGHT–SUNSET keeps daytime-to-sunset visibility with faster, sharper outbreak infected">TIME CYCLE</span>
+          <div class="zenith-tabs" id="pause-atmosphere-group">
+            <button class="zenith-tab active" data-atmosphere="night_horror" type="button" title="Classic dark horror progression">NIGHT HORROR</button>
+            <button class="zenith-tab" data-atmosphere="daylight_outbreak" type="button" title="Bright daytime-to-sunset lighting with faster outbreak infected">DAYLIGHT–SUNSET</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
           <span class="setting-label">LIGHTING</span>
           <button class="zenith-toggle" id="btn-pause-lighting" type="button">DAYLIGHT</button>
         </div>
@@ -491,6 +543,16 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
         <div class="setting-row">
           <span class="setting-label">AUDIO</span>
           <button class="zenith-toggle" id="btn-pause-mute" type="button">ON</button>
+        </div>
+      </div>
+
+      <div class="zenith-subpanel pause-logs-panel">
+        <div class="setting-head">
+          <span class="setting-label">ARSIP LOG // FIELD NOTES</span>
+          <span class="setting-readout" id="pause-logs-count">0 LOGS</span>
+        </div>
+        <div class="pause-logs-list" id="pause-field-logs-list">
+          <div class="pause-log-empty">No field logs recovered yet.</div>
         </div>
       </div>
 

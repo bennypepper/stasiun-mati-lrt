@@ -22,6 +22,7 @@
   CORE.enemySightTimer = 0;
   CORE.victoryCruiseTimer = 0;
   CORE.prevTrainState = 'AWAY';
+  CORE.atmosphereMode = 'night_horror';
 
   const CAMPAIGN_MOODS = [
     'GOLDEN_DUSK',          // 0: Dukuh Atas BSI (Sunset)
@@ -31,6 +32,56 @@
     'TOXIC_SMOG',           // 4: Cikoko (Toxic Spore Night)
     'CRIMSON_BLOOD_MOON'    // 5: Setiabudi (Crimson Blood Moon)
   ];
+
+  const FALLBACK_CAMPAIGN_MOODS_DAYLIGHT = [
+    'DAYLIGHT_CLEAR',
+    'DAYLIGHT_OVERCAST',
+    'DAYLIGHT_CLEAR',
+    'DAYLIGHT_OVERCAST',
+    'GOLDEN_DUSK',
+    'AMBER_SUNSET'
+  ];
+
+  function getActiveCampaignMoods() {
+    if (CORE.atmosphereMode === 'daylight_outbreak') {
+      return (C.CAMPAIGN_MOODS_DAYLIGHT && C.CAMPAIGN_MOODS_DAYLIGHT.length)
+        ? C.CAMPAIGN_MOODS_DAYLIGHT
+        : FALLBACK_CAMPAIGN_MOODS_DAYLIGHT;
+    }
+    return CAMPAIGN_MOODS;
+  }
+
+  function getCampaignMoodForStation(idx) {
+    const moods = getActiveCampaignMoods();
+    const i = ((idx | 0) % 6 + 6) % 6;
+    return moods[i % moods.length] || 'GOLDEN_DUSK';
+  }
+
+  function getAtmosphereMode() {
+    return CORE.atmosphereMode === 'daylight_outbreak' ? 'daylight_outbreak' : 'night_horror';
+  }
+
+  function setAtmosphereMode(mode) {
+    const nextMode = mode === 'daylight_outbreak' ? 'daylight_outbreak' : 'night_horror';
+    const prevMode = CORE.atmosphereMode;
+    CORE.atmosphereMode = nextMode;
+    if (LRT.Enemies && typeof LRT.Enemies.setAtmosphereMode === 'function') {
+      LRT.Enemies.setAtmosphereMode(nextMode);
+    }
+    if (prevMode !== nextMode) {
+      CORE.isMoodLerping = false;
+      CORE._rideFromMoodKey = null;
+      CORE._rideToMoodKey = null;
+      if (!CORE.lightingLockedByUser && CORE.gameState !== STATES.MENU && CORE.gameMode === MODES.SURVIVAL && typeof CORE.applyMoodLighting === 'function') {
+        const targetMoodKey = getCampaignMoodForStation(CORE.stationIndex || 0);
+        const stAtmos = (LRT.Station && typeof LRT.Station.getAtmosphere === 'function') ? LRT.Station.getAtmosphere() : null;
+        const stStats = (LRT.Station && typeof LRT.Station.getStats === 'function') ? LRT.Station.getStats() : null;
+        CORE.currentLightingKey = targetMoodKey;
+        CORE.applyMoodLighting(stStats, stAtmos ? { ...stAtmos, moodKey: targetMoodKey } : { moodKey: targetMoodKey });
+      }
+    }
+    return nextMode;
+  }
 
   const campaignState = {
     stationUsedIds: new Map(),
@@ -49,8 +100,15 @@
     collectedLogs: [],
     campaignVictory: false,
     firstBarrelExploded: false,
-    barrelCueActive: false
+    barrelCueActive: false,
+    trainCallActive: false,
+    trainCallWaitElapsed: 0,
+    trainCallTrickleStage: 0
   };
+
+  const _spawnEyePos = new THREE.Vector3();
+  const _spawnCamFwd = new THREE.Vector3();
+  const _spawnCandDir = new THREE.Vector3();
 
   function resetCampaignState() {
     campaignState.stationUsedIds.clear();
@@ -71,6 +129,9 @@
     campaignState.campaignVictory = false;
     campaignState.firstBarrelExploded = false;
     campaignState.barrelCueActive = false;
+    campaignState.trainCallActive = false;
+    campaignState.trainCallWaitElapsed = 0;
+    campaignState.trainCallTrickleStage = 0;
     if (LRT.Station && typeof LRT.Station.setBarrelCueActive === 'function') {
       LRT.Station.setBarrelCueActive(false);
     }
@@ -227,7 +288,13 @@
     return allowScreamer ? 'screamer' : 'runner';
   }
 
-  function gatherClusterSpawnNodes(preferredZones) {
+  const TRAIN_CALL_CONCEALED_ZONES = [
+    'concealed_station', 'stairwell_pocket', 'concourse',
+    'platform_south', 'platform_north', 'jpo', 'depot', 'garden',
+    'island_far', 'plat2', 'balcony', 'island2'
+  ];
+
+  function gatherClusterSpawnNodes(preferredZones, opts) {
     const allNodes = [];
     if (LRT.Station && typeof LRT.Station.getSpawnNodes === 'function') {
       const sn = LRT.Station.getSpawnNodes();
@@ -241,44 +308,139 @@
         for (let i = 0; i < ng.nodes.length; i++) allNodes.push(ng.nodes[i]);
       }
     }
-    const pPos = (LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function') ? LRT.PlayerUI.getState().pos : null;
-    const zoneSet = Array.isArray(preferredZones) && preferredZones.length ? new Set(preferredZones) : null;
 
+    const pState = (LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function') ? LRT.PlayerUI.getState() : null;
+    const pPos = pState ? pState.pos : null;
+    const zoneSet = Array.isArray(preferredZones) && preferredZones.length ? new Set(preferredZones) : null;
+    const o = opts || {};
+    const useHiddenClose = !!(o.requireHidden || o.preferClose);
+    const minDist = o.minDist !== undefined ? o.minDist : (useHiddenClose ? 12.0 : 7.0);
+    const maxDist = o.maxDist !== undefined ? o.maxDist : 34.0;
+
+    let hasCam = false;
+    if (useHiddenClose && pPos) {
+      const cam = (LRT.PlayerUI && typeof LRT.PlayerUI.getCamera === 'function') ? LRT.PlayerUI.getCamera() : null;
+      if (cam) {
+        cam.getWorldPosition(_spawnEyePos);
+        if (typeof cam.getWorldDirection === 'function') {
+          cam.getWorldDirection(_spawnCamFwd);
+        } else {
+          _spawnCamFwd.setFromMatrixColumn(cam.matrixWorld, 2).multiplyScalar(-1).normalize();
+        }
+        hasCam = _spawnCamFwd.lengthSq() > 1e-6;
+      } else {
+        _spawnEyePos.set(pPos.x, (pPos.y || 0) + 1.6, pPos.z);
+        const yaw = typeof pState.yaw === 'number' ? pState.yaw : 0;
+        _spawnCamFwd.set(-Math.sin(yaw), 0, -Math.cos(yaw)).normalize();
+        hasCam = true;
+      }
+    }
+
+    const checkTrainInside = LRT.Train && typeof LRT.Train.isPlayerInside === 'function';
+    const hasStationRay = LRT.Station && typeof LRT.Station.raycastWorld === 'function';
+    const hasTrainRay = LRT.Train && typeof LRT.Train.raycastTrain === 'function';
+
+    const tier1 = []; // preferred zone + 12..34m + out-of-sight/occluded
+    const tier2 = []; // non-crossing station + 12..34m + out-of-sight/occluded
+    const tier3 = []; // preferred zone + relaxed range (9..44m) + occluded or edge FOV
     const preferred = [];
     const fallback = [];
+
     for (let i = 0; i < allNodes.length; i++) {
       const n = allNodes[i];
       if (!n || typeof n.x !== 'number' || typeof n.z !== 'number') continue;
-      if (pPos && Math.hypot(n.x - pPos.x, n.z - pPos.z) < 7.0) continue;
+      const ny = n.y !== undefined ? n.y : 0.0;
+      if (checkTrainInside && LRT.Train.isPlayerInside({ x: n.x, y: ny + 0.8, z: n.z })) continue;
+
+      const dh = pPos ? Math.hypot(n.x - pPos.x, n.z - pPos.z) : 20.0;
+      if (dh < (useHiddenClose ? 9.0 : minDist)) continue;
+
       const tag = String(n.zone || n.tag || '').toLowerCase();
-      if (zoneSet && zoneSet.has(tag)) {
-        preferred.push(n);
-      } else {
-        fallback.push(n);
+      const inPref = !!(zoneSet && zoneSet.has(tag));
+      const isCrossing = tag.indexOf('crossing') === 0 || tag.indexOf('street') === 0;
+
+      if (useHiddenClose && pPos && hasCam) {
+        _spawnCandDir.set(n.x - _spawnEyePos.x, (ny + 1.35) - _spawnEyePos.y, n.z - _spawnEyePos.z);
+        const d3 = _spawnCandDir.length();
+        let dot = -1.0;
+        let losOccluded = false;
+        if (d3 > 0.2) {
+          _spawnCandDir.divideScalar(d3);
+          dot = _spawnCandDir.dot(_spawnCamFwd);
+          if (hasStationRay && d3 > 0.6) {
+            if (LRT.Station.raycastWorld(_spawnEyePos, _spawnCandDir, d3 - 0.45)) losOccluded = true;
+          }
+          if (!losOccluded && hasTrainRay && d3 > 0.6) {
+            if (LRT.Train.raycastTrain(_spawnEyePos, _spawnCandDir, d3 - 0.45)) losOccluded = true;
+          }
+        }
+        const inViewCone = dot > 0.36;
+        const isHidden = !inViewCone || losOccluded;
+        const score = Math.abs(dh - 20.0) + (tag === 'concealed_station' || tag === 'stairwell_pocket' ? -4.0 : 0.0);
+
+        if (dh >= minDist && dh <= maxDist && isHidden) {
+          if (inPref) {
+            tier1.push({ node: n, score });
+            continue;
+          }
+          if (!isCrossing) {
+            tier2.push({ node: n, score });
+            continue;
+          }
+        }
+        if (dh <= maxDist + 10.0 && (losOccluded || dot <= 0.55) && inPref) {
+          tier3.push({ node: n, score });
+          continue;
+        }
+      }
+
+      if (inPref) preferred.push(n);
+      else fallback.push(n);
+    }
+
+    if (useHiddenClose) {
+      const chosen = tier1.length > 0 ? tier1 : (tier2.length > 0 ? tier2 : (tier3.length > 0 ? tier3 : null));
+      if (chosen) {
+        chosen.sort((a, b) => a.score - b.score);
+        return chosen.map((c) => c.node);
       }
     }
     if (preferred.length > 0) return preferred;
     if (fallback.length > 0) return fallback;
     return [
-      { x: 3.4, y: 0.0, z: -38.0 },
-      { x: 3.4, y: 0.0, z: 38.0 },
-      { x: 16.0, y: -1.0, z: -42.0 },
-      { x: 16.0, y: -1.0, z: 42.0 }
+      { x: 3.4, y: 0.0, z: -26.0 },
+      { x: 3.4, y: 0.0, z: 26.0 },
+      { x: 14.0, y: 0.0, z: -22.0 },
+      { x: 14.0, y: 0.0, z: 22.0 }
     ];
   }
 
-  function spawnExtraInfectedCluster(variants, preferredZones) {
+  function spawnExtraInfectedCluster(variants, preferredZones, opts) {
     if (!LRT.Enemies || typeof LRT.Enemies.spawnOneZombie !== 'function') return 0;
-    const nodes = gatherClusterSpawnNodes(preferredZones);
+    const nodes = gatherClusterSpawnNodes(preferredZones, opts);
+    const spreadCount = (opts && opts.preferClose) ? Math.min(nodes.length, Math.max(variants.length, 6)) : nodes.length;
+    const grid = (LRT.Station && typeof LRT.Station.getSpatialGrid === 'function') ? LRT.Station.getSpatialGrid() : null;
     let spawned = 0;
     for (let i = 0; i < variants.length; i++) {
-      const n = nodes[i % nodes.length];
-      const pos = {
-        x: n.x + (Math.random() - 0.5) * 1.4,
-        y: n.y !== undefined ? n.y : 0.0,
-        z: n.z + (Math.random() - 0.5) * 1.4
-      };
-      if (LRT.Enemies.spawnOneZombie(variants[i], pos, { isRoamer: false, aggroState: 'CHASE', diffKey: CORE.difficultyKey })) {
+      const n = nodes[i % spreadCount];
+      const ny = n.y !== undefined ? n.y : 0.0;
+      const jitterRange = (opts && opts.preferClose) ? 0.7 : 1.4;
+      let px = n.x + (Math.random() - 0.5) * jitterRange;
+      let pz = n.z + (Math.random() - 0.5) * jitterRange;
+      if (grid && typeof grid.queryPoint === 'function') {
+        const near = grid.queryPoint(px, pz, 0.5);
+        for (let k = 0; k < near.length; k++) {
+          const b = near[k];
+          if (!b || b.broken || b.disabled || b.blocksWalk === false || b.isFloor || b.isRamp || b.isTrigger) continue;
+          if (b.maxY <= ny + 0.1 || b.minY >= ny + 1.8) continue;
+          if (px + 0.4 > b.minX && px - 0.4 < b.maxX && pz + 0.4 > b.minZ && pz - 0.4 < b.maxZ) {
+            px = n.x;
+            pz = n.z;
+            break;
+          }
+        }
+      }
+      if (LRT.Enemies.spawnOneZombie(variants[i], { x: px, y: ny, z: pz }, { isRoamer: false, aggroState: 'CHASE', diffKey: CORE.difficultyKey })) {
         spawned++;
       }
     }
@@ -315,18 +477,85 @@
     return spawned;
   }
 
-  function triggerTrainCallSiegeWave(stationIdx) {
-    if (CORE.gameMode !== MODES.SURVIVAL || CORE.difficultyKey !== 'nightmare') return 0;
+  function buildTrainCallSiegeVariants(diffKey, stationIdx, isReinforcement) {
     const s = Math.max(0, stationIdx);
-    const count = 6 + s;
-    const variants = ['runner', 'runner', 'screamer'];
-    if (s >= 1) variants.push('brute');
-    while (variants.length < count) {
-      variants.push(pickDifficultyVariant('nightmare', true));
+    const dk = diffKey || CORE.difficultyKey || 'medium';
+    const variants = [];
+    if (isReinforcement) {
+      let count = 2;
+      if (dk === 'easy') count = 2;
+      else if (dk === 'medium') count = 3;
+      else if (dk === 'hard') count = 3 + (s >= 2 ? 1 : 0);
+      else count = 4 + (s >= 2 ? 1 : 0);
+
+      if (dk !== 'easy') variants.push('runner');
+      if (dk === 'nightmare' && s >= 1) variants.push('screamer');
+      while (variants.length < count) {
+        variants.push(pickDifficultyVariant(dk, dk === 'hard' || dk === 'nightmare' || s >= 1));
+      }
+      return variants;
     }
-    const spawned = spawnExtraInfectedCluster(variants, ['crossing_south', 'crossing_north', 'concourse']);
-    if (spawned > 0 && LRT.Audio) {
-      LRT.Audio.play('zombie_groan_2', { gain: 0.8 });
+
+    let count = 5;
+    if (dk === 'easy') {
+      count = 3 + Math.min(2, Math.floor(s / 2));
+      if (s >= 1) variants.push('runner');
+      if (s >= 3) variants.push('spitter');
+    } else if (dk === 'medium') {
+      count = 5 + Math.min(3, Math.floor((s + 1) / 2));
+      variants.push('runner');
+      if (s >= 1) variants.push('runner');
+      if (s >= 2) variants.push('spitter');
+    } else if (dk === 'hard') {
+      count = 6 + s;
+      variants.push('runner', 'runner');
+      if (s >= 1) variants.push('screamer', 'brute');
+      else variants.push('spitter');
+    } else {
+      count = 8 + s;
+      variants.push('runner', 'runner', 'screamer');
+      if (s >= 1) variants.push('brute');
+      else variants.push('spitter');
+    }
+    while (variants.length < count) {
+      variants.push(pickDifficultyVariant(dk, s >= 1 || dk === 'hard' || dk === 'nightmare'));
+    }
+    return variants;
+  }
+
+  function triggerTrainCallSiegeWave(stationIdx) {
+    if (CORE.gameMode !== MODES.SURVIVAL) return 0;
+    const variants = buildTrainCallSiegeVariants(CORE.difficultyKey, stationIdx, false);
+    const spawned = spawnExtraInfectedCluster(variants, TRAIN_CALL_CONCEALED_ZONES, {
+      minDist: 12.0,
+      maxDist: 34.0,
+      requireHidden: true,
+      preferClose: true
+    });
+    if (spawned > 0) {
+      if (LRT.Audio) LRT.Audio.play('zombie_groan_2', { gain: 0.82 });
+      if (LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
+        LRT.PlayerUI.setNotice('TAHAN PERON — GEROMBOLAN INFECTED MENDEKAT!', '#f97316');
+      }
+    }
+    return spawned;
+  }
+
+  function triggerTrainCallReinforcementTrickle(stationIdx, stage) {
+    if (CORE.gameMode !== MODES.SURVIVAL) return 0;
+    const variants = buildTrainCallSiegeVariants(CORE.difficultyKey, stationIdx, true);
+    if (stage >= 2 && variants.length > 2) variants.length = 2;
+    const spawned = spawnExtraInfectedCluster(variants, TRAIN_CALL_CONCEALED_ZONES, {
+      minDist: 12.0,
+      maxDist: 34.0,
+      requireHidden: true,
+      preferClose: true
+    });
+    if (spawned > 0) {
+      if (LRT.Audio) LRT.Audio.play('zombie_groan_1', { gain: 0.78 });
+      if (stage === 1 && LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
+        LRT.PlayerUI.setNotice('GELOMBANG SUSULAN MUNCUL — PERTAHANKAN PERON!', '#f97316');
+      }
     }
     return spawned;
   }
@@ -338,6 +567,9 @@
     if (typeof LRT.Enemies.setDifficulty === 'function') {
       LRT.Enemies.setDifficulty(CORE.difficultyKey);
     }
+    if (typeof LRT.Enemies.setAtmosphereMode === 'function') {
+      LRT.Enemies.setAtmosphereMode(CORE.atmosphereMode);
+    }
     if (typeof LRT.Enemies.spawnRoamers === 'function') {
       const navGraph = (LRT.Station && typeof LRT.Station.getNavGraph === 'function') ? LRT.Station.getNavGraph() : null;
       return LRT.Enemies.spawnRoamers(stationIdx, CORE.difficultyKey, navGraph);
@@ -348,6 +580,9 @@
   function onStationBuilt(idx, offsetZ) {
     if (LRT.Enemies && typeof LRT.Enemies.setDifficulty === 'function') {
       LRT.Enemies.setDifficulty(CORE.difficultyKey);
+    }
+    if (LRT.Enemies && typeof LRT.Enemies.setAtmosphereMode === 'function') {
+      LRT.Enemies.setAtmosphereMode(CORE.atmosphereMode);
     }
     if (!offsetZ) {
       spawnStationRoamers(idx);
@@ -587,9 +822,6 @@
       direction: dir,
       nextStationName: nextName
     });
-    if (dir === 1 && CORE.gameMode === MODES.SURVIVAL && CORE.difficultyKey === 'nightmare') {
-      triggerTrainCallSiegeWave(CORE.stationIndex);
-    }
     if (LRT.Audio) LRT.Audio.play('station_chime', { gain: 0.85 });
     LRT.PlayerUI.setNotice(
       dir === -1
@@ -597,17 +829,27 @@
         : `KERETA LRT MENDEKATI PERON 1 (→ ${nextArch ? nextArch.name : 'NEXT'})`,
       '#38bdf8'
     );
+    if (dir === 1 && CORE.gameMode === MODES.SURVIVAL) {
+      campaignState.trainCallActive = true;
+      campaignState.trainCallWaitElapsed = 0;
+      campaignState.trainCallTrickleStage = 0;
+      triggerTrainCallSiegeWave(CORE.stationIndex);
+    } else {
+      campaignState.trainCallActive = false;
+      campaignState.trainCallWaitElapsed = 0;
+      campaignState.trainCallTrickleStage = 0;
+    }
   }
 
   function initRideMoodTransition() {
     if (CORE.gameMode !== MODES.SURVIVAL || CORE.lightingLockedByUser) return;
     const fromIdx = CORE.stationIndex;
     const toIdx = Math.max(0, fromIdx + CORE.activeTravelDir);
-    const moods = CORE.CAMPAIGN_MOODS || [];
-    const fromMood = moods[fromIdx % 6] || CORE.currentLightingKey || 'GOLDEN_DUSK';
+    const moods = getActiveCampaignMoods();
+    const fromMood = moods[fromIdx % moods.length] || CORE.currentLightingKey || 'GOLDEN_DUSK';
     const toMood = (fromIdx === 5 && CORE.activeTravelDir === 1)
       ? fromMood
-      : (moods[toIdx % 6] || fromMood);
+      : (moods[toIdx % moods.length] || fromMood);
     CORE._rideFromMoodKey = fromMood;
     CORE._rideToMoodKey = toMood;
     CORE.isMoodLerping = true;
@@ -623,7 +865,9 @@
     }
     if (LRT.Station && LRT.Station.setPsdOpen) LRT.Station.setPsdOpen(0, CORE.activeTravelDir);
     LRT.Train.closeDoors();
+    if (typeof LRT.Train.ejectExteriorEntities === 'function') LRT.Train.ejectExteriorEntities();
     LRT.Train.departNow();
+    campaignState.trainCallActive = false;
     CORE.gameState = STATES.TRAIN_DEPARTING;
     CORE.boardingCloseTimer = 0;
     initRideMoodTransition();
@@ -1204,7 +1448,7 @@
             LRT.Train.openDoors();
             if (wasArrival) {
               if (CORE.gameMode === MODES.SURVIVAL && !CORE.lightingLockedByUser) {
-                const finalMoodKey = CORE._rideToMoodKey || (CORE.CAMPAIGN_MOODS && CORE.CAMPAIGN_MOODS[CORE.stationIndex % 6]) || CORE.currentLightingKey;
+                const finalMoodKey = CORE._rideToMoodKey || getCampaignMoodForStation(CORE.stationIndex) || CORE.currentLightingKey;
                 if (finalMoodKey && typeof CORE.applyMoodLighting === 'function') {
                   CORE.currentLightingKey = finalMoodKey;
                   const stAtmos = (LRT.Station && typeof LRT.Station.getAtmosphere === 'function') ? LRT.Station.getAtmosphere() : null;
@@ -1255,6 +1499,7 @@
             }
           }
         } else if (trState === 'DEPARTING') {
+          campaignState.trainCallActive = false;
           CORE.gameState = STATES.TRAIN_DEPARTING;
           if (!CORE.isMoodLerping || !CORE._rideFromMoodKey || !CORE._rideToMoodKey) {
             initRideMoodTransition();
@@ -1267,6 +1512,21 @@
           if (typeof CORE.markShadowDirty === 'function') CORE.markShadowDirty();
         }
         CORE.prevTrainState = trState;
+      }
+
+      // Mid-wait train-call reinforcement trickle while LRT approaches / awaits boarding
+      if (CORE.gameMode === MODES.SURVIVAL && campaignState.trainCallActive && CORE.activeTravelDir === 1 &&
+          (CORE.gameState === STATES.TRAIN_APPROACHING || (CORE.gameState === STATES.TRAIN_BOARDING && !CORE.rideCompleteReady))) {
+        campaignState.trainCallWaitElapsed += dt;
+        if (campaignState.trainCallTrickleStage === 0 && campaignState.trainCallWaitElapsed >= 7.5) {
+          campaignState.trainCallTrickleStage = 1;
+          triggerTrainCallReinforcementTrickle(CORE.stationIndex, 1);
+        } else if (campaignState.trainCallTrickleStage === 1 && campaignState.trainCallWaitElapsed >= 14.5) {
+          campaignState.trainCallTrickleStage = 2;
+          if (getWaveRemainingCountSafe() < 12) {
+            triggerTrainCallReinforcementTrickle(CORE.stationIndex, 2);
+          }
+        }
       }
 
       if ((trState === 'DEPARTING' || trState === 'CRUISE' || trState === 'ARRIVING') &&
@@ -1451,6 +1711,11 @@
   }
 
   CORE.CAMPAIGN_MOODS = CAMPAIGN_MOODS;
+  CORE.CAMPAIGN_MOODS_DAYLIGHT = (C.CAMPAIGN_MOODS_DAYLIGHT || FALLBACK_CAMPAIGN_MOODS_DAYLIGHT);
+  CORE.getActiveCampaignMoods = getActiveCampaignMoods;
+  CORE.getCampaignMoodForStation = getCampaignMoodForStation;
+  CORE.setAtmosphereMode = setAtmosphereMode;
+  CORE.getAtmosphereMode = getAtmosphereMode;
   CORE.campaignState = campaignState;
   CORE.resetCampaignState = resetCampaignState;
   CORE.saveCurrentStationUsedIds = saveCurrentStationUsedIds;

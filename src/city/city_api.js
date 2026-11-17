@@ -33,6 +33,8 @@
     trafficSignalPositions: [],
     _lootboxGlows: null,
     _lootboxVisuals: null,
+    _fieldLogGlints: null,
+    _fieldLogPropAssets: null,
     destructibleProps: null,
     _concourseBounds: null,
     _lastCamPos: null,
@@ -231,6 +233,8 @@
       this.trafficSignalPositions = [];
       this._lootboxGlows = null;
       this._lootboxVisuals = null;
+      this._fieldLogGlints = null;
+      this._fieldLogPropAssets = null;
       this.destructibleProps = null;
       this._concourseBounds = null;
       this._lastCamPos = null;
@@ -294,6 +298,8 @@
       this.trafficSignalPositions = [];
       this._lootboxGlows = {};
       this._lootboxVisuals = [];
+      this._fieldLogGlints = [];
+      this._fieldLogPropAssets = null;
       this.destructibleProps = [];
       this._concourseBounds = null;
       this._lastCamPos = null;
@@ -518,6 +524,13 @@
         const oz = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
         P.updateLootboxVisuals(this._lootboxVisuals, dt, this._timeAccum, camPos, camForward, difficultyKey, oz);
       }
+      if (this._fieldLogGlints && this._fieldLogGlints.length > 0) {
+        for (let i = 0; i < this._fieldLogGlints.length; i++) {
+          const fg = this._fieldLogGlints[i];
+          if (fg.used || !fg.mesh || !fg.mesh.visible) continue;
+          if (fg.mat) fg.mat.opacity = 0.22 + 0.14 * Math.sin(this._timeAccum * 2.8 + i * 1.1);
+        }
+      }
       const focusPos = camPos || this._lastCamPos;
       if (focusPos) {
         this._repositionPooledLights(focusPos, this._suppressPooledLights);
@@ -707,6 +720,17 @@
       return best;
     },
 
+    _markFieldLogGlintUsed: function (id) {
+      if (!this._fieldLogGlints || !this._fieldLogGlints.length) return;
+      for (let i = 0; i < this._fieldLogGlints.length; i++) {
+        const fg = this._fieldLogGlints[i];
+        if (fg.id === id) {
+          fg.used = true;
+          if (fg.mesh) fg.mesh.visible = false;
+        }
+      }
+    },
+
     interact: function (id) {
       if (!this.interactables) return { ok: false };
       const it = this.interactables.find((x) => x.id === id);
@@ -744,6 +768,7 @@
         it.label = '[E] Gerobak Kopi East Promenade (Sudah Digeledah)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(it.id);
+        this._markFieldLogGlintUsed(it.id);
         return {
           ok: true,
           type: 'street_stash',
@@ -766,6 +791,7 @@
         it.label = '[E] Mobil Patroli TNI MT Haryono (Sudah Digeledah)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(it.id);
+        this._markFieldLogGlintUsed(it.id);
         return {
           ok: true,
           type: 'street_stash',
@@ -786,6 +812,7 @@
         it.label = '[E] Peti Taktis Taman East Pocket (Sudah Digeledah)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(it.id);
+        this._markFieldLogGlintUsed(it.id);
         if (fresh && LRT.Weapons && typeof LRT.Weapons.addAmmo === 'function') {
           LRT.Weapons.addAmmo('rifle', 30);
         }
@@ -825,10 +852,11 @@
         const fresh = !it.used;
         const riskLuck = it.riskLuck !== undefined ? it.riskLuck : 0.55;
         const isAlley = it.id === 'city_alley_lootbox' || riskLuck >= 0.75;
+        const isWest = it.id === 'city_west_plaza_lootbox';
         it.used = true;
         it.label = isAlley
           ? '[E] Peti Suplai Gang Samping (Sudah Diambil)'
-          : '[E] Peti Taktis Taman & Busway (Sudah Diambil)';
+          : (isWest ? '[E] Peti Suplai Trotoar Barat (Sudah Diambil)' : '[E] Peti Taktis Taman & Busway (Sudah Diambil)');
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(it.id);
         if (this._lootboxGlows && this._lootboxGlows[it.id]) {

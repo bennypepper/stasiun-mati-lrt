@@ -241,47 +241,79 @@
     return bestId;
   }
 
-  function hasDirectWalkPath(spatialGrid, x0, y0, z0, x1, z1) {
-    if (!spatialGrid || typeof spatialGrid.queryPoint !== 'function') return false;
+  function hasDirectWalkPath(spatialGrid, x0, y0, z0, x1, z1, trainColliders) {
+    const hasGrid = !!(spatialGrid && typeof spatialGrid.queryPoint === 'function');
+    const tc = Array.isArray(trainColliders)
+      ? trainColliders
+      : ((LRT.Train && typeof LRT.Train.getColliders === 'function') ? LRT.Train.getColliders() : null);
+    if (!hasGrid && (!tc || tc.length === 0)) return false;
+
     const dist = Math.hypot(x1 - x0, z1 - z0);
-    if (dist < 1.2) return true;
+    if (dist < 0.45) return true;
     if (dist > 28.0) return false;
-    const steps = Math.max(2, Math.ceil(dist / 1.15));
+    const steps = Math.max(2, Math.ceil(dist / 0.45));
     for (let s = 1; s < steps; s++) {
       const t = s / steps;
       const px = x0 + (x1 - x0) * t;
       const pz = z0 + (z1 - z0) * t;
-      const near = spatialGrid.queryPoint(px, pz, 0.55);
       let hasFloor = false;
-      for (let k = 0; k < near.length; k++) {
-        const b = near[k];
-        if (!b || b.broken || b.disabled || b.blocksWalk === false || b.isTrigger) continue;
-        if (isWalkableCollider(b)) {
+
+      if (hasGrid) {
+        const near = spatialGrid.queryPoint(px, pz, 0.55);
+        for (let k = 0; k < near.length; k++) {
+          const b = near[k];
+          if (!b || b.broken || b.disabled || b.blocksWalk === false || b.isTrigger) continue;
+          if (isWalkableCollider(b)) {
+            const minX = b.min ? b.min.x : b.minX, maxX = b.max ? b.max.x : b.maxX;
+            const minZ = b.min ? b.min.z : b.minZ, maxZ = b.max ? b.max.z : b.maxZ;
+            const maxY = b.max ? b.max.y : b.maxY, minY = b.min ? b.min.y : b.minY;
+            if (px >= minX - 0.1 && px <= maxX + 0.1 && pz >= minZ - 0.1 && pz <= maxZ + 0.1 && maxY >= y0 - 0.55 && minY <= y0 + 0.55) {
+              hasFloor = true;
+            }
+            continue;
+          }
+          if ((b.tag || '') === 'interact') continue;
+          const minY = b.min ? b.min.y : b.minY, maxY = b.max ? b.max.y : b.maxY;
+          if (maxY <= y0 + 0.42 || minY >= y0 + 1.65) continue;
           const minX = b.min ? b.min.x : b.minX, maxX = b.max ? b.max.x : b.maxX;
           const minZ = b.min ? b.min.z : b.minZ, maxZ = b.max ? b.max.z : b.maxZ;
-          const maxY = b.max ? b.max.y : b.maxY, minY = b.min ? b.min.y : b.minY;
-          if (px >= minX - 0.1 && px <= maxX + 0.1 && pz >= minZ - 0.1 && pz <= maxZ + 0.1 && maxY >= y0 - 0.55 && minY <= y0 + 0.55) {
-            hasFloor = true;
-          }
-          continue;
+          const cx = Math.max(minX, Math.min(px, maxX));
+          const cz = Math.max(minZ, Math.min(pz, maxZ));
+          if ((px - cx) * (px - cx) + (pz - cz) * (pz - cz) < 0.16) return false;
         }
-        if ((b.tag || '') === 'interact') continue;
-        const minY = b.min ? b.min.y : b.minY, maxY = b.max ? b.max.y : b.maxY;
-        if (maxY <= y0 + 0.42 || minY >= y0 + 1.65) continue;
-        const minX = b.min ? b.min.x : b.minX, maxX = b.max ? b.max.x : b.maxX;
-        const minZ = b.min ? b.min.z : b.minZ, maxZ = b.max ? b.max.z : b.maxZ;
-        const cx = Math.max(minX, Math.min(px, maxX));
-        const cz = Math.max(minZ, Math.min(pz, maxZ));
-        if ((px - cx) * (px - cx) + (pz - cz) * (pz - cz) < 0.16) return false;
       }
+
+      if (tc && tc.length > 0) {
+        for (let k = 0; k < tc.length; k++) {
+          const b = tc[k];
+          if (!b || b.broken || b.disabled || b.blocksWalk === false || b.isTrigger) continue;
+          const minX = b.min ? b.min.x : b.minX, maxX = b.max ? b.max.x : b.maxX;
+          const minZ = b.min ? b.min.z : b.minZ, maxZ = b.max ? b.max.z : b.maxZ;
+          if (maxX < px - 0.55 || minX > px + 0.55 || maxZ < pz - 0.55 || minZ > pz + 0.55) continue;
+          if (isWalkableCollider(b)) {
+            const maxY = b.max ? b.max.y : b.maxY, minY = b.min ? b.min.y : b.minY;
+            if (px >= minX - 0.1 && px <= maxX + 0.1 && pz >= minZ - 0.1 && pz <= maxZ + 0.1 && maxY >= y0 - 0.55 && minY <= y0 + 0.55) {
+              hasFloor = true;
+            }
+            continue;
+          }
+          if ((b.tag || '') === 'interact') continue;
+          const minY = b.min ? b.min.y : b.minY, maxY = b.max ? b.max.y : b.maxY;
+          if (maxY <= y0 + 0.42 || minY >= y0 + 1.65) continue;
+          const cx = Math.max(minX, Math.min(px, maxX));
+          const cz = Math.max(minZ, Math.min(pz, maxZ));
+          if ((px - cx) * (px - cx) + (pz - cz) * (pz - cz) < 0.16) return false;
+        }
+      }
+
       if (!hasFloor) return false;
     }
     return true;
   }
 
-  function solveNavWaypoint(zObj, px, py, pz, spatialGrid) {
+  function solveNavWaypoint(zObj, px, py, pz, spatialGrid, trainColliders) {
     const sameLevel = Math.abs((py || 0) - zObj.y) <= 0.65;
-    if (sameLevel && hasDirectWalkPath(spatialGrid, zObj.x, zObj.y, zObj.z, px, pz)) {
+    if (sameLevel && hasDirectWalkPath(spatialGrid, zObj.x, zObj.y, zObj.z, px, pz, trainColliders)) {
       zObj.hasNavWp = false;
       return false;
     }
@@ -402,12 +434,12 @@
     if (pathLen >= 3) {
       const skipTarget = _astarPath[pathLen - 2];
       const nxt2 = nodes[skipTarget];
-      if (nxt2 && Math.abs(nxt2.y - zObj.y) <= 0.65 && hasDirectWalkPath(spatialGrid, zObj.x, zObj.y, zObj.z, nxt2.x, nxt2.z)) {
+      if (nxt2 && Math.abs(nxt2.y - zObj.y) <= 0.65 && hasDirectWalkPath(spatialGrid, zObj.x, zObj.y, zObj.z, nxt2.x, nxt2.z, trainColliders)) {
         targetNodeId = skipTarget;
         if (pathLen >= 4) {
           const skipTarget2 = _astarPath[pathLen - 3];
           const nxt3 = nodes[skipTarget2];
-          if (nxt3 && Math.abs(nxt3.y - zObj.y) <= 0.65 && hasDirectWalkPath(spatialGrid, zObj.x, zObj.y, zObj.z, nxt3.x, nxt3.z)) {
+          if (nxt3 && Math.abs(nxt3.y - zObj.y) <= 0.65 && hasDirectWalkPath(spatialGrid, zObj.x, zObj.y, zObj.z, nxt3.x, nxt3.z, trainColliders)) {
             targetNodeId = skipTarget2;
           }
         }

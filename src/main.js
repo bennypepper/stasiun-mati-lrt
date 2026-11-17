@@ -18,6 +18,7 @@
   let rafId = 0;
   let _bootPromise = null;
   let _lastActiveObjKey = null;
+  let _atmosphereMode = 'night_horror';
   const _camForward = new THREE.Vector3();
   const _bvhMeshesScratch = [];
   const consoleErrors = [];
@@ -66,11 +67,34 @@
 
   CORE.updateCityVisibility = updateCityVisibility;
 
+  function normalizeAtmosphereMode(mode) {
+    return mode === 'daylight_outbreak' ? 'daylight_outbreak' : 'night_horror';
+  }
+
+  function getAtmosphereMode() {
+    if (typeof CORE.getAtmosphereMode === 'function') {
+      return normalizeAtmosphereMode(CORE.getAtmosphereMode());
+    }
+    return normalizeAtmosphereMode(CORE.atmosphereMode || _atmosphereMode);
+  }
+
+  function getCampaignMoodKey(idx) {
+    const i = ((idx | 0) % 6 + 6) % 6;
+    if (typeof CORE.getCampaignMoodForStation === 'function') {
+      const k = CORE.getCampaignMoodForStation(i);
+      if (k && C.MOODS && (k in C.MOODS)) return k;
+    }
+    if (getAtmosphereMode() === 'daylight_outbreak' && Array.isArray(C.CAMPAIGN_MOODS_DAYLIGHT) && C.CAMPAIGN_MOODS_DAYLIGHT.length) {
+      return C.CAMPAIGN_MOODS_DAYLIGHT[i % C.CAMPAIGN_MOODS_DAYLIGHT.length] || 'DAYLIGHT_CLEAR';
+    }
+    return (CORE.CAMPAIGN_MOODS && CORE.CAMPAIGN_MOODS[i]) || 'GOLDEN_DUSK';
+  }
+
   function _resolveStationBuildParams(idx) {
     const seed = getStationSeed(idx);
     const autoMood = (CORE.gameState !== STATES.MENU && CORE.gameMode === MODES.SURVIVAL && !CORE.lightingLockedByUser);
     const targetMoodKey = autoMood
-      ? (CORE.CAMPAIGN_MOODS[idx % 6] || 'GOLDEN_DUSK')
+      ? getCampaignMoodKey(idx)
       : CORE.currentLightingKey;
     const savedUsed = CORE.campaignState.stationUsedIds ? CORE.campaignState.stationUsedIds.get(idx) : null;
     const usedIds = savedUsed ? new Set(savedUsed) : new Set();
@@ -143,6 +167,7 @@
     if (LRT.Station && LRT.Station.dispose) LRT.Station.dispose(CORE.scene);
     if (LRT.Enemies && LRT.Enemies.reset) LRT.Enemies.reset();
     if (LRT.Enemies && typeof LRT.Enemies.setDifficulty === 'function') LRT.Enemies.setDifficulty(CORE.difficultyKey);
+    if (LRT.Enemies && typeof LRT.Enemies.setAtmosphereMode === 'function') LRT.Enemies.setAtmosphereMode(getAtmosphereMode());
     if (LRT.Weapons && LRT.Weapons.reset) LRT.Weapons.reset(CORE.gameMode, CORE.difficultyKey);
     if (LRT.Weapons && LRT.Weapons.setVisible) LRT.Weapons.setVisible(true);
     if (LRT.Train && LRT.Train.reset) LRT.Train.reset(CORE.gameMode);
@@ -346,6 +371,43 @@
     return applied;
   }
 
+  function applyAtmosphereSetting(mode, notify) {
+    const normalized = normalizeAtmosphereMode(mode);
+    const applied = typeof CORE.setAtmosphereMode === 'function'
+      ? normalizeAtmosphereMode(CORE.setAtmosphereMode(normalized))
+      : normalized;
+    _atmosphereMode = applied;
+    CORE.atmosphereMode = applied;
+
+    if (LRT.Enemies && typeof LRT.Enemies.setAtmosphereMode === 'function') {
+      LRT.Enemies.setAtmosphereMode(applied);
+    }
+    if (LRT.PlayerUI && typeof LRT.PlayerUI.syncAtmosphereUi === 'function') {
+      LRT.PlayerUI.syncAtmosphereUi(applied);
+    }
+    if (typeof CORE.saveSettings === 'function') {
+      CORE.saveSettings({ atmosphereMode: applied });
+    }
+
+    if (!CORE.lightingLockedByUser && CORE.gameState !== STATES.MENU && CORE.gameMode === MODES.SURVIVAL && typeof CORE.applyMoodLighting === 'function') {
+      const targetMoodKey = getCampaignMoodKey(CORE.stationIndex || 0);
+      const stStats = (LRT.Station && typeof LRT.Station.getStats === 'function') ? LRT.Station.getStats() : null;
+      CORE.isMoodLerping = false;
+      CORE._rideFromMoodKey = null;
+      CORE._rideToMoodKey = null;
+      CORE.applyMoodLighting(stStats, { moodKey: targetMoodKey });
+    }
+
+    if (notify === true && LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
+      const label = applied === 'daylight_outbreak'
+        ? 'TIME CYCLE: DAYLIGHT–SUNSET'
+        : 'TIME CYCLE: NIGHT HORROR';
+      const color = applied === 'daylight_outbreak' ? '#f59e0b' : '#38bdf8';
+      LRT.PlayerUI.setNotice(label, color);
+    }
+    return applied;
+  }
+
   function bindUiButtons() {
     const dom = LRT.PlayerUI.getDom();
 
@@ -408,6 +470,11 @@
           applyDifficultySetting(diffBtn.dataset.difficulty, true);
           return;
         }
+        const atmoBtn = e.target.closest('[data-atmosphere]');
+        if (atmoBtn) {
+          applyAtmosphereSetting(atmoBtn.dataset.atmosphere, true);
+          return;
+        }
         const resBtn = e.target.closest('[data-resscale]');
         if (resBtn) {
           if (typeof CORE.setRenderScale === 'function') CORE.setRenderScale(resBtn.dataset.resscale);
@@ -438,7 +505,7 @@
     LRT.PlayerUI.setPaused(true, false);
     LRT.PlayerUI.showScreen('pause');
     if (LRT.PlayerUI && typeof LRT.PlayerUI.syncAllSettingsUi === 'function' && typeof CORE.getSettings === 'function') {
-      LRT.PlayerUI.syncAllSettingsUi(CORE.getSettings());
+      LRT.PlayerUI.syncAllSettingsUi(Object.assign({ atmosphereMode: getAtmosphereMode() }, CORE.getSettings() || {}));
     }
   }
 
@@ -531,6 +598,7 @@
         if (savedSettings.aoMode && typeof CORE.setAoMode === 'function') CORE.setAoMode(savedSettings.aoMode);
         if (typeof savedSettings.fpsCounterEnabled === 'boolean' && typeof CORE.setFpsCounterEnabled === 'function') CORE.setFpsCounterEnabled(savedSettings.fpsCounterEnabled);
         if (savedSettings.difficultyKey && typeof CORE.setDifficulty === 'function') CORE.setDifficulty(savedSettings.difficultyKey);
+        if (savedSettings.atmosphereMode) applyAtmosphereSetting(savedSettings.atmosphereMode, false);
       }
 
       if (LRT.Audio && LRT.Audio.init) LRT.Audio.init();
@@ -556,6 +624,7 @@
       if (LRT.Enemies && LRT.Enemies.init) {
         LRT.Enemies.init(scene);
         if (typeof LRT.Enemies.setDifficulty === 'function') LRT.Enemies.setDifficulty(CORE.difficultyKey);
+        if (typeof LRT.Enemies.setAtmosphereMode === 'function') LRT.Enemies.setAtmosphereMode(getAtmosphereMode());
       }
 
       // Pre-build Station 0 & apply startup Daylight preset
@@ -593,7 +662,7 @@
       LRT.PlayerUI.setPaused(true, false);
       bindUiButtons();
       if (LRT.PlayerUI && typeof LRT.PlayerUI.syncAllSettingsUi === 'function' && typeof CORE.getSettings === 'function') {
-        LRT.PlayerUI.syncAllSettingsUi(CORE.getSettings());
+        LRT.PlayerUI.syncAllSettingsUi(Object.assign({ atmosphereMode: getAtmosphereMode() }, CORE.getSettings() || {}));
       }
 
       window.addEventListener('resize', () => {
@@ -627,6 +696,7 @@
             revision: THREE.REVISION,
             state: CORE.gameState,
             mode: CORE.gameMode,
+            atmosphereMode: getAtmosphereMode(),
             lightingMode: CORE.currentLightingKey,
             lightingLockedByUser: CORE.lightingLockedByUser,
             stationIndex: CORE.stationIndex,
@@ -723,6 +793,8 @@
           CORE.saveCurrentStationUsedIds();
           if (LRT.Station && LRT.Station.dispose) LRT.Station.dispose(CORE.scene);
           if (LRT.Enemies && LRT.Enemies.reset) LRT.Enemies.reset();
+          if (LRT.Enemies && typeof LRT.Enemies.setDifficulty === 'function') LRT.Enemies.setDifficulty(CORE.difficultyKey);
+          if (LRT.Enemies && typeof LRT.Enemies.setAtmosphereMode === 'function') LRT.Enemies.setAtmosphereMode(getAtmosphereMode());
           if (LRT.Train && LRT.Train.reset) LRT.Train.reset(CORE.gameMode);
           CORE.stationIndex = Math.max(0, idx | 0);
           CORE.activeTravelDir = 1;
@@ -761,6 +833,8 @@
           ? LRT.Weapons.unlockWeapon(idOrAll, bonus)
           : null,
         setDifficulty: (k) => applyDifficultySetting(k, false),
+        setAtmosphereMode: (m, notify) => applyAtmosphereSetting(m, !!notify),
+        getAtmosphereMode: () => getAtmosphereMode(),
         grantLoot: (forcedRarity, riskLuck) => {
           if (!LRT.Weapons || typeof LRT.Weapons.rollLootbox !== 'function') return null;
           const opts = {
@@ -827,6 +901,8 @@
     setAoMode: CORE.setAoMode,
     setFpsCounterEnabled: CORE.setFpsCounterEnabled,
     setDifficulty: (k, notify) => applyDifficultySetting(k, !!notify),
+    setAtmosphereMode: (m, notify) => applyAtmosphereSetting(m, !!notify),
+    getAtmosphereMode: () => getAtmosphereMode(),
     getRenderSettings: CORE.getSettings,
     setBrightness: CORE.setBrightness,
     getBrightness: CORE.getBrightness,
