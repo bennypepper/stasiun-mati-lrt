@@ -34,7 +34,9 @@
       alertDelay: 0.45,
       screamerBuffMult: 1.22,
       screamRadius: 18.0,
-      roamSpeedMult: 0.55
+      roamSpeedMult: 0.55,
+      dropRate: 0.48,
+      dropRates: { walker: 0.48, runner: 0.48, spitter: 0.56, screamer: 0.58, brute: 0.72 }
     },
     medium: {
       key: 'medium',
@@ -62,7 +64,9 @@
       alertDelay: 0.28,
       screamerBuffMult: 1.22,
       screamRadius: 24.0,
-      roamSpeedMult: 0.55
+      roamSpeedMult: 0.55,
+      dropRate: 0.26,
+      dropRates: { walker: 0.26, runner: 0.26, spitter: 0.36, screamer: 0.38, brute: 0.52 }
     },
     hard: {
       key: 'hard',
@@ -90,7 +94,9 @@
       alertDelay: 0.14,
       screamerBuffMult: 1.22,
       screamRadius: 30.0,
-      roamSpeedMult: 0.65
+      roamSpeedMult: 0.65,
+      dropRate: 0.12,
+      dropRates: { walker: 0.12, runner: 0.12, spitter: 0.19, screamer: 0.21, brute: 0.32 }
     },
     nightmare: {
       key: 'nightmare',
@@ -118,7 +124,9 @@
       alertDelay: 0.05,
       screamerBuffMult: 1.30,
       screamRadius: 38.0,
-      roamSpeedMult: 0.75
+      roamSpeedMult: 0.75,
+      dropRate: 0.06,
+      dropRates: { walker: 0.06, runner: 0.06, spitter: 0.10, screamer: 0.12, brute: 0.18 }
     }
   };
 
@@ -220,24 +228,28 @@
 
   function getDropRoll(variant, diffKey) {
     const tier = getDifficultyTier(diffKey);
-    const key = tier.key;
-    const r = Math.random();
-    if (variant === 'brute') {
-      if (r < 0.35) return 'lootcrate';
-      if (r < 0.70) return 'health';
-      if (r < 0.88) return 'ammo';
-      return null;
+    const v = variant || 'walker';
+    const rates = tier.dropRates || null;
+    const chance = (rates && typeof rates[v] === 'number')
+      ? rates[v]
+      : (typeof tier.dropRate === 'number' ? tier.dropRate : 0.26);
+    if (Math.random() >= chance) return null;
+
+    const itemRoll = Math.random();
+    if (v === 'brute') {
+      if (itemRoll < 0.38) return 'lootcrate';
+      if (itemRoll < 0.72) return 'health';
+      return 'ammo';
     }
-    if (variant === 'screamer') {
-      if (r < 0.20) return 'lootcrate';
-      if (r < 0.35) return 'health';
-      if (r < 0.60) return 'ammo';
-      return null;
+    if (v === 'screamer') {
+      if (itemRoll < 0.25) return 'lootcrate';
+      if (itemRoll < 0.55) return 'health';
+      return 'ammo';
     }
-    const baseChance = variant === 'spitter' ? 0.45 : 0.28;
-    const diffAdj = key === 'easy' ? 0.06 : (key === 'nightmare' ? -0.04 : 0.0);
-    if (r >= Math.max(0.10, baseChance + diffAdj)) return null;
-    return Math.random() < 0.35 ? 'health' : 'ammo';
+    if (v === 'spitter') {
+      return itemRoll < 0.38 ? 'health' : 'ammo';
+    }
+    return itemRoll < 0.32 ? 'health' : 'ammo';
   }
 
   function isValidSpawnPoint(x, y, z, playerPos, minPlayerDistSq) {
@@ -339,6 +351,7 @@
     slot.attackCooldown = cfg.attackCooldown;
     slot.attackTimer = 0.25 + Math.random() * 0.4;
     slot.spitTimer = 1.2 + Math.random() * 1.4;
+    slot.spitBlocked = false;
     slot.staggerTimer = 0;
     slot.hitFlashTimer = 0;
     slot.deathTimer = 0;
@@ -912,6 +925,9 @@
       const cfg = E.getEnemyCfg('spitter');
       if (LRT.Weapons && typeof LRT.Weapons.applyExplosion === 'function') {
         LRT.Weapons.applyExplosion(_v1, cfg.deathBlastRadius || 3.6, cfg.deathBlastDmg || 32, 9.0, true);
+      }
+      if (typeof E.spawnBilePuddle === 'function') {
+        E.spawnBilePuddle(z.x, z.y, z.z, 1.55, z.y);
       }
     }
 
@@ -1841,7 +1857,10 @@
             }
           }
 
-          const stopDist = (z.variant === 'spitter' && !z.hasNavWp && Math.abs(pdy) <= 1.2) ? 7.5 : (z.attackRange * 0.82);
+          const meleeRange = z.variant === 'spitter' ? 1.75 : z.attackRange;
+          const stopDist = (z.variant === 'spitter' && !z.hasNavWp && Math.abs(pdy) <= 1.2 && !z.spitBlocked && distHoriz <= 13.5)
+            ? 7.5
+            : (meleeRange * 0.82);
 
           if ((dist3D > stopDist || isBackpedaling || z.chargeTimer > 0) && z.alertDelay <= 0 && z.shriekTimer <= 0 && z.chargeWindup <= 0) {
             steerAndMove(z, i, goalX, goalZ, moveSpd, moveStep, isBackpedaling, dist3D, distHoriz, pdx, pdz);
@@ -1859,7 +1878,7 @@
             z.groundedOnce = true;
           }
 
-          if (dist3D <= z.attackRange && z.attackTimer <= 0 && z.staggerTimer <= 0 && z.shriekTimer <= 0 && z.chargeWindup <= 0 && z.alertDelay <= 0) {
+          if (dist3D <= meleeRange && Math.abs(pdy) <= 1.8 && z.attackTimer <= 0 && z.staggerTimer <= 0 && z.shriekTimer <= 0 && z.chargeWindup <= 0 && z.alertDelay <= 0) {
             z.attackTimer = z.attackCooldown;
             const isChargingHit = z.chargeTimer > 0;
             if (isChargingHit) z.chargeTimer = 0;
@@ -1901,23 +1920,48 @@
             }
           }
 
-          if (z.variant === 'spitter' && playerPos && dist3D >= 4.5 && dist3D <= 14.5 && z.spitTimer <= 0 && z.staggerTimer <= 0 && z.alertDelay <= 0) {
-            _v1.set(z.x, z.y + 1.48 * z.scale, z.z);
-            _v2.set(playerPos.x - _v1.x, ((playerPos.y || 0) + 1.25) - _v1.y, playerPos.z - _v1.z).normalize();
+          if (z.variant === 'spitter' && playerPos && distHoriz >= 3.2 && distHoriz <= 14.0 && dist3D <= 14.5 && Math.abs(pdy) <= 5.5 && z.spitTimer <= 0 && z.staggerTimer <= 0 && z.alertDelay <= 0) {
+            const mouthY = z.y + 1.46 * z.scale;
+            const targetY = (playerPos.y || 0) + 1.05;
+            _v1.set(z.x, mouthY, z.z);
+            _v2.set(playerPos.x - _v1.x, targetY - _v1.y, playerPos.z - _v1.z);
+            const losLen = _v2.length();
+            if (losLen > 0.01) _v2.divideScalar(losLen);
             let blocked = false;
+            const checkDist = Math.max(0.1, losLen - 0.45);
             if (LRT.Station && typeof LRT.Station.raycastWorld === 'function') {
-              const wallHit = LRT.Station.raycastWorld(_v1, _v2, dist3D - 0.6);
+              const wallHit = LRT.Station.raycastWorld(_v1, _v2, checkDist);
               if (wallHit) blocked = true;
             }
             if (!blocked && LRT.Train && typeof LRT.Train.raycastTrain === 'function') {
-              const trainHit = LRT.Train.raycastTrain(_v1, _v2, dist3D - 0.6);
-              if (trainHit && !trainHit.isGlass && trainHit.material !== 'glass' && trainHit.type !== 'glass') blocked = true;
+              const trainHit = LRT.Train.raycastTrain(_v1, _v2, checkDist);
+              if (trainHit) blocked = true;
+            }
+            // Also verify ballistic arc apex clearance so Spitters do not lob blindly into low lintels/ceilings
+            if (!blocked && distHoriz > 3.5) {
+              const ft = Math.max(0.26, Math.min(1.40, distHoriz / 11.0));
+              const apexY = (mouthY + targetY) * 0.5 + 0.125 * 11.5 * ft * ft;
+              _v3.set((z.x + playerPos.x) * 0.5, apexY, (z.z + playerPos.z) * 0.5);
+              _v4.subVectors(_v3, _v1);
+              const seg1 = _v4.length();
+              if (seg1 > 0.25) {
+                _v4.divideScalar(seg1);
+                if (LRT.Station && typeof LRT.Station.raycastWorld === 'function' && LRT.Station.raycastWorld(_v1, _v4, seg1 - 0.15)) {
+                  blocked = true;
+                }
+                if (!blocked && LRT.Train && typeof LRT.Train.raycastTrain === 'function' && LRT.Train.raycastTrain(_v1, _v4, seg1 - 0.15)) {
+                  blocked = true;
+                }
+              }
             }
             if (!blocked) {
-              z.spitTimer = 3.2 + Math.random() * 0.9;
+              z.yaw = Math.atan2(pdx, pdz);
+              z.spitBlocked = false;
+              z.spitTimer = 3.2 + Math.random() * 1.0;
               E.spawnBileProjectile(z, playerPos);
             } else {
-              z.spitTimer = 0.6;
+              z.spitBlocked = true;
+              z.spitTimer = 0.55;
             }
           }
         }
@@ -1977,6 +2021,18 @@
     for (let i = 0; i < MAX_BILE; i++) {
       if (E.bileOrbs[i].active) {
         out.push({ pos: E.bileOrbs[i].pos, vel: E.bileOrbs[i].vel, active: true });
+      }
+    }
+    return out;
+  }
+
+  function getActiveAcidPuddles() {
+    const out = [];
+    if (!E.bilePuddles) return out;
+    for (let i = 0; i < E.bilePuddles.length; i++) {
+      const p = E.bilePuddles[i];
+      if (p && p.active) {
+        out.push({ pos: p.pos, radius: p.radius, life: p.life, maxLife: p.maxLife, active: true });
       }
     }
     return out;
@@ -2168,6 +2224,7 @@
     getTotalCount,
     getKills: () => _totalKills,
     getSpawnedSpitterProjectiles,
+    getActiveAcidPuddles,
     getDebugSummary
   };
 

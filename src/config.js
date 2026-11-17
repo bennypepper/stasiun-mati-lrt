@@ -611,6 +611,8 @@
       screamRadius: 18.0,
       screamerBuffMult: 1.22,
       luckDelta: -0.10,
+      dropRate: 0.48,
+      dropRates: { walker: 0.48, runner: 0.48, spitter: 0.56, screamer: 0.58, brute: 0.72 },
       variantMix: { walker: 0.80, runner: 0.08, spitter: 0.07, brute: 0.05, screamer: 0.00 }
     },
     medium: {
@@ -647,6 +649,8 @@
       screamRadius: 24.0,
       screamerBuffMult: 1.22,
       luckDelta: 0.00,
+      dropRate: 0.26,
+      dropRates: { walker: 0.26, runner: 0.26, spitter: 0.36, screamer: 0.38, brute: 0.52 },
       variantMix: { walker: 0.68, runner: 0.12, spitter: 0.10, brute: 0.06, screamer: 0.04 }
     },
     hard: {
@@ -683,6 +687,8 @@
       screamRadius: 30.0,
       screamerBuffMult: 1.22,
       luckDelta: 0.10,
+      dropRate: 0.12,
+      dropRates: { walker: 0.12, runner: 0.12, spitter: 0.19, screamer: 0.21, brute: 0.32 },
       variantMix: { walker: 0.50, runner: 0.22, spitter: 0.12, brute: 0.09, screamer: 0.07 }
     },
     nightmare: {
@@ -719,6 +725,8 @@
       screamRadius: 38.0,
       screamerBuffMult: 1.30,
       luckDelta: 0.20,
+      dropRate: 0.06,
+      dropRates: { walker: 0.06, runner: 0.06, spitter: 0.10, screamer: 0.12, brute: 0.18 },
       variantMix: { walker: 0.38, runner: 0.28, spitter: 0.14, brute: 0.11, screamer: 0.09 }
     }
   };
@@ -914,7 +922,11 @@
     'train_horn', 'station_chime', 'train_ride_loop',
     'footstep_concrete_1', 'footstep_concrete_2', 'footstep_metal',
     'zombie_groan_1', 'zombie_groan_2', 'zombie_attack', 'zombie_hit', 'zombie_death',
-    'player_hurt', 'player_heartbeat', 'player_gasp'
+    'player_hurt', 'player_heartbeat', 'player_gasp',
+    'generator_start', 'generator_loop', 'electric_box_open', 'breaker_throw',
+    'crate_open', 'loot_chime', 'pickup_ammo', 'pickup_medkit', 'paper_rustle',
+    'car_trunk_open', 'water_pour', 'hydrant_spray', 'rain_loop',
+    'casing_concrete', 'casing_metal', 'flashlight_click', 'headshot_crit'
   ];
 
   LRT.Config = {

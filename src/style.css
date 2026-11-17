@@ -921,6 +921,248 @@ html, body {
   backdrop-filter: none;
 }
 
+#gameover-overlay.is-victory {
+  background: radial-gradient(
+    circle at 26% 44%,
+    rgba(36, 28, 14, 0.74) 0%,
+    rgba(6, 10, 14, 0.94) 74%
+  );
+}
+
+#gameover-overlay.is-victory .zenith-kicker {
+  color: var(--amber-muted);
+}
+
+/* Victory Rolling Credits Stage (Right column on desktop, stacked on mobile) */
+.victory-credits {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(22px, 3.8vh, 48px) clamp(26px, 4vw, 56px) clamp(20px, 3.4vh, 38px) clamp(20px, 2.8vw, 42px);
+  border-left: 1px solid rgba(225, 222, 214, 0.12);
+  background: linear-gradient(
+    90deg,
+    rgba(6, 8, 12, 0.28) 0%,
+    rgba(6, 8, 12, 0.62) 100%
+  );
+  overflow: hidden;
+  animation: creditsReveal 0.65s ease-out both;
+}
+
+.victory-credits.is-collapsed {
+  background: transparent;
+  border-left-color: transparent;
+  justify-content: flex-start;
+}
+
+@keyframes creditsReveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.credits-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.credits-toolbar-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: var(--amber-muted);
+  text-transform: uppercase;
+}
+
+.credits-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.credits-viewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 0 clamp(4px, 1vw, 14px);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 9%,
+    #000 88%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 9%,
+    #000 88%,
+    transparent 100%
+  );
+}
+
+.credits-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.credits-track {
+  max-width: 620px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.credits-lead-spacer {
+  height: clamp(24px, 5vh, 56px);
+}
+
+.credits-tail-spacer {
+  height: clamp(80px, 24vh, 220px);
+}
+
+.credits-hero {
+  padding-top: 8px;
+}
+
+.credits-kicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  color: var(--amber-muted);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.credits-game-title {
+  margin: 0;
+  font-size: clamp(24px, 2.5vw, 34px);
+  font-weight: 300;
+  letter-spacing: 0.24em;
+  color: var(--bone);
+  text-transform: uppercase;
+}
+
+.credits-game-sub {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  color: var(--ash);
+  text-transform: uppercase;
+}
+
+.credits-featured {
+  padding: 16px 18px;
+  border-left: 2px solid var(--amber-muted);
+  background: rgba(194, 160, 98, 0.07);
+}
+
+.credits-role {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  color: var(--amber-muted);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.credits-name-hero {
+  font-size: clamp(24px, 2.3vw, 32px);
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  color: var(--bone);
+  text-transform: uppercase;
+}
+
+.credits-detail {
+  margin-top: 6px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--bone-soft);
+}
+
+.credits-rule {
+  height: 1px;
+  background: linear-gradient(90deg, rgba(225, 222, 214, 0.22), transparent);
+}
+
+.credits-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.credits-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(225, 222, 214, 0.07);
+}
+
+.credits-item {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--bone);
+}
+
+.credits-license {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  letter-spacing: 0.03em;
+  color: var(--ash);
+}
+
+.credits-finale {
+  padding: 18px 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.credits-finale-kicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--amber-muted);
+  text-transform: uppercase;
+}
+
+.credits-finale-msg {
+  font-size: clamp(16px, 1.5vw, 20px);
+  font-weight: 300;
+  letter-spacing: 0.18em;
+  color: var(--bone);
+  text-transform: uppercase;
+}
+
+.credits-finale-dev {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  color: var(--bone-soft);
+}
+
 /* Completely transparent left column — NO card box, NO borders */
 .zenith-column,
 .menu-dock {
@@ -1295,7 +1537,99 @@ html, body {
     width: min(440px, 90vw);
     padding: 28px 24px;
   }
+  #gameover-overlay.is-victory {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  #gameover-overlay.is-victory .gameover-summary-col {
+    width: 100%;
+    height: auto;
+    padding: 24px 24px 12px;
+    overflow: visible;
+  }
+  #gameover-overlay.is-victory .victory-credits {
+    width: 100%;
+    height: auto;
+    min-height: 320px;
+    border-left: none;
+    border-top: 1px solid rgba(225, 222, 214, 0.14);
+    padding: 18px 24px 28px;
+  }
   .controls-list {
     grid-template-columns: 1fr;
   }
+}
+
+/* GTA-style Cheat Console Bar (` key) */
+#cheat-console {
+  position: fixed;
+  top: 120px;
+  left: 22px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 340px;
+  max-width: min(500px, 90vw);
+  padding: 7px 12px;
+  background: rgba(6, 8, 12, 0.88);
+  border: 1px solid rgba(224, 180, 34, 0.55);
+  border-left: 3px solid #e0b422;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.72);
+  pointer-events: auto;
+  z-index: 45;
+}
+
+.cheat-prompt {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: #e0b422;
+  line-height: 1;
+}
+
+#cheat-input {
+  flex: 1 1 auto;
+  min-width: 140px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--bone);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+#cheat-input::placeholder {
+  color: rgba(212, 208, 198, 0.42);
+  letter-spacing: 0.10em;
+  font-weight: 400;
+}
+
+.cheat-hint {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  color: var(--ash-dim);
+  white-space: nowrap;
+}
+
+.cheat-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.cheat-pill {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  padding: 2px 6px;
+  border: 1px solid rgba(74, 222, 128, 0.55);
+  background: rgba(74, 222, 128, 0.12);
+  color: #4ade80;
+  font-variant-numeric: tabular-nums;
 }

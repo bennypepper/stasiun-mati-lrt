@@ -4,6 +4,37 @@
   window.__LRT_INTERNAL__ = window.__LRT_INTERNAL__ || {};
   const S = (window.__LRT_INTERNAL__.station = window.__LRT_INTERNAL__.station || {});
 
+  function computeRailConfig(arch, dims) {
+    const a = arch || {};
+    const d = dims || {};
+    const layout = a.layout || 'SIDE_DUAL';
+    const isCawang = layout === 'CAWANG_HUB';
+    const isDepot = layout === 'ISLAND_DEPOT';
+    const isIsland = layout === 'ISLAND_CENTRAL' || isCawang || isDepot;
+    const psdX = d.psdEdgeX || 1.46;
+    const p1MinX = psdX;
+    const p1Width = isIsland ? (a.islandWidth || d.islandPlatformWidth || 9.60) : 5.60;
+    const p1MaxX = p1MinX + p1Width;
+    const track2X = isIsland ? (p1MaxX + 1.46) : (d.track2X || -4.70);
+    return {
+      layout: layout,
+      isCawang: isCawang,
+      isDepot: isDepot,
+      isIsland: isIsland,
+      track1X: 0.0,
+      track2X: track2X,
+      psd1X: psdX,
+      psd2X: track2X - 1.46,
+      platEdge1X: psdX,
+      platEdge2X: track2X - 1.46,
+      p1MinX: p1MinX,
+      p1Width: p1Width,
+      p1MaxX: p1MaxX,
+      p2MinX: isIsland ? p1MinX : (track2X - 1.46 - 5.20),
+      p2MaxX: track2X - 1.46
+    };
+  }
+
   function buildArchitecture(station, ctx) {
     const {
       STREET_GROUND_Y, SIDEWALK_Y, RAIL_TOP_Y, TRACK_BED_Y,
@@ -26,34 +57,18 @@
       bStairStepsConc, bStairStepsSteel, bStairSlopeBvh
     } = buckets;
 
-    const layout = arch.layout || 'SIDE_DUAL';
-    const isCawang = layout === 'CAWANG_HUB';
-    const isDepot = layout === 'ISLAND_DEPOT';
-    const isIsland = layout === 'ISLAND_CENTRAL' || isCawang || isDepot;
+    const railCfg = computeRailConfig(arch, dims);
+    const {
+      layout, isCawang, isDepot, isIsland,
+      psd1X: psdX, p1MinX, p1Width, p1MaxX, track2X
+    } = railCfg;
 
     // Clamp platform length <= 124m ([-62..+62]) so level crossings at z = ±74 are 100% open across all 6 archetypes!
     const platLen = Math.min(arch.platLen || dims.platformLength || 120, 124);
     const halfPlat = platLen * 0.5;
-    const psdX = dims.psdEdgeX || 1.46;
-    const p1MinX = psdX;
-    const p1Width = isIsland ? (arch.islandWidth || dims.islandPlatformWidth) : 5.60;
-    const p1MaxX = p1MinX + p1Width;
     const platMinZ = -halfPlat;
     const platMaxZ = halfPlat;
-    const track2X = isIsland ? (p1MaxX + 1.46) : (dims.track2X || -4.70);
-    station._railConfig = {
-      isIsland: isIsland,
-      track1X: 0.0,
-      track2X: track2X,
-      psd1X: psdX,
-      psd2X: track2X - 1.46,
-      platEdge1X: psdX,
-      platEdge2X: track2X - 1.46,
-      p1MinX: p1MinX,
-      p1MaxX: p1MaxX,
-      p2MinX: isIsland ? p1MinX : (track2X - 1.46 - 5.20),
-      p2MaxX: track2X - 1.46
-    };
+    station._railConfig = railCfg;
 
     // =========================================================
     // 1. AT-GRADE GROUND-LEVEL BALLASTED TRACKS (railTopY = -1.00)
@@ -876,8 +891,8 @@
       const j2Piers = isCawang
         ? [jpo2MinX + 0.55, p1MinX + 0.65, p1MaxX - 0.65, i2MinX + 0.65, jpo2MaxX - 0.55]
         : (arch.hasGardenTerrace
-          ? [jpo2MinX + 0.55, p1MaxX - 0.55, gxBridgeMin + 0.55, jpo2MaxX - 0.55]
-          : (isIsland ? [jpo2MinX + 0.55, jpo2MaxX - 0.55] : [jpo2MinX + 0.55, jpo2MaxX - 0.45]));
+          ? [jpo2MinX + 0.55, p1MaxX - 0.65, gxBridgeMin + 0.55, jpo2MaxX - 0.55]
+          : (isIsland ? [jpo2MinX + 0.55, p1MaxX - 0.65] : [jpo2MinX + 0.55, jpo2MaxX - 0.45]));
       buildJpoBridgeSpan(jpo2Z, jpo2Depth, jpo2MinX, jpo2MaxX, jpo2NearZ, jpo2FarZ, j2Ops, [], j2Piers);
 
       buildStairRamp(stairX, j2StairFootZ, jpo2NearZ, UPPER_FLOOR_Y, 0.0);
@@ -1217,12 +1232,12 @@
 
       const wreckX = ctx.cawangWreckX;
       // Platform canopy truss-mounted track signs (clear of trains)
-      addTrackSign(p1MinX + 1.5, 3.45, -16.0, 0.0, trackUv.jalur1);
-      addTrackSign(p1MinX + 1.5, 3.45, 18.0, 0.0, trackUv.jalur1);
-      addTrackSign(p1MaxX - 1.5, 3.45, -16.0, 0.0, trackUv.jalur2);
-      addTrackSign(p1MaxX - 1.5, 3.45, 18.0, 0.0, trackUv.jalur2);
-      addTrackSign(i2MinX + 1.8, 3.45, -16.0, 0.0, trackUv.jalur4);
-      addTrackSign(i2MinX + 1.8, 3.45, 18.0, 0.0, trackUv.jalur4);
+      addTrackSign(p1MinX + 2.3, 3.45, -16.0, 0.0, trackUv.jalur1);
+      addTrackSign(p1MinX + 2.3, 3.45, 18.0, 0.0, trackUv.jalur1);
+      addTrackSign(p1MaxX - 2.3, 3.45, -16.0, 0.0, trackUv.jalur2);
+      addTrackSign(p1MaxX - 2.3, 3.45, 18.0, 0.0, trackUv.jalur2);
+      addTrackSign(i2MinX + 2.3, 3.45, -16.0, 0.0, trackUv.jalur4);
+      addTrackSign(i2MinX + 2.3, 3.45, 18.0, 0.0, trackUv.jalur4);
 
       // JPO Pergola & Stair-head overhead signs across Tracks 1-4 (y = 6.38, suspended from jpoPergolaY)
       addTrackSign(-4.70, 6.38, jpoNearZ + 0.55, 0.0, trackUv.jalur3, jpoPergolaY);
@@ -1257,6 +1272,8 @@
     station.disposableGeometries.push(psdFrameGeo);
 
     const buildPsdRow = (rowX, signDirX, outDoors) => {
+      // Offset PSD screen 5cm platform-ward from platform edge so steel frames & signage never clip the train hull (±1.37m)
+      const rcX = rowX + signDirX * 0.05;
       const signYaw = signDirX > 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
       for (let s = 0; s < fixedSpans.length; s++) {
         const z0 = fixedSpans[s][0];
@@ -1264,61 +1281,61 @@
         const spanLen = z1 - z0;
         const cz = (z0 + z1) * 0.5;
 
-        addBox(bSteelDark, 0.22, 1.40, 0.42, rowX, 0.70, z0 + 0.21);
-        addBox(bSteelDark, 0.22, 1.40, 0.42, rowX, 0.70, z1 - 0.21);
+        addBox(bSteelDark, 0.16, 1.40, 0.42, rcX, 0.70, z0 + 0.21);
+        addBox(bSteelDark, 0.16, 1.40, 0.42, rcX, 0.70, z1 - 0.21);
         if (spanLen > 1.1) {
-          addAtlasQuad(bSign, 0.36, 0.55, rowX + signDirX * 0.12, 0.72, z0 + 0.21, 0, signYaw, 0, SIGN_UV.safetyWarn);
+          addAtlasQuad(bSign, 0.36, 0.55, rcX + signDirX * 0.09, 0.72, z0 + 0.21, 0, signYaw, 0, SIGN_UV.safetyWarn);
         }
 
         const midSpan = spanLen - 0.84;
         if (midSpan > 0.6) {
           const isAdPanel = (s % 2 === 1);
           if (isAdPanel) {
-            addBox(bSteelDark, 0.16, 1.18, midSpan, rowX, 0.59, cz);
-            addAtlasQuad(bSign, midSpan - 0.12, 1.02, rowX + signDirX * 0.09, 0.62, cz, 0, signYaw, 0, SIGN_UV.smartTravelAd);
-            station._addCollider(rowX - 0.12, 0, z0, rowX + 0.12, 1.42, z1, 'metal');
+            addBox(bSteelDark, 0.14, 1.18, midSpan, rcX, 0.59, cz);
+            addAtlasQuad(bSign, midSpan - 0.12, 1.02, rcX + signDirX * 0.08, 0.62, cz, 0, signYaw, 0, SIGN_UV.smartTravelAd);
+            station._addCollider(rcX - 0.09, 0, z0, rcX + 0.09, 1.42, z1, 'metal');
           } else {
-            addBox(bSteelDark, 0.18, 0.42, midSpan, rowX, 0.21, cz);
-            const cIdx = station._addCollider(rowX - 0.12, 0, z0, rowX + 0.12, 1.42, z1, 'glass');
+            addBox(bSteelDark, 0.14, 0.42, midSpan, rcX, 0.21, cz);
+            const cIdx = station._addCollider(rcX - 0.09, 0, z0, rcX + 0.09, 1.42, z1, 'glass');
             glassRecords.push({
-              cx: rowX, cy: 0.82, cz: cz, w: midSpan - 0.06, h: 0.78, d: 0.04,
+              cx: rcX, cy: 0.82, cz: cz, w: midSpan - 0.06, h: 0.78, d: 0.04,
               ry: Math.PI * 0.5, hp: 25, isPsdDoor: false, psdDoorIdx: -1, slideSign: 0, colliderIdx: cIdx
             });
           }
-          addBox(bSteelDark, 0.19, 0.24, spanLen, rowX, 1.30, cz);
+          addBox(bSteelDark, 0.16, 0.24, spanLen, rcX, 1.30, cz);
           const tileCount = Math.max(1, Math.round(spanLen / 1.35));
           const tileW = (spanLen - 0.1) / tileCount;
           for (let tc = 0; tc < tileCount; tc++) {
             const tz = z0 + 0.05 + (tc + 0.5) * tileW;
-            addAtlasQuad(bSign, tileW - 0.04, 0.24, rowX + 0.105, 1.30, tz, 0, Math.PI * 0.5, 0, SIGN_UV.psdHeader);
-            addAtlasQuad(bSign, tileW - 0.04, 0.24, rowX - 0.105, 1.30, tz, 0, -Math.PI * 0.5, 0, SIGN_UV.psdHeader);
+            addAtlasQuad(bSign, tileW - 0.04, 0.24, rcX + 0.09, 1.30, tz, 0, Math.PI * 0.5, 0, SIGN_UV.psdHeader);
+            addAtlasQuad(bSign, tileW - 0.04, 0.24, rcX - 0.09, 1.30, tz, 0, -Math.PI * 0.5, 0, SIGN_UV.psdHeader);
           }
         }
-        station._addCollider(rowX - 0.14, 0, z0, rowX + 0.14, 1.45, z0 + 0.44, 'metal');
-        station._addCollider(rowX - 0.14, 0, z1 - 0.44, rowX + 0.14, 1.45, z1, 'metal');
+        station._addCollider(rcX - 0.10, 0, z0, rcX + 0.10, 1.45, z0 + 0.44, 'metal');
+        station._addCollider(rcX - 0.10, 0, z1 - 0.44, rcX + 0.10, 1.45, z1, 'metal');
       }
 
       const extLen = Math.max(4.0, (platMaxZ - 0.5) - 29.0);
       const extMidZ = 29.0 + extLen * 0.5;
-      addBox(bSteelDark, 0.16, 1.15, extLen, rowX, 0.58, -extMidZ);
-      addBox(bSteelDark, 0.16, 1.15, extLen, rowX, 0.58, extMidZ);
-      station._addCollider(rowX - 0.12, 0, -(platMaxZ - 0.5), rowX + 0.12, 1.35, -29.0, 'metal');
-      station._addCollider(rowX - 0.12, 0, 29.0, rowX + 0.12, 1.35, platMaxZ - 0.5, 'metal');
+      addBox(bSteelDark, 0.14, 1.15, extLen, rcX, 0.58, -extMidZ);
+      addBox(bSteelDark, 0.14, 1.15, extLen, rcX, 0.58, extMidZ);
+      station._addCollider(rcX - 0.09, 0, -(platMaxZ - 0.5), rcX + 0.09, 1.35, -29.0, 'metal');
+      station._addCollider(rcX - 0.09, 0, 29.0, rcX + 0.09, 1.35, platMaxZ - 0.5, 'metal');
 
       outDoors.length = 0;
       for (let d = 0; d < doorCenters.length; d++) {
         const dz = doorCenters[d];
-        const doorCollId = station._addCollider(rowX - 0.10, 0.0, dz - halfDoor, rowX + 0.10, 1.40, dz + halfDoor, 'psd_door', {
+        const doorCollId = station._addCollider(rcX - 0.08, 0.0, dz - halfDoor, rcX + 0.08, 1.40, dz + halfDoor, 'psd_door', {
           isDoor: true, isOpen: false, blocksWalk: true, blocksBullets: true
         });
         const leftGlassIdx = glassRecords.length;
         glassRecords.push({
-          cx: rowX, cy: 0.85, cz: dz - halfDoor * 0.5, w: halfDoor - 0.04, h: 0.98, d: 0.04,
+          cx: rcX, cy: 0.85, cz: dz - halfDoor * 0.5, w: halfDoor - 0.04, h: 0.98, d: 0.04,
           ry: Math.PI * 0.5, hp: 20, isPsdDoor: true, psdDoorIdx: d, slideSign: -1, colliderIdx: doorCollId
         });
         const rightGlassIdx = glassRecords.length;
         glassRecords.push({
-          cx: rowX, cy: 0.85, cz: dz + halfDoor * 0.5, w: halfDoor - 0.04, h: 0.98, d: 0.04,
+          cx: rcX, cy: 0.85, cz: dz + halfDoor * 0.5, w: halfDoor - 0.04, h: 0.98, d: 0.04,
           ry: Math.PI * 0.5, hp: 20, isPsdDoor: true, psdDoorIdx: d, slideSign: 1, colliderIdx: doorCollId
         });
         outDoors.push({
@@ -1585,6 +1602,7 @@
   }
 
   S.arch = {
+    computeRailConfig: computeRailConfig,
     buildArchitecture: buildArchitecture,
     mergeStaticBuckets: mergeStaticBuckets,
     mergeStaticBucketsBatch: mergeStaticBucketsBatch

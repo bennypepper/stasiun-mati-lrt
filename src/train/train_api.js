@@ -522,6 +522,28 @@
     return Math.max(0.0, Math.min(1.0, done / totalDist));
   }
 
+  function setTrackX(nextTrackX) {
+    if (typeof nextTrackX !== 'number' || !Number.isFinite(nextTrackX)) return 0.0;
+    const prevX = T.activeTrackX || 0.0;
+    const deltaX = nextTrackX - prevX;
+    if (Math.abs(deltaX) <= 1e-6) return 0.0;
+    T.activeTrackX = nextTrackX;
+    if (T.trainGroup) T.trainGroup.position.x = nextTrackX;
+    if (T.viaductGroup) T.viaductGroup.position.x = nextTrackX;
+    T.syncTrainLights();
+    return deltaX;
+  }
+
+  function syncStationOffsetZ(stationRef, z) {
+    if (!stationRef) return;
+    if (typeof stationRef.setOffsetZ === 'function') {
+      stationRef.setOffsetZ(z);
+    } else if (stationRef.rootGroup) {
+      stationRef.rootGroup.position.z = z;
+      stationRef.rootGroup.updateMatrixWorld(true);
+    }
+  }
+
   function update(dt, stationRef, onDisposeOld, onSpawnNext, onBuildComplete) {
     if (!T.initialized) return;
     const clampedDt = Math.min(dt || 0.016, 0.05);
@@ -611,7 +633,8 @@
 
       // Scroll Old Station opposite to travelDir until 160m behind, then dispose & spawn destination station ahead
       if (!T.oldDisposed && stationRef && stationRef.rootGroup) {
-        stationRef.rootGroup.position.z -= T.travelDir * stepZ;
+        const nextOldZ = stationRef.rootGroup.position.z - T.travelDir * stepZ;
+        syncStationOffsetZ(stationRef, nextOldZ);
         stationWorldZ = stationRef.rootGroup.position.z;
         if (stationWorldZ * T.travelDir <= -160.0) {
           T.oldDisposed = true;
@@ -624,9 +647,9 @@
         const targetRef = spawned || stationRef;
         T.nextBuildInProgress = !!(targetRef && typeof targetRef.isIncrementalBuilding === 'function' && targetRef.isIncrementalBuilding());
         if (spawned && spawned.rootGroup) {
-          spawned.rootGroup.position.z = T.incomingStationZ;
+          syncStationOffsetZ(spawned, T.incomingStationZ);
         } else if (stationRef && stationRef.rootGroup && stationRef.rootGroup !== T.activeOldRootGroup) {
-          stationRef.rootGroup.position.z = T.incomingStationZ;
+          syncStationOffsetZ(stationRef, T.incomingStationZ);
           stationWorldZ = T.incomingStationZ;
         }
         if (!T.nextBuildInProgress && typeof onBuildComplete === 'function' && targetRef && typeof targetRef.getStats === 'function') {
@@ -648,7 +671,7 @@
         }
         const remDist = T.incomingStationZ * T.travelDir;
         if (stationRef && stationRef.rootGroup && stationRef.rootGroup !== T.activeOldRootGroup) {
-          stationRef.rootGroup.position.z = T.incomingStationZ;
+          syncStationOffsetZ(stationRef, T.incomingStationZ);
           stationWorldZ = T.incomingStationZ;
         }
         if (T.state === 'CRUISE' && !T.nextBuildInProgress && remDist <= 114.0) {
@@ -661,7 +684,8 @@
         }
         if (remDist <= 0.02) {
           T.incomingStationZ = 0.0;
-          if (stationRef && stationRef.rootGroup) stationRef.rootGroup.position.z = 0;
+          syncStationOffsetZ(stationRef, 0);
+          stationWorldZ = 0.0;
           T.speed = 0.0;
           T.accel = 0.0;
           T.state = 'BOARDED_WAIT';
@@ -861,6 +885,7 @@
     getDoorOpen: () => T.doorOpen,
     getOffsetZ: () => (T.trainGroup ? T.trainGroup.position.z : 0),
     getTrackX: () => T.activeTrackX,
+    setTrackX,
     getDirection: () => T.travelDir,
     localToWorld: T.localToWorld,
     createStaticLrtConsist: T.createStaticLrtConsist,

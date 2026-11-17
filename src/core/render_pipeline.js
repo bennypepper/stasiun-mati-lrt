@@ -773,6 +773,13 @@
     if (LRT.Station && typeof LRT.Station.setMood === 'function') {
       LRT.Station.setMood(moodKey);
     }
+    if (LRT.Audio) {
+      if (moodKey === 'MONSOON_OVERCAST' && CORE.gameState !== C.STATES.MENU) {
+        if (typeof LRT.Audio.startLoop === 'function') LRT.Audio.startLoop('rain_loop', 0.28, 0.9, 1.0);
+      } else if (typeof LRT.Audio.stopLoop === 'function') {
+        LRT.Audio.stopLoop('rain_loop', 0.6);
+      }
+    }
     if (LRT.PlayerUI && typeof LRT.PlayerUI.syncLightingUi === 'function') {
       LRT.PlayerUI.syncLightingUi(moodKey, m);
     }
@@ -951,7 +958,7 @@
       const anchor = camPos.clone().addScaledVector(forward, 6.0);
 
       if (LRT.AssetLoader && typeof LRT.AssetLoader.instantiateModel === 'function') {
-        const lateProps = ['Barrel_01', 'portable_generator', 'ammo_box', 'mounted_fluorescent_lights'];
+        const lateProps = ['Barrel_01', 'portable_generator', 'ammo_box', 'medical_box', 'old_military_crate', 'mounted_fluorescent_lights'];
         for (let i = 0; i < lateProps.length; i++) {
           const inst = LRT.AssetLoader.instantiateModel(lateProps[i]);
           if (inst) {

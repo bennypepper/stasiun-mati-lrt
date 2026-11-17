@@ -1204,30 +1204,66 @@
     grp.position.set(x, y, z);
     if (ry) grp.rotation.y = ry;
 
-    const addPart = (geo, mat, px, py, pz, rx) => {
+    const addPart = (geo, mat, px, py, pz, rx, ryLoc, rz) => {
       disposableGeos.push(geo);
       const m = new THREE.Mesh(geo, mat);
       m.position.set(px, py, pz);
       if (rx) m.rotation.x = rx;
+      if (ryLoc) m.rotation.y = ryLoc;
+      if (rz) m.rotation.z = rz;
       m.castShadow = false;
       m.receiveShadow = true;
       grp.add(m);
       return m;
     };
 
-    // Armored lower tub & interior supply tray (revealed when lid opens!)
-    addPart(new THREE.BoxGeometry(0.92, 0.42, 0.60), mats.body, 0, 0.21, 0);
-    for (const cx of [-0.44, 0.44]) {
-      addPart(new THREE.BoxGeometry(0.06, 0.44, 0.62), mats.rim, cx, 0.22, 0);
-      addPart(new THREE.BoxGeometry(0.06, 0.05, 0.22), mats.rim, cx * 1.08, 0.28, 0);
+    // Armored lower tub with structural ribs, corner bumpers, and side handles
+    addPart(new THREE.BoxGeometry(0.92, 0.38, 0.60), mats.body, 0, 0.21, 0);
+    // Corner protective bumpers (4 corners)
+    for (const bx of [-0.45, 0.45]) {
+      for (const bz of [-0.29, 0.29]) {
+        addPart(new THREE.BoxGeometry(0.07, 0.42, 0.07), mats.rim, bx, 0.22, bz);
+      }
+    }
+    // Side reinforced ribs + recessed steel carry handles
+    for (const cx of [-0.46, 0.46]) {
+      addPart(new THREE.BoxGeometry(0.05, 0.40, 0.56), mats.rim, cx, 0.22, 0);
+      addPart(new THREE.CylinderGeometry(0.014, 0.014, 0.22, 8), mats.gold, cx * 1.09, 0.24, 0, Math.PI * 0.5, 0, 0);
+    }
+    // Front & rear vertical stiffening ribs + upper lip collar
+    for (const rxPos of [-0.26, 0, 0.26]) {
+      addPart(new THREE.BoxGeometry(0.035, 0.34, 0.63), mats.rim, rxPos, 0.21, 0);
     }
     addPart(new THREE.BoxGeometry(0.96, 0.05, 0.64), mats.rim, 0, 0.415, 0);
-    // Yellow tactical lock clasps on front face
-    for (const lx of [-0.24, 0.24]) {
-      addPart(new THREE.BoxGeometry(0.07, 0.14, 0.04), mats.gold, lx, 0.36, 0.31);
+    // Heavy dual tactical draw-latches + yellow hazard plate on front face
+    for (const lx of [-0.26, 0.26]) {
+      addPart(new THREE.BoxGeometry(0.075, 0.14, 0.045), mats.gold, lx, 0.35, 0.315);
+      addPart(new THREE.BoxGeometry(0.04, 0.06, 0.055), mats.rim, lx, 0.29, 0.32);
     }
-    // Interior ammo rack & first-aid pack insert visible once lid hinges back
-    addPart(new THREE.BoxGeometry(0.76, 0.06, 0.44), mats.gold, 0, 0.43, 0);
+    addPart(new THREE.BoxGeometry(0.28, 0.05, 0.02), mats.gold, 0, 0.24, 0.308);
+
+    // Recessed foam supply tray + detailed 3D interior items (revealed when lid opens!)
+    addPart(new THREE.BoxGeometry(0.84, 0.04, 0.52), mats.rim, 0, 0.41, 0);
+    if (!mats._interiorRed) {
+      mats._interiorRed = new THREE.MeshStandardMaterial({ color: 0xc81e1e, roughness: 0.42, metalness: 0.15 });
+      mats._interiorWhite = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.45, metalness: 0.1 });
+      mats._interiorBrass = new THREE.MeshStandardMaterial({ color: 0xd9a738, roughness: 0.28, metalness: 0.85 });
+      mats._interiorGun = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.38, metalness: 0.72 });
+      disposableMats.push(mats._interiorRed, mats._interiorWhite, mats._interiorBrass, mats._interiorGun);
+    }
+    // Two angled 5.56 STANAG magazines inside left bay
+    addPart(new THREE.BoxGeometry(0.07, 0.045, 0.20), mats._interiorGun, -0.28, 0.445, -0.04, 0, 0.18, 0);
+    addPart(new THREE.BoxGeometry(0.07, 0.045, 0.20), mats._interiorGun, -0.17, 0.445, 0.02, 0, 0.18, 0);
+    // Row of four 12G red shells with brass heads in center bay
+    for (let si = 0; si < 4; si++) {
+      const sz = -0.11 + si * 0.07;
+      addPart(new THREE.CylinderGeometry(0.018, 0.018, 0.11, 8), mats._interiorRed, 0.02, 0.445, sz, 0, 0, Math.PI * 0.5);
+      addPart(new THREE.CylinderGeometry(0.019, 0.019, 0.025, 8), mats._interiorBrass, 0.075, 0.445, sz, 0, 0, Math.PI * 0.5);
+    }
+    // White & red-cross emergency trauma pouch in right bay
+    addPart(new THREE.BoxGeometry(0.20, 0.055, 0.26), mats._interiorWhite, 0.26, 0.445, 0.0);
+    addPart(new THREE.BoxGeometry(0.09, 0.012, 0.028), mats._interiorRed, 0.26, 0.476, 0.0);
+    addPart(new THREE.BoxGeometry(0.028, 0.012, 0.09), mats._interiorRed, 0.26, 0.476, 0.0);
 
     // Hinged Lid Pivot anchored along back top edge (z = -0.31, y = 0.44)
     const lidPivot = new THREE.Group();
@@ -1244,9 +1280,14 @@
       lidPivot.add(m);
       return m;
     };
-    addLidPart(new THREE.BoxGeometry(0.96, 0.12, 0.64), mats.rim, 0, 0.06, 0.31);
-    addLidPart(new THREE.BoxGeometry(0.84, 0.04, 0.52), mats.body, 0, 0.13, 0.31);
-    addLidPart(new THREE.BoxGeometry(0.68, 0.025, 0.07), mats.gold, 0, 0.155, 0.50);
+    addLidPart(new THREE.BoxGeometry(0.96, 0.10, 0.64), mats.rim, 0, 0.05, 0.31);
+    addLidPart(new THREE.BoxGeometry(0.84, 0.05, 0.52), mats.body, 0, 0.115, 0.31);
+    // Molded lid ribs + front hazard trim + top carry handle
+    for (const lx of [-0.28, 0, 0.28]) {
+      addLidPart(new THREE.BoxGeometry(0.05, 0.03, 0.50), mats.rim, lx, 0.145, 0.31);
+    }
+    addLidPart(new THREE.BoxGeometry(0.68, 0.025, 0.065), mats.gold, 0, 0.145, 0.52);
+    addLidPart(new THREE.BoxGeometry(0.22, 0.028, 0.035), mats.gold, 0, 0.155, 0.31);
     grp.add(lidPivot);
 
     // Yellow-only perimeter halo around the crate model (ZERO floating orb/cone!)

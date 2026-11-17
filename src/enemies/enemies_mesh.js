@@ -6,6 +6,13 @@
 
   const MAX_ENEMIES = 32;
   const MAX_BILE = 16;
+  const MAX_BILE_CHUNKS = 32;
+  const MAX_BILE_DROPS = 96;
+  const MAX_PUDDLES = 24;
+  const MAX_PUDDLE_BUBBLES = 48;
+  const BILE_GRAVITY = 11.5;
+  const BILE_HORIZ_SPEED = 11.0;
+  const BILE_MAX_RANGE = 14.5;
 
   const FALLBACK_TYPES = {
     walker: { id: 'walker', label: 'Commuter Infected', hp: 70, speed: 1.95, damage: 10, attackRange: 1.75, attackCooldown: 1.25, scale: 1.0, armorMult: 1.0 },
@@ -44,7 +51,17 @@
   const _scale = new THREE.Vector3();
   const _color = new THREE.Color();
   const _bileHitVec = new THREE.Vector3();
+  const _bileNormal = new THREE.Vector3(0, 1, 0);
+  const _bileDir = new THREE.Vector3();
+  const _bileOrigin = new THREE.Vector3();
+  const _fwdZ = new THREE.Vector3(0, 0, 1);
+  const _upY = new THREE.Vector3(0, 1, 0);
+  const _downY = new THREE.Vector3(0, -1, 0);
   const _zeroMat = new THREE.Matrix4().makeScale(0, 0, 0);
+
+  const BILE_COLORS = [0x7a901c, 0x8ea326, 0x657816, 0x9ab02e, 0x5c6d14];
+  const DROP_COLORS = [0x7e941e, 0x99ad2c, 0x5d6d16, 0x4b4318, 0x869a22];
+  const PUDDLE_COLORS = [0xdde6a8, 0xcbd88a, 0xe4ec9e, 0xc3d07e];
 
   // Articulated anatomical horror InstancedMeshes (zero shared-blob gear overlap)
   let _headMesh = null;
@@ -63,12 +80,17 @@
   let _ragMesh = null;
   let _headEyeAttr = null;
   let _bileMesh = null;
+  let _bileChunkMesh = null;
+  let _bileDropMesh = null;
+  let _puddleMesh = null;
+  let _puddleBubbleMesh = null;
   let _corePartMeshes = [];
   let _overlayPartMeshes = [];
   let _allPartMeshes = [];
 
   E.MAX_ENEMIES = MAX_ENEMIES;
   E.MAX_BILE = MAX_BILE;
+  E.MAX_PUDDLES = MAX_PUDDLES;
   E.FALLBACK_TYPES = FALLBACK_TYPES;
   E.camPos = new THREE.Vector3();
   E.camRight = new THREE.Vector3();
@@ -79,6 +101,12 @@
   E.zombies = [];
   E.pendingQueue = [];
   E.bileOrbs = [];
+  E.bileDrops = [];
+  E.bilePuddles = [];
+  E.bileBubbles = [];
+  let _bileDropCursor = 0;
+  let _puddleCursor = 0;
+  let _bubbleCursor = 0;
   E.activeHighWater = 0;
   E.warmupActive = false;
 
@@ -550,16 +578,197 @@
     ];
     _allPartMeshes = _corePartMeshes.concat(_overlayPartMeshes);
 
-    // Pooled Spitter bile projectiles
-    const bileMat = new THREE.MeshBasicMaterial({ color: 0x7eff2a });
-    _bileMesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.14, 1), bileMat, MAX_BILE);
+    const createVomitPuddleTex = () => {
+      if (typeof document === 'undefined') return null;
+      const c = document.createElement('canvas');
+      c.width = 192;
+      c.height = 192;
+      const ctx = c.getContext('2d');
+      if (!ctx) return null;
+
+      let seed = 9187;
+      const rng = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+
+      // Multi-lobe irregular vomit puddle silhouette
+      const cx = 96;
+      const cy = 96;
+      for (let i = 0; i < 10; i++) {
+        const ang = (i / 10) * Math.PI * 2 + rng() * 0.45;
+        const off = i === 0 ? 0 : (10 + rng() * 24);
+        const lx = cx + Math.cos(ang) * off;
+        const ly = cy + Math.sin(ang) * off;
+        const rad = i === 0 ? 52 : (20 + rng() * 22);
+        const g = ctx.createRadialGradient(lx, ly, 3, lx, ly, rad);
+        g.addColorStop(0.0, 'rgba(66, 78, 16, 0.96)');
+        g.addColorStop(0.48, 'rgba(108, 128, 22, 0.88)');
+        g.addColorStop(0.80, 'rgba(148, 168, 34, 0.56)');
+        g.addColorStop(1.0, 'rgba(92, 110, 18, 0.0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(lx, ly, rad, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Radial impact splash streaks & satellite droplets
+      for (let i = 0; i < 18; i++) {
+        const ang = (i / 18) * Math.PI * 2 + (rng() - 0.5) * 0.28;
+        const r0 = 28 + rng() * 14;
+        const r1 = 56 + rng() * 34;
+        ctx.strokeStyle = i % 3 === 0 ? 'rgba(134, 154, 28, 0.72)' : 'rgba(78, 92, 18, 0.78)';
+        ctx.lineWidth = 2.0 + rng() * 4.5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0);
+        ctx.lineTo(cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1);
+        ctx.stroke();
+
+        const dr = r1 + 4 + rng() * 8;
+        ctx.fillStyle = 'rgba(116, 136, 24, 0.76)';
+        ctx.beginPath();
+        ctx.arc(cx + Math.cos(ang) * dr, cy + Math.sin(ang) * dr, 2.2 + rng() * 3.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Digested dark-brown/olive bile chunks & frothy acid pockets
+      for (let i = 0; i < 48; i++) {
+        const ang = rng() * Math.PI * 2;
+        const r = Math.sqrt(rng()) * 54;
+        const px = cx + Math.cos(ang) * r;
+        const py = cy + Math.sin(ang) * r;
+        const cr = 1.4 + rng() * 3.6;
+        ctx.fillStyle = (i % 3 === 0)
+          ? 'rgba(176, 198, 48, 0.62)'
+          : (i % 2 === 0 ? 'rgba(54, 46, 15, 0.85)' : 'rgba(84, 70, 20, 0.75)');
+        ctx.beginPath();
+        ctx.arc(px, py, cr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    };
+
+    // Pooled Spitter vomit projectile (clustered lumpy wad + trailing mucus streak, NOT neon orb)
+    const bileHeadGeo = new THREE.IcosahedronGeometry(0.095, 1);
+    bileHeadGeo.scale(1.05, 0.92, 1.35);
+    const bileLumpA = new THREE.IcosahedronGeometry(0.068, 0);
+    const bileLumpB = new THREE.IcosahedronGeometry(0.056, 0);
+    const bileStreakGeo = new THREE.ConeGeometry(0.075, 0.38, 6);
+    const bileGeo = mergePartGeometries([
+      { geo: bileHeadGeo, tx: 0, ty: 0, tz: 0.04 },
+      { geo: bileLumpA, tx: 0.055, ty: 0.032, tz: -0.04 },
+      { geo: bileLumpB, tx: -0.052, ty: -0.025, tz: -0.06 },
+      { geo: bileStreakGeo, tx: 0, ty: 0, tz: -0.19, rx: -Math.PI * 0.5 }
+    ]);
+    bileHeadGeo.dispose();
+    bileLumpA.dispose();
+    bileLumpB.dispose();
+    bileStreakGeo.dispose();
+
+    const bileMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.16,
+      metalness: 0.05,
+      emissive: 0x263106,
+      emissiveIntensity: 0.34
+    });
+    _bileMesh = new THREE.InstancedMesh(bileGeo, bileMat, MAX_BILE);
     _bileMesh.frustumCulled = false;
     _bileMesh.visible = false;
     for (let i = 0; i < MAX_BILE; i++) {
       _bileMesh.setMatrixAt(i, _zeroMat);
+      _bileMesh.setColorAt(i, _color.setHex(BILE_COLORS[i % BILE_COLORS.length]));
     }
     _bileMesh.instanceMatrix.needsUpdate = true;
+    if (_bileMesh.instanceColor) _bileMesh.instanceColor.needsUpdate = true;
     E.enemyRoot.add(_bileMesh);
+
+    // Trailing secondary vomit chunks tumbling behind each projectile
+    const chunkMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.22,
+      metalness: 0.04,
+      emissive: 0x202905,
+      emissiveIntensity: 0.25
+    });
+    _bileChunkMesh = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.052, 0), chunkMat, MAX_BILE_CHUNKS);
+    _bileChunkMesh.frustumCulled = false;
+    _bileChunkMesh.visible = false;
+    for (let i = 0; i < MAX_BILE_CHUNKS; i++) {
+      _bileChunkMesh.setMatrixAt(i, _zeroMat);
+      _bileChunkMesh.setColorAt(i, _color.setHex(DROP_COLORS[i % DROP_COLORS.length]));
+    }
+    _bileChunkMesh.instanceMatrix.needsUpdate = true;
+    if (_bileChunkMesh.instanceColor) _bileChunkMesh.instanceColor.needsUpdate = true;
+    E.enemyRoot.add(_bileChunkMesh);
+
+    // Falling vomit droplets in flight + impact splash particles
+    const dropMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.14,
+      metalness: 0.05,
+      emissive: 0x2a3508,
+      emissiveIntensity: 0.32
+    });
+    _bileDropMesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.036, 0), dropMat, MAX_BILE_DROPS);
+    _bileDropMesh.frustumCulled = false;
+    _bileDropMesh.visible = false;
+    for (let i = 0; i < MAX_BILE_DROPS; i++) {
+      _bileDropMesh.setMatrixAt(i, _zeroMat);
+      _bileDropMesh.setColorAt(i, _color.setHex(DROP_COLORS[i % DROP_COLORS.length]));
+    }
+    _bileDropMesh.instanceMatrix.needsUpdate = true;
+    if (_bileDropMesh.instanceColor) _bileDropMesh.instanceColor.needsUpdate = true;
+    E.enemyRoot.add(_bileDropMesh);
+
+    // Persistent floor acid/vomit splatter puddle decals
+    const puddleGeo = new THREE.PlaneGeometry(1, 1);
+    puddleGeo.rotateX(-Math.PI * 0.5);
+    const puddleMat = new THREE.MeshStandardMaterial({
+      map: createVomitPuddleTex(),
+      color: 0xffffff,
+      roughness: 0.12,
+      metalness: 0.08,
+      emissive: 0x324008,
+      emissiveIntensity: 0.45,
+      transparent: true,
+      opacity: 0.94,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      side: THREE.DoubleSide
+    });
+    _puddleMesh = new THREE.InstancedMesh(puddleGeo, puddleMat, MAX_PUDDLES);
+    _puddleMesh.frustumCulled = false;
+    _puddleMesh.visible = false;
+    _puddleMesh.renderOrder = 2;
+    for (let i = 0; i < MAX_PUDDLES; i++) {
+      _puddleMesh.setMatrixAt(i, _zeroMat);
+      _puddleMesh.setColorAt(i, _color.setHex(PUDDLE_COLORS[i % PUDDLE_COLORS.length]));
+    }
+    _puddleMesh.instanceMatrix.needsUpdate = true;
+    if (_puddleMesh.instanceColor) _puddleMesh.instanceColor.needsUpdate = true;
+    E.enemyRoot.add(_puddleMesh);
+
+    // Acid puddle fizzing/popping bubbles
+    const bubbleMat = new THREE.MeshStandardMaterial({
+      color: 0xb4ce32,
+      roughness: 0.10,
+      metalness: 0.10,
+      emissive: 0x45560c,
+      emissiveIntensity: 0.52,
+      transparent: true,
+      opacity: 0.82
+    });
+    _puddleBubbleMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.048, 6, 5), bubbleMat, MAX_PUDDLE_BUBBLES);
+    _puddleBubbleMesh.frustumCulled = false;
+    _puddleBubbleMesh.visible = false;
+    for (let i = 0; i < MAX_PUDDLE_BUBBLES; i++) {
+      _puddleBubbleMesh.setMatrixAt(i, _zeroMat);
+    }
+    _puddleBubbleMesh.instanceMatrix.needsUpdate = true;
+    E.enemyRoot.add(_puddleBubbleMesh);
   }
 
   function initZombiePool() {
@@ -647,10 +856,59 @@
       E.bileOrbs.push({
         active: false,
         pos: new THREE.Vector3(),
+        startPos: new THREE.Vector3(),
         vel: new THREE.Vector3(),
-        life: 0
+        life: 0,
+        dropAccum: 0,
+        damage: 14,
+        groundY: 0,
+        spin: 0
       });
     }
+
+    E.bileDrops.length = 0;
+    for (let i = 0; i < MAX_BILE_DROPS; i++) {
+      E.bileDrops.push({
+        active: false,
+        pos: new THREE.Vector3(),
+        vel: new THREE.Vector3(),
+        life: 0,
+        maxLife: 0.65,
+        scale: 1.0,
+        floorY: -1.05
+      });
+    }
+
+    E.bilePuddles.length = 0;
+    for (let i = 0; i < MAX_PUDDLES; i++) {
+      E.bilePuddles.push({
+        active: false,
+        pos: new THREE.Vector3(),
+        normal: new THREE.Vector3(0, 1, 0),
+        radius: 1.35,
+        life: 0,
+        maxLife: 7.0,
+        yaw: 0,
+        aspect: 1.0,
+        damageTickTimer: 0,
+        bubbleAccum: 0
+      });
+    }
+
+    E.bileBubbles.length = 0;
+    for (let i = 0; i < MAX_PUDDLE_BUBBLES; i++) {
+      E.bileBubbles.push({
+        active: false,
+        pos: new THREE.Vector3(),
+        riseSpeed: 0.25,
+        life: 0,
+        maxLife: 0.65,
+        maxScale: 1.0
+      });
+    }
+    _bileDropCursor = 0;
+    _puddleCursor = 0;
+    _bubbleCursor = 0;
   }
 
   function assignVariantVisuals(z) {
@@ -795,6 +1053,23 @@
       E.bileOrbs[i].active = false;
       if (_bileMesh) _bileMesh.setMatrixAt(i, _zeroMat);
     }
+    if (_bileChunkMesh) {
+      for (let i = 0; i < MAX_BILE_CHUNKS; i++) _bileChunkMesh.setMatrixAt(i, _zeroMat);
+      _bileChunkMesh.visible = false;
+      _bileChunkMesh.instanceMatrix.needsUpdate = true;
+    }
+    for (let i = 0; i < MAX_BILE_DROPS; i++) {
+      if (E.bileDrops[i]) E.bileDrops[i].active = false;
+      if (_bileDropMesh) _bileDropMesh.setMatrixAt(i, _zeroMat);
+    }
+    for (let i = 0; i < MAX_PUDDLES; i++) {
+      if (E.bilePuddles[i]) E.bilePuddles[i].active = false;
+      if (_puddleMesh) _puddleMesh.setMatrixAt(i, _zeroMat);
+    }
+    for (let i = 0; i < MAX_PUDDLE_BUBBLES; i++) {
+      if (E.bileBubbles[i]) E.bileBubbles[i].active = false;
+      if (_puddleBubbleMesh) _puddleBubbleMesh.setMatrixAt(i, _zeroMat);
+    }
 
     for (let m = 0; m < _corePartMeshes.length; m++) {
       if (_corePartMeshes[m]) {
@@ -813,42 +1088,167 @@
       _bileMesh.visible = false;
       _bileMesh.instanceMatrix.needsUpdate = true;
     }
+    if (_bileDropMesh) {
+      _bileDropMesh.visible = false;
+      _bileDropMesh.instanceMatrix.needsUpdate = true;
+    }
+    if (_puddleMesh) {
+      _puddleMesh.visible = false;
+      _puddleMesh.instanceMatrix.needsUpdate = true;
+    }
+    if (_puddleBubbleMesh) {
+      _puddleBubbleMesh.visible = false;
+      _puddleBubbleMesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  function resolveBileFloorY(x, y, z, fallbackY) {
+    let bestY = -999;
+    _bileOrigin.set(x, y + 0.35, z);
+    if (LRT.Station && typeof LRT.Station.raycastWorld === 'function') {
+      const wh = LRT.Station.raycastWorld(_bileOrigin, _downY, 6.5);
+      if (wh && wh.normal && wh.normal.y > 0.45 && wh.point.y > bestY) {
+        bestY = wh.point.y;
+      }
+    }
+    if (LRT.Train && typeof LRT.Train.raycastTrain === 'function') {
+      const th = LRT.Train.raycastTrain(_bileOrigin, _downY, 6.5);
+      if (th && th.normal && th.normal.y > 0.45 && th.point.y > bestY) {
+        bestY = th.point.y;
+      }
+    }
+    if (bestY > -50) return bestY;
+    if (fallbackY !== undefined) return fallbackY;
+    return y > 1.5 ? 0.0 : -1.0;
+  }
+
+  function spawnBileDrop(x, y, z, vx, vy, vz, scale, maxLife, floorY) {
+    if (!E.bileDrops.length) return;
+    const d = E.bileDrops[_bileDropCursor];
+    _bileDropCursor = (_bileDropCursor + 1) % MAX_BILE_DROPS;
+    d.active = true;
+    d.life = 0;
+    d.maxLife = maxLife || (0.45 + Math.random() * 0.35);
+    d.scale = scale || (0.75 + Math.random() * 0.65);
+    d.floorY = floorY !== undefined ? floorY : -1.1;
+    d.pos.set(x, y, z);
+    d.vel.set(vx, vy, vz);
+  }
+
+  function spawnBileDropsBurst(pos, normal, count, floorY) {
+    const nx = normal ? normal.x : 0;
+    const ny = normal ? normal.y : 1;
+    const nz = normal ? normal.z : 0;
+    for (let i = 0; i < count; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const spd = 1.2 + Math.random() * 3.0;
+      const vx = Math.cos(ang) * spd + nx * 1.4;
+      const vy = 1.4 + Math.random() * 2.8 + ny * 1.1;
+      const vz = Math.sin(ang) * spd + nz * 1.4;
+      spawnBileDrop(
+        pos.x + (Math.random() - 0.5) * 0.16,
+        pos.y + 0.08,
+        pos.z + (Math.random() - 0.5) * 0.16,
+        vx, vy, vz,
+        0.7 + Math.random() * 0.75,
+        0.42 + Math.random() * 0.42,
+        floorY
+      );
+    }
+  }
+
+  function spawnBilePuddle(x, y, z, radius, fallbackFloorY) {
+    if (!E.bilePuddles.length) return null;
+    const idx = _puddleCursor;
+    _puddleCursor = (_puddleCursor + 1) % MAX_PUDDLES;
+    const p = E.bilePuddles[idx];
+    const floorY = resolveBileFloorY(x, y, z, fallbackFloorY);
+    p.active = true;
+    p.pos.set(x, floorY + 0.024, z);
+    p.normal.set(0, 1, 0);
+    p.radius = radius || (1.28 + Math.random() * 0.32);
+    p.life = 0;
+    p.maxLife = 6.8 + Math.random() * 1.4;
+    p.yaw = Math.random() * Math.PI * 2;
+    p.aspect = 0.86 + Math.random() * 0.28;
+    p.damageTickTimer = 0.25;
+    p.bubbleAccum = 0;
+    return p;
+  }
+
+  function spawnPuddleBubble(p) {
+    if (!E.bileBubbles.length) return;
+    const b = E.bileBubbles[_bubbleCursor];
+    _bubbleCursor = (_bubbleCursor + 1) % MAX_PUDDLE_BUBBLES;
+    const ang = Math.random() * Math.PI * 2;
+    const rad = Math.sqrt(Math.random()) * p.radius * 0.62;
+    b.active = true;
+    b.life = 0;
+    b.maxLife = 0.45 + Math.random() * 0.45;
+    b.maxScale = 0.65 + Math.random() * 0.95;
+    b.riseSpeed = 0.14 + Math.random() * 0.18;
+    b.pos.set(p.pos.x + Math.cos(ang) * rad, p.pos.y + 0.01, p.pos.z + Math.sin(ang) * rad);
   }
 
   function spawnBileProjectile(z, playerPos) {
+    if (!playerPos) return;
     let slot = null;
     for (let i = 0; i < MAX_BILE; i++) {
       if (!E.bileOrbs[i].active) { slot = E.bileOrbs[i]; break; }
     }
     if (!slot) return;
 
-    const sc = z.scale;
+    const sc = z.scale || 1.0;
+    const fwdX = Math.sin(z.yaw || 0);
+    const fwdZ = Math.cos(z.yaw || 0);
     slot.active = true;
     slot.life = 0;
-    slot.pos.set(z.x, z.y + 1.48 * sc, z.z);
+    slot.dropAccum = 0;
+    slot.damage = Math.max(8, z.damage || 14);
+    slot.groundY = z.y !== undefined ? z.y : 0.0;
+    slot.spin = Math.random() * Math.PI * 2;
+    slot.pos.set(z.x + fwdX * 0.28, slot.groundY + 1.46 * sc, z.z + fwdZ * 0.28);
+    slot.startPos.copy(slot.pos);
 
-    const tx = playerPos.x;
-    const ty = playerPos.y + 1.15;
-    const tz = playerPos.z;
-    const dx = tx - slot.pos.x;
+    let dx = playerPos.x - slot.pos.x;
+    const ty = (playerPos.y || 0) + 1.05;
     const dy = ty - slot.pos.y;
-    const dz = tz - slot.pos.z;
-    const horizDist = Math.sqrt(dx * dx + dz * dz);
-    const speed = 15.5;
-    const flightTime = Math.max(0.15, horizDist / speed);
+    let dz = playerPos.z - slot.pos.z;
+    let horizDist = Math.sqrt(dx * dx + dz * dz);
+    if (horizDist > 14.0) {
+      const clampScale = 14.0 / horizDist;
+      dx *= clampScale;
+      dz *= clampScale;
+      horizDist = 14.0;
+    }
+    const flightTime = Math.max(0.26, Math.min(1.40, horizDist / BILE_HORIZ_SPEED));
 
     slot.vel.set(
       dx / flightTime,
-      (dy / flightTime) + 0.5 * 9.8 * flightTime,
+      (dy / flightTime) + 0.5 * BILE_GRAVITY * flightTime,
       dz / flightTime
     );
+
+    // Mouth spit droplets right at launch
+    for (let k = 0; k < 3; k++) {
+      spawnBileDrop(
+        slot.pos.x, slot.pos.y, slot.pos.z,
+        slot.vel.x * 0.35 + (Math.random() - 0.5) * 1.6,
+        slot.vel.y * 0.30 - 0.4 + Math.random() * 0.8,
+        slot.vel.z * 0.35 + (Math.random() - 0.5) * 1.6,
+        0.85, 0.45, slot.groundY
+      );
+    }
 
     play3D('zombie_attack', slot.pos, 0.16, 0.85);
   }
 
   function updateBileProjectiles(step, elapsed, playerPos, onPlayerHit) {
     let anyBile = false;
+    let anyChunks = false;
     let bileMatDirty = false;
+    const hasStationRaycast = !!(LRT.Station && typeof LRT.Station.raycastWorld === 'function');
+
     for (let i = 0; i < MAX_BILE; i++) {
       const b = E.bileOrbs[i];
       if (!b.active) {
@@ -857,57 +1257,254 @@
       anyBile = true;
       bileMatDirty = true;
       b.life += step;
-      b.vel.y -= 9.8 * step;
-      const stepDist = b.vel.length() * step;
-      _v1.copy(b.vel).normalize();
+      b.vel.y -= BILE_GRAVITY * step;
+      const spd = b.vel.length();
+      const stepDist = spd * step;
+      if (spd > 0.001) {
+        _bileDir.copy(b.vel).divideScalar(spd);
+      } else {
+        _bileDir.set(0, -1, 0);
+      }
+
+      b.dropAccum += step;
+      while (b.dropAccum >= 0.035) {
+        b.dropAccum -= 0.035;
+        spawnBileDrop(
+          b.pos.x + (Math.random() - 0.5) * 0.10,
+          b.pos.y + (Math.random() - 0.5) * 0.10,
+          b.pos.z + (Math.random() - 0.5) * 0.10,
+          b.vel.x * 0.18 + (Math.random() - 0.5) * 1.1,
+          b.vel.y * 0.12 - 0.7 - Math.random() * 1.1,
+          b.vel.z * 0.18 + (Math.random() - 0.5) * 1.1,
+          0.65 + Math.random() * 0.55,
+          0.42 + Math.random() * 0.30,
+          b.groundY
+        );
+      }
 
       let hitPoint = null;
+      let directPlayerHit = false;
+      _bileNormal.copy(_upY);
+
       if (playerPos) {
         const dx = b.pos.x - playerPos.x;
-        const dy = b.pos.y - (playerPos.y + 1.0);
+        const dy = b.pos.y - ((playerPos.y || 0) + 1.0);
         const dz = b.pos.z - playerPos.z;
-        if (dx * dx + dy * dy + dz * dz < 0.72) {
+        if (dx * dx + dy * dy + dz * dz < 0.65) {
           hitPoint = _bileHitVec.copy(b.pos);
+          directPlayerHit = true;
         }
       }
-      if (!hitPoint && LRT.Station && typeof LRT.Station.raycastWorld === 'function') {
-        const wh = LRT.Station.raycastWorld(b.pos, _v1, stepDist + 0.15);
-        if (wh) hitPoint = wh.point;
+      if (!hitPoint && hasStationRaycast) {
+        const wh = LRT.Station.raycastWorld(b.pos, _bileDir, stepDist + 0.14);
+        if (wh) {
+          hitPoint = wh.point;
+          if (wh.normal) _bileNormal.copy(wh.normal);
+        }
       }
       if (!hitPoint && LRT.Train && typeof LRT.Train.raycastTrain === 'function') {
-        const th = LRT.Train.raycastTrain(b.pos, _v1, stepDist + 0.15);
-        if (th) hitPoint = th.point;
+        const th = LRT.Train.raycastTrain(b.pos, _bileDir, stepDist + 0.14);
+        if (th) {
+          hitPoint = th.point;
+          if (th.normal) _bileNormal.copy(th.normal);
+        }
       }
 
       b.pos.addScaledVector(b.vel, step);
+      const horizTravelSq =
+        (b.pos.x - b.startPos.x) * (b.pos.x - b.startPos.x) +
+        (b.pos.z - b.startPos.z) * (b.pos.z - b.startPos.z);
+      const minFloorCut = hasStationRaycast ? -1.15 : (b.groundY + 0.04);
 
-      if (hitPoint || b.pos.y <= -1.3 || b.life > 3.5) {
+      if (hitPoint || b.pos.y <= minFloorCut || b.life > 2.4 || horizTravelSq > BILE_MAX_RANGE * BILE_MAX_RANGE) {
         b.active = false;
         if (_bileMesh) _bileMesh.setMatrixAt(i, _zeroMat);
-        const impact = hitPoint || b.pos;
-        if (LRT.Weapons && typeof LRT.Weapons.spawnSparks === 'function') {
-          LRT.Weapons.spawnSparks(impact, 10);
+        if (_bileChunkMesh) {
+          _bileChunkMesh.setMatrixAt(i * 2, _zeroMat);
+          _bileChunkMesh.setMatrixAt(i * 2 + 1, _zeroMat);
         }
-        play3D('debris_crumble', impact, 0.2, 0.65);
+
+        const impact = hitPoint || b.pos;
+        const puddle = spawnBilePuddle(impact.x, impact.y, impact.z, 1.32 + Math.random() * 0.28, b.groundY);
+        const floorRef = puddle ? (puddle.pos.y - 0.02) : b.groundY;
+        spawnBileDropsBurst(impact, _bileNormal, 12, floorRef);
+        play3D('debris_crumble', impact, 0.24, 0.55);
+
         if (playerPos && typeof onPlayerHit === 'function') {
-          const dx = impact.x - playerPos.x;
-          const dy = impact.y - (playerPos.y + 1.0);
-          const dz = impact.z - playerPos.z;
-          if (dx * dx + dy * dy + dz * dz < 4.8) {
-            onPlayerHit(15, impact);
+          if (directPlayerHit) {
+            onPlayerHit(b.damage, impact);
+          } else {
+            const dx = impact.x - playerPos.x;
+            const dy = impact.y - ((playerPos.y || 0) + 1.0);
+            const dz = impact.z - playerPos.z;
+            if (dx * dx + dy * dy + dz * dz < 2.15) {
+              onPlayerHit(Math.max(4, Math.round(b.damage * 0.65)), impact);
+            }
           }
         }
-      } else if (_bileMesh) {
-        _q1.identity();
-        _scale.setScalar(1.0 + Math.sin(elapsed * 16 + i) * 0.18);
-        _m4.compose(b.pos, _q1, _scale);
-        _bileMesh.setMatrixAt(i, _m4);
+      } else {
+        if (_bileMesh) {
+          _q1.setFromUnitVectors(_fwdZ, _bileDir);
+          const pulse = 1.0 + Math.sin(elapsed * 18 + i) * 0.14;
+          _scale.set(pulse, pulse, 1.05 + Math.cos(elapsed * 14 + i) * 0.12);
+          _m4.compose(b.pos, _q1, _scale);
+          _bileMesh.setMatrixAt(i, _m4);
+        }
+        if (_bileChunkMesh) {
+          anyChunks = true;
+          for (let c = 0; c < 2; c++) {
+            const cIdx = i * 2 + c;
+            const back = 0.16 + c * 0.15;
+            const wob = elapsed * 10 + i * 2.1 + c * 3.1;
+            _pos.set(
+              b.pos.x - _bileDir.x * back + Math.cos(wob) * 0.06,
+              b.pos.y - _bileDir.y * back + Math.sin(wob * 1.3) * 0.05,
+              b.pos.z - _bileDir.z * back + Math.sin(wob) * 0.06
+            );
+            _e1.set(wob, wob * 0.7, c);
+            _q1.setFromEuler(_e1);
+            _scale.setScalar(c === 0 ? 1.05 : 0.78);
+            _m4.compose(_pos, _q1, _scale);
+            _bileChunkMesh.setMatrixAt(cIdx, _m4);
+          }
+        }
       }
     }
 
     if (_bileMesh) {
       _bileMesh.visible = anyBile;
       if (bileMatDirty) _bileMesh.instanceMatrix.needsUpdate = true;
+    }
+    if (_bileChunkMesh) {
+      _bileChunkMesh.visible = anyChunks;
+      if (bileMatDirty) _bileChunkMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    // Update falling vomit droplets in flight & impact splashes
+    let anyDrops = false;
+    let dropsDirty = false;
+    for (let i = 0; i < MAX_BILE_DROPS; i++) {
+      const d = E.bileDrops[i];
+      if (!d || !d.active) continue;
+      dropsDirty = true;
+      d.life += step;
+      d.vel.y -= BILE_GRAVITY * 1.1 * step;
+      d.pos.addScaledVector(d.vel, step);
+
+      if (d.life >= d.maxLife || d.pos.y <= d.floorY) {
+        d.active = false;
+        if (_bileDropMesh) _bileDropMesh.setMatrixAt(i, _zeroMat);
+      } else {
+        anyDrops = true;
+        if (_bileDropMesh) {
+          const dSpd = d.vel.length();
+          if (dSpd > 0.05) {
+            _bileDir.copy(d.vel).divideScalar(dSpd);
+            _q1.setFromUnitVectors(_fwdZ, _bileDir);
+          } else {
+            _q1.identity();
+          }
+          const fade = Math.max(0.25, 1.0 - (d.life / d.maxLife) * 0.65);
+          _scale.set(d.scale * fade, d.scale * fade, d.scale * fade * 2.1);
+          _m4.compose(d.pos, _q1, _scale);
+          _bileDropMesh.setMatrixAt(i, _m4);
+        }
+      }
+    }
+    if (_bileDropMesh) {
+      _bileDropMesh.visible = anyDrops;
+      if (dropsDirty) _bileDropMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    // Update persistent acid/vomit floor puddles + brief DoT hazard
+    let anyPuddles = false;
+    let puddlesDirty = false;
+    for (let i = 0; i < MAX_PUDDLES; i++) {
+      const p = E.bilePuddles[i];
+      if (!p || !p.active) continue;
+      puddlesDirty = true;
+      p.life += step;
+
+      if (p.life >= p.maxLife) {
+        p.active = false;
+        if (_puddleMesh) _puddleMesh.setMatrixAt(i, _zeroMat);
+        continue;
+      }
+
+      anyPuddles = true;
+      const growT = Math.min(1.0, p.life / 0.14);
+      const decayWindow = 1.6;
+      const fadeT = p.life > (p.maxLife - decayWindow)
+        ? Math.max(0.0, (p.maxLife - p.life) / decayWindow)
+        : 1.0;
+
+      if (fadeT > 0.35) {
+        p.bubbleAccum += step;
+        if (p.bubbleAccum >= 0.20) {
+          p.bubbleAccum -= 0.20;
+          spawnPuddleBubble(p);
+        }
+      }
+
+      if (playerPos && typeof onPlayerHit === 'function' && p.life > 0.35 && fadeT > 0.25) {
+        const hdx = playerPos.x - p.pos.x;
+        const hdz = playerPos.z - p.pos.z;
+        const pdy = Math.abs((playerPos.y || 0) - p.pos.y);
+        const effRad = p.radius * 0.88;
+        if (pdy <= 1.2 && (hdx * hdx + hdz * hdz) <= (effRad * effRad)) {
+          p.damageTickTimer -= step;
+          if (p.damageTickTimer <= 0) {
+            p.damageTickTimer = 0.55;
+            onPlayerHit(4, p.pos);
+          }
+        } else {
+          p.damageTickTimer = Math.min(p.damageTickTimer, 0.15);
+        }
+      }
+
+      if (_puddleMesh) {
+        const pulse = 1.0 + Math.sin(elapsed * 4.5 + i * 1.7) * 0.03;
+        const diameter = p.radius * 2.0 * growT * fadeT * pulse;
+        _e1.set(0, p.yaw, 0, 'YXZ');
+        _q1.setFromEuler(_e1);
+        _scale.set(diameter, 1.0, diameter * p.aspect);
+        _m4.compose(p.pos, _q1, _scale);
+        _puddleMesh.setMatrixAt(i, _m4);
+      }
+    }
+    if (_puddleMesh) {
+      _puddleMesh.visible = anyPuddles;
+      if (puddlesDirty) _puddleMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    // Update rising & popping acid puddle bubbles
+    let anyBubbles = false;
+    let bubblesDirty = false;
+    for (let i = 0; i < MAX_PUDDLE_BUBBLES; i++) {
+      const b = E.bileBubbles[i];
+      if (!b || !b.active) continue;
+      bubblesDirty = true;
+      b.life += step;
+      b.pos.y += b.riseSpeed * step;
+
+      if (b.life >= b.maxLife) {
+        b.active = false;
+        if (_puddleBubbleMesh) _puddleBubbleMesh.setMatrixAt(i, _zeroMat);
+      } else {
+        anyBubbles = true;
+        if (_puddleBubbleMesh) {
+          const t = b.life / b.maxLife;
+          const sc = Math.sin(t * Math.PI) * b.maxScale;
+          _q1.identity();
+          _scale.setScalar(Math.max(0.05, sc));
+          _m4.compose(b.pos, _q1, _scale);
+          _puddleBubbleMesh.setMatrixAt(i, _m4);
+        }
+      }
+    }
+    if (_puddleBubbleMesh) {
+      _puddleBubbleMesh.visible = anyBubbles;
+      if (bubblesDirty) _puddleBubbleMesh.instanceMatrix.needsUpdate = true;
     }
   }
 
@@ -1180,6 +1777,7 @@
   E.setWarmupMode = setWarmupMode;
   E.resetMeshes = resetMeshes;
   E.spawnBileProjectile = spawnBileProjectile;
+  E.spawnBilePuddle = spawnBilePuddle;
   E.updateBileProjectiles = updateBileProjectiles;
   E.updateOverlayVisibilityAndCounts = updateOverlayVisibilityAndCounts;
   E.updateZombieMatrices = updateZombieMatrices;

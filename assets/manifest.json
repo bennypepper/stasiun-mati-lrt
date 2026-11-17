@@ -5,12 +5,12 @@
   "summary": {
     "hdriCount": 4,
     "textureCount": 12,
-    "modelCount": 28,
+    "modelCount": 30,
     "skippedModelCount": 2,
     "hdriMB": 6.14,
     "texturesMB": 24.6,
-    "modelsMB": 114.42,
-    "totalMB": 145.17
+    "modelsMB": 118.89,
+    "totalMB": 149.64
   },
   "hdris": {
     "day_clear": {
@@ -319,6 +319,22 @@
       "gltf": "assets/models/ammo_box/ammo_box_1k.gltf",
       "binBytes": 153588,
       "totalBytes": 1472675,
+      "files": 5
+    },
+    "medical_box": {
+      "id": "medical_box",
+      "category": "station_prop",
+      "gltf": "assets/models/medical_box/medical_box_1k.gltf",
+      "binBytes": 127972,
+      "totalBytes": 1975384,
+      "files": 5
+    },
+    "old_military_crate": {
+      "id": "old_military_crate",
+      "category": "station_prop",
+      "gltf": "assets/models/old_military_crate/old_military_crate_1k.gltf",
+      "binBytes": 329004,
+      "totalBytes": 2495423,
       "files": 5
     },
     "Barrel_01": {

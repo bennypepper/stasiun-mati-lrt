@@ -4,6 +4,7 @@
   const MAX_VOICES = 24;
   let ctx = null;
   let masterGain = null;
+  let masterCompressor = null;
   let sfxGain = null;
   let loopGain = null;
   let voiceGain = null;
@@ -26,6 +27,8 @@
   let currentVoice = null;
   let voiceCallbacks = { onStart: null, onEnd: null };
   let voiceDucked = false;
+  let radioBus = null;
+  let paBus = null;
 
   let decodeStarted = false;
   let decodeDone = false;
@@ -51,7 +54,18 @@
     ctx = new AC();
     masterGain = ctx.createGain();
     masterGain.gain.value = muted ? 0 : masterVolume;
-    masterGain.connect(ctx.destination);
+    if (typeof ctx.createDynamicsCompressor === 'function') {
+      masterCompressor = ctx.createDynamicsCompressor();
+      masterCompressor.threshold.value = -4.0;
+      masterCompressor.knee.value = 6.0;
+      masterCompressor.ratio.value = 6.0;
+      masterCompressor.attack.value = 0.002;
+      masterCompressor.release.value = 0.08;
+      masterGain.connect(masterCompressor);
+      masterCompressor.connect(ctx.destination);
+    } else {
+      masterGain.connect(ctx.destination);
+    }
 
     sfxGain = ctx.createGain();
     sfxGain.gain.value = sfxVolume;
@@ -64,6 +78,45 @@
     voiceGain = ctx.createGain();
     voiceGain.gain.value = 1.0;
     voiceGain.connect(masterGain);
+
+    if (typeof ctx.createBiquadFilter === 'function') {
+      // Tactical OCC radio bandpass (380Hz - 3200Hz + mid presence)
+      const rHp = ctx.createBiquadFilter();
+      rHp.type = 'highpass';
+      rHp.frequency.value = 380;
+      const rPeak = ctx.createBiquadFilter();
+      rPeak.type = 'peaking';
+      rPeak.frequency.value = 1650;
+      rPeak.Q.value = 1.1;
+      rPeak.gain.value = 4.0;
+      const rLp = ctx.createBiquadFilter();
+      rLp.type = 'lowpass';
+      rLp.frequency.value = 3200;
+      rHp.connect(rPeak);
+      rPeak.connect(rLp);
+      rLp.connect(voiceGain);
+      radioBus = rHp;
+
+      // Station PA speaker bandpass + subtle concourse slapback echo
+      const pHp = ctx.createBiquadFilter();
+      pHp.type = 'highpass';
+      pHp.frequency.value = 320;
+      const pLp = ctx.createBiquadFilter();
+      pLp.type = 'lowpass';
+      pLp.frequency.value = 3800;
+      pHp.connect(pLp);
+      pLp.connect(voiceGain);
+      if (typeof ctx.createDelay === 'function') {
+        const delay = ctx.createDelay(0.25);
+        delay.delayTime.value = 0.085;
+        const echoGain = ctx.createGain();
+        echoGain.gain.value = 0.22;
+        pLp.connect(delay);
+        delay.connect(echoGain);
+        echoGain.connect(voiceGain);
+      }
+      paBus = pHp;
+    }
     return ctx;
   }
 
@@ -467,7 +520,11 @@
 
         const src = c.createBufferSource();
         src.buffer = buf;
-        src.connect(voiceGain);
+        const spk = String(entry.speaker || '').toUpperCase();
+        const targetBus = (spk.includes('OCC') && radioBus)
+          ? radioBus
+          : ((spk.includes('SYSTEM') || spk.includes('ANN')) && paBus ? paBus : voiceGain);
+        src.connect(targetBus);
         handle.src = src;
 
         src.onended = () => {

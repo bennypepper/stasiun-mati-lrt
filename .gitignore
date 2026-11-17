@@ -13,9 +13,19 @@ scripts/
 verify_*_report.json
 *.log
 *.tmp
+*.bak
+*.orig
 
-# Python & OS caches
+# Python, Playwright & IDE caches
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.playwright-mcp/
+test-results/
+playwright-report/
+.venv/
+venv/
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db

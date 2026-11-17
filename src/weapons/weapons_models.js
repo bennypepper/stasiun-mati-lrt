@@ -643,10 +643,15 @@
     muzzleAnchor.position.set(0, 0.022, -0.175);
     g.add(muzzleAnchor);
 
+    const ejectAnchor = new THREE.Object3D();
+    ejectAnchor.position.set(0.018, 0.028, -0.025);
+    g.add(ejectAnchor);
+
     barrel.visible = true;
     return {
       group: g,
       muzzleAnchor,
+      ejectAnchor,
       parts: { slide, mag },
       hipPos: new THREE.Vector3(0.18, -0.16, -0.34),
       adsPos: new THREE.Vector3(0.0, -0.044, -0.25),
@@ -704,9 +709,14 @@
     muzzleAnchor.position.set(0, 0.010, -0.55);
     g.add(muzzleAnchor);
 
+    const ejectAnchor = new THREE.Object3D();
+    ejectAnchor.position.set(0.026, 0.018, -0.010);
+    g.add(ejectAnchor);
+
     return {
       group: g,
       muzzleAnchor,
+      ejectAnchor,
       parts: { bolt, mag },
       hipPos: new THREE.Vector3(0.20, -0.18, -0.36),
       adsPos: new THREE.Vector3(0.0, -0.068, -0.23),
@@ -747,9 +757,14 @@
     muzzleAnchor.position.set(0, 0.022, -0.64);
     g.add(muzzleAnchor);
 
+    const ejectAnchor = new THREE.Object3D();
+    ejectAnchor.position.set(0.027, 0.008, -0.020);
+    g.add(ejectAnchor);
+
     return {
       group: g,
       muzzleAnchor,
+      ejectAnchor,
       parts: { pump },
       hipPos: new THREE.Vector3(0.21, -0.19, -0.38),
       adsPos: new THREE.Vector3(0.0, -0.046, -0.28),
@@ -1440,6 +1455,7 @@
       if (W._pumpTimer >= 0.16 && !W._pumpPlayed) {
         W._pumpPlayed = true;
         play3D('shotgun_pump', null, 0.04, 0.9);
+        if (typeof W.ejectShellCasing === 'function') W.ejectShellCasing('shotgun');
       }
       if (W._pumpTimer >= 0.16 && W._pumpTimer <= 0.48) {
         const pt = (W._pumpTimer - 0.16) / 0.32;

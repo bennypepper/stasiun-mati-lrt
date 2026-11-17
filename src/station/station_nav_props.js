@@ -1110,6 +1110,7 @@
           blocksBullets: cc.blocksBullets,
           isFloor: cc.isFloor,
           isRamp: cc.isRamp,
+          isTrackGate: !!cc.isTrackGate,
           rampAxis: cc.rampAxis,
           y0: cc.y0,
           y1: cc.y1

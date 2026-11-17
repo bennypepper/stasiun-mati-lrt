@@ -11,6 +11,13 @@
   let logTimer = 0;
   let currentBrightness = 1.0;
 
+  let creditsRafId = 0;
+  let creditsLastTs = 0;
+  let creditsScrollPos = 0;
+  let creditsPaused = false;
+  let creditsEnded = false;
+  let creditsCollapsed = false;
+
   const WAYPOINT_POOL_SIZE = 6;
   const _wpPool = [];
   const _wpList = [];
@@ -87,9 +94,11 @@
       'interact-label', 'hud-subtitle-box', 'subtitle-speaker', 'subtitle-text-id', 'subtitle-text-en',
       'hud-log-banner', 'log-title', 'log-body',
       'vitals-card', 'hp-value', 'hp-bar-fill', 'armor-row', 'armor-value', 'armor-bar-fill',
+      'cheat-console', 'cheat-input', 'cheat-status-row', 'cheat-pill-god', 'cheat-pill-sprint',
       'pill-flashlight', 'pill-lighting', 'pill-hud',
       'pill-mute', 'weapon-name', 'weapon-skin-tag', 'ammo-mag', 'ammo-reserve', 'weapon-slots',
       'menu-overlay', 'pause-overlay', 'gameover-overlay', 'gameover-stats',
+      'victory-credits', 'credits-viewport', 'btn-credits-pause', 'btn-credits-skip', 'btn-credits-toggle',
       'btn-start-survival', 'btn-start-exploration', 'btn-menu-settings', 'btn-menu-controls',
       'btn-menu-lighting', 'btn-pause-lighting',
       'menu-settings-panel', 'menu-controls-panel', 'brightness-slider', 'brightness-readout',
@@ -390,6 +399,109 @@
     syncMuteUi();
   }
 
+  function stopCreditsRoll() {
+    if (creditsRafId) {
+      window.cancelAnimationFrame(creditsRafId);
+      creditsRafId = 0;
+    }
+    creditsLastTs = 0;
+  }
+
+  function syncCreditsControlsUi() {
+    const panel = dom['victory-credits'];
+    const vp = dom['credits-viewport'];
+    const pauseBtn = dom['btn-credits-pause'];
+    const skipBtn = dom['btn-credits-skip'];
+    const toggleBtn = dom['btn-credits-toggle'];
+
+    if (panel) panel.classList.toggle('is-collapsed', creditsCollapsed);
+    if (vp) vp.classList.toggle('hidden', creditsCollapsed);
+
+    if (pauseBtn) {
+      pauseBtn.textContent = creditsPaused ? 'RESUME' : 'PAUSE';
+      pauseBtn.classList.toggle('active', creditsPaused);
+      pauseBtn.classList.toggle('hidden', creditsCollapsed || creditsEnded);
+    }
+    if (skipBtn) {
+      skipBtn.textContent = creditsEnded ? 'REPLAY' : 'SKIP';
+      skipBtn.classList.toggle('hidden', creditsCollapsed);
+    }
+    if (toggleBtn) {
+      toggleBtn.textContent = creditsCollapsed ? 'SHOW' : 'HIDE';
+      toggleBtn.classList.toggle('active', creditsCollapsed);
+    }
+  }
+
+  function stepCreditsRoll(ts) {
+    creditsRafId = 0;
+    const ov = dom['gameover-overlay'];
+    const panel = dom['victory-credits'];
+    const vp = dom['credits-viewport'];
+    if (
+      !ov || ov.classList.contains('hidden') || !ov.classList.contains('is-victory') ||
+      !panel || panel.classList.contains('hidden') || !vp || creditsCollapsed
+    ) {
+      creditsLastTs = 0;
+      return;
+    }
+    if (!creditsLastTs) creditsLastTs = ts;
+    const dt = Math.min(0.1, Math.max(0, (ts - creditsLastTs) / 1000));
+    creditsLastTs = ts;
+
+    const maxScroll = Math.max(0, vp.scrollHeight - vp.clientHeight);
+    if (!creditsPaused && !creditsEnded && maxScroll > 0) {
+      if (Math.abs(vp.scrollTop - creditsScrollPos) > 4) {
+        creditsScrollPos = vp.scrollTop;
+      }
+      creditsScrollPos = Math.min(maxScroll, creditsScrollPos + dt * 36);
+      vp.scrollTop = creditsScrollPos;
+      if (creditsScrollPos >= maxScroll - 1) {
+        creditsEnded = true;
+        syncCreditsControlsUi();
+      }
+    }
+    if (!creditsPaused && !creditsEnded) {
+      creditsRafId = window.requestAnimationFrame(stepCreditsRoll);
+    } else {
+      creditsLastTs = 0;
+    }
+  }
+
+  function startCreditsRoll(fromTop) {
+    stopCreditsRoll();
+    const vp = dom['credits-viewport'];
+    if (fromTop) {
+      creditsScrollPos = 0;
+      creditsPaused = false;
+      creditsEnded = false;
+      if (vp) vp.scrollTop = 0;
+    }
+    syncCreditsControlsUi();
+    if (!creditsCollapsed && !creditsPaused && !creditsEnded) {
+      creditsRafId = window.requestAnimationFrame(stepCreditsRoll);
+    }
+  }
+
+  function setVictoryCreditsActive(active) {
+    const ov = dom['gameover-overlay'];
+    const panel = dom['victory-credits'];
+    const isVic = !!active;
+    if (ov) ov.classList.toggle('is-victory', isVic);
+    if (panel) panel.classList.toggle('hidden', !isVic);
+    if (!isVic) {
+      stopCreditsRoll();
+      creditsScrollPos = 0;
+      creditsPaused = false;
+      creditsEnded = false;
+      creditsCollapsed = false;
+      if (dom['credits-viewport']) dom['credits-viewport'].scrollTop = 0;
+      syncCreditsControlsUi();
+      return;
+    }
+    creditsCollapsed = false;
+    startCreditsRoll(true);
+  }
+
   function bindHudUiInputs() {
     if (dom['btn-menu-settings']) {
       dom['btn-menu-settings'].addEventListener('click', () => {
@@ -408,6 +520,57 @@
       slider.addEventListener('input', (e) => applyBrightness(e.target.value));
       slider.addEventListener('change', (e) => applyBrightness(e.target.value));
     });
+    if (dom['btn-credits-pause']) {
+      dom['btn-credits-pause'].addEventListener('click', () => {
+        if (creditsEnded || creditsCollapsed) return;
+        creditsPaused = !creditsPaused;
+        if (creditsPaused) {
+          stopCreditsRoll();
+          syncCreditsControlsUi();
+        } else {
+          startCreditsRoll(false);
+        }
+      });
+    }
+    if (dom['btn-credits-skip']) {
+      dom['btn-credits-skip'].addEventListener('click', () => {
+        if (creditsCollapsed) return;
+        const vp = dom['credits-viewport'];
+        if (creditsEnded) {
+          startCreditsRoll(true);
+          return;
+        }
+        stopCreditsRoll();
+        if (vp) {
+          const maxScroll = Math.max(0, vp.scrollHeight - vp.clientHeight);
+          creditsScrollPos = maxScroll;
+          vp.scrollTop = maxScroll;
+        }
+        creditsPaused = false;
+        creditsEnded = true;
+        syncCreditsControlsUi();
+      });
+    }
+    if (dom['btn-credits-toggle']) {
+      dom['btn-credits-toggle'].addEventListener('click', () => {
+        creditsCollapsed = !creditsCollapsed;
+        if (creditsCollapsed) {
+          stopCreditsRoll();
+          syncCreditsControlsUi();
+        } else {
+          startCreditsRoll(false);
+        }
+      });
+    }
+    if (dom['credits-viewport']) {
+      dom['credits-viewport'].addEventListener('scroll', () => {
+        const vp = dom['credits-viewport'];
+        if (!vp) return;
+        if (Math.abs(vp.scrollTop - creditsScrollPos) > 4) {
+          creditsScrollPos = vp.scrollTop;
+        }
+      }, { passive: true });
+    }
   }
 
   function update(dt, worldCtx) {
@@ -464,7 +627,9 @@
     hmActive: null,
     hmCrit: null,
     chPx: null,
-    chAds: null
+    chAds: null,
+    godText: null,
+    sprintActive: null
   };
 
   function formatWeaponTag(wh) {
@@ -698,6 +863,26 @@
       if (dom['armor-bar-fill']) dom['armor-bar-fill'].style.width = `${armorPct}%`;
     }
 
+    const godRem = Math.ceil(state.invulnCheatTimer || 0);
+    const godText = godRem > 0
+      ? `PAINKILLER ${String(Math.floor(godRem / 60)).padStart(2, '0')}:${String(godRem % 60).padStart(2, '0')}`
+      : '';
+    const sprintActive = !!state.fastSprint;
+    if (_hudCache.godText !== godText || _hudCache.sprintActive !== sprintActive) {
+      _hudCache.godText = godText;
+      _hudCache.sprintActive = sprintActive;
+      if (dom['cheat-pill-god']) {
+        dom['cheat-pill-god'].classList.toggle('hidden', !godText);
+        if (godText) dom['cheat-pill-god'].textContent = godText;
+      }
+      if (dom['cheat-pill-sprint']) {
+        dom['cheat-pill-sprint'].classList.toggle('hidden', !sprintActive);
+      }
+      if (dom['cheat-status-row']) {
+        dom['cheat-status-row'].classList.toggle('hidden', !godText && !sprintActive);
+      }
+    }
+
     if (info) {
       const mode = info.mode === C.MODES.EXPLORATION ? 'EXPLORATION' : 'SURVIVAL';
       if (_hudCache.mode !== mode) {
@@ -839,8 +1024,19 @@
     if (dom['pause-overlay']) dom['pause-overlay'].classList.toggle('hidden', screenName !== 'pause');
     if (dom['gameover-overlay']) dom['gameover-overlay'].classList.toggle('hidden', screenName !== 'gameover');
     if (dom.hud) dom.hud.classList.toggle('hidden', screenName !== 'play');
+    if (screenName !== 'play' && PL.closeCheatConsole) {
+      PL.closeCheatConsole(false);
+    }
     if (screenName !== 'menu') {
       setMenuSubpanel(null);
+    }
+    if (screenName === 'gameover') {
+      const ov = dom['gameover-overlay'];
+      const titleEl = ov ? ov.querySelector('.zenith-title') : null;
+      const isVictory = !!(titleEl && titleEl.textContent.trim().toUpperCase() === 'EXTRACTION COMPLETE');
+      setVictoryCreditsActive(isVictory);
+    } else {
+      setVictoryCreditsActive(false);
     }
     if (screenName === 'menu' || screenName === 'pause') {
       if (I.core && typeof I.core.getSettings === 'function') {
@@ -914,6 +1110,11 @@
     _hudCache.skinTag = null;
     _hudCache.skinIdAttr = null;
     _hudCache.slotKey = null;
+    _hudCache.godText = null;
+    _hudCache.sprintActive = null;
+    if (dom['cheat-status-row']) dom['cheat-status-row'].classList.add('hidden');
+    if (dom['cheat-pill-god']) dom['cheat-pill-god'].classList.add('hidden');
+    if (dom['cheat-pill-sprint']) dom['cheat-pill-sprint'].classList.add('hidden');
     if (dom['armor-row']) dom['armor-row'].classList.add('hidden');
     if (dom['weapon-skin-tag']) {
       dom['weapon-skin-tag'].textContent = '';
@@ -963,11 +1164,15 @@
       PL.flags.paused = !!flag;
       PL.flags.allowActionInput = allowInput !== undefined ? !!allowInput : !PL.flags.paused;
       if (PL.flags.paused) {
+        if (PL.closeCheatConsole) PL.closeCheatConsole(false);
         for (const k of Object.keys(PL.keys)) PL.keys[k] = false;
         PL.state.ads = false;
         if (LRT.Weapons) LRT.Weapons.setADS(false);
       }
     },
+    openCheatConsole: PL.openCheatConsole,
+    closeCheatConsole: PL.closeCheatConsole,
+    executeCheat: PL.executeCheat,
     setLook: (yaw, pitch) => {
       PL.state.yaw = yaw;
       PL.state.pitch = Math.max(-1.46, Math.min(1.46, pitch));

@@ -35,6 +35,14 @@ python build.py --strict
 | `T` | Quick-Summon LRT / Depart inside cab |
 | `L` | Cycle Time-of-Day & Lighting (`DAYLIGHT_CLEAR`, `DAYLIGHT_OVERCAST`, `GOLDEN_DUSK`, `BLACKOUT_EMERGENCY`, `CRIMSON_BLOOD_MOON`) |
 | `H` / `M` | Toggle HUD / Mute Audio |
+| `` ` `` / `~` | Open Cheat Console (`PAINKILLER`, `TURTLE`, `TOOLUP`, `CATCHME`) |
+
+---
+
+## License & Third-Party Credits
+
+- **Game Source Code:** Licensed under the [MIT License](LICENSE) (`Copyright (c) 2026 Benny Pepper`).
+- **3D Models, Textures, HDRIs, SFX & Voiceovers:** Full third-party disclosures and attributions are listed in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and [`assets/sfx/sfx_licenses.md`](assets/sfx/sfx_licenses.md).
 
 ---
 

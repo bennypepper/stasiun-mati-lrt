@@ -227,6 +227,13 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
       <div id="subtitle-text-en">English subtitle translation</div>
     </div>
 
+    <!-- GTA-style Cheat Console Bar (Toggle with ` key) -->
+    <div id="cheat-console" class="hidden" role="dialog" aria-label="Cheat Console">
+      <span class="cheat-prompt">&gt;</span>
+      <input id="cheat-input" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="ENTER CHEAT CODE..." aria-label="Cheat Code Input">
+      <span class="cheat-hint">[ENTER] APPLY · [` / ESC] CLOSE</span>
+    </div>
+
     <div id="hud-bottom">
       <div id="vitals-card">
         <div class="vital-row">
@@ -238,6 +245,10 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
           <span class="armor-label">ARMOR</span>
           <span id="armor-value">0</span>
           <div class="armor-bar-track"><div id="armor-bar-fill"></div></div>
+        </div>
+        <div class="cheat-status-row hidden" id="cheat-status-row">
+          <span class="cheat-pill hidden" id="cheat-pill-god">PAINKILLER 05:00</span>
+          <span class="cheat-pill hidden" id="cheat-pill-sprint">CATCHME // FAST SPRINT</span>
         </div>
         <div class="tool-pills">
           <span class="pill-ind" id="pill-flashlight">[F] Senter: OFF</span>
@@ -383,6 +394,7 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
             <div class="ctrl-row"><span class="ctrl-key">F3</span><span class="ctrl-desc">FPS Telemetry</span></div>
             <div class="ctrl-row"><span class="ctrl-key">H</span><span class="ctrl-desc">Toggle HUD</span></div>
             <div class="ctrl-row"><span class="ctrl-key">M</span><span class="ctrl-desc">Mute Audio</span></div>
+            <div class="ctrl-row"><span class="ctrl-key">` / ~</span><span class="ctrl-desc">Cheat Console</span></div>
           </div>
         </div>
       </nav>
@@ -493,7 +505,7 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
 
   <!-- Game Over Overlay -->
   <div id="gameover-overlay" class="overlay-screen menu-asymmetric hidden">
-    <div class="zenith-column">
+    <div class="zenith-column gameover-summary-col">
       <div class="zenith-header">
         <div class="zenith-kicker kicker-alert">SIGNAL LOST // JALUR TERPUTUS</div>
         <h1 class="zenith-title">OVERRUN AT STATION</h1>
@@ -511,6 +523,116 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
         </button>
       </nav>
     </div>
+
+    <!-- Victory Rolling Credits Stage (shown ONLY on EXTRACTION COMPLETE) -->
+    <section id="victory-credits" class="victory-credits hidden" aria-label="End Credits">
+      <div class="credits-toolbar">
+        <div class="credits-toolbar-label">EVACUATION ARCHIVE // CREDITS</div>
+        <div class="credits-toolbar-actions">
+          <button class="zenith-tab" id="btn-credits-pause" type="button">PAUSE</button>
+          <button class="zenith-tab" id="btn-credits-skip" type="button">SKIP</button>
+          <button class="zenith-tab" id="btn-credits-toggle" type="button">HIDE</button>
+        </div>
+      </div>
+
+      <div class="credits-viewport" id="credits-viewport">
+        <div class="credits-track" id="credits-track">
+          <div class="credits-lead-spacer"></div>
+
+          <div class="credits-hero">
+            <div class="credits-kicker">PROTOKOL EVAKUASI 114-OMEGA // CORRIDOR CB–BK</div>
+            <h2 class="credits-game-title">STASIUN MATI</h2>
+            <div class="credits-game-sub">HYDROGEN-SUBWAY · JAKARTA LRT SURVIVAL FPS</div>
+          </div>
+
+          <div class="credits-section credits-featured">
+            <div class="credits-role">DEVELOPER</div>
+            <div class="credits-name-hero">Benny Pepper</div>
+            <div class="credits-detail">Game Design · 3D Architecture · Gameplay Systems · Narrative</div>
+          </div>
+
+          <div class="credits-rule"></div>
+
+          <div class="credits-section">
+            <div class="credits-role">ENGINE &amp; 3D TECHNOLOGY</div>
+            <div class="credits-entry">
+              <span class="credits-item">Three.js</span>
+              <span class="credits-license">MIT License · WebGL 3D Engine</span>
+            </div>
+            <div class="credits-entry">
+              <span class="credits-item">three-mesh-bvh</span>
+              <span class="credits-license">MIT License · Spatial Raycasting &amp; Collision BVH</span>
+            </div>
+            <div class="credits-entry">
+              <span class="credits-item">N8AO</span>
+              <span class="credits-license">MIT License · Screen-Space Ambient Occlusion</span>
+            </div>
+          </div>
+
+          <div class="credits-section">
+            <div class="credits-role">3D MODELS, HDRIS &amp; PBR TEXTURES</div>
+            <div class="credits-entry">
+              <span class="credits-item">Poly Haven</span>
+              <span class="credits-license">CC0 1.0 Public Domain · Props, Foliage, Skies &amp; Materials</span>
+            </div>
+          </div>
+
+          <div class="credits-section">
+            <div class="credits-role">SOUND EFFECTS &amp; AUDIO ARCHIVE</div>
+            <div class="credits-entry">
+              <span class="credits-item">Oculus Audio Pack 1 — Oculus VR / Meta</span>
+              <span class="credits-license">CC-BY 4.0 · Transit Doors, Chimes, Props, Impacts &amp; Foley</span>
+            </div>
+            <div class="credits-entry">
+              <span class="credits-item">Michel Baradari</span>
+              <span class="credits-license">CC-BY 3.0 · Shotgun, RPG Launch, Explosions &amp; Creature Death</span>
+            </div>
+            <div class="credits-entry">
+              <span class="credits-item">Philt3r &amp; PascalHD</span>
+              <span class="credits-license">CC-BY 4.0 via Wikimedia Commons · Train Arrival &amp; Braking</span>
+            </div>
+            <div class="credits-entry">
+              <span class="credits-item">OpenGameArt CC0 Contributors</span>
+              <span class="credits-license">CC0 1.0 · Ben Jaszczak / bart, SpringySpringo, LFA, Till Behrend, Fantozzi, artisticdude, Darsycho</span>
+            </div>
+            <div class="credits-entry">
+              <span class="credits-item">Lavenderdotpet CC0 Archive</span>
+              <span class="credits-license">CC0 1.0 · Concrete Impacts &amp; Structural Debris</span>
+            </div>
+            <div class="credits-entry">
+              <span class="credits-item">Cassiopeia sweet &amp; NIRVAAN222222</span>
+              <span class="credits-license">Public Domain / CC0 1.0 via Wikimedia Commons · Rail Joint Loop &amp; Train Horn</span>
+            </div>
+          </div>
+
+          <div class="credits-section">
+            <div class="credits-role">VOICE SYNTHESIS</div>
+            <div class="credits-entry">
+              <span class="credits-item">Google Gemini 3.8 Flash-Lite TTS</span>
+              <span class="credits-license">via OpenRouter · Bilingual Tactical Dispatch &amp; PA Announcements</span>
+            </div>
+          </div>
+
+          <div class="credits-section">
+            <div class="credits-role">SETTING TRIBUTE</div>
+            <div class="credits-entry">
+              <span class="credits-item">LRT Jabodebek &amp; Jakarta Transit Corridor</span>
+              <span class="credits-license">Dukuh Atas BSI · Cawang Interchange · Harjamukti · Kuningan · Cikoko · Setiabudi</span>
+            </div>
+          </div>
+
+          <div class="credits-rule"></div>
+
+          <div class="credits-finale">
+            <div class="credits-finale-kicker">INKA iE203 TRAINSET #04 // HYDROGEN-SUBWAY</div>
+            <div class="credits-finale-msg">THANK YOU FOR SURVIVING THE CORRIDOR</div>
+            <div class="credits-finale-dev">Created by Benny Pepper</div>
+          </div>
+
+          <div class="credits-tail-spacer"></div>
+        </div>
+      </div>
+    </section>
   </div>"""
 
 

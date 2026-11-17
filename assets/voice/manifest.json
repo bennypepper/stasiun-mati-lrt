@@ -4,9 +4,9 @@
     "speaker": "OCC_DISPATCH",
     "trigger_event": "Mission start at Station 0 concourse",
     "file": "assets/voice/VO_01_INTRO.mp3",
-    "subtitle_id": "Unit Gagak-03, OCC Bekasi online. Sudirman blackout total. Hidupkan generator stasiun, bersihkan gerbang tiket!",
+    "subtitle_id": "Unit Gagak-03, OCC Bekasi online. Sudirman padam total. Nyalakan generator stasiun, bersihkan gerbang tiket!",
     "subtitle_en": "Gagak-03, OCC Bekasi is online. Total Sudirman blackout. Power the station generator and clear the faregates!",
-    "duration_sec": 7.92,
+    "duration_sec": 8.93,
     "priority": "HIGH"
   },
   "VO_02_GEN_ON": {
@@ -16,7 +16,7 @@
     "file": "assets/voice/VO_02_GEN_ON.mp3",
     "subtitle_id": "Daya cadangan aktif! Lampu peron menyala. Awas, suara mesin memancing infected dari jalan raya!",
     "subtitle_en": "Aux power active! Platform lights on. Caution: engine noise is drawing infected from the boulevard!",
-    "duration_sec": 7.12,
+    "duration_sec": 6.46,
     "priority": "HIGH"
   },
   "VO_03_STREET_HINT": {
@@ -24,9 +24,9 @@
     "speaker": "OCC_DISPATCH",
     "trigger_event": "Player approaches street stairs",
     "file": "assets/voice/VO_03_STREET_HINT.mp3",
-    "subtitle_id": "Trotoar luar penuh perbekalan. Cek gerobak kopi dan kotak PLN jalanan sebelum kamu naik ke peron.",
+    "subtitle_id": "Trotoar luar penuh perbekalan. Cek gerobak kopi dan kotak PLN jalanan sebelum naik ke peron.",
     "subtitle_en": "Outer sidewalks have supplies. Check the coffee carts and street PLN boxes before heading up to the platform.",
-    "duration_sec": 6.72,
+    "duration_sec": 7.18,
     "priority": "MEDIUM"
   },
   "VO_04_CALL_HOLD": {
@@ -36,7 +36,7 @@
     "file": "assets/voice/VO_04_CALL_HOLD.mp3",
     "subtitle_id": "Rangkaian LRT darurat meluncur dari stabling. Bertahan di peron empat puluh lima detik!",
     "subtitle_en": "Emergency LRT consist en route from stabling. Hold the platform for forty-five seconds!",
-    "duration_sec": 6.08,
+    "duration_sec": 6.22,
     "priority": "HIGH"
   },
   "VO_05_TRAIN_DOCK": {
@@ -44,9 +44,9 @@
     "speaker": "SYSTEM_ANN",
     "trigger_event": "Trainset 04 arrives at PSD",
     "file": "assets/voice/VO_05_TRAIN_DOCK.mp3",
-    "subtitle_id": "Stasiun Dukuh Atas BSI. Kereta evakuasi telah tiba di peron satu. Hati-hati celah peron.",
+    "subtitle_id": "Stasiun Dukuh Atas BSI. Kereta evakuasi telah tiba di Peron Satu. Hati-hati celah peron.",
     "subtitle_en": "Dukuh Atas BSI Station. Evacuation train has arrived on Platform 1. Mind the platform gap.",
-    "duration_sec": 7.08,
+    "duration_sec": 8.18,
     "priority": "CRITICAL"
   },
   "VO_06_BOARD_WARN": {
@@ -56,7 +56,7 @@
     "file": "assets/voice/VO_06_BOARD_WARN.mp3",
     "subtitle_id": "Kereta sudah merapat! Masuk ke kabin sekarang sebelum kawanan infected menjebol pintu kaca!",
     "subtitle_en": "Train has docked! Get into the cabin now before the swarm breaches the window glass!",
-    "duration_sec": 5.8,
+    "duration_sec": 4.7,
     "priority": "CRITICAL"
   },
   "VO_07_CAWANG_ARR": {
@@ -64,9 +64,9 @@
     "speaker": "OCC_DISPATCH",
     "trigger_event": "Arrival at Cawang Interchange",
     "file": "assets/voice/VO_07_CAWANG_ARR.mp3",
-    "subtitle_id": "Cawang Interchange. Jalur terkunci sinyal mati. Ambil sekring bypass dari kabin bangkai kereta di Jalur Empat!",
-    "subtitle_en": "Cawang Interchange. Tracks locked by dead signals. Retrieve the bypass fuse from the derelict cab on Track 4!",
-    "duration_sec": 8.04,
+    "subtitle_id": "Stasiun Cawang! Sinyal mati, jalur terkunci. Ambil sekring bypass dari bangkai kereta di Jalur Empat!",
+    "subtitle_en": "Cawang Station! Dead signals, tracks locked. Retrieve the bypass fuse from the derelict cab on Track 4!",
+    "duration_sec": 7.13,
     "priority": "HIGH"
   },
   "VO_08_FUSE_FOUND": {
@@ -74,9 +74,9 @@
     "speaker": "PLAYER_G2",
     "trigger_event": "Derelict fuse retrieved",
     "file": "assets/voice/VO_08_FUSE_FOUND.mp3",
-    "subtitle_id": "Sekring bypass didapat! Membawa shotgun taktis dari bangkai masinis. Bergerak kembali ke Peron Satu.",
+    "subtitle_id": "Sekring bypass didapat! Mengambil shotgun taktis dari bangkai masinis. Bergerak kembali ke Peron Satu.",
     "subtitle_en": "Bypass fuse secured! Salvaged a tactical shotgun from the driver's wreck. Moving back to Platform 1.",
-    "duration_sec": 5.6,
+    "duration_sec": 5.62,
     "priority": "HIGH"
   },
   "VO_09_SPITTER_SEE": {
@@ -84,9 +84,9 @@
     "speaker": "OCC_DISPATCH",
     "trigger_event": "First Spitter spotted",
     "file": "assets/voice/VO_09_SPITTER_SEE.mp3",
-    "subtitle_id": "Awas hazmat infected di skybridge! Dia melontarkan cairan asam beracun dari jarak jauh, cari perlindungan!",
-    "subtitle_en": "Watch out for the hazmat infected on the skybridge! Lobbing toxic acid from range—get behind cover!",
-    "duration_sec": 7.16,
+    "subtitle_id": "Awas, Spitter berjas hazmat di jembatan atas! Cari perlindungan dari semburan asamnya!",
+    "subtitle_en": "Watch out, hazmat Spitter on the skybridge! Take cover from its toxic acid spit!",
+    "duration_sec": 5.5,
     "priority": "CRITICAL"
   },
   "VO_10_HARJA_ARR": {
@@ -94,9 +94,9 @@
     "speaker": "OCC_DISPATCH",
     "trigger_event": "Arrival at Harjamukti Depot",
     "file": "assets/voice/VO_10_HARJA_ARR.mp3",
-    "subtitle_id": "Harjamukti gelap gulita! Gunakan senter. Riset vaksin Dr. Rina ada di Kebun Atap Selatan!",
+    "subtitle_id": "Harjamukti gelap gulita! Nyalakan senter. Riset vaksin Dokter Rina ada di Kebun Atap Selatan!",
     "subtitle_en": "Harjamukti is pitch black! Use your flashlight. Dr. Rina's vaccine research is on the South Roof Garden!",
-    "duration_sec": 7.32,
+    "duration_sec": 6.74,
     "priority": "HIGH"
   },
   "VO_11_BRUTE_SEE": {
@@ -104,9 +104,9 @@
     "speaker": "OCC_DISPATCH",
     "trigger_event": "First Riot Brute spotted",
     "file": "assets/voice/VO_11_BRUTE_SEE.mp3",
-    "subtitle_id": "Brute lapis baja huru-hara di depan! Tembak kepalanya atau pancing ke drum merah yang meledak!",
-    "subtitle_en": "Riot-armored Brute ahead! Aim for the head or lure him into the red explosive drums!",
-    "duration_sec": 5.88,
+    "subtitle_id": "Awas Brute berlapis baja di depan! Incar kepalanya atau pancing ke drum merah!",
+    "subtitle_en": "Armored Brute ahead! Aim for the head or lure it into the red explosive drums!",
+    "duration_sec": 5.42,
     "priority": "CRITICAL"
   },
   "VO_12_VAX_FOUND": {
@@ -114,9 +114,9 @@
     "speaker": "PLAYER_G2",
     "trigger_event": "Botanical serum collected",
     "file": "assets/voice/VO_12_VAX_FOUND.mp3",
-    "subtitle_id": "Vaksin spora Dr. Rina berhasil diamankan. Menuju hanggar depo untuk membuka jalur traksi utama.",
-    "subtitle_en": "Dr. Rina's spore vaccine secured. Heading to the depot hanger to unlock the main traction line.",
-    "duration_sec": 6.44,
+    "subtitle_id": "Vaksin spora Dokter Rina berhasil diamankan. Menuju hanggar depo untuk buka jalur traksi utama.",
+    "subtitle_en": "Dr. Rina's spore vaccine secured. Heading to the depot hangar to unlock the main traction line.",
+    "duration_sec": 5.78,
     "priority": "HIGH"
   },
   "VO_13_SCREAM_WARN": {
@@ -124,9 +124,9 @@
     "speaker": "OCC_DISPATCH",
     "trigger_event": "Screamer appears",
     "file": "assets/voice/VO_13_SCREAM_WARN.mp3",
-    "subtitle_id": "Screamer terdeteksi! Tembak kista lehernya sebelum dia menjerit memanggil seluruh infected di depo!",
-    "subtitle_en": "Screamer detected! Shoot the neck cyst before she shrieks and summons the entire depot horde!",
-    "duration_sec": 6.56,
+    "subtitle_id": "Awas Screamer! Tembak kista di lehernya sebelum dia menjerit memanggil seluruh kawanan!",
+    "subtitle_en": "Screamer alert! Shoot the neck cyst before it shrieks and summons the entire horde!",
+    "duration_sec": 5.33,
     "priority": "CRITICAL"
   },
   "VO_14_HORN_HINT": {
@@ -134,9 +134,9 @@
     "speaker": "OCC_DISPATCH",
     "trigger_event": "Horn lure tutorial trigger",
     "file": "assets/voice/VO_14_HORN_HINT.mp3",
-    "subtitle_id": "Gunakan tombol klakson di kabin! Frekuensi suara LRT memecah konsentrasi spora dan memancing kawanan itu!",
+    "subtitle_id": "Tekan tombol klakson di kabin! Frekuensi suara LRT memecah fokus spora dan memancing mereka!",
     "subtitle_en": "Use the horn switch in the cab! The LRT acoustic frequency disrupts spore focus and lures the horde!",
-    "duration_sec": 7.24,
+    "duration_sec": 5.9,
     "priority": "MEDIUM"
   },
   "VO_15_RETREAT_NOTE": {
@@ -144,9 +144,9 @@
     "speaker": "OCC_DISPATCH",
     "trigger_event": "Low ammo / Track 2 look",
     "file": "assets/voice/VO_15_RETREAT_NOTE.mp3",
-    "subtitle_id": "Amunisi menipis? Gunakan konsol Peron Dua untuk mundur ke stasiun sebelumnya dan mengisi ulang logistik!",
-    "subtitle_en": "Running low on ammo? Use the Platform 2 console to backtrack to prior stations and restock!",
-    "duration_sec": 6.8,
+    "subtitle_id": "Amunisi menipis? Gunakan konsol Peron Dua untuk mundur dan isi ulang logistik!",
+    "subtitle_en": "Running low on ammo? Use the Platform 2 console to backtrack and restock supplies!",
+    "duration_sec": 5.21,
     "priority": "MEDIUM"
   },
   "VO_16_KUNING_ARR": {
@@ -154,9 +154,9 @@
     "speaker": "OCC_DISPATCH",
     "trigger_event": "Kuningan monsoon storm",
     "file": "assets/voice/VO_16_KUNING_ARR.mp3",
-    "subtitle_id": "Ngarai Rasuna Said dilanda badai muson. Hati-hati terpeleset di peron, jalanan bawah banjir parah!",
-    "subtitle_en": "The Rasuna Said canyon is hit by the monsoon storm. Mind your footing—the street below is severely flooded!",
-    "duration_sec": 6.96,
+    "subtitle_id": "Koridor Kuningan dilanda badai besar! Hati-hati peron licin, jalanan bawah banjir parah.",
+    "subtitle_en": "Kuningan corridor is hit by a heavy storm! Watch your footing—the street below is flooded.",
+    "duration_sec": 6.14,
     "priority": "HIGH"
   },
   "VO_17_CIKOKO_ARR": {
@@ -164,9 +164,9 @@
     "speaker": "OCC_DISPATCH",
     "trigger_event": "Cikoko transit arrival",
     "file": "assets/voice/VO_17_CIKOKO_ARR.mp3",
-    "subtitle_id": "Stasiun Cikoko. Tangga transfer KRL Cawang penuh reruntuhan. Bersihkan barikade jalan tol untuk melanjutkan!",
-    "subtitle_en": "Cikoko Station. KRL Cawang transfer stairs are choked with debris. Clear the highway roadblock to push through!",
-    "duration_sec": 7.56,
+    "subtitle_id": "Stasiun Cikoko. Tangga transfer KRL penuh reruntuhan. Hancurkan barikade jalan tol untuk lanjut!",
+    "subtitle_en": "Cikoko Station. KRL transfer stairs are choked with debris. Breach the highway barricade to push through!",
+    "duration_sec": 6.7,
     "priority": "HIGH"
   },
   "VO_18_SETIA_ARR": {
@@ -174,9 +174,9 @@
     "speaker": "OCC_DISPATCH",
     "trigger_event": "Setiabudi arrival",
     "file": "assets/voice/VO_18_SETIA_ARR.mp3",
-    "subtitle_id": "Setiabudi! Garis pertahanan terakhir Kodam Jaya. Hubungkan tiga relai sinyal untuk membuka gerbang evakuasi!",
+    "subtitle_id": "Setiabudi! Garis akhir Kodam Jaya. Hubungkan tiga relai sinyal untuk buka gerbang evakuasi!",
     "subtitle_en": "Setiabudi! Kodam Jaya's final defense line. Connect all three signal relays to open the extraction gate!",
-    "duration_sec": 8.6,
+    "duration_sec": 6.94,
     "priority": "CRITICAL"
   },
   "VO_19_FINAL_WAVE": {
@@ -184,9 +184,9 @@
     "speaker": "OCC_DISPATCH",
     "trigger_event": "90s Omega holdout triggers",
     "file": "assets/voice/VO_19_FINAL_WAVE.mp3",
-    "subtitle_id": "Gelombang merah datang dari segala arah! Bertahan sembilan puluh detik, helikopter evakuasi sudah di atas gedung!",
-    "subtitle_en": "Red moon swarm incoming from all directions! Hold for ninety seconds—extraction chopper is over the rooftop!",
-    "duration_sec": 7.12,
+    "subtitle_id": "Gelombang merah datang dari segala arah! Bertahan sembilan puluh detik, helikopter evakuasi sudah di atas!",
+    "subtitle_en": "Red moon swarm incoming from all directions! Hold for ninety seconds—extraction chopper is overhead!",
+    "duration_sec": 6.77,
     "priority": "CRITICAL"
   },
   "VO_20_COUNT_10": {
@@ -194,9 +194,9 @@
     "speaker": "OCC_DISPATCH",
     "trigger_event": "T-minus 10 seconds",
     "file": "assets/voice/VO_20_COUNT_10.mp3",
-    "subtitle_id": "Sepuluh detik lagi! Masuk ke kabin masinis, bersiap tabrak barikade terakhir!",
-    "subtitle_en": "Ten seconds remaining! Get into the driver's cab and prepare to ram through the final barrier!",
-    "duration_sec": 5.84,
+    "subtitle_id": "Sepuluh detik lagi! Masuk ke kabin masinis, bersiap terobos barikade terakhir!",
+    "subtitle_en": "Ten seconds left! Get into the driver's cab and prepare to ram the final barrier!",
+    "duration_sec": 4.97,
     "priority": "CRITICAL"
   },
   "VO_21_VICTORY": {
@@ -204,9 +204,9 @@
     "speaker": "OCC_DISPATCH",
     "trigger_event": "Campaign extraction win",
     "file": "assets/voice/VO_21_VICTORY.mp3",
-    "subtitle_id": "Pintu gerbang terbuka! Jalur aman terkonfirmasi. Kamu berhasil, Arya. Vaksin dan data koridor selamat!",
-    "subtitle_en": "Blast doors open! Clear line confirmed. You made it, Arya. The vaccine and corridor data are safe!",
-    "duration_sec": 7.96,
+    "subtitle_id": "Gerbang terbuka! Jalur aman. Kamu berhasil, Arya—vaksin dan data koridor selamat!",
+    "subtitle_en": "Blast doors open! Line clear. You made it, Arya—the vaccine and corridor data are safe!",
+    "duration_sec": 6.77,
     "priority": "HIGH"
   },
   "VO_22_GAME_OVER": {
@@ -214,9 +214,9 @@
     "speaker": "OCC_DISPATCH",
     "trigger_event": "Player killed in action",
     "file": "assets/voice/VO_22_GAME_OVER.mp3",
-    "subtitle_id": "Gagak-03 tumbang! Telemetri vital hilang... Seluruh unit, koridor CB/BK dinyatakan gugur.",
-    "subtitle_en": "Gagak-03 is down! Vital telemetry lost... All units, corridor CB/BK is officially lost.",
-    "duration_sec": 7.72,
+    "subtitle_id": "Gagak-03 tumbang! Sinyal vital terputus.",
+    "subtitle_en": "Gagak-03 is down! Vital signal lost.",
+    "duration_sec": 3.34,
     "priority": "CRITICAL"
   },
   "VO_23_AMBIENT_CHIME": {
@@ -224,9 +224,9 @@
     "speaker": "SYSTEM_ANN",
     "trigger_event": "Idle station ambience",
     "file": "assets/voice/VO_23_AMBIENT_CHIME.mp3",
-    "subtitle_id": "LRT Jabodebek mengutamakan keselamatan. Tetap berada di belakang garis kuning demi keselamatan Anda.",
-    "subtitle_en": "LRT Jabodebek prioritizes safety. Please stand behind the yellow line for your personal safety.",
-    "duration_sec": 7.32,
+    "subtitle_id": "LRT Jabodebek mengutamakan keselamatan. Tetap berada di belakang garis kuning.",
+    "subtitle_en": "LRT Jabodebek prioritizes safety. Please stand behind the yellow line.",
+    "duration_sec": 6.14,
     "priority": "AMBIENT"
   },
   "VO_24_DOOR_CLOSE": {
@@ -234,9 +234,9 @@
     "speaker": "SYSTEM_ANN",
     "trigger_event": "Doors closing before departure",
     "file": "assets/voice/VO_24_DOOR_CLOSE.mp3",
-    "subtitle_id": "Pintu kereta akan ditutup. Mohon tidak memaksakan diri untuk masuk. Mind the closing doors.",
-    "subtitle_en": "Train doors are closing. Please do not force entry. Mind the closing doors.",
-    "duration_sec": 7.64,
+    "subtitle_id": "Pintu kereta akan ditutup. Harap berhati-hati. Mind the closing doors.",
+    "subtitle_en": "Train doors are closing. Please take care. Mind the closing doors.",
+    "duration_sec": 5.18,
     "priority": "HIGH"
   }
 }

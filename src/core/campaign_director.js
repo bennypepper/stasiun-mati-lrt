@@ -646,6 +646,10 @@
       : (typeof tierCfg.pickupAmmoMult === 'number' ? tierCfg.pickupAmmoMult : 1.0);
 
     if (dropType === 'lootcrate') {
+      if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+        LRT.Audio.play('crate_open', { gain: 0.78 });
+        LRT.Audio.play('loot_chime', { gain: 0.65 });
+      }
       if (typeof LRT.Weapons.rollLootbox === 'function') {
         const riskLuck = typeof meta.luckFactor === 'number'
           ? meta.luckFactor
@@ -663,12 +667,18 @@
     if (dropType === 'health') {
       const healAmt = Math.max(1, Math.round(18 * healMult));
       LRT.PlayerUI.heal(healAmt);
+      if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+        LRT.Audio.play('pickup_medkit', { gain: 0.72 });
+      }
       LRT.PlayerUI.setNotice(`+${healAmt} HEALTH PICKUP`, '#22c55e');
       return;
     }
 
     if (dropType === 'rpg') {
       LRT.Weapons.addAmmo('rpg', 1);
+      if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+        LRT.Audio.play('pickup_ammo', { gain: 0.80 });
+      }
       LRT.PlayerUI.setNotice('+1 RPG ROCKET', '#f97316');
       return;
     }
@@ -677,6 +687,9 @@
     const sgAmt = Math.max(1, Math.round(4 * ammoMult));
     LRT.Weapons.addAmmo('rifle', rifleAmt);
     LRT.Weapons.addAmmo('shotgun', sgAmt);
+    if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+      LRT.Audio.play('pickup_ammo', { gain: 0.75 });
+    }
     LRT.PlayerUI.setNotice('+AMMO RESUPPLY', '#e0b422');
   }
 
@@ -783,6 +796,16 @@
     if (CORE.gameState === STATES.TRAIN_BOARDING) {
       const p = LRT.PlayerUI.getState();
       const inside = LRT.Train && LRT.Train.isPlayerInside(p.pos);
+      if (CORE.rideCompleteReady) {
+        return {
+          mode: CORE.gameMode,
+          stationName: name,
+          stationCode: code,
+          stationSub: sub,
+          objectiveTitle: inside ? 'ARRIVED — DISEMBARK TO PLATFORM' : 'BOARD LRT TRAIN',
+          objectiveDetail: `Exit open doors onto Peron ${CORE.activeTravelDir === -1 ? 2 : 1}`
+        };
+      }
       return {
         mode: CORE.gameMode,
         stationName: name,
@@ -1078,6 +1101,43 @@
     return ids;
   }
 
+  function syncTrackGatesForTrainState(trState) {
+    const gatesOpen = (trState === 'APPROACHING' || trState === 'DEPARTING' || trState === 'CRUISE' || trState === 'ARRIVING');
+    if (LRT.City && typeof LRT.City.setTrackGatesOpen === 'function') {
+      LRT.City.setTrackGatesOpen(gatesOpen);
+    }
+    const stCols = (LRT.Station && typeof LRT.Station.getColliders === 'function')
+      ? LRT.Station.getColliders()
+      : (LRT.Station && LRT.Station.colliders);
+    if (Array.isArray(stCols)) {
+      for (let i = 0; i < stCols.length; i++) {
+        const c = stCols[i];
+        if (c && c.isTrackGate) {
+          c.disabled = gatesOpen;
+          c.blocksWalk = !gatesOpen;
+        }
+      }
+    }
+  }
+
+  function syncTrainTrackToDestination(pState) {
+    if (!LRT.Train || typeof LRT.Train.setTrackX !== 'function') return;
+    const destRail = (LRT.Station && typeof LRT.Station.getRailConfig === 'function')
+      ? LRT.Station.getRailConfig()
+      : null;
+    if (!destRail) return;
+    const targetTrackX = CORE.activeTravelDir === -1 ? destRail.track2X : destRail.track1X;
+    if (typeof targetTrackX !== 'number' || !Number.isFinite(targetTrackX)) return;
+    const curTrackX = typeof LRT.Train.getTrackX === 'function' ? LRT.Train.getTrackX() : targetTrackX;
+    if (Math.abs(targetTrackX - curTrackX) <= 1e-4) return;
+    const wasInside = !!(pState && (pState.isInsideTrain || pState.isSitting || LRT.Train.isPlayerInside(pState.pos)));
+    const deltaX = LRT.Train.setTrackX(targetTrackX);
+    if (wasInside && pState && pState.pos && Math.abs(deltaX) > 1e-4) {
+      pState.pos.x += deltaX;
+      if (pState.lastSafePos) pState.lastSafePos.x += deltaX;
+    }
+  }
+
   function updateTrainCampaign(dt, pState) {
     // Victory check 1.5s into cruise from Station 5 heading forward
     if (CORE.gameState === STATES.TRAIN_CRUISE && CORE.stationIndex === 5 && CORE.activeTravelDir === 1 && !campaignState.campaignVictory) {
@@ -1119,6 +1179,7 @@
           } else if (CORE.buildStation) {
             CORE.buildStation(CORE.stationIndex, spawnZ);
           }
+          syncTrainTrackToDestination(pState);
           CORE.rideCompleteReady = true;
           return LRT.Station;
         },
@@ -1126,15 +1187,14 @@
           if (typeof CORE.finishBuildStation === 'function') {
             CORE.finishBuildStation(CORE.stationIndex, builtZ || 0, builtStats);
           }
+          syncTrainTrackToDestination(pState);
+          syncTrackGatesForTrainState(LRT.Train.getState());
         }
       );
 
       const trState = LRT.Train.getState();
       if (trState !== CORE.prevTrainState) {
-        if (LRT.City && typeof LRT.City.setTrackGatesOpen === 'function') {
-          const gatesOpen = (trState === 'APPROACHING' || trState === 'DEPARTING' || trState === 'CRUISE' || trState === 'ARRIVING');
-          LRT.City.setTrackGatesOpen(gatesOpen);
-        }
+        syncTrackGatesForTrainState(trState);
         if (trState === 'BOARDED_WAIT') {
           if (CORE.gameState === STATES.TRAIN_APPROACHING || CORE.gameState === STATES.TRAIN_ARRIVING) {
             const wasArrival = CORE.gameState === STATES.TRAIN_ARRIVING;

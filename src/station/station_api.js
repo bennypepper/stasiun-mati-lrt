@@ -147,6 +147,7 @@
         isDoor: !!o.isDoor,
         isOpen: !!o.isOpen,
         isRamp: !!o.isRamp,
+        isTrackGate: !!o.isTrackGate,
         rampAxis: o.rampAxis,
         y0: o.y0,
         y1: o.y1,
@@ -170,6 +171,9 @@
       }
       if (LRT.City && typeof LRT.City.dispose === 'function') {
         LRT.City.dispose();
+      }
+      if (LRT.Audio && typeof LRT.Audio.stopLoop === 'function') {
+        LRT.Audio.stopLoop('generator_loop', 0.15);
       }
       if (this.rootGroup) {
         const parent = scene || this.rootGroup.parent;
@@ -308,6 +312,9 @@
       this._psdTarget = 0;
       this._timeAccum = 0;
       this._raycaster.firstHitOnly = true;
+      if (S.arch && typeof S.arch.computeRailConfig === 'function') {
+        this._railConfig = S.arch.computeRailConfig(arch, dims);
+      }
 
       const root = new THREE.Group();
       root.name = 'StationRoot_' + arch.id;
@@ -908,9 +915,6 @@
               pu.group.visible = false;
               if (core && typeof core.collectEnemyDrop === 'function') {
                 core.collectEnemyDrop(pu.type, pu.meta);
-              }
-              if (LRT.Audio && typeof LRT.Audio.play === 'function') {
-                LRT.Audio.play('turnstile_beep', { gain: 0.55 });
               }
             }
           }
@@ -1733,7 +1737,10 @@
       }
 
       if (it.type === 'generator' || it.id === 'portable_generator') {
-        if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('turnstile_beep', { gain: 0.8 });
+        if (LRT.Audio) {
+          if (LRT.Audio.play) LRT.Audio.play('generator_start', { gain: 0.9 });
+          if (LRT.Audio.startLoop) LRT.Audio.startLoop('generator_loop', 0.32, 1.2, 1.0);
+        }
         this._powerRestored = true;
         this.setLightingFactor(this._lightingFactor);
         it.used = true;
@@ -1753,7 +1760,10 @@
       }
 
       if (it.type === 'derelict_fuse' || it.id === 'cawang_derelict_cab') {
-        if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('turnstile_beep', { gain: 0.8 });
+        if (LRT.Audio && LRT.Audio.play) {
+          LRT.Audio.play('electric_box_open', { gain: 0.8 });
+          LRT.Audio.play('breaker_throw', { gain: 0.65 });
+        }
         const fresh = !it.used;
         it.used = true;
         it.label = '[E] Kabin Bangkai LRT Cawang (Sudah Digeledah)';
@@ -1771,7 +1781,7 @@
       }
 
       if (it.type === 'field_log' || it.id === 'loket_counter') {
-        if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('turnstile_beep', { gain: 0.5 });
+        if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('paper_rustle', { gain: 0.72 });
         it.used = true;
         it.label = '[E] Meja Loket Stasiun (Sudah Diperiksa)';
         it.prompt = it.label;
@@ -1787,7 +1797,7 @@
       }
 
       if (it.type === 'relay' || it.id === 'setiabudi_jpo_switch') {
-        if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('turnstile_beep', { gain: 0.8 });
+        if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('breaker_throw', { gain: 0.85 });
         it.used = true;
         it.label = '[E] Sakelar Relai Sinyal Master JPO Setiabudi (Terhubung)';
         it.prompt = it.label;
@@ -1807,7 +1817,9 @@
       }
 
       if (it.type === 'rotio') {
-        if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('station_chime', { gain: 0.55 });
+        if (LRT.Audio && LRT.Audio.play) {
+          LRT.Audio.play(it.used ? 'paper_rustle' : 'pickup_medkit', { gain: 0.68 });
+        }
         const heal = it.used ? 0 : 25;
         it.used = true;
         it.label = "[E] Etalase Roti'O Coffee Bun (Kosong)";
@@ -1825,7 +1837,7 @@
       }
 
       if (it.type === 'coway') {
-        if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('turnstile_beep', { gain: 0.45 });
+        if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('water_pour', { gain: 0.72 });
         const heal = it.used ? 0 : 15;
         it.used = true;
         it.label = '[E] Dispenser Coway (Sudah Minum)';
@@ -1838,7 +1850,7 @@
       }
 
       if (it.type === 'jaklingko') {
-        if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('turnstile_beep', { gain: 0.6 });
+        if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('electric_box_open', { gain: 0.7 });
         const bonus = it.used ? 0 : 1;
         it.used = true;
         it.label = '[E] Terminal JakLingko (Sudah Diambil)';
@@ -1857,7 +1869,7 @@
       }
 
       if (it.type === 'balcony_supply') {
-        if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('turnstile_beep', { gain: 0.65 });
+        if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('crate_open', { gain: 0.78 });
         const fresh = !it.used;
         it.used = true;
         it.label = it.label.replace(/\(\+[^)]+\)/, '(Sudah Diambil)');
@@ -1902,7 +1914,10 @@
       }
 
       if (it.type === 'lootbox') {
-        if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('turnstile_beep', { gain: 0.7 });
+        if (LRT.Audio && LRT.Audio.play) {
+          LRT.Audio.play('crate_open', { gain: 0.85 });
+          if (!it.used) LRT.Audio.play('loot_chime', { gain: 0.65 });
+        }
         const fresh = !it.used;
         it.used = true;
         it.label = it.label.replace(/\([^)]+\)/, '(Sudah Dibuka)');
@@ -2046,29 +2061,134 @@
       return true;
     },
 
+    _buildPickupVisual: function (kind, assets) {
+      const wrap = new THREE.Group();
+      const addPart = (parent, geo, mat, px, py, pz, rx, ry, rz) => {
+        this.disposableGeometries.push(geo);
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(px || 0, py || 0, pz || 0);
+        if (rx) m.rotation.x = rx;
+        if (ry) m.rotation.y = ry;
+        if (rz) m.rotation.z = rz;
+        m.castShadow = false;
+        m.receiveShadow = true;
+        parent.add(m);
+        return m;
+      };
+
+      const tryGltf = (modelId, targetSpan, emissiveHex) => {
+        if (!LRT.AssetLoader || typeof LRT.AssetLoader.instantiateModel !== 'function') return null;
+        const inst = LRT.AssetLoader.instantiateModel(modelId);
+        if (!inst) return null;
+        const box = new THREE.Box3().setFromObject(inst);
+        const sz = new THREE.Vector3();
+        const ctr = new THREE.Vector3();
+        box.getSize(sz);
+        box.getCenter(ctr);
+        const maxDim = Math.max(sz.x, sz.y, sz.z, 0.01);
+        const sc = targetSpan / maxDim;
+        inst.scale.setScalar(sc);
+        inst.position.set(-ctr.x * sc, -ctr.y * sc, -ctr.z * sc);
+        inst.traverse((ch) => {
+          if (ch.isMesh) {
+            ch.castShadow = false;
+            ch.receiveShadow = true;
+            if (ch.material && emissiveHex && ch.material.emissive) {
+              ch.material = ch.material.clone();
+              this.disposableMaterials.push(ch.material);
+              ch.material.emissive.setHex(emissiveHex);
+              ch.material.emissiveIntensity = 0.16;
+            }
+          }
+        });
+        wrap.add(inst);
+        return wrap;
+      };
+
+      if (kind === 'health') {
+        if (tryGltf('medical_box', 0.44, 0x16a34a)) {
+          // Subtle glowing crimson cross badge on top so medkit pops in blackout stations
+          addPart(wrap, new THREE.BoxGeometry(0.14, 0.012, 0.045), assets.crossRed, 0, 0.13, 0);
+          addPart(wrap, new THREE.BoxGeometry(0.045, 0.012, 0.14), assets.crossRed, 0, 0.13, 0);
+          return wrap;
+        }
+        // Fallback detailed multi-part procedural first-aid kit
+        addPart(wrap, new THREE.BoxGeometry(0.38, 0.18, 0.28), assets.medWhite, 0, 0, 0);
+        addPart(wrap, new THREE.BoxGeometry(0.40, 0.035, 0.30), assets.medGreen, 0, 0.07, 0);
+        addPart(wrap, new THREE.BoxGeometry(0.15, 0.018, 0.048), assets.crossRed, 0, 0.095, 0);
+        addPart(wrap, new THREE.BoxGeometry(0.048, 0.018, 0.15), assets.crossRed, 0, 0.095, 0);
+        addPart(wrap, new THREE.BoxGeometry(0.14, 0.025, 0.03), assets.steelDark, 0, 0.11, -0.11);
+        for (const lx of [-0.11, 0.11]) {
+          addPart(wrap, new THREE.BoxGeometry(0.035, 0.07, 0.02), assets.steelDark, lx, 0.03, 0.145);
+        }
+        return wrap;
+      }
+
+      if (kind === 'ammo') {
+        if (tryGltf('ammo_box', 0.42, 0xb45309)) return wrap;
+        // Fallback military ammo tin with brass belt & top handle
+        addPart(wrap, new THREE.BoxGeometry(0.34, 0.22, 0.20), assets.oliveMetal, 0, 0, 0);
+        addPart(wrap, new THREE.BoxGeometry(0.36, 0.045, 0.22), assets.oliveRim, 0, 0.10, 0);
+        addPart(wrap, new THREE.BoxGeometry(0.14, 0.025, 0.026), assets.steelDark, 0, 0.135, 0);
+        addPart(wrap, new THREE.BoxGeometry(0.045, 0.08, 0.02), assets.brass, 0, 0.03, 0.105);
+        for (let i = -2; i <= 2; i++) {
+          addPart(wrap, new THREE.CylinderGeometry(0.011, 0.011, 0.065, 6), assets.brass, i * 0.032, 0.14, 0.04);
+        }
+        return wrap;
+      }
+
+      if (kind === 'rpg') {
+        // Detailed PG-7V warhead pickup angled on tactical cradle
+        const rocket = new THREE.Group();
+        rocket.rotation.z = 0.34;
+        rocket.rotation.y = 0.25;
+        addPart(rocket, new THREE.CylinderGeometry(0.034, 0.050, 0.18, 10), assets.oliveMetal, 0, 0.08, 0);
+        addPart(rocket, new THREE.ConeGeometry(0.050, 0.14, 10), assets.oliveRim, 0, 0.24, 0);
+        addPart(rocket, new THREE.CylinderGeometry(0.012, 0.018, 0.06, 8), assets.copper, 0, 0.32, 0);
+        addPart(rocket, new THREE.CylinderGeometry(0.024, 0.032, 0.24, 8), assets.steelDark, 0, -0.12, 0);
+        for (let f = 0; f < 4; f++) {
+          const ang = (f / 4) * Math.PI * 2;
+          addPart(rocket, new THREE.BoxGeometry(0.006, 0.075, 0.048), assets.steelDark, Math.cos(ang) * 0.034, -0.22, Math.sin(ang) * 0.034, 0, -ang, 0);
+        }
+        wrap.add(rocket);
+        return wrap;
+      }
+
+      // 'lootcrate' field drop
+      if (tryGltf('old_military_crate', 0.50, 0x7e22ce)) return wrap;
+      addPart(wrap, new THREE.BoxGeometry(0.46, 0.24, 0.32), assets.cratePurple, 0, 0, 0);
+      addPart(wrap, new THREE.BoxGeometry(0.48, 0.04, 0.34), assets.steelDark, 0, 0.11, 0);
+      for (const lx of [-0.14, 0.14]) {
+        addPart(wrap, new THREE.BoxGeometry(0.04, 0.09, 0.025), assets.brass, lx, 0.04, 0.165);
+      }
+      return wrap;
+    },
+
     _ensureGroundPickupPool: function () {
       if (this._groundPickupAssets) return this._groundPickupAssets;
-      const boxGeo = new THREE.BoxGeometry(0.36, 0.28, 0.36);
       const ringGeo = new THREE.RingGeometry(0.30, 0.44, 18);
       ringGeo.rotateX(-Math.PI * 0.5);
-      const mats = {
-        health: new THREE.MeshBasicMaterial({ color: 0x22c55e }),
-        ammo: new THREE.MeshBasicMaterial({ color: 0xe0b422 }),
-        rpg: new THREE.MeshBasicMaterial({ color: 0xf97316 }),
-        lootcrate: new THREE.MeshBasicMaterial({ color: 0xc084fc })
-      };
       const ringMats = {
         health: new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.65, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
         ammo: new THREE.MeshBasicMaterial({ color: 0xe0b422, transparent: true, opacity: 0.65, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
         rpg: new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.65, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
         lootcrate: new THREE.MeshBasicMaterial({ color: 0xc084fc, transparent: true, opacity: 0.72, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })
       };
-      this.disposableGeometries.push(boxGeo, ringGeo);
-      this.disposableMaterials.push(
-        mats.health, mats.ammo, mats.rpg, mats.lootcrate,
-        ringMats.health, ringMats.ammo, ringMats.rpg, ringMats.lootcrate
-      );
-      this._groundPickupAssets = { boxGeo, ringGeo, mats, ringMats };
+      const sharedMats = {
+        medWhite: new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.42, metalness: 0.15 }),
+        medGreen: new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.45, metalness: 0.25, emissive: 0x052e16, emissiveIntensity: 0.35 }),
+        crossRed: new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.35, metalness: 0.1, emissive: 0x991b1b, emissiveIntensity: 0.55 }),
+        oliveMetal: new THREE.MeshStandardMaterial({ color: 0x3f4e36, roughness: 0.48, metalness: 0.55 }),
+        oliveRim: new THREE.MeshStandardMaterial({ color: 0x2d3826, roughness: 0.42, metalness: 0.65 }),
+        brass: new THREE.MeshStandardMaterial({ color: 0xd9a738, roughness: 0.28, metalness: 0.85, emissive: 0x451a03, emissiveIntensity: 0.25 }),
+        copper: new THREE.MeshStandardMaterial({ color: 0xc26a3d, roughness: 0.32, metalness: 0.82 }),
+        steelDark: new THREE.MeshStandardMaterial({ color: 0x2a2f36, roughness: 0.38, metalness: 0.78 }),
+        cratePurple: new THREE.MeshStandardMaterial({ color: 0x3b2654, roughness: 0.44, metalness: 0.45, emissive: 0x581c87, emissiveIntensity: 0.35 })
+      };
+      this.disposableGeometries.push(ringGeo);
+      for (const m of Object.values(ringMats)) this.disposableMaterials.push(m);
+      for (const m of Object.values(sharedMats)) this.disposableMaterials.push(m);
+      this._groundPickupAssets = Object.assign({ ringGeo, ringMats }, sharedMats);
       return this._groundPickupAssets;
     },
 
@@ -2084,14 +2204,24 @@
       }
       if (!slot) {
         const grp = new THREE.Group();
-        const mesh = new THREE.Mesh(assets.boxGeo, assets.mats[kind]);
-        mesh.position.y = 0.34;
+        const meshHolder = new THREE.Group();
+        meshHolder.position.y = 0.34;
+        const variants = {
+          health: this._buildPickupVisual('health', assets),
+          ammo: this._buildPickupVisual('ammo', assets),
+          rpg: this._buildPickupVisual('rpg', assets),
+          lootcrate: this._buildPickupVisual('lootcrate', assets)
+        };
+        for (const vk of Object.keys(variants)) {
+          variants[vk].visible = false;
+          meshHolder.add(variants[vk]);
+        }
         const ring = new THREE.Mesh(assets.ringGeo, assets.ringMats[kind]);
         ring.position.y = 0.04;
         grp.add(ring);
-        grp.add(mesh);
+        grp.add(meshHolder);
         this.rootGroup.add(grp);
-        slot = { group: grp, mesh: mesh, ring: ring, active: false, age: 0, x: 0, y: 0, z: 0, type: kind, meta: null };
+        slot = { group: grp, mesh: meshHolder, variants, ring, active: false, age: 0, x: 0, y: 0, z: 0, type: kind, meta: null };
         this._groundPickups.push(slot);
       }
 
@@ -2106,7 +2236,9 @@
       slot.z = lz;
       slot.type = kind;
       slot.meta = dropMeta || null;
-      slot.mesh.material = assets.mats[kind];
+      for (const vk of Object.keys(slot.variants)) {
+        slot.variants[vk].visible = (vk === kind);
+      }
       slot.ring.material = assets.ringMats[kind];
       slot.group.position.set(lx, ly, lz);
       slot.group.visible = true;

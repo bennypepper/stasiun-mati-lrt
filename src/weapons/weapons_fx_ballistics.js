@@ -42,12 +42,13 @@
   const BLOOD_CAP = 110;
   const GLASS_CAP = 140;
   const RUBBLE_CAP = 120;
+  const CASING_CAP = 48;
   const SCORCH_CAP = 96;
   const BLOOD_DECAL_CAP = 96;
   const ATTACHED_SCORCH_CAP = 32;
 
   let _tracerMesh, _rocketMesh, _smokeMesh, _fireballMesh, _ringMesh;
-  let _sparkMesh, _bloodMesh, _glassMesh, _rubbleMesh, _scorchMesh, _bloodDecalMesh;
+  let _sparkMesh, _bloodMesh, _glassMesh, _rubbleMesh, _casingMesh, _scorchMesh, _bloodDecalMesh;
   let _scorchMat = null;
   let _scorchGeo = null;
   let _bloodDecalMat = null;
@@ -61,6 +62,7 @@
   const _bloods = [];
   const _glasses = [];
   const _rubbles = [];
+  const _casings = [];
   const _scorches = [];
   const _bloodDecals = [];
 
@@ -71,6 +73,11 @@
   let _bloodCursor = 0;
   let _glassCursor = 0;
   let _rubbleCursor = 0;
+  let _casingCursor = 0;
+  let _lastCasingSfxMs = 0;
+  let _playerGroundY = 0;
+  let _playerInsideTrain = false;
+  const _playerVel = new THREE.Vector3();
   let _scorchCursor = 0;
   let _bloodDecalCursor = 0;
   let _attachedScorchCursor = 0;
@@ -278,6 +285,21 @@
       });
     }
 
+    // 9B. Ejected brass/12G shell casings
+    _casingMesh = makeInstanced(
+      new THREE.CylinderGeometry(0.0048, 0.0052, 0.024, 6),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.28, metalness: 0.82 }),
+      CASING_CAP
+    );
+    for (let i = 0; i < CASING_CAP; i++) {
+      _casings.push({
+        active: false, life: 0, maxLife: 2.1, bounced: false, groundY: 0,
+        pos: new THREE.Vector3(), vel: new THREE.Vector3(),
+        rot: new THREE.Euler(), rotVel: new THREE.Vector3(),
+        sx: 1, sy: 1, sz: 1, color: new THREE.Color(0xd4a843)
+      });
+    }
+
     // 10. World scorch decals, blood decals, + train/parented scorch decal pool
     const matScorch = new THREE.MeshBasicMaterial({
       map: createFallbackScorchTex(),
@@ -339,6 +361,7 @@
     clearList(_bloods, _bloodMesh);
     clearList(_glasses, _glassMesh);
     clearList(_rubbles, _rubbleMesh);
+    clearList(_casings, _casingMesh);
     clearList(_scorches, _scorchMesh);
     clearList(_bloodDecals, _bloodDecalMesh);
 
@@ -519,6 +542,67 @@
       r.color.setHex(Math.random() > 0.35 ? 0x7b7870 : 0x52504a);
     }
   }
+
+  function ejectShellCasing(weaponId) {
+    if (!_casingMesh || !W._camera) return;
+    if (weaponId === 'rpg') return;
+
+    W._camera.updateMatrixWorld(true);
+    _camRight.setFromMatrixColumn(W._camera.matrixWorld, 0).normalize();
+    _camUp.setFromMatrixColumn(W._camera.matrixWorld, 1).normalize();
+    W._camera.getWorldDirection(_rayDir);
+
+    const idx = _casingCursor;
+    _casingCursor = (_casingCursor + 1) % CASING_CAP;
+    const c = _casings[idx];
+    c.active = true;
+    c.life = 0;
+    c.maxLife = weaponId === 'shotgun' ? 2.4 : 2.0;
+    c.bounced = false;
+    c.groundY = _playerGroundY;
+
+    const slotIdx = weaponId === 'shotgun' ? 2 : (weaponId === 'rifle' ? 1 : 0);
+    const vm = _vmModels[slotIdx] || _vmModels[W._activeIdx];
+    if (vm && vm.ejectAnchor) {
+      vm.ejectAnchor.getWorldPosition(c.pos);
+    } else {
+      W._camera.getWorldPosition(c.pos);
+      c.pos.addScaledVector(_camRight, 0.22).addScaledVector(_camUp, -0.10).addScaledVector(_rayDir, 0.35);
+    }
+
+    const rSpd = (weaponId === 'shotgun' ? 2.25 : 2.05) + Math.random() * 0.75;
+    const uSpd = (weaponId === 'shotgun' ? 1.55 : 1.35) + Math.random() * 0.55;
+    const fSpd = (Math.random() - 0.55) * 0.65;
+    c.vel.copy(_playerVel)
+      .addScaledVector(_camRight, rSpd)
+      .addScaledVector(_camUp, uSpd)
+      .addScaledVector(_rayDir, fSpd);
+
+    c.rot.set(Math.random() * 6, Math.random() * 6, Math.PI * 0.5 + (Math.random() - 0.5) * 0.5);
+    c.rotVel.set(
+      (Math.random() - 0.5) * 26,
+      (Math.random() - 0.5) * 22,
+      14 + Math.random() * 14
+    );
+
+    if (weaponId === 'shotgun') {
+      c.sx = 1.9;
+      c.sy = 2.2;
+      c.sz = 1.9;
+      c.color.setHex(0xb91c1c);
+    } else if (weaponId === 'rifle') {
+      c.sx = 0.85;
+      c.sy = 1.45;
+      c.sz = 0.85;
+      c.color.setHex(0xd4a843);
+    } else {
+      c.sx = 0.92;
+      c.sy = 0.86;
+      c.sz = 0.92;
+      c.color.setHex(0xd4a843);
+    }
+  }
+  W.ejectShellCasing = ejectShellCasing;
 
   function spawnScorchDecal(pos, normal, parentGroup, size) {
     if (!pos) return;
@@ -956,6 +1040,10 @@
       return;
     }
 
+    if (wCfg.id === 'pistol' || wCfg.id === 'rifle') {
+      ejectShellCasing(wCfg.id);
+    }
+
     // Hitscan pellets
     const pellets = wCfg.pellets || 1;
     const baseSpread = (W._isADS ? (wCfg.adsSpread || 0.003) : (wCfg.spread || 0.01)) + W._bloom * adsFactor;
@@ -1010,6 +1098,9 @@
           spawnBlood(pt, _shotDir, h.isHeadshot ? 16 : 9);
           if (p === 0) {
             W.play3D('zombie_hit', pt, 0.1, 0.85);
+            if (h.isHeadshot) {
+              W.play3D('headshot_crit', pt, 0.08, 0.65);
+            }
             // Exit blood splatter decal on wall/floor behind target
             if (LRT.Station && typeof LRT.Station.raycastWorld === 'function') {
               const exitHit = LRT.Station.raycastWorld(pt, _shotDir, 2.4);
@@ -1544,10 +1635,62 @@
         if (_rubbleMesh.instanceColor) _rubbleMesh.instanceColor.needsUpdate = true;
       }
     }
+
+    // 9. Ejected shell casings
+    if (_casingMesh) {
+      let dirty = false;
+      for (let i = 0; i < CASING_CAP; i++) {
+        const c = _casings[i];
+        if (!c.active) continue;
+        dirty = true;
+        c.life += dt;
+        if (c.life >= c.maxLife) {
+          c.active = false;
+          _casingMesh.setMatrixAt(i, _zeroMat);
+          continue;
+        }
+        c.vel.y -= 11.5 * dt;
+        c.pos.addScaledVector(c.vel, dt);
+        const floorY = c.groundY + 0.014;
+        if (c.pos.y <= floorY && c.vel.y < 0) {
+          c.pos.y = floorY;
+          c.vel.y = Math.abs(c.vel.y) * 0.36;
+          c.vel.x *= 0.62;
+          c.vel.z *= 0.62;
+          c.rotVel.multiplyScalar(0.45);
+          if (!c.bounced) {
+            c.bounced = true;
+            const nowMs = performance.now();
+            if (nowMs - _lastCasingSfxMs >= 75) {
+              _lastCasingSfxMs = nowMs;
+              W.play3D(_playerInsideTrain ? 'casing_metal' : 'casing_concrete', c.pos, 0.14, 0.38);
+            }
+          }
+        }
+        c.rot.x += c.rotVel.x * dt;
+        c.rot.y += c.rotVel.y * dt;
+        c.rot.z += c.rotVel.z * dt;
+        const fade = c.life > c.maxLife * 0.78 ? (1 - (c.life - c.maxLife * 0.78) / (c.maxLife * 0.22)) : 1.0;
+        _q1.setFromEuler(c.rot);
+        _scaleV.set(c.sx * fade, c.sy * fade, c.sz * fade);
+        _m4.compose(c.pos, _q1, _scaleV);
+        _casingMesh.setMatrixAt(i, _m4);
+        _casingMesh.setColorAt(i, c.color);
+      }
+      if (dirty) {
+        _casingMesh.instanceMatrix.needsUpdate = true;
+        if (_casingMesh.instanceColor) _casingMesh.instanceColor.needsUpdate = true;
+      }
+    }
   }
 
   function update(dt, playerState, trainSpeed) {
     if (!W._initialized) return;
+    if (playerState) {
+      if (playerState.pos) _playerGroundY = playerState.pos.y || 0;
+      if (playerState.vel) _playerVel.copy(playerState.vel);
+      _playerInsideTrain = !!playerState.isInsideTrain;
+    }
     const step = Math.min(dt || 0.016, 0.05);
     W._currentTrainSpeed = (typeof trainSpeed === 'number')
       ? trainSpeed
@@ -2053,7 +2196,12 @@
     getProgressionState: W.getProgressionState,
     setDifficulty: W.setDifficulty,
     rollLootbox,
-    computeLootProbabilities
+    computeLootProbabilities,
+    ejectShellCasing,
+    getCasingStats: () => ({
+      cap: CASING_CAP,
+      activeCount: _casings.filter((c) => c.active).length
+    })
   };
 
   LRT.Weapons = Weapons;

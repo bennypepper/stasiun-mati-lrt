@@ -55,6 +55,9 @@
     flashlightOn: false,
     hudHidden: false,
     invulnerable: false,
+    invulnCheatTimer: 0,
+    fastSprint: false,
+    cheatOpen: false,
     kills: 0,
     lastSafePos: new THREE.Vector3(4.0, 0.05, 6.0),
     bobPhase: 0,
@@ -127,7 +130,7 @@
       dom['pill-flashlight'].textContent = `[F] Senter: ${state.flashlightOn ? 'ON' : 'OFF'}`;
       dom['pill-flashlight'].classList.toggle('active', state.flashlightOn);
     }
-    if (LRT.Audio) LRT.Audio.play('weapon_switch', { gain: 0.4, pitchVar: 0.05 });
+    if (LRT.Audio) LRT.Audio.play('flashlight_click', { gain: 0.65, pitchVar: 0.05 });
   }
 
   function requestLock() {
@@ -275,10 +278,146 @@
     }
   }
 
+  function openCheatConsole() {
+    if (!flags.allowActionInput || flags.paused) return false;
+    const dom = PL.dom;
+    const panel = dom && dom['cheat-console'];
+    const input = dom && dom['cheat-input'];
+    state.cheatOpen = true;
+    for (const k of Object.keys(keys)) keys[k] = false;
+    state.ads = false;
+    if (LRT.Weapons) LRT.Weapons.setADS(false);
+    if (callbacks.onWeaponShootUp) callbacks.onWeaponShootUp();
+    releaseLock();
+    if (panel) panel.classList.remove('hidden');
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+    return true;
+  }
+
+  function closeCheatConsole(refocusGame) {
+    const dom = PL.dom;
+    const panel = dom && dom['cheat-console'];
+    const input = dom && dom['cheat-input'];
+    const wasOpen = !!state.cheatOpen;
+    state.cheatOpen = false;
+    for (const k of Object.keys(keys)) keys[k] = false;
+    if (panel) panel.classList.add('hidden');
+    if (input) {
+      input.value = '';
+      if (document.activeElement === input) input.blur();
+    }
+    if (wasOpen && refocusGame && flags.allowActionInput && !flags.paused) {
+      requestLock();
+    }
+  }
+
+  function executeCheat(rawCode) {
+    const code = String(rawCode || '').trim().toUpperCase().replace(/\s+/g, '');
+    if (!code) return { ok: false, code: '' };
+
+    if (code === 'PAINKILLER') {
+      if (state.invulnCheatTimer > 0) {
+        state.invulnCheatTimer = 0;
+        state.invulnerable = (state.mode === 'exploration');
+        if (PL.setNotice) PL.setNotice('CHEAT DEACTIVATED: PAINKILLER', '#94a3b8');
+      } else {
+        state.invulnCheatTimer = 300;
+        state.invulnerable = true;
+        if (state.heartbeatActive && LRT.Audio) {
+          state.heartbeatActive = false;
+          LRT.Audio.stopLoop('player_heartbeat', 0.2);
+        }
+        if (PL.setNotice) PL.setNotice('CHEAT ACTIVATED: PAINKILLER — INVINCIBILITY (05:00)', '#4ade80');
+      }
+      if (LRT.Audio) LRT.Audio.play('turnstile_beep', { gain: 0.7 });
+      return { ok: true, code };
+    }
+
+    if (code === 'TURTLE') {
+      state.health = state.maxHealth;
+      const cap = Math.max(state.maxArmor || 100, 100);
+      state.maxArmor = cap;
+      state.armor = cap;
+      if (state.heartbeatActive && LRT.Audio) {
+        state.heartbeatActive = false;
+        LRT.Audio.stopLoop('player_heartbeat', 0.2);
+      }
+      if (PL.setNotice) PL.setNotice('CHEAT ACTIVATED: TURTLE — MAX HEALTH & ARMOR', '#4ade80');
+      if (LRT.Audio) LRT.Audio.play('turnstile_beep', { gain: 0.7 });
+      return { ok: true, code };
+    }
+
+    if (code === 'TOOLUP') {
+      if (LRT.Weapons && typeof LRT.Weapons.unlockWeapon === 'function') {
+        LRT.Weapons.unlockWeapon('all', 999);
+      }
+      if (LRT.Weapons && typeof LRT.Weapons.addAmmo === 'function') {
+        LRT.Weapons.addAmmo('all', 999);
+      }
+      if (PL.setNotice) PL.setNotice('CHEAT ACTIVATED: TOOLUP — ALL WEAPONS & AMMO', '#4ade80');
+      if (LRT.Audio) LRT.Audio.play('turnstile_beep', { gain: 0.7 });
+      return { ok: true, code };
+    }
+
+    if (code === 'CATCHME') {
+      state.fastSprint = !state.fastSprint;
+      if (PL.setNotice) {
+        PL.setNotice(
+          state.fastSprint
+            ? 'CHEAT ACTIVATED: CATCHME — FAST SPRINT ON'
+            : 'CHEAT DEACTIVATED: CATCHME — FAST SPRINT OFF',
+          state.fastSprint ? '#4ade80' : '#94a3b8'
+        );
+      }
+      if (LRT.Audio) LRT.Audio.play('turnstile_beep', { gain: 0.7 });
+      return { ok: true, code };
+    }
+
+    if (PL.setNotice) PL.setNotice(`UNKNOWN CHEAT: ${code}`, '#ef4444');
+    if (LRT.Audio) LRT.Audio.play('dry_fire', { gain: 0.6 });
+    return { ok: false, code };
+  }
+
   function bindInputListeners() {
     const canvas = refs.canvas;
 
     window.addEventListener('keydown', (e) => {
+      const isBackquote = (e.code === 'Backquote' || e.key === '`' || e.key === '~')
+        && !e.ctrlKey && !e.altKey && !e.metaKey;
+      if (isBackquote) {
+        if (state.cheatOpen) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeCheatConsole(true);
+          return;
+        }
+        if (flags.allowActionInput && !flags.paused) {
+          e.preventDefault();
+          e.stopPropagation();
+          openCheatConsole();
+          return;
+        }
+      }
+
+      if (state.cheatOpen) {
+        if (e.code === 'Escape' || e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          closeCheatConsole(true);
+        } else if (e.code === 'Enter' || e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          const input = PL.dom && PL.dom['cheat-input'];
+          const raw = input ? input.value : '';
+          closeCheatConsole(true);
+          if (raw.trim()) executeCheat(raw);
+        }
+        return;
+      }
+
       keys[e.code] = true;
       if (e.code === 'F3') e.preventDefault();
       if (!flags.allowActionInput || flags.paused) return;
@@ -344,7 +483,7 @@
     });
 
     document.addEventListener('mousemove', (e) => {
-      if (flags.paused || !flags.allowActionInput) return;
+      if (flags.paused || !flags.allowActionInput || state.cheatOpen) return;
       if (document.pointerLockElement !== canvas) return;
       // Chromium pointer lock spike guard
       if (Math.abs(e.movementX) > 180 || Math.abs(e.movementY) > 180) return;
@@ -355,6 +494,10 @@
 
     canvas.addEventListener('mousedown', (e) => {
       if (flags.paused || !flags.allowActionInput) return;
+      if (state.cheatOpen) {
+        closeCheatConsole(true);
+        return;
+      }
       if (document.pointerLockElement !== canvas) {
         requestLock();
       }
@@ -384,7 +527,7 @@
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
     window.addEventListener('wheel', (e) => {
-      if (flags.paused || !flags.allowActionInput || !LRT.Weapons) return;
+      if (flags.paused || !flags.allowActionInput || state.cheatOpen || !LRT.Weapons) return;
       const dir = e.deltaY > 0 ? 1 : -1;
       if (typeof LRT.Weapons.cycleWeapon === 'function') {
         LRT.Weapons.cycleWeapon(dir);
@@ -401,7 +544,7 @@
 
     document.addEventListener('pointerlockchange', () => {
       flags.pointerLocked = document.pointerLockElement === canvas;
-      if (!flags.pointerLocked && flags.allowActionInput && !flags.paused && callbacks.onPause) {
+      if (!flags.pointerLocked && flags.allowActionInput && !flags.paused && !state.cheatOpen && callbacks.onPause) {
         callbacks.onPause();
       }
     });
@@ -760,6 +903,15 @@
 
     if (flags.paused) return;
 
+    if (state.invulnCheatTimer > 0) {
+      state.invulnCheatTimer = Math.max(0, state.invulnCheatTimer - dt);
+      state.invulnerable = true;
+      if (state.invulnCheatTimer <= 0) {
+        state.invulnerable = (state.mode === 'exploration');
+        if (PL.setNotice) PL.setNotice('PAINKILLER EXPIRED — INVINCIBILITY ENDED', '#f97316');
+      }
+    }
+
     let horizSpeed = 0;
     if (state.isSitting && state.seatLocalPos) {
       if (state.sitSource === 'world') {
@@ -805,7 +957,8 @@
       const targetEye = state.crouching ? P.crouchEyeHeight : P.eyeHeight;
       state.eyeHeight += (targetEye - state.eyeHeight) * Math.min(1, dt * 12);
 
-      const speed = state.crouching ? P.crouchSpeed : (state.sprinting ? P.sprintSpeed : P.walkSpeed);
+      const sprintSpeed = state.fastSprint ? (P.sprintSpeed * 1.8) : P.sprintSpeed;
+      const speed = state.crouching ? P.crouchSpeed : (state.sprinting ? sprintSpeed : P.walkSpeed);
       const sinY = Math.sin(state.yaw);
       const cosY = Math.cos(state.yaw);
       _tmpForward.set(-sinY, 0, -cosY);
@@ -1040,6 +1193,9 @@
     state.armor = 0;
     state.maxArmor = 100;
     state.invulnerable = !!invulnerable;
+    state.invulnCheatTimer = 0;
+    state.fastSprint = false;
+    closeCheatConsole(false);
     state.isInsideTrain = false;
     state.isSitting = false;
     state.sitSource = null;
@@ -1083,4 +1239,7 @@
   PL.heal = heal;
   PL.addArmor = addArmor;
   PL.resetPhysics = resetPhysics;
+  PL.openCheatConsole = openCheatConsole;
+  PL.closeCheatConsole = closeCheatConsole;
+  PL.executeCheat = executeCheat;
 })(window.LRT = window.LRT || {});

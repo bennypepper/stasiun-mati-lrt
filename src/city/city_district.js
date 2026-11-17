@@ -1703,7 +1703,10 @@
     }
 
     function buildSkylineAndPropsStage() {
-    buildSkylineSilhouetteRing(city, cMinX, cMaxX, root);
+    // Pad rail corridor exclusion by >= 24m so 46m-wide distant skyline silhouettes never intrude on tracks
+    const skyMinX = Math.min(cMinX, Math.min.apply(null, trackXs) - 2.5) - 22.0;
+    const skyMaxX = Math.max(cMaxX, Math.max.apply(null, trackXs) + 2.5) + 22.0;
+    buildSkylineSilhouetteRing(city, skyMinX, skyMaxX, root);
 
     // =========================================================
     // 7. OPTIMIZED LOW-POLY JAKARTA PROPS + INSTANCED STREET SCENERY

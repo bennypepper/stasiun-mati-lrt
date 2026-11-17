@@ -640,6 +640,11 @@
             trainDir: LRT.Train && LRT.Train.getDirection ? LRT.Train.getDirection() : 1,
             playerPos: { x: +p.pos.x.toFixed(2), y: +p.pos.y.toFixed(2), z: +p.pos.z.toFixed(2) },
             playerHp: p.health,
+            playerArmor: p.armor,
+            invulnerable: !!p.invulnerable,
+            invulnCheatTimer: +(p.invulnCheatTimer || 0).toFixed(2),
+            fastSprint: !!p.fastSprint,
+            cheatOpen: !!p.cheatOpen,
             isInsideTrain: p.isInsideTrain,
             isSitting: !!p.isSitting,
             activeWeapon: wh.id || null,
@@ -797,7 +802,10 @@
         setShadowsEnabled: CORE.setShadowsEnabled,
         setBloomEnabled: CORE.setBloomEnabled,
         setAoMode: CORE.setAoMode,
-        setFpsCounterEnabled: CORE.setFpsCounterEnabled
+        setFpsCounterEnabled: CORE.setFpsCounterEnabled,
+        executeCheat: (code) => (LRT.PlayerUI && typeof LRT.PlayerUI.executeCheat === 'function')
+          ? LRT.PlayerUI.executeCheat(code)
+          : null
       };
 
       if (!loopPaused) {

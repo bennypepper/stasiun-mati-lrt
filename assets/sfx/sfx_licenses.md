@@ -8,12 +8,12 @@ Each recording was trimmed to remove dead air, high-pass filtered against DC/sub
 
 | Metric | Value |
 | --- | --- |
-| Total Clips | 33 |
-| Total Audio Duration | 34.946 s |
-| Total Raw MP3 Size | 457,212 bytes (446.5 KB) |
-| Total Base64 Payload | 609,660 bytes (595.4 KB) |
-| `sfx_bank.json` Size | 612,271 bytes (597.9 KB) |
-| License Breakdown | 16 CC0 1.0, 1 Public Domain, 4 CC-BY 3.0, 12 CC-BY 4.0 |
+| Total Clips | 50 |
+| Total Audio Duration | 55.454 s |
+| Total Raw MP3 Size | 708,952 bytes (692.3 KB) |
+| Total Base64 Payload | 945,336 bytes (923.2 KB) |
+| `sfx_bank.json` Size | 949,325 bytes (927.1 KB) |
+| License Breakdown | 17 CC0 1.0, 1 Public Domain, 4 CC-BY 3.0, 28 CC-BY 4.0 |
 
 ---
 
@@ -23,10 +23,10 @@ Each recording was trimmed to remove dead air, high-pass filtered against DC/sub
 
 | Key | Output File | Duration | MP3 Bytes | Base64 Bytes | Original Filename & Processing | Author / Creator | License | Source URL |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- | --- |
-| `pistol_fire` | `sfx/pistol_fire.mp3` | 0.500 s | 6,956 | 9,276 | `Prepared SFX Library/1911/A_42P.wav` (trimmed `0.928s–1.428s`) | Ben Jaszczak et al. (submitted by `bart`) | CC0 1.0 | https://opengameart.org/content/the-free-firearm-sound-library |
-| `rifle_fire` | `sfx/rifle_fire.mp3` | 0.400 s | 6,092 | 8,124 | `Prepared SFX Library/AK-47/C_28P.wav` (trimmed `3.245s–3.645s`) | Ben Jaszczak et al. (submitted by `bart`) | CC0 1.0 | https://opengameart.org/content/the-free-firearm-sound-library |
-| `shotgun_fire` | `sfx/shotgun_fire.mp3` | 0.960 s | 12,572 | 16,764 | `shots.7z` -> `shots/shotgun.wav` (blast + pump, `0.000s–0.960s`) | Michel Baradari | CC-BY 3.0 | https://opengameart.org/content/chaingun-pistol-rifle-shotgun-shots |
-| `rpg_launch` | `sfx/rpg_launch.mp3` | 1.500 s | 19,052 | 25,404 | `launches.7z` -> `launches/rlaunch.wav` (`0.000s–1.500s`) | Michel Baradari | CC-BY 3.0 | https://opengameart.org/content/4-projectile-launches |
+| `pistol_fire` | `sfx/pistol_fire.mp3` | 0.612 s | 7,820 | 10,428 | `Prepared SFX Library/1911/A_42P.wav` (trimmed `0.928s–1.428s`, EQ + compand + limiter punch) | Ben Jaszczak et al. (submitted by `bart`) | CC0 1.0 | https://opengameart.org/content/the-free-firearm-sound-library |
+| `rifle_fire` | `sfx/rifle_fire.mp3` | 0.504 s | 6,524 | 8,700 | `Prepared SFX Library/AK-47/C_28P.wav` (trimmed `3.245s–3.645s`, EQ + compand + limiter punch) | Ben Jaszczak et al. (submitted by `bart`) | CC0 1.0 | https://opengameart.org/content/the-free-firearm-sound-library |
+| `shotgun_fire` | `sfx/shotgun_fire.mp3` | 1.008 s | 12,572 | 16,764 | `shots.7z` -> `shots/shotgun.wav` (blast + pump, `0.000s–0.960s`, EQ + compand + limiter) | Michel Baradari | CC-BY 3.0 | https://opengameart.org/content/chaingun-pistol-rifle-shotgun-shots |
+| `rpg_launch` | `sfx/rpg_launch.mp3` | 1.548 s | 19,052 | 25,404 | `launches.7z` -> `launches/rlaunch.wav` (`0.000s–1.500s`, EQ + compand + limiter) | Michel Baradari | CC-BY 3.0 | https://opengameart.org/content/4-projectile-launches |
 | `rpg_explosion` | `sfx/rpg_explosion.mp3` | 1.450 s | 18,620 | 24,828 | `explosions.7z` -> `explosions/explode.wav` (`0.000s–1.450s`) | Michel Baradari | CC-BY 3.0 | https://opengameart.org/content/2-high-quality-explosions |
 | `weapon_reload` | `sfx/weapon_reload.mp3` | 1.500 s | 19,052 | 25,404 | `gunreload1.wav` (`0.040s–1.540s`) | SpringySpringo | CC0 1.0 | https://opengameart.org/content/gun-reload-sounds |
 | `shotgun_pump` | `sfx/shotgun_pump.mp3` | 0.440 s | 6,524 | 8,700 | `shotguncock_0.wav` (`0.030s–0.470s`) | SpringySpringo | CC0 1.0 | https://opengameart.org/content/gun-reload-sounds |
@@ -72,13 +72,35 @@ Each recording was trimmed to remove dead air, high-pass filtered against DC/sub
 | `player_heartbeat` | `sfx/player_heartbeat.mp3` | 1.000 s | 13,004 | 17,340 | `heartbeat_fast_0.wav` (`0.000s–1.000s`) | bart | CC0 1.0 | https://opengameart.org/content/heartbeat-sounds |
 | `player_gasp` | `sfx/player_gasp.mp3` | 0.317 s | 4,796 | 6,396 | `VOXEfrt_Male01Effort_OS_01.ogg` (`0.000s–0.320s`) | Oculus VR, LLC | CC-BY 4.0 | https://developers.meta.com/vr/downloads/package/oculus-audio-pack-1/ |
 
+### 5. Props, Pickups, Weather & Combat Details (17 clips)
+
+| Key | Output File | Duration | MP3 Bytes | Original Filename & Processing | Author / Creator | License | Source URL |
+| --- | --- | ---: | ---: | --- | --- | --- | --- |
+| `generator_start` | `sfx/generator_start.mp3` | 1.656 s | 20,348 | `engine_start_up_01.mp3` (trimmed `0.03s–1.62s`, ignition crank + startup, mono 32kHz 96kbps MP3) | looneybits | CC0 1.0 | https://opengameart.org/content/car-engine-start-up-02 |
+| `generator_loop` | `sfx/generator_loop.mp3` | 2.844 s | 34,604 | `MACHMisc_MachineGeneric_LOOP_01.ogg` | Oculus VR, LLC | CC-BY 4.0 | https://github.com/facebookincubator/Meta-open-sound |
+| `electric_box_open` | `sfx/electric_box_open.mp3` | 0.936 s | 11,708 | `METLHndl_ElectricBoxOpen_OS_01.ogg` | Oculus VR, LLC | CC-BY 4.0 | https://github.com/facebookincubator/Meta-open-sound |
+| `breaker_throw` | `sfx/breaker_throw.mp3` | 0.864 s | 10,844 | `MECHLvr_LeverPull_OS_01.ogg` | Oculus VR, LLC | CC-BY 4.0 | https://github.com/facebookincubator/Meta-open-sound |
+| `crate_open` | `sfx/crate_open.mp3` | 1.152 s | 14,300 | `DOORMetl_HatchOpen_OS_01.ogg` | Oculus VR, LLC | CC-BY 4.0 | https://github.com/facebookincubator/Meta-open-sound |
+| `loot_chime` | `sfx/loot_chime.mp3` | 1.260 s | 15,596 | `UIMisc_Powerup_OS_01.ogg` | Oculus VR, LLC | CC-BY 4.0 | https://github.com/facebookincubator/Meta-open-sound |
+| `pickup_ammo` | `sfx/pickup_ammo.mp3` | 0.684 s | 8,684 | `CLOTHMvmt_MovementWithGear_OS_01.ogg` | Oculus VR, LLC | CC-BY 4.0 | https://github.com/facebookincubator/Meta-open-sound |
+| `pickup_medkit` | `sfx/pickup_medkit.mp3` | 0.936 s | 11,708 | `UIMisc_Powerup_OS_02.ogg` | Oculus VR, LLC | CC-BY 4.0 | https://github.com/facebookincubator/Meta-open-sound |
+| `paper_rustle` | `sfx/paper_rustle.mp3` | 0.792 s | 9,980 | `PAPRHndl_PaperCrumple_OS_01.ogg` | Oculus VR, LLC | CC-BY 4.0 | https://github.com/facebookincubator/Meta-open-sound |
+| `car_trunk_open` | `sfx/car_trunk_open.mp3` | 0.936 s | 11,708 | `VEHDoor_CarDoorOpen_OS_01.ogg` | Oculus VR, LLC | CC-BY 4.0 | https://github.com/facebookincubator/Meta-open-sound |
+| `water_pour` | `sfx/water_pour.mp3` | 1.008 s | 12,572 | `WATRPlmb_FaucetWaterRun_LOOP_01.ogg` | Oculus VR, LLC | CC-BY 4.0 | https://github.com/facebookincubator/Meta-open-sound |
+| `hydrant_spray` | `sfx/hydrant_spray.mp3` | 2.268 s | 27,692 | `WATRFall_Waterfall_LOOP_01.ogg` | Oculus VR, LLC | CC-BY 4.0 | https://github.com/facebookincubator/Meta-open-sound |
+| `rain_loop` | `sfx/rain_loop.mp3` | 3.060 s | 37,196 | `RAIN_CityRain_LOOP_01.ogg` | Oculus VR, LLC | CC-BY 4.0 | https://github.com/facebookincubator/Meta-open-sound |
+| `casing_concrete` | `sfx/casing_concrete.mp3` | 0.504 s | 6,524 | `BLLTShel_ShellCasingConcrete_OS_01.ogg` | Oculus VR, LLC | CC-BY 4.0 | https://github.com/facebookincubator/Meta-open-sound |
+| `casing_metal` | `sfx/casing_metal.mp3` | 0.504 s | 6,524 | `BLLTShel_ShellCasingMetal_OS_01.ogg` | Oculus VR, LLC | CC-BY 4.0 | https://github.com/facebookincubator/Meta-open-sound |
+| `flashlight_click` | `sfx/flashlight_click.mp3` | 0.288 s | 3,932 | `MECHSwtch_SwitchSmallOn_OS_01.ogg` | Oculus VR, LLC | CC-BY 4.0 | https://github.com/facebookincubator/Meta-open-sound |
+| `headshot_crit` | `sfx/headshot_crit.mp3` | 0.504 s | 6,524 | `GOREBone_SkullCracking_OS_01.ogg` | Oculus VR, LLC | CC-BY 4.0 | https://github.com/facebookincubator/Meta-open-sound |
+
 ---
 
 ## Required Attribution Notice (CC-BY 3.0 / CC-BY 4.0 Credits)
 
 If displaying an in-game or repository credits block, include the following attributions for CC-BY assets (all remaining assets are CC0 1.0 / Public Domain):
 
-- **Oculus Audio Pack 01** (`impact_metal`, `turnstile_beep`, `door_chime`, `door_open`, `door_close`, `station_chime`, `footstep_metal`, `zombie_hit`, `player_hurt`, `player_gasp`): Copyright Oculus VR, LLC (`https://developers.meta.com/vr/downloads/package/oculus-audio-pack-1/`, GitHub mirror `https://github.com/facebookincubator/Meta-open-sound`), licensed under **CC BY 4.0** (`https://creativecommons.org/licenses/by/4.0/`). Modified (trimmed, filtered, mono MP3 re-encoded).
+- **Oculus Audio Pack 01** (`impact_metal`, `turnstile_beep`, `door_chime`, `door_open`, `door_close`, `station_chime`, `footstep_metal`, `zombie_hit`, `player_hurt`, `player_gasp`, `generator_loop`, `electric_box_open`, `breaker_throw`, `crate_open`, `loot_chime`, `pickup_ammo`, `pickup_medkit`, `paper_rustle`, `car_trunk_open`, `water_pour`, `hydrant_spray`, `rain_loop`, `casing_concrete`, `casing_metal`, `flashlight_click`, `headshot_crit`): Copyright Oculus VR, LLC (`https://developers.meta.com/vr/downloads/package/oculus-audio-pack-1/`, GitHub mirror `https://github.com/facebookincubator/Meta-open-sound`), licensed under **CC BY 4.0** (`https://creativecommons.org/licenses/by/4.0/`). Modified (trimmed, filtered, mono MP3 re-encoded).
 - **Michel Baradari** (`shotgun_fire`, `rpg_launch`, `rpg_explosion`, `zombie_death`): Sound effects from OpenGameArt (`https://opengameart.org/content/chaingun-pistol-rifle-shotgun-shots`, `/4-projectile-launches`, `/2-high-quality-explosions`, `/15-monster-gruntpaindeath-sounds`), licensed under **CC BY 3.0** (`https://creativecommons.org/licenses/by/3.0/`). Modified (trimmed, mono MP3 re-encoded).
 - **Philt3r** (`train_approach`): *"London Underground 1996 Stock train arriving in a station.ogg"* (`https://commons.wikimedia.org/wiki/File:London_Underground_1996_Stock_train_arriving_in_a_station.ogg`), licensed under **CC BY 4.0**. Modified (excerpted `5.10s–9.40s`, mono MP3 re-encoded).
 - **PascalHD** (`train_brake`): *"GO Train arrives at Guildwood GO Station (Freesound).ogg"* (`https://commons.wikimedia.org/wiki/File:GO_Train_arrives_at_Guildwood_GO_Station_(Freesound).ogg`), licensed under **CC BY 4.0**. Modified (excerpted braking squeal `48.40s–51.80s`, mono MP3 re-encoded).

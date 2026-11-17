@@ -714,7 +714,8 @@
 
       if (it.type === 'power_box' || it.id === 'city_pln_box') {
         if (LRT.Audio && typeof LRT.Audio.play === 'function') {
-          LRT.Audio.play('turnstile_beep', { gain: 0.85 });
+          LRT.Audio.play('electric_box_open', { gain: 0.85 });
+          LRT.Audio.play('breaker_throw', { gain: 0.72 });
         }
         this._plnRestored = true;
         this.setLightingFactor(Math.max(this._lightingFactor, 1.35));
@@ -736,7 +737,7 @@
 
       if (it.id === 'city_coffee_cart') {
         if (LRT.Audio && typeof LRT.Audio.play === 'function') {
-          LRT.Audio.play('turnstile_beep', { gain: 0.6 });
+          LRT.Audio.play('paper_rustle', { gain: 0.72 });
         }
         const fresh = !it.used;
         it.used = true;
@@ -758,7 +759,7 @@
 
       if (it.id === 'city_convoy_car') {
         if (LRT.Audio && typeof LRT.Audio.play === 'function') {
-          LRT.Audio.play('turnstile_beep', { gain: 0.6 });
+          LRT.Audio.play('car_trunk_open', { gain: 0.82 });
         }
         const fresh = !it.used;
         it.used = true;
@@ -778,7 +779,7 @@
 
       if (it.id === 'city_pocket_park') {
         if (LRT.Audio && typeof LRT.Audio.play === 'function') {
-          LRT.Audio.play('turnstile_beep', { gain: 0.65 });
+          LRT.Audio.play('crate_open', { gain: 0.8 });
         }
         const fresh = !it.used;
         it.used = true;
@@ -818,7 +819,8 @@
 
       if (it.type === 'lootbox') {
         if (LRT.Audio && typeof LRT.Audio.play === 'function') {
-          LRT.Audio.play('turnstile_beep', { gain: 0.72 });
+          LRT.Audio.play('crate_open', { gain: 0.85 });
+          if (!it.used) LRT.Audio.play('loot_chime', { gain: 0.65 });
         }
         const fresh = !it.used;
         const riskLuck = it.riskLuck !== undefined ? it.riskLuck : 0.55;
@@ -882,7 +884,8 @@
             h.burst = true;
             events.push({ kind: 'hydrant', x: h.x, y: h.y + 0.6, z: h.z + oz });
             if (LRT.Audio && typeof LRT.Audio.play === 'function') {
-              LRT.Audio.play('metal_impact', { gain: 0.75, pitchVar: 0.12 });
+              LRT.Audio.play('impact_metal', { gain: 0.75, pitchVar: 0.12 });
+              LRT.Audio.play('hydrant_spray', { gain: 0.65 });
             }
           }
         }
@@ -975,7 +978,8 @@
       const pos = { x: h.x, y: h.y + 0.5, z: h.z };
 
       if (LRT.Audio && typeof LRT.Audio.play === 'function') {
-        LRT.Audio.play('debris_crumble', { gain: 0.85 });
+        LRT.Audio.play('impact_metal', { gain: 0.72, pitchVar: 0.1 });
+        LRT.Audio.play('hydrant_spray', { gain: 0.75 });
       }
 
       if (LRT.Weapons && typeof LRT.Weapons.spawnSmoke === 'function') {
