@@ -567,7 +567,9 @@
       sy = Math.round(Math.max(marginY, Math.min(maxY, sy)));
 
       const rawType = String(m.type || m.kind || m.id || '').toLowerCase();
-      const typeClass = rawType.includes('train') ? 'wp-train' : (rawType.includes('loot') ? 'wp-loot' : 'wp-objective');
+      const typeClass = rawType.includes('train')
+        ? 'wp-train'
+        : (rawType.includes('loot') ? 'wp-loot' : ((rawType.includes('hazard') || rawType.includes('barrel')) ? 'wp-hazard' : 'wp-objective'));
       if (slot.lastType !== typeClass) {
         slot.el.classList.remove(slot.lastType);
         slot.el.classList.add(typeClass);

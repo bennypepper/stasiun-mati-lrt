@@ -46,7 +46,9 @@
       5: { relays: { totem: false, pln: false, jpo: false }, waveCleared: false, omegaActive: false, holdoutElapsed: 0 }
     },
     voTriggered: new Set(),
-    campaignVictory: false
+    campaignVictory: false,
+    firstBarrelExploded: false,
+    barrelCueActive: false
   };
 
   function resetCampaignState() {
@@ -65,7 +67,20 @@
     };
     campaignState.voTriggered.clear();
     campaignState.campaignVictory = false;
+    campaignState.firstBarrelExploded = false;
+    campaignState.barrelCueActive = false;
+    if (LRT.Station && typeof LRT.Station.setBarrelCueActive === 'function') {
+      LRT.Station.setBarrelCueActive(false);
+    }
   }
+
+  CORE.onBarrelExploded = function () {
+    campaignState.firstBarrelExploded = true;
+    campaignState.barrelCueActive = false;
+    if (LRT.Station && typeof LRT.Station.setBarrelCueActive === 'function') {
+      LRT.Station.setBarrelCueActive(false);
+    }
+  };
 
   function saveCurrentStationUsedIds() {
     let existing = campaignState.stationUsedIds.get(CORE.stationIndex);
@@ -944,7 +959,7 @@
     };
   }
 
-  function getActiveObjectiveTargetIds() {
+  function getBaseObjectiveTargetIds() {
     if (CORE.gameState !== STATES.STATION_ACTIVE) return [];
     if (CORE.gameMode === MODES.EXPLORATION) return ['call_train', 'call_train_p2'];
 
@@ -993,6 +1008,22 @@
     }
 
     return waveRemaining > 0 ? [] : ['call_train', 'call_train_p2'];
+  }
+
+  function getActiveObjectiveTargetIds() {
+    const ids = getBaseObjectiveTargetIds();
+    if (
+      CORE.gameState === STATES.STATION_ACTIVE &&
+      CORE.gameMode === MODES.SURVIVAL &&
+      campaignState.barrelCueActive &&
+      !campaignState.firstBarrelExploded &&
+      LRT.Station &&
+      LRT.Station.explosiveBarrels &&
+      LRT.Station.explosiveBarrels.length > 0
+    ) {
+      ids.push('explosive_barrel_cue');
+    }
+    return ids;
   }
 
   function updateTrainCampaign(dt, pState) {
@@ -1214,6 +1245,14 @@
           for (let i = 0; i < summary.length; i++) {
             const e = summary[i];
             const dist = Math.hypot(e.x - pState.pos.x, e.z - pState.pos.z);
+            if (dist < 28.0 && e.variant === 'brute' && !campaignState.firstBarrelExploded && !campaignState.barrelCueActive) {
+              if (LRT.Station && LRT.Station.explosiveBarrels && LRT.Station.explosiveBarrels.some((b) => !b.exploded)) {
+                campaignState.barrelCueActive = true;
+                if (typeof LRT.Station.setBarrelCueActive === 'function') {
+                  LRT.Station.setBarrelCueActive(true);
+                }
+              }
+            }
             if (dist < 24.0) {
               if (e.variant === 'spitter' && !campaignState.voTriggered.has('VO_09_SPITTER_SEE')) {
                 campaignState.voTriggered.add('VO_09_SPITTER_SEE');
@@ -1232,6 +1271,15 @@
                 }
               }
             }
+          }
+        }
+        if (LRT.Station && typeof LRT.Station.setBarrelCueActive === 'function') {
+          const hasUnexploded = !!(LRT.Station.explosiveBarrels && LRT.Station.explosiveBarrels.some((b) => !b.exploded));
+          if (campaignState.firstBarrelExploded || !hasUnexploded) {
+            campaignState.barrelCueActive = false;
+            LRT.Station.setBarrelCueActive(false);
+          } else {
+            LRT.Station.setBarrelCueActive(campaignState.barrelCueActive);
           }
         }
         if (CORE.stationIndex >= 1 && !campaignState.voTriggered.has('VO_15_RETREAT_NOTE')) {

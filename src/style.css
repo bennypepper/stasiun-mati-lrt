@@ -324,6 +324,17 @@ html, body {
   color: #38bdf8;
 }
 
+.hud-wp.wp-hazard .wp-diamond {
+  border-color: #ff5a1f;
+  box-shadow: 0 0 8px rgba(255, 90, 31, 0.72);
+}
+.hud-wp.wp-hazard .wp-info {
+  border-left-color: rgba(255, 90, 31, 0.68);
+}
+.hud-wp.wp-hazard .wp-meta {
+  color: #ff7a3d;
+}
+
 .hud-wp.wp-offscreen {
   opacity: 0.82;
 }

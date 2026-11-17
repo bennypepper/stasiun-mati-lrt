@@ -781,20 +781,114 @@
     placeLootbox('station_far_lootbox', farLootX, 0.0, farLootZ, farLootRy, 0.65, arch.hasDepotShed ? 'Peti Taktis Depot' : 'Peti Taktis Peron 2');
 
     station.explosiveBarrels = [];
+    station._barrelCueVisual = null;
     if (arch.hasDepotShed) {
-      const b1 = station._placeNormalizedModel('Barrel_01', depotMaxX - 1.3, 0.0, 41.0, 0.0, 0.90, null, 'barrel');
-      const c1 = station.colliders[station.colliders.length - 1];
-      if (c1) c1.barrelId = 0;
-      station.explosiveBarrels.push({
-        id: 0, x: depotMaxX - 1.3, y: 0.0, z: 41.0, hp: 35, exploded: false, mesh: b1, colliderIdx: station.colliders.length - 1
+      const barrelHaloRingGeo = new THREE.RingGeometry(0.46, 0.72, 24);
+      barrelHaloRingGeo.rotateX(-Math.PI * 0.5);
+      const barrelHaloShellGeo = new THREE.CylinderGeometry(0.48, 0.56, 1.08, 16, 1, true);
+      const barrelHaloRingMat = new THREE.MeshBasicMaterial({
+        color: 0xff5a1f,
+        transparent: true,
+        opacity: 0.78,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
       });
+      const barrelHaloShellMat = new THREE.MeshBasicMaterial({
+        color: 0xff4500,
+        transparent: true,
+        opacity: 0.22,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
+      });
+      station.disposableGeometries.push(barrelHaloRingGeo, barrelHaloShellGeo);
+      station.disposableMaterials.push(barrelHaloRingMat, barrelHaloShellMat);
 
-      const b2 = station._placeNormalizedModel('Barrel_01', depotMaxX - 1.3, 0.0, 48.0, 1.2, 0.90, null, 'barrel');
-      const c2 = station.colliders[station.colliders.length - 1];
-      if (c2) c2.barrelId = 1;
-      station.explosiveBarrels.push({
-        id: 1, x: depotMaxX - 1.3, y: 0.0, z: 48.0, hp: 35, exploded: false, mesh: b2, colliderIdx: station.colliders.length - 1
+      const addExplosiveBarrel = (id, bx, bz, rotY) => {
+        const mesh = station._placeNormalizedModel('Barrel_01', bx, 0.0, bz, rotY, 0.90, null, 'barrel');
+        const cIdx = station.colliders.length - 1;
+        const col = station.colliders[cIdx];
+        if (col) col.barrelId = id;
+
+        const haloGroup = new THREE.Group();
+        haloGroup.position.set(bx, 0.0, bz);
+        const haloRing = new THREE.Mesh(barrelHaloRingGeo, barrelHaloRingMat);
+        haloRing.position.y = 0.035;
+        const haloShell = new THREE.Mesh(barrelHaloShellGeo, barrelHaloShellMat);
+        haloShell.position.y = 0.54;
+        haloGroup.add(haloRing);
+        haloGroup.add(haloShell);
+        root.add(haloGroup);
+
+        station.explosiveBarrels.push({
+          id: id,
+          x: bx,
+          y: 0.0,
+          z: bz,
+          hp: 35,
+          exploded: false,
+          mesh: mesh,
+          colliderIdx: cIdx,
+          haloGroup: haloGroup,
+          haloRing: haloRing,
+          haloShell: haloShell
+        });
+      };
+
+      addExplosiveBarrel(0, depotMaxX - 1.3, 41.0, 0.0);
+      addExplosiveBarrel(1, depotMaxX - 1.3, 50.0, 1.2);
+
+      const cueOrbGeo = new THREE.SphereGeometry(0.18, 12, 10);
+      const cueShellGeo = new THREE.OctahedronGeometry(0.28, 0);
+      const cueBeamGeo = new THREE.CylinderGeometry(0.05, 0.30, 1.55, 12, 1, true);
+      const cueOrbMat = new THREE.MeshBasicMaterial({
+        color: 0xff8c38,
+        transparent: true,
+        opacity: 0.92,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
       });
+      const cueShellMat = new THREE.MeshBasicMaterial({
+        color: 0xffb347,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.72,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      });
+      const cueBeamMat = new THREE.MeshBasicMaterial({
+        color: 0xff5a1f,
+        transparent: true,
+        opacity: 0.24,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
+      });
+      station.disposableGeometries.push(cueOrbGeo, cueShellGeo, cueBeamGeo);
+      station.disposableMaterials.push(cueOrbMat, cueShellMat, cueBeamMat);
+
+      const cueGroup = new THREE.Group();
+      cueGroup.visible = false;
+      const cueOrb = new THREE.Mesh(cueOrbGeo, cueOrbMat);
+      cueOrb.position.y = 1.65;
+      const cueShell = new THREE.Mesh(cueShellGeo, cueShellMat);
+      cueShell.position.y = 1.65;
+      const cueBeam = new THREE.Mesh(cueBeamGeo, cueBeamMat);
+      cueBeam.position.y = 0.80;
+      cueGroup.add(cueBeam);
+      cueGroup.add(cueOrb);
+      cueGroup.add(cueShell);
+      root.add(cueGroup);
+
+      station._barrelCueVisual = {
+        group: cueGroup,
+        orb: cueOrb,
+        shell: cueShell,
+        beam: cueBeam,
+        ringMat: barrelHaloRingMat,
+        shellMat: barrelHaloShellMat
+      };
     }
 
     // =========================================================

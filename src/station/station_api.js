@@ -236,6 +236,9 @@
       this._lightingFactor = 1.0;
       this.destructibles = null;
       this.explosiveBarrels = [];
+      this._barrelCueVisual = null;
+      this._barrelCueActive = false;
+      this._barrelCueMarker = null;
       this._powerRestored = true;
       this._usedIds = new Set();
       this._isBuilding = false;
@@ -775,6 +778,65 @@
         }
       }
 
+      if (this.explosiveBarrels && this.explosiveBarrels.length > 0) {
+        const t = this._timeAccum;
+        const hPulse = 0.55 + 0.45 * Math.sin(t * 4.2);
+        let nearestBarrel = null;
+        let nearestD2 = Infinity;
+        for (let i = 0; i < this.explosiveBarrels.length; i++) {
+          const b = this.explosiveBarrels[i];
+          if (b.exploded) {
+            if (b.haloGroup && b.haloGroup.visible) b.haloGroup.visible = false;
+            continue;
+          }
+          if (b.haloGroup) {
+            b.haloGroup.visible = true;
+            const rSc = 0.94 + 0.14 * hPulse;
+            if (b.haloRing) b.haloRing.scale.set(rSc, rSc, rSc);
+            if (b.haloShell) {
+              const sSc = 0.98 + 0.06 * hPulse;
+              b.haloShell.scale.set(sSc, 1.0, sSc);
+            }
+          }
+          const dx = b.x - px;
+          const dz = b.z - pz;
+          const d2 = dx * dx + dz * dz;
+          if (d2 < nearestD2) {
+            nearestD2 = d2;
+            nearestBarrel = b;
+          }
+        }
+        if (this._barrelCueVisual) {
+          this._barrelCueVisual.ringMat.opacity = 0.56 + 0.30 * hPulse;
+          this._barrelCueVisual.shellMat.opacity = 0.16 + 0.14 * hPulse;
+          const showCue = !!(this._barrelCueActive && nearestBarrel);
+          this._barrelCueVisual.group.visible = showCue;
+          if (showCue) {
+            this._barrelCueVisual.group.position.set(nearestBarrel.x, nearestBarrel.y, nearestBarrel.z);
+            const orbY = 1.62 + Math.sin(t * 3.6) * 0.14;
+            this._barrelCueVisual.orb.position.y = orbY;
+            this._barrelCueVisual.orb.rotation.y = t * 1.8;
+            this._barrelCueVisual.shell.position.y = orbY;
+            this._barrelCueVisual.shell.rotation.y = -t * 2.4;
+          }
+          if (this._barrelCueMarker) {
+            if (showCue) {
+              this._barrelCueMarker.active = true;
+              this._barrelCueMarker.used = false;
+              this._barrelCueMarker.x = nearestBarrel.x;
+              this._barrelCueMarker.y = nearestBarrel.y + 1.55;
+              this._barrelCueMarker.z = nearestBarrel.z + offsetZ;
+            } else {
+              this._barrelCueMarker.active = false;
+              this._barrelCueMarker.used = true;
+            }
+          }
+        }
+      } else if (this._barrelCueVisual && this._barrelCueVisual.group.visible) {
+        this._barrelCueVisual.group.visible = false;
+        if (this._barrelCueMarker) this._barrelCueMarker.active = false;
+      }
+
       let paintDirty = false;
       let metalDirty = false;
       let barricadeDirty = false;
@@ -1005,6 +1067,22 @@
           isLootbox: isLootbox
         });
       }
+
+      if (this.explosiveBarrels && this.explosiveBarrels.length > 0) {
+        this._barrelCueMarker = {
+          id: 'explosive_barrel_cue',
+          x: this.explosiveBarrels[0].x,
+          y: this.explosiveBarrels[0].y + 1.55,
+          z: this.explosiveBarrels[0].z,
+          label: 'TEMBAK BAREL PELEDAK',
+          kind: 'hazard',
+          used: true,
+          active: false
+        };
+        this._objectiveMarkersCache.push(this._barrelCueMarker);
+      } else {
+        this._barrelCueMarker = null;
+      }
     },
 
     _syncObjectiveBeacons: function () {
@@ -1043,6 +1121,10 @@
       }
     },
 
+    setBarrelCueActive: function (active) {
+      this._barrelCueActive = !!active;
+    },
+
     setActiveObjectiveIds: function (idsArray) {
       if (!this._activeObjectiveIds) this._activeObjectiveIds = new Set();
       this._activeObjectiveIds.clear();
@@ -1064,6 +1146,7 @@
       const activeSet = this._activeObjectiveIds;
       for (let i = 0; i < this._objectiveMarkersCache.length; i++) {
         const m = this._objectiveMarkersCache[i];
+        if (!m.item) continue;
         const it = m.item;
         m.x = it.x;
         m.y = it.y;
@@ -1814,11 +1897,16 @@
       if (!b || b.exploded) return;
       b.exploded = true;
       if (b.mesh) b.mesh.visible = false;
+      if (b.haloGroup) b.haloGroup.visible = false;
       if (b.colliderIdx !== undefined && this.colliders[b.colliderIdx]) {
         const c = this.colliders[b.colliderIdx];
         c.blocksWalk = false;
         c.blocksBullets = false;
         c.disabled = true;
+      }
+      const core = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core;
+      if (core && typeof core.onBarrelExploded === 'function') {
+        core.onBarrelExploded(id);
       }
       const offsetZ = this.rootGroup ? this.rootGroup.position.z : 0;
       const pos = { x: b.x, y: b.y + 0.6, z: b.z + offsetZ };
