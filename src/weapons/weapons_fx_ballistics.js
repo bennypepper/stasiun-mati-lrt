@@ -35,20 +35,22 @@
   // Pre-allocated InstancedMesh VFX pools
   const TRACER_CAP = 32;
   const ROCKET_CAP = 4;
-  const SMOKE_CAP = 110;
-  const FIREBALL_CAP = 14;
-  const RING_CAP = 8;
-  const SPARK_CAP = 110;
-  const BLOOD_CAP = 80;
+  const SMOKE_CAP = 160;
+  const FIREBALL_CAP = 28;
+  const RING_CAP = 12;
+  const SPARK_CAP = 160;
+  const BLOOD_CAP = 110;
   const GLASS_CAP = 140;
-  const RUBBLE_CAP = 84;
-  const SCORCH_CAP = 64;
+  const RUBBLE_CAP = 120;
+  const SCORCH_CAP = 96;
+  const BLOOD_DECAL_CAP = 96;
   const ATTACHED_SCORCH_CAP = 32;
 
   let _tracerMesh, _rocketMesh, _smokeMesh, _fireballMesh, _ringMesh;
-  let _sparkMesh, _bloodMesh, _glassMesh, _rubbleMesh, _scorchMesh;
+  let _sparkMesh, _bloodMesh, _glassMesh, _rubbleMesh, _scorchMesh, _bloodDecalMesh;
   let _scorchMat = null;
   let _scorchGeo = null;
+  let _bloodDecalMat = null;
 
   const _tracers = [];
   const _rockets = [];
@@ -60,6 +62,7 @@
   const _glasses = [];
   const _rubbles = [];
   const _scorches = [];
+  const _bloodDecals = [];
 
   let _smokeCursor = 0;
   let _fireballCursor = 0;
@@ -69,9 +72,17 @@
   let _glassCursor = 0;
   let _rubbleCursor = 0;
   let _scorchCursor = 0;
+  let _bloodDecalCursor = 0;
   let _attachedScorchCursor = 0;
+  const _downVec = new THREE.Vector3(0, -1, 0);
+  const _probeDirs = [
+    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(-1, 0, 0),
+    new THREE.Vector3(0, 0, 1),
+    new THREE.Vector3(0, 0, -1)
+  ];
+  const _flashPos = new THREE.Vector3();
 
-  // Fallback scorch canvas texture if LRT.Materials is absent
   function createFallbackScorchTex() {
     if (typeof document === 'undefined') return null;
     const c = document.createElement('canvas');
@@ -79,12 +90,52 @@
     c.height = 128;
     const ctx = c.getContext('2d');
     const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 60);
-    g.addColorStop(0.0, 'rgba(8,8,8,0.95)');
-    g.addColorStop(0.35, 'rgba(20,18,16,0.82)');
-    g.addColorStop(0.70, 'rgba(32,26,20,0.42)');
+    g.addColorStop(0.0, 'rgba(6,6,6,0.98)');
+    g.addColorStop(0.42, 'rgba(14,12,10,0.88)');
+    g.addColorStop(0.76, 'rgba(26,22,18,0.48)');
     g.addColorStop(1.0, 'rgba(0,0,0,0)');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 128, 128);
+    // Radial soot blast streaks
+    ctx.strokeStyle = 'rgba(8,8,8,0.55)';
+    for (let i = 0; i < 18; i++) {
+      const ang = (i / 18) * Math.PI * 2 + (i % 3) * 0.14;
+      const rLen = 36 + (i % 5) * 6;
+      ctx.lineWidth = 2.0 + (i % 3);
+      ctx.beginPath();
+      ctx.moveTo(64 + Math.cos(ang) * 14, 64 + Math.sin(ang) * 14);
+      ctx.lineTo(64 + Math.cos(ang) * rLen, 64 + Math.sin(ang) * rLen);
+      ctx.stroke();
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  function createBloodDecalTex() {
+    if (typeof document === 'undefined') return null;
+    const c = document.createElement('canvas');
+    c.width = 128;
+    c.height = 128;
+    const ctx = c.getContext('2d');
+    const g = ctx.createRadialGradient(64, 64, 6, 64, 64, 50);
+    g.addColorStop(0.0, 'rgba(72,4,6,0.96)');
+    g.addColorStop(0.55, 'rgba(98,8,10,0.85)');
+    g.addColorStop(0.85, 'rgba(56,4,6,0.38)');
+    g.addColorStop(1.0, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(64, 64, 52, 0, Math.PI * 2);
+    ctx.fill();
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2 + 0.25;
+      const d = 24 + (i % 4) * 9;
+      const rad = 4 + (i % 3) * 3.5;
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(82,6,8,0.82)' : 'rgba(110,10,12,0.72)';
+      ctx.beginPath();
+      ctx.arc(64 + Math.cos(a) * d, 64 + Math.sin(a) * d, rad, 0, Math.PI * 2);
+      ctx.fill();
+    }
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
@@ -124,7 +175,7 @@
     // 2. Flying RPG rockets
     _rocketMesh = makeInstanced(
       new THREE.CylinderGeometry(0.036, 0.052, 0.52, 10),
-      new THREE.MeshStandardMaterial({ color: 0x4b5c3a, roughness: 0.42, metalness: 0.55, emissive: 0xff5511, emissiveIntensity: 0.4 }),
+      new THREE.MeshStandardMaterial({ color: 0x5c6d45, roughness: 0.36, metalness: 0.55, emissive: 0xff7722, emissiveIntensity: 1.8 }),
       ROCKET_CAP
     );
     _rocketMesh.geometry.rotateX(Math.PI / 2);
@@ -184,9 +235,9 @@
       _sparks.push({ active: false, life: 0, maxLife: 0.4, pos: new THREE.Vector3(), vel: new THREE.Vector3(), color: new THREE.Color(0xffbb44) });
     }
 
-    // 7. Blood splatters
+    // 7. Blood splatters (velocity-stretched arterial droplets)
     _bloodMesh = makeInstanced(
-      new THREE.IcosahedronGeometry(0.065, 0),
+      new THREE.BoxGeometry(0.036, 0.036, 0.11),
       new THREE.MeshLambertMaterial({ color: 0xffffff }),
       BLOOD_CAP
     );
@@ -227,18 +278,16 @@
       });
     }
 
-    // 10. World scorch decals + train/parented scorch decal pool
-    const matScorch = (LRT.Materials && LRT.Materials.mats && LRT.Materials.mats.scorchDecal)
-      ? LRT.Materials.mats.scorchDecal
-      : new THREE.MeshBasicMaterial({
-          map: createFallbackScorchTex(),
-          transparent: true,
-          opacity: 0.88,
-          depthWrite: false,
-          polygonOffset: true,
-          polygonOffsetFactor: -2,
-          side: THREE.DoubleSide
-        });
+    // 10. World scorch decals, blood decals, + train/parented scorch decal pool
+    const matScorch = new THREE.MeshBasicMaterial({
+      map: createFallbackScorchTex(),
+      transparent: true,
+      opacity: 0.92,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      side: THREE.DoubleSide
+    });
     _scorchMat = matScorch;
     _scorchGeo = new THREE.PlaneGeometry(1, 1);
     if (typeof _scorchGeo.computeBoundingSphere === 'function') {
@@ -248,6 +297,20 @@
     _scorchMesh = makeInstanced(_scorchGeo, _scorchMat, SCORCH_CAP);
     for (let i = 0; i < SCORCH_CAP; i++) {
       _scorches.push({ active: false });
+    }
+
+    _bloodDecalMat = new THREE.MeshBasicMaterial({
+      map: createBloodDecalTex(),
+      transparent: true,
+      opacity: 0.90,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      side: THREE.DoubleSide
+    });
+    _bloodDecalMesh = makeInstanced(_scorchGeo, _bloodDecalMat, BLOOD_DECAL_CAP);
+    for (let i = 0; i < BLOOD_DECAL_CAP; i++) {
+      _bloodDecals.push({ active: false });
     }
 
     for (let i = 0; i < ATTACHED_SCORCH_CAP; i++) {
@@ -277,6 +340,7 @@
     clearList(_glasses, _glassMesh);
     clearList(_rubbles, _rubbleMesh);
     clearList(_scorches, _scorchMesh);
+    clearList(_bloodDecals, _bloodDecalMesh);
 
     for (let i = 0; i < _attachedScorches.length; i++) {
       const m = _attachedScorches[i];
@@ -284,6 +348,7 @@
       if (m.parent) m.parent.remove(m);
     }
     _scorchCursor = 0;
+    _bloodDecalCursor = 0;
     _attachedScorchCursor = 0;
   }
 
@@ -500,6 +565,24 @@
     _scorchMesh.instanceMatrix.needsUpdate = true;
   }
 
+  function spawnBloodDecal(pos, normal, size) {
+    if (!_bloodDecalMesh || !pos) return;
+    const decalSize = size || 0.95;
+    const norm = normal ? _v1.copy(normal).normalize() : _v1.set(0, 1, 0);
+    const idx = _bloodDecalCursor;
+    _bloodDecalCursor = (_bloodDecalCursor + 1) % BLOOD_DECAL_CAP;
+    _bloodDecals[idx].active = true;
+
+    _v2.copy(pos).addScaledVector(norm, 0.024);
+    _q1.setFromUnitVectors(_fwdVec, norm);
+    _q2.setFromAxisAngle(_fwdVec, Math.random() * Math.PI * 2);
+    _q1.multiply(_q2);
+    _scaleV.set(decalSize, decalSize * (0.85 + Math.random() * 0.3), 1);
+    _m4.compose(_v2, _q1, _scaleV);
+    _bloodDecalMesh.setMatrixAt(idx, _m4);
+    _bloodDecalMesh.instanceMatrix.needsUpdate = true;
+  }
+
   function triggerFlashLight(pos, colorHex, intensity, distance, duration) {
     if (!W._flashLight || !pos) return;
     W._flashLight.position.copy(pos);
@@ -557,13 +640,13 @@
     // 1. Audio + Blast light + Camera trauma + AI sound impulse
     if (enemyBlast) {
       W.play3D('debris_crumble', origVec, 0.14, 0.95, { refDist: 10.0, maxDist: 90.0 });
-      triggerFlashLight(origVec, 0x66ff33, 9.0, 14, 0.25);
+      triggerFlashLight(origVec, 0x66ff33, 12.0, 18, 0.28);
     } else {
-      W.play3D('rpg_explosion', origVec, 0.08, 1.45, { refDist: 26.0, maxDist: 260.0 });
-      W.play3D('debris_crumble', origVec, 0.12, 0.80, { refDist: 18.0, maxDist: 160.0 });
-      triggerFlashLight(origVec, 0xff8822, 16.0, 24, 0.34);
+      W.play3D('rpg_explosion', origVec, 0.08, 1.50, { refDist: 28.0, maxDist: 280.0 });
+      W.play3D('debris_crumble', origVec, 0.12, 0.90, { refDist: 20.0, maxDist: 180.0 });
+      triggerFlashLight(origVec, 0xff8a24, 48.0, 42, 0.45);
       if (LRT.Enemies && typeof LRT.Enemies.emitSoundImpulse === 'function') {
-        LRT.Enemies.emitSoundImpulse(origVec, 75, 'rpg');
+        LRT.Enemies.emitSoundImpulse(origVec, 80, 'rpg');
       }
     }
 
@@ -572,7 +655,7 @@
       const distToCam = _camPos.distanceTo(origVec);
       const shakeAmt = enemyBlast
         ? Math.max(0.0, 0.45 * (1 - distToCam / 10))
-        : Math.max(0.18, 0.95 * (1 - distToCam / 18));
+        : Math.max(0.26, 1.0 * (1 - distToCam / 22));
       W._trauma = Math.min(1.0, W._trauma + shakeAmt);
     }
 
@@ -638,37 +721,58 @@
       }
       spawnSparks(origVec, 14, _upVec);
     } else {
-      // Shockwave ring
-      spawnRing(origVec, rad * 1.1, 0.32, 0xffc166);
-      // Multi-layered fireball spheres
-      for (let i = 0; i < 5; i++) {
-        _v1.set((Math.random() - 0.5) * 3.5, 1.2 + Math.random() * 3.2, (Math.random() - 0.5) * 3.5);
-        const scEnd = (i === 0) ? rad * 0.75 : (2.0 + Math.random() * 2.4);
-        spawnFireball(origVec, _v1, 0.45, scEnd, 0.28 + Math.random() * 0.14, 0xfff3b8, 0xc82a0a);
+      // Double shockwave rings
+      spawnRing(origVec, rad * 1.25, 0.36, 0xffd07a);
+      spawnRing(origVec, rad * 0.78, 0.24, 0xff7722);
+      // Multi-layered fireballs (bright white-gold core + orange-red outer plumes)
+      for (let i = 0; i < 11; i++) {
+        _v1.set((Math.random() - 0.5) * 4.8, 1.4 + Math.random() * 4.2, (Math.random() - 0.5) * 4.8);
+        const scEnd = (i === 0) ? rad * 0.95 : (i < 4 ? rad * 0.68 : 2.4 + Math.random() * 2.8);
+        const cStart = i < 3 ? 0xfffad0 : 0xffcc66;
+        const cEnd = i < 3 ? 0xff6611 : 0xb81f06;
+        spawnFireball(origVec, _v1, 0.55, scEnd, 0.34 + Math.random() * 0.20, cStart, cEnd);
       }
-      // Billowing smoke plume
-      for (let i = 0; i < 18; i++) {
-        _v1.set((Math.random() - 0.5) * 5.2, 1.8 + Math.random() * 5.0, (Math.random() - 0.5) * 5.2);
-        const shade = Math.random() > 0.45 ? 0x383633 : 0x56524c;
-        spawnSmoke(origVec, _v1, 0.45, 2.4 + Math.random() * 1.4, 0.95 + Math.random() * 0.6, shade);
+      // Dense billowing dark smoke & soot plume
+      for (let i = 0; i < 30; i++) {
+        _v1.set((Math.random() - 0.5) * 6.8, 2.2 + Math.random() * 6.4, (Math.random() - 0.5) * 6.8);
+        const shade = Math.random() > 0.40 ? 0x242220 : 0x46423d;
+        spawnSmoke(origVec, _v1, 0.55, 3.0 + Math.random() * 1.8, 1.25 + Math.random() * 0.85, shade);
       }
-      // Sparks & concrete rubble chunks
-      spawnSparks(origVec, 28, _upVec);
-      spawnRubble(origVec, 18, _upVec);
-      // Stamp floor/surface scorch decal if near platform, sidewalk, or street and not inside train
+      // Sparks & flying concrete rubble chunks
+      spawnSparks(origVec, 44, _upVec);
+      spawnRubble(origVec, 26, _upVec);
+
+      // Stamp lasting black soot crater onto ground & nearby walls
       const trainBox = (LRT.Train && typeof LRT.Train.isPlayerInside === 'function' && LRT.Train.isPlayerInside(origVec));
       if (!trainBox) {
-        if (origVec.y >= -1.25 && origVec.y <= -0.90) {
-          _v2.set(origVec.x, -0.99, origVec.z);
-          spawnScorchDecal(_v2, _upVec, null, 2.8);
-        } else if (origVec.y > -0.90 && origVec.y <= -0.60) {
-          _v2.set(origVec.x, -0.81, origVec.z);
-          spawnScorchDecal(_v2, _upVec, null, 2.6);
-        } else if (origVec.y >= -0.25 && origVec.y <= 0.45) {
-          _v2.set(origVec.x, 0.01, origVec.z);
-          spawnScorchDecal(_v2, _upVec, null, 2.8);
-        } else {
-          spawnScorchDecal(origVec, _upVec, null, 2.2);
+        let stampedFloor = false;
+        if (LRT.Station && typeof LRT.Station.raycastWorld === 'function') {
+          _v2.set(origVec.x, origVec.y + 0.65, origVec.z);
+          const downHit = LRT.Station.raycastWorld(_v2, _downVec, 4.0);
+          if (downHit && downHit.point) {
+            spawnScorchDecal(downHit.point, downHit.normal || _upVec, null, 5.2);
+            spawnScorchDecal(downHit.point, downHit.normal || _upVec, null, 3.1);
+            stampedFloor = true;
+          }
+          for (let pi = 0; pi < _probeDirs.length; pi++) {
+            const wallHit = LRT.Station.raycastWorld(origVec, _probeDirs[pi], 2.8);
+            if (wallHit && wallHit.point) {
+              spawnScorchDecal(wallHit.point, wallHit.normal || _upVec, null, 2.5);
+            }
+          }
+        }
+        if (!stampedFloor) {
+          if (origVec.y >= -1.25 && origVec.y <= -0.90) {
+            _v2.set(origVec.x, -0.99, origVec.z);
+          } else if (origVec.y > -0.90 && origVec.y <= -0.60) {
+            _v2.set(origVec.x, -0.81, origVec.z);
+          } else if (origVec.y >= -0.25 && origVec.y <= 0.45) {
+            _v2.set(origVec.x, 0.01, origVec.z);
+          } else {
+            _v2.copy(origVec);
+          }
+          spawnScorchDecal(_v2, _upVec, null, 5.0);
+          spawnScorchDecal(_v2, _upVec, null, 2.9);
         }
       }
     }
@@ -821,11 +925,6 @@
         W._muzzleFlashGroup.visible = true;
         W._muzzleFlashTimer = W._isADS ? 0.024 : 0.042;
       }
-      if (W._flashLightTimer <= 0.08) {
-        const lInt = W._isADS ? (wCfg.id === 'shotgun' ? 1.8 : 1.15) : (wCfg.id === 'shotgun' ? 5.6 : 3.6);
-        const lRange = W._isADS ? 5.5 : 10.5;
-        triggerFlashLight(_muzzlePos, 0xffb355, lInt, lRange, W._isADS ? 0.045 : 0.070);
-      }
     }
 
     if (!W._camera) return;
@@ -834,6 +933,16 @@
     W._camera.getWorldDirection(_rayDir);
     _camRight.setFromMatrixColumn(W._camera.matrixWorld, 0).normalize();
     _camUp.setFromMatrixColumn(W._camera.matrixWorld, 1).normalize();
+
+    // Illuminate surrounding dark geometry & zombie faces with dynamic muzzle flash light
+    if (W._flashLightTimer <= 0.08 && wCfg.id !== 'rpg') {
+      const clearProbe = findNearestHit(_rayOrigin, _rayDir, 0.85);
+      const fwdPush = clearProbe ? Math.max(0.22, clearProbe.dist - 0.15) : 0.65;
+      _flashPos.copy(_rayOrigin).addScaledVector(_rayDir, fwdPush);
+      const baseFlash = wCfg.id === 'shotgun' ? 28.0 : (wCfg.id === 'rifle' ? 20.0 : 22.0);
+      const lInt = W._isADS ? baseFlash * 0.85 : baseFlash;
+      triggerFlashLight(_flashPos, 0xffb355, lInt, 24.0, W._isADS ? 0.075 : 0.095);
+    }
 
     // Emit AI sound perception impulse on gunfire
     const noiseRadius = wCfg.noiseRadius || (wCfg.id === 'rpg' ? 75 : wCfg.id === 'shotgun' ? 50 : wCfg.id === 'rifle' ? 42 : 28);
@@ -891,15 +1000,24 @@
         const dmg = Math.round((wCfg.damage || 25) * dmgScale * (h.isHeadshot ? (wCfg.headMult || 2.0) : 1.0));
         let hitInfo = null;
         if (LRT.Enemies && typeof LRT.Enemies.hitZombie === 'function') {
-          hitInfo = LRT.Enemies.hitZombie(h.zombieId, dmg, pt, _shotDir, wCfg.knockback || 2.0, !!h.isHeadshot);
+          hitInfo = LRT.Enemies.hitZombie(h.zombieId, dmg, pt, _shotDir, wCfg.knockback || 2.0, !!h.isHeadshot, h.hitZone || (h.isHeadshot ? 'head' : 'torso'));
         }
         if (hitInfo && hitInfo.killed) anyKill = true;
         if (h.isArmor || (hitInfo && hitInfo.armored)) {
           spawnSparks(pt, 6, norm);
           if (p === 0) W.play3D('impact_metal', pt, 0.1, 0.8);
         } else {
-          spawnBlood(pt, _shotDir, h.isHeadshot ? 14 : 7);
-          if (p === 0) W.play3D('zombie_hit', pt, 0.1, 0.85);
+          spawnBlood(pt, _shotDir, h.isHeadshot ? 16 : 9);
+          if (p === 0) {
+            W.play3D('zombie_hit', pt, 0.1, 0.85);
+            // Exit blood splatter decal on wall/floor behind target
+            if (LRT.Station && typeof LRT.Station.raycastWorld === 'function') {
+              const exitHit = LRT.Station.raycastWorld(pt, _shotDir, 2.4);
+              if (exitHit && exitHit.point) {
+                spawnBloodDecal(exitHit.point, exitHit.normal || _upVec, h.isHeadshot ? 0.92 : 0.65);
+              }
+            }
+          }
         }
       } else if (res.kind === 'train') {
         const tag = h.material || h.type || h.tag || h.materialTag || (h.isGlass ? 'glass' : 'metal');
@@ -1005,10 +1123,15 @@
       }
 
       W._muzzleFlashGroup = W.buildMuzzleFlash();
-      W._flashLight = new THREE.PointLight(0xffaa44, 0, 14, 2);
+      W._flashLight = new THREE.PointLight(0xffaa44, 0, 24, 1.15);
       W._flashLight.castShadow = false;
       W._flashLight.visible = true;
       scene.add(W._flashLight);
+
+      W._rocketLight = new THREE.PointLight(0xff9428, 0, 28, 1.15);
+      W._rocketLight.castShadow = false;
+      W._rocketLight.visible = true;
+      scene.add(W._rocketLight);
 
       if (camera) camera.add(W._viewmodelRoot);
       W._viewmodelRoot.visible = false;
@@ -1017,6 +1140,7 @@
     } else {
       if (camera && W._viewmodelRoot.parent !== camera) camera.add(W._viewmodelRoot);
       if (W._flashLight && W._flashLight.parent !== scene) scene.add(W._flashLight);
+      if (W._rocketLight && W._rocketLight.parent !== scene) scene.add(W._rocketLight);
       if (W._vfxRoot && W._vfxRoot.parent !== scene) scene.add(W._vfxRoot);
       W._viewmodelRoot.visible = false;
     }
@@ -1029,6 +1153,7 @@
     resetPools();
     W.initWeaponStates(mode, difficultyKey);
     W._isFiringHeld = false;
+    W._meleeCooldown = 0;
     if (W._camera) {
       const pcfg = W.getPlayerCfg();
       W._camera.fov = pcfg.baseFov || 74;
@@ -1038,6 +1163,10 @@
       W._flashLight.intensity = 0;
       W._flashLight.visible = true;
       W._flashLightTimer = 0;
+    }
+    if (W._rocketLight) {
+      W._rocketLight.intensity = 0;
+      W._rocketLight.visible = true;
     }
   }
 
@@ -1095,6 +1224,7 @@
 
   function updateRockets(dt) {
     let dirty = false;
+    let activeRocketRef = null;
     for (let i = 0; i < ROCKET_CAP; i++) {
       const r = _rockets[i];
       if (!r.active) continue;
@@ -1124,23 +1254,34 @@
         continue;
       }
 
-      // Billowing smoke trail + thruster sparks
+      activeRocketRef = r;
+
+      // Bright thruster flame + billowing smoke trail + hot sparks
       r.smokeAccum += dt;
-      if (r.smokeAccum >= 0.018) {
+      if (r.smokeAccum >= 0.014) {
         r.smokeAccum = 0;
-        _v2.set((Math.random() - 0.5) * 1.4, 0.6 + Math.random() * 1.2, (Math.random() - 0.5) * 1.4);
-        _v2.addScaledVector(_v1, -2.5);
-        spawnSmoke(r.pos, _v2, 0.24, 1.35, 0.65, Math.random() > 0.3 ? 0xbab6ad : 0x7a7670);
-        if (Math.random() > 0.45) {
-          _v3.copy(_v1).multiplyScalar(-1);
-          spawnSparks(r.pos, 1, _v3);
-        }
+        _v2.set((Math.random() - 0.5) * 1.6, 0.7 + Math.random() * 1.4, (Math.random() - 0.5) * 1.6);
+        _v2.addScaledVector(_v1, -2.8);
+        spawnSmoke(r.pos, _v2, 0.28, 1.55, 0.75, Math.random() > 0.35 ? 0xb5b1a8 : 0x6c6862);
+        _v3.copy(_v1).multiplyScalar(-4.5);
+        spawnFireball(r.pos, _v3, 0.16, 0.38, 0.11, 0xfff5aa, 0xff5a12);
+        _v3.copy(_v1).multiplyScalar(-1);
+        spawnSparks(r.pos, 2, _v3);
       }
 
       _q1.setFromUnitVectors(_fwdVec, _v1);
       _scaleV.set(1, 1, 1);
       _m4.compose(r.pos, _q1, _scaleV);
       _rocketMesh.setMatrixAt(i, _m4);
+    }
+    if (W._rocketLight) {
+      W._rocketLight.visible = true;
+      if (activeRocketRef) {
+        W._rocketLight.position.copy(activeRocketRef.pos);
+        W._rocketLight.intensity = 26.0 + Math.sin(W._traumaTime * 42.0) * 4.0;
+      } else {
+        W._rocketLight.intensity = 0;
+      }
     }
     if (dirty && _rocketMesh) _rocketMesh.instanceMatrix.needsUpdate = true;
   }
@@ -1312,9 +1453,12 @@
         }
         b.vel.y -= 16.0 * dt;
         b.pos.addScaledVector(b.vel, dt);
+        const spd = b.vel.length();
+        if (spd > 0.05) _v1.copy(b.vel).multiplyScalar(1 / spd);
+        else _v1.copy(_upVec);
+        _q1.setFromUnitVectors(_fwdVec, _v1);
         const sc = b.scale * (1.0 - b.life / b.maxLife);
-        _q1.identity();
-        _scaleV.set(sc, sc, sc);
+        _scaleV.set(sc, sc, sc * Math.max(0.8, Math.min(2.4, spd * 0.25)));
         _m4.compose(b.pos, _q1, _scaleV);
         _bloodMesh.setMatrixAt(i, _m4);
         _bloodMesh.setColorAt(i, b.color);
@@ -1411,6 +1555,7 @@
 
     // Cooldowns & HUD feedback
     if (W._fireCooldown > 0) W._fireCooldown = Math.max(0, W._fireCooldown - step);
+    if (W._meleeCooldown > 0) W._meleeCooldown = Math.max(0, W._meleeCooldown - step);
     if (W._hitmarkerTimer > 0) W._hitmarkerTimer = Math.max(0, W._hitmarkerTimer - step);
     if (W._killConfirmTimer > 0) W._killConfirmTimer = Math.max(0, W._killConfirmTimer - step);
 
@@ -1834,6 +1979,51 @@
     };
   }
 
+  function meleeShove() {
+    if (W._meleeCooldown > 0 || !W._camera) return { hitCount: 0 };
+    W._meleeCooldown = 0.95;
+    W._recoilZ = -0.10;
+    W._recoilPitchVM = -0.14;
+    W._trauma = Math.min(1.0, W._trauma + 0.08);
+    W.play3D('weapon_switch', null, 0.06, 0.85);
+
+    W._camera.updateMatrixWorld(true);
+    W._camera.getWorldPosition(_rayOrigin);
+    W._camera.getWorldDirection(_rayDir);
+
+    const enemyInt = I.enemies;
+    const pool = enemyInt && enemyInt.zombies ? enemyInt.zombies : null;
+    if (!pool || !LRT.Enemies || typeof LRT.Enemies.hitZombie !== 'function') {
+      return { hitCount: 0 };
+    }
+
+    let hits = 0;
+    for (let i = 0; i < pool.length && hits < 2; i++) {
+      const z = pool[i];
+      if (!z || !z.active || z.dead) continue;
+      const dx = z.x - _rayOrigin.x;
+      const dy = (z.y + 1.1 * z.scale) - _rayOrigin.y;
+      const dz = z.z - _rayOrigin.z;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (dist > 2.25) continue;
+      const invD = dist > 0.05 ? 1 / dist : 1;
+      const dot = (dx * _rayDir.x + dy * _rayDir.y + dz * _rayDir.z) * invD;
+      if (dot < 0.45 && dist > 1.05) continue;
+
+      _v1.set(z.x, z.y + 1.15 * z.scale, z.z);
+      _v2.set(_rayDir.x, 0, _rayDir.z).normalize();
+      const res = LRT.Enemies.hitZombie(z.id, 24, _v1, _v2, 6.8, false, 'torso');
+      if (res && res.hit) {
+        hits++;
+        spawnBlood(_v1, _v2, 6);
+        W.play3D('zombie_hit', _v1, 0.08, 0.95);
+        W._hitmarkerTimer = 0.16;
+        if (res.killed) W._killConfirmTimer = 0.30;
+      }
+    }
+    return { hitCount: hits };
+  }
+
   const Weapons = {
     init,
     reset,
@@ -1845,12 +2035,14 @@
     fireDown,
     fireUp,
     reload: W.reload,
+    meleeShove,
     addAmmo,
     update,
     applyExplosion,
     spawnGlassShards,
     spawnSparks,
     spawnBlood,
+    spawnBloodDecal,
     spawnRubble,
     spawnScorchDecal,
     consumeCameraKick: W.consumeCameraKick,

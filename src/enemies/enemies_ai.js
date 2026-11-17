@@ -20,7 +20,7 @@
       bruteChargeMult: 1.75,
       bruteChargeCooldown: 7.5,
       bruteChargeWindup: 0.80,
-      runnerFlankAngle: 0.35,
+      runnerFlankAngle: 0.08,
       enemyDmgMult: 0.65,
       pickupAmmoMult: 1.35,
       healMult: 1.30,
@@ -48,7 +48,7 @@
       bruteChargeMult: 2.10,
       bruteChargeCooldown: 5.5,
       bruteChargeWindup: 0.65,
-      runnerFlankAngle: 0.52,
+      runnerFlankAngle: 0.12,
       enemyDmgMult: 1.00,
       pickupAmmoMult: 1.00,
       healMult: 1.00,
@@ -76,7 +76,7 @@
       bruteChargeMult: 2.35,
       bruteChargeCooldown: 4.5,
       bruteChargeWindup: 0.52,
-      runnerFlankAngle: 0.62,
+      runnerFlankAngle: 0.22,
       enemyDmgMult: 1.35,
       pickupAmmoMult: 0.80,
       healMult: 0.80,
@@ -104,7 +104,7 @@
       bruteChargeMult: 2.65,
       bruteChargeCooldown: 3.6,
       bruteChargeWindup: 0.42,
-      runnerFlankAngle: 0.72,
+      runnerFlankAngle: 0.30,
       enemyDmgMult: 1.75,
       pickupAmmoMult: 0.65,
       healMult: 0.65,
@@ -130,10 +130,10 @@
   };
 
   const VARIANT_MIX_RATIOS = {
-    easy: { walker: 0.70, runner: 0.22, spitter: 0.05, brute: 0.03, screamer: 0.00 },
-    medium: { walker: 0.54, runner: 0.26, spitter: 0.10, brute: 0.06, screamer: 0.04 },
-    hard: { walker: 0.40, runner: 0.32, spitter: 0.12, brute: 0.09, screamer: 0.07 },
-    nightmare: { walker: 0.28, runner: 0.38, spitter: 0.14, brute: 0.11, screamer: 0.09 }
+    easy: { walker: 0.80, runner: 0.08, spitter: 0.07, brute: 0.05, screamer: 0.00 },
+    medium: { walker: 0.68, runner: 0.12, spitter: 0.10, brute: 0.06, screamer: 0.04 },
+    hard: { walker: 0.50, runner: 0.22, spitter: 0.12, brute: 0.09, screamer: 0.07 },
+    nightmare: { walker: 0.38, runner: 0.28, spitter: 0.14, brute: 0.11, screamer: 0.09 }
   };
 
   // Pre-allocated scratch math (ZERO per-frame heap allocations inside update)
@@ -275,6 +275,27 @@
     for (let i = 0; i < MAX_ENEMIES; i++) {
       if (!E.zombies[i].active) { slot = E.zombies[i]; break; }
     }
+    if (!slot) {
+      // Evict oldest settled dead corpse so persistent corpses never block wave spawns
+      let oldestDead = null;
+      let bestScore = -1;
+      for (let i = 0; i < MAX_ENEMIES; i++) {
+        const cand = E.zombies[i];
+        if (cand.active && cand.dead && cand.deathTimer >= 1.2) {
+          const score = cand.deathTimer;
+          if (score > bestScore) {
+            bestScore = score;
+            oldestDead = cand;
+          }
+        }
+      }
+      if (oldestDead) {
+        oldestDead.active = false;
+        oldestDead.dead = false;
+        E.zeroZombieMatrices(oldestDead.id);
+        slot = oldestDead;
+      }
+    }
     if (!slot) return false;
 
     const o = opts || {};
@@ -305,6 +326,13 @@
     slot.armorHp = variant === 'brute' ? Math.round(115 * tier.armorMult * armorScale) : 0;
     slot.hasArmor = variant === 'brute';
     slot.speed = cfg.speed * tier.enemySpeedMult * (0.93 + Math.random() * 0.14);
+    slot.baseSpeed = slot.speed;
+    slot.legDmg = 0;
+    slot.legCrippled = false;
+    slot.hitZone = 'torso';
+    slot.hitSide = 0;
+    slot.hornVulnTimer = 0;
+    slot.fallPitchSign = 1;
     slot.scale = cfg.scale || 1.0;
     slot.damage = Math.round(cfg.damage * tier.enemyDmgMult);
     slot.attackRange = cfg.attackRange;
@@ -503,10 +531,10 @@
 
     if (w === 1 && s === 0) {
       let ratios;
-      if (key === 'easy') ratios = [0.75, 0.25, 0, 0, 0];
-      else if (key === 'hard') ratios = [0.55, 0.35, 0.10, 0, 0];
-      else if (key === 'nightmare') ratios = [0.45, 0.40, 0.10, 0.05, 0];
-      else ratios = [0.67, 0.33, 0, 0, 0];
+      if (key === 'easy') ratios = [1.0, 0, 0, 0, 0];
+      else if (key === 'hard') ratios = [0.70, 0.20, 0.10, 0, 0];
+      else if (key === 'nightmare') ratios = [0.55, 0.30, 0.10, 0.05, 0];
+      else ratios = [0.85, 0.15, 0, 0, 0];
       const counts = allocateCountsByWeights(total, ratios);
       const order = ['walker', 'runner', 'spitter', 'brute', 'screamer'];
       for (let v = 0; v < order.length; v++) {
@@ -699,7 +727,9 @@
     const key = tier.key;
     const s = stationIdx % 6;
     if (s === 0) {
-      return Math.random() < 0.68 ? 'walker' : 'runner';
+      if (key === 'easy') return 'walker';
+      const runnerChance = key === 'medium' ? 0.10 : 0.22;
+      return Math.random() < (1.0 - runnerChance) ? 'walker' : 'runner';
     }
     const allowScreamer = (key !== 'easy') || (s === 5);
 
@@ -857,13 +887,26 @@
     _totalKills++;
     E.setHeadEyeDead(z.id);
 
+    // Fall direction follows bullet momentum relative to zombie facing
     if (hitDir) {
-      z.vx += hitDir.x * 3.5;
-      z.vz += hitDir.z * 3.5;
+      const fwdX = Math.sin(z.yaw);
+      const fwdZ = Math.cos(z.yaw);
+      const fwdDot = hitDir.x * fwdX + hitDir.z * fwdZ;
+      z.fallPitchSign = (z.hitZone === 'legs' || fwdDot > 0.15) ? 1 : -1;
+      z.vx += hitDir.x * 2.8;
+      z.vz += hitDir.z * 2.8;
+    } else {
+      z.fallPitchSign = Math.random() > 0.5 ? -1 : 1;
     }
 
     _v1.set(z.x, z.y + 1.1, z.z);
     E.play3D('zombie_death', _v1, 0.14, 0.95);
+
+    if (LRT.Weapons && typeof LRT.Weapons.spawnBloodDecal === 'function') {
+      _v2.set(z.x, z.y + 0.025, z.z);
+      _v3.set(0, 1, 0);
+      LRT.Weapons.spawnBloodDecal(_v2, _v3, (z.variant === 'brute' ? 1.55 : 1.15) + Math.random() * 0.25);
+    }
 
     if (z.variant === 'spitter') {
       const cfg = E.getEnemyCfg('spitter');
@@ -886,16 +929,29 @@
     }
   }
 
-  function applyDamageToZombie(z, dmg, hitPoint, hitDir, knockbackForce, isHeadshot, onDropPickup) {
-    if (!z || !z.active || z.dead) return { hit: false, killed: false, armored: false };
+  function applyDamageToZombie(z, dmg, hitPoint, hitDir, knockbackForce, isHeadshot, onDropPickup, hitZone) {
+    if (!z || !z.active || z.dead) return { hit: false, killed: false, armored: false, hitZone: 'torso', legCrippledNow: false };
 
+    const zone = hitZone || (isHeadshot ? 'head' : 'torso');
+    const isHead = zone === 'head' || !!isHeadshot;
     let finalDmg = dmg;
     let armoredHit = false;
+    let legCrippledNow = false;
+
+    if (zone === 'torso') {
+      finalDmg = Math.max(1, Math.round(dmg * 0.90));
+    } else if (zone === 'legs') {
+      finalDmg = Math.max(1, Math.round(dmg * 0.60));
+    }
+
+    if (z.hornVulnTimer > 0 && (z.variant === 'spitter' || z.variant === 'screamer')) {
+      finalDmg = Math.round(finalDmg * 1.45);
+    }
 
     if (z.variant === 'brute' && z.hasArmor) {
-      if (!isHeadshot) {
+      if (!isHead) {
         armoredHit = true;
-        finalDmg = Math.round(dmg * 0.5);
+        finalDmg = Math.max(1, Math.round(dmg * 0.5));
         z.armorHp -= dmg;
         _v1.set(hitPoint ? hitPoint.x : z.x, hitPoint ? hitPoint.y : (z.y + 1.25), hitPoint ? hitPoint.z : z.z);
         if (LRT.Weapons && typeof LRT.Weapons.spawnSparks === 'function') {
@@ -913,6 +969,25 @@
           if (typeof LRT.Weapons.spawnRubble === 'function') LRT.Weapons.spawnRubble(_v2, 6);
         }
         E.play3D('debris_crumble', _v2, 0.1, 0.9);
+      }
+    }
+
+    z.hitZone = zone;
+    if (hitDir) {
+      const rightX = Math.cos(z.yaw);
+      const rightZ = -Math.sin(z.yaw);
+      z.hitSide = Math.max(-1, Math.min(1, hitDir.x * rightX + hitDir.z * rightZ));
+    } else {
+      z.hitSide = 0;
+    }
+
+    if (zone === 'legs' && !armoredHit) {
+      z.legDmg = (z.legDmg || 0) + finalDmg;
+      if (!z.legCrippled && (z.legDmg >= 22 || finalDmg >= 24)) {
+        z.legCrippled = true;
+        legCrippledNow = true;
+        const baseSpd = z.baseSpeed || z.speed;
+        z.speed = baseSpd * 0.48;
       }
     }
 
@@ -938,21 +1013,24 @@
       z.vx += hitDir.x * kb;
       z.vz += hitDir.z * kb;
     }
-    z.staggerTimer = Math.max(z.staggerTimer, Math.min(0.5, 0.14 + kb * 0.05));
+    let minStagger = Math.min(0.45, 0.12 + kb * 0.05);
+    if (isHead) minStagger = Math.max(minStagger, 0.32);
+    if (legCrippledNow) minStagger = Math.max(minStagger, 0.45);
+    z.staggerTimer = Math.max(z.staggerTimer, minStagger);
 
     E.applyZombieColors(z);
     E.markColorsDirty();
 
     if (z.hp <= 0) {
       handleZombieDeath(z, hitDir, onDropPickup);
-      return { hit: true, killed: true, armored: armoredHit };
+      return { hit: true, killed: true, armored: armoredHit, hitZone: zone, legCrippledNow };
     }
-    return { hit: true, killed: false, armored: armoredHit };
+    return { hit: true, killed: false, armored: armoredHit, hitZone: zone, legCrippledNow };
   }
 
-  function hitZombie(zombieId, dmg, hitPoint, hitDir, knockbackForce, isHeadshot) {
+  function hitZombie(zombieId, dmg, hitPoint, hitDir, knockbackForce, isHeadshot, hitZone) {
     const z = E.zombies[zombieId];
-    return applyDamageToZombie(z, dmg, hitPoint, hitDir, knockbackForce, isHeadshot, _cachedOnDropPickup);
+    return applyDamageToZombie(z, dmg, hitPoint, hitDir, knockbackForce, isHeadshot, _cachedOnDropPickup, hitZone);
   }
 
   function applyBlast(origin, radius, maxDmg, force) {
@@ -1001,11 +1079,12 @@
       const z = E.zombies[i];
       if (!z.active || z.dead) continue;
       const sc = z.scale;
+      const hipDrop = z.legCrippled ? 0.14 * sc : 0;
 
-      // 1. Head sphere test (matched to hunched anatomy)
+      // 1. Head sphere test (matched to hunched anatomy & leg-crippled crouch)
       const leanFwd = (z.variant === 'runner' || z.variant === 'screamer') ? 0.26 * sc : 0.12 * sc;
       const hx = z.x + Math.sin(z.yaw) * leanFwd;
-      const hy = z.y + (z.variant === 'runner' ? 1.42 : (z.variant === 'screamer' ? 1.46 : 1.56)) * sc;
+      const hy = z.y + (z.variant === 'runner' ? 1.42 : (z.variant === 'screamer' ? 1.46 : 1.56)) * sc - hipDrop;
       const hz = z.z + Math.cos(z.yaw) * leanFwd;
       const hr = 0.24 * sc;
 
@@ -1029,6 +1108,7 @@
             zombieId: z.id,
             variant: z.variant,
             isHeadshot: true,
+            hitZone: 'head',
             isArmor: false
           };
           continue;
@@ -1036,8 +1116,8 @@
       }
 
       // 2. Torso/Legs vertical segment capsule test
-      const ax = z.x, ay = z.y + 0.22 * sc, az = z.z;
-      const bx = z.x, by = z.y + 1.38 * sc, bz = z.z;
+      const ax = z.x, ay = z.y + 0.18 * sc, az = z.z;
+      const bx = z.x, by = z.y + 1.38 * sc - hipDrop, bz = z.z;
       const segLen = by - ay;
       const tr = (z.variant === 'brute' ? 0.44 : 0.36) * sc;
 
@@ -1072,6 +1152,8 @@
           const px = _rayOrig.x + _rayDir.x * tHit;
           const py = _rayOrig.y + _rayDir.y * tHit;
           const pz = _rayOrig.z + _rayDir.z * tHit;
+          const hipSplit = Math.max(0.25 * sc, 0.60 * sc - hipDrop * 0.5);
+          const hitZone = sNear < hipSplit ? 'legs' : 'torso';
           _v1.set(px - ax, py - (ay + sNear), pz - az).normalize();
           best = {
             dist: tHit,
@@ -1080,7 +1162,8 @@
             zombieId: z.id,
             variant: z.variant,
             isHeadshot: false,
-            isArmor: z.variant === 'brute' && z.hasArmor
+            hitZone: hitZone,
+            isArmor: z.variant === 'brute' && z.hasArmor && hitZone === 'torso'
           };
         }
       }
@@ -1155,13 +1238,11 @@
     } else if (z.aggroState === 'CHASE') {
       if (z.variant === 'walker') {
         if (dist3D >= 3.2) {
-          baseAng += Math.sin(z.animPhase * 0.7 + z.seed) * 0.18 * z.limbBias;
-        } else if (dist3D < 3.2 && dist3D > z.attackRange) {
-          moveSpd *= 1.35;
+          baseAng += Math.sin(z.animPhase * 0.7 + z.seed) * 0.04 * z.limbBias;
         }
-      } else if (z.variant === 'runner' && distHoriz > 4.2 && !z.hasNavWp) {
+      } else if (z.variant === 'runner' && distHoriz > 5.0 && !z.hasNavWp) {
         const tier = getDifficultyTier();
-        const flankOffset = z.steerDir * Math.min(tier.runnerFlankAngle, 2.2 / distHoriz);
+        const flankOffset = z.steerDir * Math.min(tier.runnerFlankAngle, 1.4 / distHoriz);
         baseAng += flankOffset;
       }
     }
@@ -1193,17 +1274,17 @@
       let tryCount;
       let tryList;
       if (z.steerCommit > 0) {
-        _tryAngles3[0] = baseAng + z.steerDir * 0.72;
-        _tryAngles3[1] = baseAng + z.steerDir * 1.25;
+        _tryAngles3[0] = baseAng + z.steerDir * 0.45;
+        _tryAngles3[1] = baseAng + z.steerDir * 0.85;
         _tryAngles3[2] = baseAng;
         tryList = _tryAngles3;
         tryCount = 3;
       } else {
         _tryAngles5[0] = baseAng;
-        _tryAngles5[1] = baseAng + 0.62 * z.steerDir;
-        _tryAngles5[2] = baseAng - 0.62 * z.steerDir;
-        _tryAngles5[3] = baseAng + 1.18 * z.steerDir;
-        _tryAngles5[4] = baseAng - 1.18 * z.steerDir;
+        _tryAngles5[1] = baseAng + 0.35 * z.steerDir;
+        _tryAngles5[2] = baseAng - 0.35 * z.steerDir;
+        _tryAngles5[3] = baseAng + 0.75 * z.steerDir;
+        _tryAngles5[4] = baseAng - 0.75 * z.steerDir;
         tryList = _tryAngles5;
         tryCount = 5;
       }
@@ -1224,13 +1305,13 @@
         z.blockedTime += moveStep;
         if (z.blockedTime > 0.35) {
           z.steerDir *= -1;
-          z.steerCommit = 0.85;
+          z.steerCommit = 0.50;
           z.blockedTime = 0;
           z.navTimer = 0;
         }
         moveSpd *= 0.4;
       } else if (chosenAng !== baseAng) {
-        z.steerCommit = 0.35;
+        z.steerCommit = 0.22;
       }
     }
 
@@ -1428,7 +1509,7 @@
         z.z += z.vz * step;
         z.vx *= Math.max(0, 1 - step * 6.0);
         z.vz *= Math.max(0, 1 - step * 6.0);
-        if (z.deathTimer >= 1.30) {
+        if (z.deathTimer >= 12.0) {
           z.active = false;
           z.dead = false;
           E.zeroZombieMatrices(z.id);
@@ -1441,6 +1522,7 @@
       }
 
       if (z.staggerTimer > 0) z.staggerTimer = Math.max(0, z.staggerTimer - step);
+      if (z.hornVulnTimer > 0) z.hornVulnTimer = Math.max(0, z.hornVulnTimer - step);
       if (z.attackTimer > 0) z.attackTimer = Math.max(0, z.attackTimer - step);
       if (z.spitTimer > 0) z.spitTimer = Math.max(0, z.spitTimer - step);
       if (z.lureTimer > 0) z.lureTimer = Math.max(0, z.lureTimer - step);
@@ -1723,10 +1805,10 @@
             z.chargeTimer -= moveStep;
           }
 
-          // 3. Movement speed with buffs & straggler rush
+          // 3. Movement speed with buffs & distant straggler catch-up
           let moveSpd = z.staggerTimer > 0 ? z.speed * 0.22 : z.speed;
           if (z.buffTimer > 0) moveSpd *= tier.screamerBuffMult;
-          if (isStraggler) moveSpd *= 1.25;
+          if (isStraggler && dist3D > 22.0) moveSpd *= 1.25;
           if (z.chargeTimer > 0) moveSpd = z.speed * tier.bruteChargeMult;
           if (z.shriekTimer > 0 || z.chargeWindup > 0) moveSpd = 0;
 
@@ -1913,6 +1995,10 @@
         z: +z.z.toFixed(2),
         hp: z.hp,
         armorHp: z.armorHp,
+        speed: +z.speed.toFixed(3),
+        baseSpeed: +(z.baseSpeed || z.speed).toFixed(3),
+        legCrippled: !!z.legCrippled,
+        hitZone: z.hitZone || 'torso',
         isRoamer: !!z.isRoamer,
         aggroState: z.aggroState,
         patrolTarget: z.aggroState === 'PATROL' ? { x: +z.patrolTargetX.toFixed(2), z: +z.patrolTargetZ.toFixed(2) } : null,

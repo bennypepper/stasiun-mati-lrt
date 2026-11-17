@@ -315,6 +315,10 @@
         }
       } else if (e.code === 'KeyT') {
         if (callbacks.onSummonTrain) callbacks.onSummonTrain(0);
+      } else if (e.code === 'KeyV') {
+        if (!state.isSitting && LRT.Weapons && typeof LRT.Weapons.meleeShove === 'function') {
+          LRT.Weapons.meleeShove();
+        }
       } else if (e.code === 'KeyC') {
         if (state.isSitting) standFromSeat();
       } else if (e.code === 'Space') {
