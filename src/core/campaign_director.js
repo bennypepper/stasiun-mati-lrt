@@ -42,10 +42,11 @@
       1: { fuseFound: false, waveCleared: false },
       2: { vaxFound: false, depotDone: false, waveCleared: false },
       3: { plnDone: false, waveCleared: false },
-      4: { waveCleared: false },
+      4: { barricadeCleared: false, waveCleared: false },
       5: { relays: { totem: false, pln: false, jpo: false }, waveCleared: false, omegaActive: false, holdoutElapsed: 0 }
     },
     voTriggered: new Set(),
+    collectedLogs: [],
     campaignVictory: false,
     firstBarrelExploded: false,
     barrelCueActive: false
@@ -62,10 +63,11 @@
       1: { fuseFound: false, waveCleared: false },
       2: { vaxFound: false, depotDone: false, waveCleared: false },
       3: { plnDone: false, waveCleared: false },
-      4: { waveCleared: false },
+      4: { barricadeCleared: false, waveCleared: false },
       5: { relays: { totem: false, pln: false, jpo: false }, waveCleared: false, omegaActive: false, holdoutElapsed: 0 }
     };
     campaignState.voTriggered.clear();
+    campaignState.collectedLogs.length = 0;
     campaignState.campaignVictory = false;
     campaignState.firstBarrelExploded = false;
     campaignState.barrelCueActive = false;
@@ -73,6 +75,31 @@
       LRT.Station.setBarrelCueActive(false);
     }
   }
+
+  CORE.recordFieldLog = function (title, body) {
+    if (!title && !body) return;
+    const key = String(title || '').trim();
+    if (!key) return;
+    if (!campaignState.collectedLogs.some((l) => l.title === key)) {
+      campaignState.collectedLogs.push({
+        title: key,
+        body: String(body || ''),
+        stationIndex: CORE.stationIndex
+      });
+    }
+  };
+
+  CORE.onCikokoBarricadeCleared = function () {
+    if (campaignState.stationObjectives[4]) {
+      campaignState.stationObjectives[4].barricadeCleared = true;
+    }
+    if (CORE.stationIndex === 4) {
+      triggerObjectiveSurgeWave(4);
+      if (isStationPrimaryObjectiveComplete(4) && getWaveRemainingCountSafe() === 0) {
+        campaignState.clearedStations.add(CORE.stationIndex);
+      }
+    }
+  };
 
   CORE.onBarrelExploded = function () {
     campaignState.firstBarrelExploded = true;
@@ -477,7 +504,7 @@
     if (idx === 1) return !!obj.fuseFound;
     if (idx === 2) return !!(obj.vaxFound && obj.depotDone);
     if (idx === 3) return !!obj.plnDone;
-    if (idx === 4) return true;
+    if (idx === 4) return !!obj.barricadeCleared;
     if (idx === 5) return !!(obj.relays && obj.relays.totem && obj.relays.pln && obj.relays.jpo);
     return true;
   }
@@ -533,6 +560,7 @@
           else if (s === 1) hint = 'Ambil sekring bypass dari kabin Jalur 4 [E]!';
           else if (s === 2) hint = 'Amankan vaksin (Kebun Atap) & data depot [E]!';
           else if (s === 3) hint = 'Aktifkan kotak relai PLN jalanan [E]!';
+          else if (s === 4) hint = 'Hancurkan barikade jalan tol Cikoko [E / Tembak]!';
           else if (s === 5) hint = 'Hubungkan ketiga relai sinyal evakuasi Setiabudi [E]!';
           if (LRT.Audio) LRT.Audio.play('station_chime', { gain: 0.55 });
           LRT.PlayerUI.setNotice(`OBJEKTIF BELUM SELESAI: ${hint}`, '#e0b422');
@@ -606,8 +634,8 @@
     }
   }
 
-  function handleEnemyDrop(dropPos, dropType, dropMeta) {
-    if (!dropPos || !LRT.Weapons || !LRT.Weapons.addAmmo) return;
+  function collectEnemyDrop(dropType, dropMeta) {
+    if (!LRT.Weapons || !LRT.Weapons.addAmmo) return;
     const meta = dropMeta || {};
     const tierCfg = (C.DIFFICULTY_TIERS && C.DIFFICULTY_TIERS[CORE.difficultyKey]) || {};
     const healMult = typeof meta.healMult === 'number'
@@ -639,17 +667,30 @@
       return;
     }
 
-    const roll = Math.random();
-    if (roll < 0.72) {
-      const rifleAmt = Math.max(1, Math.round(20 * ammoMult));
-      const sgAmt = Math.max(1, Math.round(4 * ammoMult));
-      LRT.Weapons.addAmmo('rifle', rifleAmt);
-      LRT.Weapons.addAmmo('shotgun', sgAmt);
-      LRT.PlayerUI.setNotice('+AMMO RESUPPLY', '#e0b422');
-    } else {
+    if (dropType === 'rpg') {
       LRT.Weapons.addAmmo('rpg', 1);
       LRT.PlayerUI.setNotice('+1 RPG ROCKET', '#f97316');
+      return;
     }
+
+    const rifleAmt = Math.max(1, Math.round(20 * ammoMult));
+    const sgAmt = Math.max(1, Math.round(4 * ammoMult));
+    LRT.Weapons.addAmmo('rifle', rifleAmt);
+    LRT.Weapons.addAmmo('shotgun', sgAmt);
+    LRT.PlayerUI.setNotice('+AMMO RESUPPLY', '#e0b422');
+  }
+
+  function handleEnemyDrop(dropPos, dropType, dropMeta) {
+    if (!dropPos || !LRT.Weapons || !LRT.Weapons.addAmmo) return;
+    let resolvedType = dropType;
+    if (resolvedType !== 'lootcrate' && resolvedType !== 'health' && resolvedType !== 'rpg') {
+      resolvedType = Math.random() < 0.72 ? 'ammo' : 'rpg';
+    }
+    if (CORE.gameMode === MODES.SURVIVAL && LRT.Station && typeof LRT.Station.spawnGroundPickup === 'function') {
+      LRT.Station.spawnGroundPickup(dropPos, resolvedType, dropMeta);
+      return;
+    }
+    collectEnemyDrop(resolvedType, dropMeta);
   }
 
   function handlePlayerHit(dmg, srcPos) {
@@ -892,6 +933,16 @@
     }
 
     if (sIdx === 4) {
+      if (!campaignState.stationObjectives[4] || !campaignState.stationObjectives[4].barricadeCleared) {
+        return {
+          mode: CORE.gameMode,
+          stationName: name,
+          stationCode: code,
+          stationSub: sub,
+          objectiveTitle: 'BREACH HIGHWAY BARRICADE',
+          objectiveDetail: 'Destroy Cikoko Roadblock with [E] Breach Charge or Firepower'
+        };
+      }
       if (alive > 0) {
         return {
           mode: CORE.gameMode,
@@ -993,6 +1044,7 @@
       return ['call_train', 'call_train_p2'];
     }
     if (sIdx === 4) {
+      if (!obj.barricadeCleared) return ['cikoko_barricade'];
       if (waveRemaining > 0) return [];
       return ['call_train', 'call_train_p2'];
     }
@@ -1350,6 +1402,7 @@
   CORE.spawnCurrentWave = spawnCurrentWave;
   CORE.summonTrain = summonTrain;
   CORE.departTrainNow = departTrainNow;
+  CORE.collectEnemyDrop = collectEnemyDrop;
   CORE.handleEnemyDrop = handleEnemyDrop;
   CORE.handlePlayerHit = handlePlayerHit;
   CORE.buildObjectiveInfo = buildObjectiveInfo;

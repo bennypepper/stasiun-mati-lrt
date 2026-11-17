@@ -239,6 +239,10 @@
       this._barrelCueVisual = null;
       this._barrelCueActive = false;
       this._barrelCueMarker = null;
+      this._cikokoBarricade = null;
+      this._track1Barricade = null;
+      this._groundPickups = null;
+      this._groundPickupAssets = null;
       this._powerRestored = true;
       this._usedIds = new Set();
       this._isBuilding = false;
@@ -885,6 +889,50 @@
       if (paintDirty && this._propsPaintInst) this._propsPaintInst.instanceMatrix.needsUpdate = true;
       if (metalDirty && this._propsMetalInst) this._propsMetalInst.instanceMatrix.needsUpdate = true;
       if (barricadeDirty && this._barricadeInst) this._barricadeInst.instanceMatrix.needsUpdate = true;
+
+      // Ground enemy drop pickup rotation & proximity auto-collect
+      if (this._groundPickups && this._groundPickups.length > 0) {
+        const core = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core;
+        for (let i = 0; i < this._groundPickups.length; i++) {
+          const pu = this._groundPickups[i];
+          if (!pu.active) continue;
+          pu.age += dt;
+          pu.mesh.rotation.y += dt * 2.3;
+          pu.mesh.position.y = 0.34 + Math.sin(this._timeAccum * 4.0 + i) * 0.08;
+          if (pRef && pu.age >= 0.25) {
+            const dx = px - pu.x;
+            const dz = pz - pu.z;
+            const dy = py - pu.y;
+            if ((dx * dx + dz * dz) <= (1.85 * 1.85) && Math.abs(dy) < 2.3) {
+              pu.active = false;
+              pu.group.visible = false;
+              if (core && typeof core.collectEnemyDrop === 'function') {
+                core.collectEnemyDrop(pu.type, pu.meta);
+              }
+              if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+                LRT.Audio.play('turnstile_beep', { gain: 0.55 });
+              }
+            }
+          }
+        }
+      }
+
+      // Setiabudi final extraction departure: ram through Track 1 Quarantine Barricade
+      if (this._track1Barricade && !this._track1Barricade.smashed) {
+        const core = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core;
+        const states = (LRT.Config && LRT.Config.STATES) || {};
+        if (
+          core &&
+          core.stationIndex === 5 &&
+          core.activeTravelDir === 1 &&
+          (core.gameState === states.TRAIN_DEPARTING || core.gameState === states.TRAIN_CRUISE)
+        ) {
+          const tbWorldZ = this._track1Barricade.z + offsetZ;
+          if (tbWorldZ <= 27.5) {
+            this.smashTrack1Barricade();
+          }
+        }
+      }
     },
 
     _initCachedBVH: function () {
@@ -909,6 +957,7 @@
         'portable_generator', 'jaklingko_kiosk', 'balcony_supply',
         'cawang_derelict_cab', 'island2_supply', 'garden_supply', 'depot_supply',
         'city_pln_box', 'city_coffee_cart', 'city_convoy_car', 'city_pocket_park',
+        'cikoko_barricade',
         'route_totem', 'setiabudi_jpo_switch', 'call_train', 'call_train_prev', 'call_train_p2'
       ]);
 
@@ -1472,6 +1521,19 @@
         }
       }
 
+      if (this._cikokoBarricade && !this._cikokoBarricade.cleared) {
+        const bc = this._cikokoBarricade;
+        const nearX = Math.abs(lx - bc.x) <= (3.4 + rad);
+        const nearZ = Math.abs(lz - bc.z) <= (0.9 + rad);
+        const nearY = Math.abs(ly - (bc.y + 0.7)) <= (1.8 + rad);
+        if (nearX && nearZ && nearY) {
+          bc.hp -= (isExplosion ? dmgVal * 1.6 : dmgVal);
+          if (bc.hp <= 0) {
+            this.breachCikokoBarricade();
+          }
+        }
+      }
+
       for (let p = 0; p < this.pillars.length; p++) {
         const pl = this.pillars[p];
         if (pl.destroyed) continue;
@@ -1871,6 +1933,19 @@
         };
       }
 
+      if (it.id === 'cikoko_barricade' || it.type === 'barricade_breach') {
+        const breachedNow = this.breachCikokoBarricade();
+        return {
+          ok: true,
+          type: 'barricade_breach',
+          action: 'barricade_breach',
+          fresh: breachedNow,
+          message: breachedNow
+            ? 'Muatan peledak diledakkan — Barikade Tol Cikoko hancur!'
+            : 'Barikade jalan tol Cikoko sudah ditembus.'
+        };
+      }
+
       if (it.type === 'info') {
         if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('station_chime', { gain: 0.5 });
         const arch = this._archetype || {};
@@ -1913,6 +1988,141 @@
       if (LRT.Weapons && typeof LRT.Weapons.applyExplosion === 'function') {
         LRT.Weapons.applyExplosion(pos, 7.5, 260, 18.0, false);
       }
+    },
+
+    breachCikokoBarricade: function () {
+      const bc = this._cikokoBarricade;
+      if (!bc || bc.cleared) return false;
+      bc.cleared = true;
+      bc.hp = 0;
+      if (bc.group) bc.group.visible = false;
+      if (bc.colliderIdx !== undefined && this.colliders[bc.colliderIdx]) {
+        const col = this.colliders[bc.colliderIdx];
+        col.blocksWalk = false;
+        col.blocksBullets = false;
+        col.disabled = true;
+      }
+      if (bc.interactItem) {
+        bc.interactItem.used = true;
+        bc.interactItem.label = '[E] Barikade Jalan Tol Ditembus';
+        bc.interactItem.prompt = bc.interactItem.label;
+      }
+      if (this._usedIds) this._usedIds.add('cikoko_barricade');
+      this._syncObjectiveBeacons();
+      const offsetZ = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
+      if (LRT.Weapons && typeof LRT.Weapons.applyExplosion === 'function') {
+        LRT.Weapons.applyExplosion({ x: bc.x, y: bc.y + 0.65, z: bc.z + offsetZ }, 6.5, 180, 14.0, false);
+      }
+      const core = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core;
+      if (core && typeof core.onCikokoBarricadeCleared === 'function') {
+        core.onCikokoBarricadeCleared();
+      }
+      return true;
+    },
+
+    smashTrack1Barricade: function () {
+      const tb = this._track1Barricade;
+      if (!tb || tb.smashed) return false;
+      tb.smashed = true;
+      if (tb.group) tb.group.visible = false;
+      const offsetZ = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
+      const worldPos = { x: tb.x, y: tb.y + 0.9, z: tb.z + offsetZ };
+      if (LRT.Weapons) {
+        if (typeof LRT.Weapons.applyExplosion === 'function') {
+          LRT.Weapons.applyExplosion(worldPos, 5.2, 0, 14.0, false);
+        }
+        if (typeof LRT.Weapons.spawnSparks === 'function') LRT.Weapons.spawnSparks(worldPos, 24);
+        if (typeof LRT.Weapons.spawnRubble === 'function') LRT.Weapons.spawnRubble(worldPos, 18);
+      }
+      if (LRT.PlayerUI) {
+        if (typeof LRT.PlayerUI.addTrauma === 'function') LRT.PlayerUI.addTrauma(0.45);
+        if (typeof LRT.PlayerUI.setNotice === 'function') {
+          LRT.PlayerUI.setNotice('BARIKADE KARANTINA SETIABUDI HANCUR — EKSTRAKSI BERHASIL!', '#4ade80');
+        }
+      }
+      if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+        LRT.Audio.play('debris_crumble', { gain: 0.95 });
+      }
+      return true;
+    },
+
+    _ensureGroundPickupPool: function () {
+      if (this._groundPickupAssets) return this._groundPickupAssets;
+      const boxGeo = new THREE.BoxGeometry(0.36, 0.28, 0.36);
+      const ringGeo = new THREE.RingGeometry(0.30, 0.44, 18);
+      ringGeo.rotateX(-Math.PI * 0.5);
+      const mats = {
+        health: new THREE.MeshBasicMaterial({ color: 0x22c55e }),
+        ammo: new THREE.MeshBasicMaterial({ color: 0xe0b422 }),
+        rpg: new THREE.MeshBasicMaterial({ color: 0xf97316 }),
+        lootcrate: new THREE.MeshBasicMaterial({ color: 0xc084fc })
+      };
+      const ringMats = {
+        health: new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.65, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
+        ammo: new THREE.MeshBasicMaterial({ color: 0xe0b422, transparent: true, opacity: 0.65, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
+        rpg: new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.65, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
+        lootcrate: new THREE.MeshBasicMaterial({ color: 0xc084fc, transparent: true, opacity: 0.72, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })
+      };
+      this.disposableGeometries.push(boxGeo, ringGeo);
+      this.disposableMaterials.push(
+        mats.health, mats.ammo, mats.rpg, mats.lootcrate,
+        ringMats.health, ringMats.ammo, ringMats.rpg, ringMats.lootcrate
+      );
+      this._groundPickupAssets = { boxGeo, ringGeo, mats, ringMats };
+      return this._groundPickupAssets;
+    },
+
+    spawnGroundPickup: function (worldPos, dropType, dropMeta) {
+      if (!this.rootGroup || this._isBuilding || !worldPos) return null;
+      const assets = this._ensureGroundPickupPool();
+      if (!this._groundPickups) this._groundPickups = [];
+
+      const kind = (dropType === 'health' || dropType === 'rpg' || dropType === 'lootcrate') ? dropType : 'ammo';
+      let slot = this._groundPickups.find((p) => !p.active);
+      if (!slot && this._groundPickups.length >= 18) {
+        slot = this._groundPickups.reduce((a, b) => (a.age > b.age ? a : b));
+      }
+      if (!slot) {
+        const grp = new THREE.Group();
+        const mesh = new THREE.Mesh(assets.boxGeo, assets.mats[kind]);
+        mesh.position.y = 0.34;
+        const ring = new THREE.Mesh(assets.ringGeo, assets.ringMats[kind]);
+        ring.position.y = 0.04;
+        grp.add(ring);
+        grp.add(mesh);
+        this.rootGroup.add(grp);
+        slot = { group: grp, mesh: mesh, ring: ring, active: false, age: 0, x: 0, y: 0, z: 0, type: kind, meta: null };
+        this._groundPickups.push(slot);
+      }
+
+      const offsetZ = this.rootGroup.position.z || 0;
+      const lx = worldPos.x;
+      const ly = Math.max(-1.0, (worldPos.y !== undefined ? worldPos.y : 0) - 0.32);
+      const lz = worldPos.z - offsetZ;
+      slot.active = true;
+      slot.age = 0;
+      slot.x = lx;
+      slot.y = ly;
+      slot.z = lz;
+      slot.type = kind;
+      slot.meta = dropMeta || null;
+      slot.mesh.material = assets.mats[kind];
+      slot.ring.material = assets.ringMats[kind];
+      slot.group.position.set(lx, ly, lz);
+      slot.group.visible = true;
+      return slot;
+    },
+
+    getActiveGroundPickups: function () {
+      if (!this._groundPickups || !this.rootGroup) return [];
+      const offsetZ = this.rootGroup.position.z || 0;
+      const out = [];
+      for (let i = 0; i < this._groundPickups.length; i++) {
+        const pu = this._groundPickups[i];
+        if (!pu.active) continue;
+        out.push({ x: pu.x, y: pu.y, z: pu.z + offsetZ, type: pu.type, age: pu.age });
+      }
+      return out;
     },
 
     getUsedIds: function () {

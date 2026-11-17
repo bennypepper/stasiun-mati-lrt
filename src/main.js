@@ -666,6 +666,7 @@
           visitedStations: Array.from(CORE.campaignState.visitedStations),
           stationObjectives: JSON.parse(JSON.stringify(CORE.campaignState.stationObjectives)),
           voTriggered: Array.from(CORE.campaignState.voTriggered),
+          collectedLogs: (CORE.campaignState.collectedLogs || []).slice(),
           campaignVictory: CORE.campaignState.campaignVictory,
           stationUsedIds: Array.from(CORE.campaignState.stationUsedIds.entries()).map(([k, v]) => [k, Array.from(v)])
         }),

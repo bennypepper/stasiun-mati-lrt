@@ -891,6 +891,121 @@
       };
     }
 
+    station._groundPickups = [];
+    station._cikokoBarricade = null;
+    if (arch.id === 'cikoko' || arch.hasTollOverpass) {
+      const bcX = concMaxX + 12.5;
+      const bcY = S.CONST.STREET_GROUND_Y;
+      const bcZ = -48.0;
+      const cleared = !!(station._usedIds && station._usedIds.has('cikoko_barricade'));
+
+      const bcConcGeo = new THREE.BoxGeometry(2.0, 1.05, 0.72);
+      const bcBeamGeo = new THREE.BoxGeometry(6.2, 0.24, 0.16);
+      const bcDrumGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.88, 12);
+      const bcGlowGeo = new THREE.BoxGeometry(1.1, 0.16, 0.18);
+      const bcConcMat = new THREE.MeshStandardMaterial({ color: 0x5c6066, roughness: 0.90, metalness: 0.08 });
+      const bcHazMat = new THREE.MeshStandardMaterial({ color: 0xd94826, emissive: 0x3b1206, roughness: 0.55, metalness: 0.35 });
+      const bcGlowMat = new THREE.MeshBasicMaterial({ color: 0xff6b2b });
+      station.disposableGeometries.push(bcConcGeo, bcBeamGeo, bcDrumGeo, bcGlowGeo);
+      station.disposableMaterials.push(bcConcMat, bcHazMat, bcGlowMat);
+
+      const bcGroup = new THREE.Group();
+      bcGroup.position.set(bcX, bcY, bcZ);
+      bcGroup.visible = !cleared;
+      for (const dx of [-2.1, 0.0, 2.1]) {
+        const blk = new THREE.Mesh(bcConcGeo, bcConcMat);
+        blk.position.set(dx, 0.525, 0);
+        blk.castShadow = true;
+        blk.receiveShadow = true;
+        bcGroup.add(blk);
+      }
+      const rail1 = new THREE.Mesh(bcBeamGeo, bcHazMat);
+      rail1.position.set(0, 1.25, 0);
+      bcGroup.add(rail1);
+      const drum = new THREE.Mesh(bcDrumGeo, bcHazMat);
+      drum.position.set(0, 0.44, 0.65);
+      bcGroup.add(drum);
+      const beaconStrip = new THREE.Mesh(bcGlowGeo, bcGlowMat);
+      beaconStrip.position.set(0, 1.44, 0.05);
+      bcGroup.add(beaconStrip);
+      root.add(bcGroup);
+
+      station._addCollider(bcX - 3.3, bcY, bcZ - 0.55, bcX + 3.3, bcY + 1.55, bcZ + 0.85, 'barricade', {
+        disabled: cleared,
+        blocksWalk: !cleared,
+        blocksBullets: !cleared,
+        barricadeId: 'cikoko_barricade'
+      });
+      const bcCollIdx = station.colliders.length - 1;
+      const bcItem = {
+        id: 'cikoko_barricade',
+        type: 'barricade_breach',
+        x: bcX,
+        y: bcY + 0.90,
+        z: bcZ + 1.15,
+        used: cleared,
+        label: cleared ? '[E] Barikade Jalan Tol Ditembus' : '[E / Tembak] Ledakkan Barikade Tol Cikoko',
+        prompt: cleared ? '[E] Barikade Jalan Tol Ditembus' : '[E / Tembak] Ledakkan Barikade Tol Cikoko'
+      };
+      station.interactables.push(bcItem);
+      station._cikokoBarricade = {
+        id: 'cikoko_barricade',
+        x: bcX,
+        y: bcY,
+        z: bcZ,
+        hp: 90,
+        maxHp: 90,
+        cleared: cleared,
+        group: bcGroup,
+        colliderIdx: bcCollIdx,
+        interactItem: bcItem
+      };
+    }
+
+    station._track1Barricade = null;
+    if (arch.id === 'setiabudi') {
+      const tbX = 0.0;
+      const tbY = S.CONST.RAIL_TOP_Y;
+      const tbZ = platMaxZ + 2.5;
+      const tbPostGeo = new THREE.BoxGeometry(0.24, 2.35, 0.24);
+      const tbBeamGeo = new THREE.BoxGeometry(3.45, 0.28, 0.20);
+      const tbSignGeo = new THREE.BoxGeometry(1.75, 0.62, 0.08);
+      const tbLampGeo = new THREE.SphereGeometry(0.14, 10, 8);
+      const tbSteelMat = new THREE.MeshStandardMaterial({ color: 0x3b4048, roughness: 0.55, metalness: 0.72 });
+      const tbRedMat = new THREE.MeshStandardMaterial({ color: 0xb91c1c, emissive: 0x450a0a, roughness: 0.50, metalness: 0.30 });
+      const tbLampMat = new THREE.MeshBasicMaterial({ color: 0xff3b3b });
+      station.disposableGeometries.push(tbPostGeo, tbBeamGeo, tbSignGeo, tbLampGeo);
+      station.disposableMaterials.push(tbSteelMat, tbRedMat, tbLampMat);
+
+      const tbGroup = new THREE.Group();
+      tbGroup.position.set(tbX, tbY, tbZ);
+      for (const sx of [-1.55, 1.55]) {
+        const post = new THREE.Mesh(tbPostGeo, tbSteelMat);
+        post.position.set(sx, 1.18, 0);
+        tbGroup.add(post);
+        const lamp = new THREE.Mesh(tbLampGeo, tbLampMat);
+        lamp.position.set(sx, 2.45, 0);
+        tbGroup.add(lamp);
+      }
+      for (const sy of [0.85, 1.65]) {
+        const beam = new THREE.Mesh(tbBeamGeo, tbRedMat);
+        beam.position.set(0, sy, 0);
+        tbGroup.add(beam);
+      }
+      const sign = new THREE.Mesh(tbSignGeo, tbRedMat);
+      sign.position.set(0, 1.25, -0.14);
+      tbGroup.add(sign);
+      root.add(tbGroup);
+
+      station._track1Barricade = {
+        x: tbX,
+        y: tbY,
+        z: tbZ,
+        smashed: false,
+        group: tbGroup
+      };
+    }
+
     // =========================================================
     // 10. STATION POOLED POINTLIGHTS (2 PERSISTENT SCENE LIGHTS, NEVER REMOVED OR TOGGLED VIA .visible!)
     // =========================================================

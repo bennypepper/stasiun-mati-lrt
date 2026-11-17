@@ -808,14 +808,24 @@
         if (item.action === 'horn') {
           T.safeAudioPlay('train_horn', { gain: 0.95 });
           const lure = T.localToWorld({ x: 0, y: 1.0, z: 0 });
-          if (LRT.Enemies && typeof LRT.Enemies.alertAllTo === 'function') {
-            LRT.Enemies.alertAllTo(lure, 60.0);
+          let stunnedCount = 0;
+          if (LRT.Enemies) {
+            if (typeof LRT.Enemies.alertAllTo === 'function') {
+              LRT.Enemies.alertAllTo(lure, 60.0);
+            }
+            if (typeof LRT.Enemies.stunByHorn === 'function') {
+              const sRes = LRT.Enemies.stunByHorn(lure, 32.0);
+              stunnedCount = sRes && sRes.stunned ? sRes.stunned : 0;
+            }
           }
           return {
             handled: true,
             action: 'horn',
             lurePos: lure,
-            message: 'Klakson LRT Jabodebek dibunyikan — Menarik perhatian infected!'
+            stunnedCount: stunnedCount,
+            message: stunnedCount > 0
+              ? `Klakson LRT dibunyikan — ${stunnedCount} infected terguncang gelombang akustik!`
+              : 'Klakson LRT Jabodebek dibunyikan — Menarik perhatian infected!'
           };
         }
         if (item.action === 'sit') {

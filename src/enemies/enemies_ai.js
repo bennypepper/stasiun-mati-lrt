@@ -2097,6 +2097,30 @@
     }
   }
 
+  function stunByHorn(origin, radius) {
+    if (!origin) return { stunned: 0 };
+    const rad = radius !== undefined ? radius : 32.0;
+    let stunned = 0;
+    for (let i = 0; i < MAX_ENEMIES; i++) {
+      const z = E.zombies[i];
+      if (!z.active || z.dead) continue;
+      const d = Math.hypot(z.x - origin.x, z.z - origin.z);
+      if (d <= rad) {
+        z.staggerTimer = Math.max(z.staggerTimer || 0, 2.6);
+        z.vx = 0;
+        z.vz = 0;
+        if (z.variant === 'spitter') z.spitTimer = Math.max(z.spitTimer || 0, 3.2);
+        if (z.variant === 'screamer') {
+          z.screamTimer = Math.max(z.screamTimer || 0, 3.8);
+          z.shriekTimer = 0;
+        }
+        z.hornVulnTimer = Math.max(z.hornVulnTimer || 0, 4.0);
+        stunned++;
+      }
+    }
+    return { stunned };
+  }
+
   function applyHydrantKnockback(origin, radius, impulse) {
     if (!origin) return;
     const rad = radius !== undefined ? radius : 4.5;
@@ -2137,6 +2161,7 @@
     hitZombie,
     applyBlast,
     alertAllTo,
+    stunByHorn,
     applyHydrantKnockback,
     getAliveCount,
     getWaveRemainingCount,
