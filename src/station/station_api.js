@@ -9,6 +9,10 @@
   const _tmpRayOrigin = tmp.rayOrigin;
   const _tmpRayDir = tmp.rayDir;
   const _tmpNormal = tmp.normal;
+  const _emptyArr = Object.freeze([]);
+  const _sharedStationMats = new Map();
+  const _sharedCanopyMats = new Map();
+  const _stationStepInProgress = Object.freeze({ done: false, stats: null });
 
   const Station = {
     rootGroup: null,
@@ -65,12 +69,13 @@
     _objectiveMarkersCache: [],
     _timeAccum: 0,
     _raycaster: new THREE.Raycaster(),
+    _isBuilding: false,
+    _buildState: null,
 
     _resolveMat: function (key, texKey, opts) {
-      if (!this._matCache) this._matCache = new Map();
       const mats = (LRT.Materials && LRT.Materials.mats) || {};
       if (mats[key]) return mats[key];
-      if (this._matCache.has(key)) return this._matCache.get(key);
+      if (_sharedStationMats.has(key)) return _sharedStationMats.get(key);
 
       const o = opts || {};
       const loader = LRT.AssetLoader;
@@ -89,11 +94,9 @@
         params.normalMap = texSet.normalMap;
         params.roughnessMap = texSet.roughnessMap;
         params.aoMap = texSet.aoMap;
-        this.disposableTextures.push(texSet.map, texSet.normalMap, texSet.roughnessMap, texSet.aoMap);
       }
       const mat = new THREE.MeshStandardMaterial(params);
-      this._matCache.set(key, mat);
-      this.disposableMaterials.push(mat);
+      _sharedStationMats.set(key, mat);
       return mat;
     },
 
@@ -103,15 +106,13 @@
       if (colHex === '#A85E32' && mats.roofTerracotta) return mats.roofTerracotta;
 
       const cacheKey = 'canopy_' + colHex;
-      if (!this._matCache) this._matCache = new Map();
-      if (this._matCache.has(cacheKey)) return this._matCache.get(cacheKey);
+      if (_sharedCanopyMats.has(cacheKey)) return _sharedCanopyMats.get(cacheKey);
 
       const base = mats.roofTerracotta || mats.roofOchre;
       if (base && typeof base.clone === 'function') {
         const cloned = base.clone();
         cloned.color.set(colHex);
-        this._matCache.set(cacheKey, cloned);
-        this.disposableMaterials.push(cloned);
+        _sharedCanopyMats.set(cacheKey, cloned);
         return cloned;
       }
       return this._resolveMat(cacheKey, 'roof_corrugated', {
@@ -160,6 +161,13 @@
     },
 
     dispose: function (scene) {
+      for (let i = 0; i < this.stationLights.length; i++) {
+        const sl = this.stationLights[i];
+        if (sl && sl.light) {
+          sl.light.visible = true; // NEVER toggle light.visible!
+          sl.light.intensity = 0;
+        }
+      }
       if (LRT.City && typeof LRT.City.dispose === 'function') {
         LRT.City.dispose();
       }
@@ -230,15 +238,18 @@
       this.explosiveBarrels = [];
       this._powerRestored = true;
       this._usedIds = new Set();
+      this._isBuilding = false;
+      this._buildState = null;
     },
 
-    build: function (index, seed, mode, scene, offsetZ, opts) {
+    beginIncrementalBuild: function (index, seed, mode, scene, offsetZ, opts) {
       if (this.rootGroup) this.dispose(scene);
 
       const o = opts || {};
       this._stationIndex = typeof index === 'number' ? index : 0;
       this._usedIds = (o.usedIds) ? (o.usedIds instanceof Set ? new Set(o.usedIds) : new Set(o.usedIds)) : (this._usedIds || new Set());
       this._powerRestored = (mode === 'exploration') || !!o.powerRestored || (this._stationIndex > 0);
+      this._isBuilding = true;
 
       const cfg = LRT.Config || {};
       const dims = cfg.STATION_DIMS || {
@@ -295,33 +306,42 @@
       root.name = 'StationRoot_' + arch.id;
       if (offsetZ) root.position.z = offsetZ;
       this.rootGroup = root;
-      if (scene) scene.add(root);
 
       const M = LRT.Materials;
       const mats = (M && M.mats) ? M.mats : {};
       const STALL_UV = M.STALL_UV;
       const SIGN_UV = M.SIGN_UV;
 
-      if (scene) {
-        scene.fog = new THREE.FogExp2(mood.fogColor, mood.fogDensity);
-        scene.background = new THREE.Color(mood.fogColor);
+      const core = LRT.Main || null;
+      const mBlend = (core && typeof core.getMoodBlendState === 'function') ? core.getMoodBlendState() : null;
+      const preserveFog = !!(o.preserveFog || (mBlend && mBlend.active) || (core && core.isMoodLerping === true));
+      if (scene && !preserveFog) {
+        if (scene.fog && scene.fog.isFogExp2) {
+          scene.fog.color.setHex(mood.fogColor);
+          scene.fog.density = mood.fogDensity;
+        } else {
+          scene.fog = new THREE.FogExp2(mood.fogColor, mood.fogDensity);
+        }
+        if (scene.background && scene.background.isColor) {
+          scene.background.setHex(mood.fogColor);
+        } else {
+          scene.background = new THREE.Color(mood.fogColor);
+        }
       }
-      if (M && M.uGlobals) {
+      if (M && M.uGlobals && !preserveFog) {
         M.uGlobals.uWetness.value = mood.wetness;
         M.uGlobals.uFogHazeColor.value.setHex(mood.fogColor);
         M.uGlobals.uFogHazeDensity.value = chosenMoodKey === 'TOXIC_SMOG' ? 0.52 : 0.38;
       }
 
       const displayName = sectorLoop > 0 ? arch.name + ' II' : arch.name;
-      if (M && typeof M.repaintStationBanner === 'function') {
-        M.repaintStationBanner({
-          codeCB: arch.id === 'harjamukti' ? 'CB 12' : arch.code.split('/')[0].trim(),
-          codeBK: arch.id === 'harjamukti' ? null : (arch.code.split('/')[1] || 'BK 01').trim(),
-          name: displayName,
-          subtitle: (arch.destinationHint || 'LRT JABODEBEK') + '  •  PERON 1',
-          accentColor: arch.lineColor
-        });
-      }
+      const bannerCfg = (M && typeof M.repaintStationBanner === 'function') ? {
+        codeCB: arch.id === 'harjamukti' ? 'CB 12' : arch.code.split('/')[0].trim(),
+        codeBK: arch.id === 'harjamukti' ? null : (arch.code.split('/')[1] || 'BK 01').trim(),
+        name: displayName,
+        subtitle: (arch.destinationHint || 'LRT JABODEBEK') + '  •  PERON 1',
+        accentColor: arch.lineColor
+      } : null;
 
       const matConcrete = this._resolveMat('concrete', 'concrete_station', { color: 0x9c9890, roughness: 0.90 });
       const matConcreteRough = this._resolveMat('concreteRough', 'concrete_rough', { color: 0x8d8982, roughness: 0.92 });
@@ -397,6 +417,7 @@
       };
 
       const ctx = {
+        scene: scene || null,
         arch, dims, mood, chosenMoodKey, rng, root, mats, STALL_UV, SIGN_UV,
         matConcrete, matConcreteRough, matDarkWood, matCanopy,
         buckets,
@@ -405,15 +426,124 @@
         stairZones, registerStairZone, isInStairExclusion
       };
 
-      S.arch.buildArchitecture(this, ctx);
-      S.navProps.buildStallsAndTubes(this, ctx);
-      S.arch.mergeStaticBuckets(this, ctx);
-      S.navProps.buildDestructiblesAndNav(this, ctx);
+      this._buildState = {
+        phase: 0,
+        scene: scene || null,
+        M: M,
+        bannerCfg: bannerCfg,
+        ctx: ctx
+      };
 
+      return this;
+    },
+
+    stepIncrementalBuild: function () {
+      const st = this._buildState;
+      if (!st) {
+        this._isBuilding = false;
+        return { done: true, stats: this.getStats() };
+      }
+      const ctx = st.ctx;
+      const phase = st.phase;
+
+      if (phase === 0) {
+        if (st.bannerCfg && st.M && typeof st.M.repaintStationBanner === 'function') {
+          st.M.repaintStationBanner(st.bannerCfg);
+        }
+        S.arch.buildArchitecture(this, ctx);
+        st.phase = 1;
+        return _stationStepInProgress;
+      }
+
+      if (phase === 1) {
+        S.navProps.buildStallsAndTubes(this, ctx);
+        st.phase = 2;
+        return _stationStepInProgress;
+      }
+
+      if (phase === 2 || phase === 3 || phase === 4) {
+        const batchIdx = phase - 2;
+        if (typeof S.arch.mergeStaticBucketsBatch === 'function') {
+          S.arch.mergeStaticBucketsBatch(this, ctx, batchIdx);
+          st.phase = phase + 1;
+        } else {
+          S.arch.mergeStaticBuckets(this, ctx);
+          st.phase = 5;
+        }
+        return _stationStepInProgress;
+      }
+
+      if (phase === 5) {
+        S.navProps.buildDestructiblesAndNav(this, ctx, { onlyDestructibles: true });
+        st.phase = 6;
+        return _stationStepInProgress;
+      }
+
+      if (phase === 6) {
+        if (LRT.City && typeof LRT.City.beginIncrementalBuild === 'function') {
+          LRT.City.beginIncrementalBuild(ctx.arch, ctx.rng, ctx.root, ctx.cityBuildOpts);
+          const cRes = LRT.City.stepIncrementalBuild();
+          st.phase = (cRes && cRes.done) ? 8 : 7;
+          return _stationStepInProgress;
+        }
+        if (LRT.City && typeof LRT.City.build === 'function') {
+          LRT.City.build(ctx.arch, ctx.rng, ctx.root, ctx.cityBuildOpts);
+        }
+        st.phase = 8;
+        return _stationStepInProgress;
+      }
+
+      if (phase === 7) {
+        const cRes = (LRT.City && typeof LRT.City.stepIncrementalBuild === 'function')
+          ? LRT.City.stepIncrementalBuild()
+          : { done: true };
+        if (cRes && !cRes.done) return _stationStepInProgress;
+        st.phase = 8;
+        return _stationStepInProgress;
+      }
+
+      if (phase === 8) {
+        S.navProps.buildDestructiblesAndNav(this, ctx, { onlyFinalizeNav: true });
+        st.phase = 9;
+        return _stationStepInProgress;
+      }
+
+      this._buildState = null;
+      this._isBuilding = false;
+      if (st.scene && this.rootGroup && !this.rootGroup.parent) {
+        st.scene.add(this.rootGroup);
+      }
+      if (this.rootGroup) this.rootGroup.updateMatrixWorld(true);
+      const finalOz = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
+      for (let i = 0; i < this.stationLights.length; i++) {
+        const sl = this.stationLights[i];
+        if (sl && sl.light) {
+          sl.light.visible = true;
+          sl.light.position.set(
+            sl.homeX !== undefined ? sl.homeX : sl.light.position.x,
+            sl.homeY !== undefined ? sl.homeY : sl.light.position.y,
+            (sl.homeZ !== undefined ? sl.homeZ : sl.light.position.z) + finalOz
+          );
+        }
+      }
+      this.setLightingFactor(this._lightingFactor);
       this._initCachedBVH();
       this._buildObjectiveBeacons();
       this.setActiveObjectiveIds([]);
+      const core = LRT.Main || null;
+      if (core && typeof core.updateCityVisibility === 'function') {
+        core.updateCityVisibility();
+      }
+      return { done: true, stats: this.getStats() };
+    },
 
+    isIncrementalBuilding: function () {
+      return !!this._isBuilding;
+    },
+
+    build: function (index, seed, mode, scene, offsetZ, opts) {
+      this.beginIncrementalBuild(index, seed, mode, scene, offsetZ, opts);
+      while (!this.stepIncrementalBuild().done) {}
       return this;
     },
 
@@ -482,7 +612,10 @@
 
     setLightingFactor: function (factor) {
       this._lightingFactor = Math.max(0, factor !== undefined ? factor : 1.0);
-      const tubeInt = this._mood && this._mood.tubeIntensity !== undefined ? this._mood.tubeIntensity : 0.85;
+      const mBlend = (LRT.Main && typeof LRT.Main.getMoodBlendState === 'function') ? LRT.Main.getMoodBlendState() : null;
+      const tubeInt = (mBlend && mBlend.active && mBlend.tubeIntensity !== undefined)
+        ? mBlend.tubeIntensity
+        : (this._mood && this._mood.tubeIntensity !== undefined ? this._mood.tubeIntensity : 0.85);
       const pwr = this._powerRestored ? 1.0 : 0.22;
       for (let i = 0; i < this.stationLights.length; i++) {
         const sl = this.stationLights[i];
@@ -506,7 +639,7 @@
     },
 
     update: function (dt, playerPos, camForward, difficultyKey) {
-      if (!this.rootGroup) return;
+      if (!this.rootGroup || this._isBuilding) return;
       this._timeAccum += dt;
       this._beaconSharedTime.value = this._timeAccum;
 
@@ -528,8 +661,13 @@
       const lerpAlpha = 1.0 - Math.exp(-6.5 * Math.min(dt, 0.1));
 
       // Dim blinking / flickering & smoothly reposition the 2 pooled station lights
-      const isNight = !this._mood || !this._mood.isDaylight;
-      const tubeInt = this._mood && this._mood.tubeIntensity !== undefined ? this._mood.tubeIntensity : 0.85;
+      const mBlend = (LRT.Main && typeof LRT.Main.getMoodBlendState === 'function') ? LRT.Main.getMoodBlendState() : null;
+      const nightMix = (mBlend && mBlend.active)
+        ? (1.0 - (mBlend.daylightBlend !== undefined ? mBlend.daylightBlend : 0.0))
+        : ((!this._mood || !this._mood.isDaylight) ? 1.0 : 0.0);
+      const tubeInt = (mBlend && mBlend.active && mBlend.tubeIntensity !== undefined)
+        ? mBlend.tubeIntensity
+        : (this._mood && this._mood.tubeIntensity !== undefined ? this._mood.tubeIntensity : 0.85);
       if (this.stationLights && this.stationLights.length > 0) {
         for (let i = 0; i < this.stationLights.length; i++) {
           const sl = this.stationLights[i];
@@ -552,7 +690,7 @@
             }
             sl.light.position.x += (bestA.x - sl.light.position.x) * lerpAlpha;
             sl.light.position.y += (bestA.y - sl.light.position.y) * lerpAlpha;
-            sl.light.position.z += (bestA.z - sl.light.position.z) * lerpAlpha;
+            sl.light.position.z += ((bestA.z + offsetZ) - sl.light.position.z) * lerpAlpha;
           } else if (sl.kind === 'cool' && this._coolLightAnchors && this._coolLightAnchors.length > 0) {
             let bestA = null;
             let bestD2 = Infinity;
@@ -571,22 +709,24 @@
             if (bestA) {
               sl.light.position.x += (bestA.x - sl.light.position.x) * lerpAlpha;
               sl.light.position.y += (bestA.y - sl.light.position.y) * lerpAlpha;
-              sl.light.position.z += (bestA.z - sl.light.position.z) * lerpAlpha;
+              sl.light.position.z += ((bestA.z + offsetZ) - sl.light.position.z) * lerpAlpha;
             } else {
               tubeAliveFactor = 0.08;
             }
           }
 
           let flick = 1.0;
-          if (isNight) {
+          if (nightMix > 0.01) {
             const wave = Math.sin(this._timeAccum * (5.8 + i * 2.1) + i * 1.7);
             const jitter = Math.sin(this._timeAccum * 19.0 + i * 4.3);
+            let rawFlick = 1.0;
             if (i % 2 === 1) {
               const cyc = (this._timeAccum * 0.7 + i * 0.9) % 3.8;
-              flick = (cyc > 2.4 && wave > -0.25) ? 0.16 : (jitter < -0.55 ? 0.38 : 0.82);
+              rawFlick = (cyc > 2.4 && wave > -0.25) ? 0.16 : (jitter < -0.55 ? 0.38 : 0.82);
             } else {
-              flick = (wave < -0.78 && jitter < -0.3) ? 0.25 : (0.72 + 0.22 * wave);
+              rawFlick = (wave < -0.78 && jitter < -0.3) ? 0.25 : (0.72 + 0.22 * wave);
             }
+            flick = 1.0 + (rawFlick - 1.0) * nightMix;
           }
           const pwr = this._powerRestored ? 1.0 : 0.22;
           sl.light.intensity = sl.baseIntensity * tubeInt * this._lightingFactor * flick * pwr * tubeAliveFactor;
@@ -693,8 +833,9 @@
     },
 
     getBVHMeshes: function () {
+      if (this._isBuilding || !this.rootGroup) return _emptyArr;
       if (this._cachedAllBVH) return this._cachedAllBVH;
-      const cityMeshes = (LRT.City && typeof LRT.City.getBVHMeshes === 'function') ? LRT.City.getBVHMeshes() : [];
+      const cityMeshes = (LRT.City && typeof LRT.City.getBVHMeshes === 'function') ? LRT.City.getBVHMeshes() : _emptyArr;
       if (!cityMeshes || cityMeshes.length === 0) return this.bvhMeshes;
       this._cachedAllBVH = this.bvhMeshes.concat(cityMeshes);
       return this._cachedAllBVH;
@@ -918,6 +1059,7 @@
     },
 
     getObjectiveMarkers: function () {
+      if (this._isBuilding || !this.rootGroup) return _emptyArr;
       const offsetZ = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
       const activeSet = this._activeObjectiveIds;
       for (let i = 0; i < this._objectiveMarkersCache.length; i++) {
@@ -938,16 +1080,19 @@
     },
 
     getBVHMesh: function () {
+      if (this._isBuilding || !this.rootGroup) return null;
       return this.bvhMeshes[0] || null;
     },
 
     getLights: function () {
-      const cityLights = (LRT.City && typeof LRT.City.getStreetLights === 'function') ? LRT.City.getStreetLights() : [];
+      if (this._isBuilding || !this.rootGroup) return _emptyArr;
+      const cityLights = (LRT.City && typeof LRT.City.getStreetLights === 'function') ? LRT.City.getStreetLights() : _emptyArr;
       if (!cityLights || cityLights.length === 0) return this.stationLights;
       return this.stationLights.concat(cityLights);
     },
 
     getStreetLights: function () {
+      if (this._isBuilding || !this.rootGroup) return _emptyArr;
       return (LRT.City && typeof LRT.City.getStreetLights === 'function') ? LRT.City.getStreetLights() : this.stationLights;
     },
 
@@ -956,6 +1101,7 @@
     },
 
     getColliders: function () {
+      if (this._isBuilding || !this.rootGroup) return _emptyArr;
       return this.colliders;
     },
 
@@ -972,9 +1118,16 @@
     },
 
     setOffsetZ: function (z) {
+      const nextZ = z || 0;
       if (this.rootGroup) {
-        this.rootGroup.position.z = z;
+        this.rootGroup.position.z = nextZ;
         this.rootGroup.updateMatrixWorld(true);
+      }
+      for (let i = 0; i < this.stationLights.length; i++) {
+        const sl = this.stationLights[i];
+        if (sl && sl.light && sl.homeZ !== undefined) {
+          sl.light.position.z = sl.homeZ + nextZ;
+        }
       }
     },
 
@@ -1037,7 +1190,7 @@
     },
 
     raycastWorld: function (origin, dir, maxDist) {
-      if (!this.rootGroup) return null;
+      if (!this.rootGroup || this._isBuilding) return null;
       const offsetZ = this.rootGroup.position.z;
       const ox = origin.x;
       const oy = origin.y;
@@ -1157,7 +1310,7 @@
     },
 
     damageAt: function (origin, radius, maxDmg, impulse, isExplosion) {
-      if (!this.rootGroup) return;
+      if (!this.rootGroup || this._isBuilding) return;
       const offsetZ = this.rootGroup.position.z;
       const lx = origin.x;
       const ly = origin.y;
@@ -1375,7 +1528,7 @@
     },
 
     getInteractableNear: function (pos, lookDir) {
-      if (!this.rootGroup) return null;
+      if (!this.rootGroup || this._isBuilding) return null;
       const offsetZ = this.rootGroup.position.z;
       let best = null;
       let bestScore = -999;

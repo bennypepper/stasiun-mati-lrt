@@ -34,14 +34,37 @@
   CORE.difficultyKey = 'medium';
   CORE.currentLightingKey = 'DAYLIGHT_CLEAR';
   CORE.lightingLockedByUser = false;
+  CORE.isMoodLerping = false;
   CORE.currentBrightness = 1.0;
   CORE.lastDrawCalls = 0;
   CORE.isSoftwareRenderer = false;
   CORE.interiorOccluded = false;
 
   const _brightFogTarget = new THREE.Color(0x526378);
+  const _lerpFogA = new THREE.Color();
+  const _lerpFogB = new THREE.Color();
+  const _lerpHemiSkyA = new THREE.Color();
+  const _lerpHemiSkyB = new THREE.Color();
+  const _lerpHemiGndA = new THREE.Color();
+  const _lerpHemiGndB = new THREE.Color();
+  const _lerpSunColA = new THREE.Color();
+  const _lerpSunColB = new THREE.Color();
+  const _skySunDir = new THREE.Vector3();
+  const _moodBlendOut = {
+    active: false,
+    fromKey: null,
+    toKey: null,
+    t: 0.0,
+    daylightBlend: 1.0,
+    tubeIntensity: 0.22,
+    streetLampIntensity: 0.0,
+    wetness: 0.25
+  };
+  let _currentEnvHdriKey = null;
+
   const baseMood = {
     isDaylight: true,
+    daylightBlend: 1.0,
     hemiIntensity: 0.92,
     sunIntensity: 2.75,
     fogColor: new THREE.Color(0x9eb8cc),
@@ -50,7 +73,8 @@
     streetLampIntensity: 0.0,
     envIntensity: 1.05,
     exposure: 1.04,
-    bloomStrength: 0.22
+    bloomStrength: 0.22,
+    wetness: 0.25
   };
 
   const _menuLookAt = new THREE.Vector3();
@@ -153,12 +177,16 @@
     }
   }
 
-  function tickShadowCache(dt, trainMoving, enemiesAlive) {
+  function tickShadowCache(dt, trainMoving, enemiesAlive, pauseShadow) {
     if (!CORE.shadowsEnabled || !CORE.renderer || !CORE.renderer.shadowMap) {
       _shadowCacheAccum = 0;
       return false;
     }
     CORE.renderer.shadowMap.autoUpdate = false;
+    if (pauseShadow || CORE.gameState === STATES.TRAIN_CRUISE) {
+      _shadowCacheAccum = 0;
+      return false;
+    }
     const isDynamic = !!trainMoving || (typeof enemiesAlive === 'number' ? enemiesAlive > 0 : !!enemiesAlive);
     if (!isDynamic) {
       _shadowCacheAccum = 0;
@@ -477,10 +505,11 @@
       }
     };
 
-    const isNight = !!(baseMood && !baseMood.isDaylight);
-    const streetFactor = isNight
-      ? Math.max(0.25, val / 1.8)
-      : Math.max(0, val / 1.8);
+    const dayMix = (baseMood && baseMood.daylightBlend !== undefined)
+      ? baseMood.daylightBlend
+      : ((baseMood && baseMood.isDaylight) ? 1.0 : 0.0);
+    const nightStreetFloor = 0.25 * (1.0 - dayMix);
+    const streetFactor = Math.max(nightStreetFloor, val / 1.8);
     if (LRT.Station) {
       const isMenu = CORE.gameState === STATES.MENU;
       const tubeInt = (baseMood && baseMood.tubeIntensity !== undefined) ? baseMood.tubeIntensity : 0.72;
@@ -554,50 +583,50 @@
     const b = CORE.currentBrightness;
     const isMenu = CORE.gameState === STATES.MENU;
     const over = Math.max(0, b - 1.0);
-    const lightScale = baseMood.isDaylight
-      ? (b <= 1.0 ? Math.pow(b, 1.35) : 1.0)
-      : (b <= 1.0 ? Math.pow(b, 1.85) : 1.0);
+    const dayMix = (baseMood.daylightBlend !== undefined)
+      ? Math.max(0.0, Math.min(1.0, baseMood.daylightBlend))
+      : (baseMood.isDaylight ? 1.0 : 0.0);
+    const nightMix = 1.0 - dayMix;
+    const lsDay = b <= 1.0 ? Math.pow(b, 1.35) : 1.0;
+    const lsNight = b <= 1.0 ? Math.pow(b, 1.85) : 1.0;
+    const lightScale = lsNight + (lsDay - lsNight) * dayMix;
 
     syncMenuLights();
 
     if (CORE.hemiLight) {
-      const baseHemi = baseMood.hemiIntensity * lightScale + over * (baseMood.isDaylight ? 0.65 : 0.25);
-      CORE.hemiLight.intensity = baseHemi + (isMenu && !baseMood.isDaylight ? 0.08 : 0);
+      const baseHemi = baseMood.hemiIntensity * lightScale + over * (0.25 + (0.65 - 0.25) * dayMix);
+      CORE.hemiLight.intensity = baseHemi + (isMenu ? 0.08 * nightMix : 0);
     }
     if (CORE.sunLight) {
-      const baseSun = baseMood.sunIntensity * lightScale + over * (baseMood.isDaylight ? 0.95 : 0.35);
-      CORE.sunLight.intensity = baseSun + (isMenu && !baseMood.isDaylight ? 0.14 : 0);
+      const baseSun = baseMood.sunIntensity * lightScale + over * (0.35 + (0.95 - 0.35) * dayMix);
+      CORE.sunLight.intensity = baseSun + (isMenu ? 0.14 * nightMix : 0);
     }
     if (CORE.renderer) {
       const baseExp = baseMood.exposure || 1.05;
-      const exp = baseMood.isDaylight
-        ? (b <= 1.0 ? Math.max(0.32, baseExp * (0.28 + b * 0.72)) : Math.min(1.65, baseExp + over * 0.55))
-        : (b <= 1.0 ? Math.max(0.54, baseExp * (0.58 + b * 0.42)) : Math.min(1.45, baseExp + over * 0.42));
-      CORE.renderer.toneMappingExposure = exp;
+      const expDay = b <= 1.0 ? Math.max(0.32, baseExp * (0.28 + b * 0.72)) : Math.min(1.65, baseExp + over * 0.55);
+      const expNight = b <= 1.0 ? Math.max(0.54, baseExp * (0.58 + b * 0.42)) : Math.min(1.45, baseExp + over * 0.42);
+      CORE.renderer.toneMappingExposure = expNight + (expDay - expNight) * dayMix;
     }
     if (CORE.scene) {
       if ('environmentIntensity' in CORE.scene) {
-        let envVal;
-        if (baseMood.isDaylight) {
-          envVal = b <= 1.0
-            ? Math.max(0.03, baseMood.envIntensity * (0.22 + 0.78 * b))
-            : Math.min(1.85, baseMood.envIntensity + over * 0.85);
-        } else {
-          envVal = b <= 1.0
-            ? Math.max(0.004, baseMood.envIntensity * Math.pow(b, 1.9))
-            : Math.min(0.45, baseMood.envIntensity + over * 0.22);
-        }
-        CORE.scene.environmentIntensity = envVal + (isMenu && !baseMood.isDaylight ? 0.06 : 0);
+        const envDay = b <= 1.0
+          ? Math.max(0.03, baseMood.envIntensity * (0.22 + 0.78 * b))
+          : Math.min(1.85, baseMood.envIntensity + over * 0.85);
+        const envNight = b <= 1.0
+          ? Math.max(0.004, baseMood.envIntensity * Math.pow(b, 1.9))
+          : Math.min(0.45, baseMood.envIntensity + over * 0.22);
+        const envVal = envNight + (envDay - envNight) * dayMix;
+        CORE.scene.environmentIntensity = envVal + (isMenu ? 0.06 * nightMix : 0);
       }
       if (CORE.scene.fog) {
-        const fogLift = (!baseMood.isDaylight && over > 0) ? Math.min(0.42, (over / 0.8) * 0.42) : 0;
+        const fogLift = over > 0 ? Math.min(0.42, (over / 0.8) * 0.42) * nightMix : 0;
         CORE.scene.fog.color.copy(baseMood.fogColor).lerp(_brightFogTarget, fogLift);
         if (CORE.scene.background && CORE.scene.background.isColor) {
           CORE.scene.background.copy(CORE.scene.fog.color);
         }
         if (LRT.Materials) {
           LRT.Materials.uGlobals.uFogHazeColor.value.copy(CORE.scene.fog.color);
-          LRT.Materials.uGlobals.uFogHazeDensity.value = baseMood.isDaylight ? 0.16 : 0.52;
+          LRT.Materials.uGlobals.uFogHazeDensity.value = 0.52 + (0.16 - 0.52) * dayMix;
         }
         if (CORE.scene.fog.isFogExp2) {
           const fogFactor = b <= 1.0
@@ -610,15 +639,15 @@
     if (CORE.bloomPass) {
       CORE.bloomPass.strength = baseMood.bloomStrength * (b <= 1.0 ? 0.88 + 0.12 * b : 1.0 + over * 0.25);
     }
-    const localLampScale = baseMood.isDaylight
-      ? (b <= 1.0 ? (0.30 + 0.70 * b) : 1.0)
-      : (b <= 1.0 ? Math.max(0.95, 0.92 + 0.08 * b) : 1.0 + over * 0.20);
+    const lampDay = b <= 1.0 ? (0.30 + 0.70 * b) : 1.0;
+    const lampNight = b <= 1.0 ? Math.max(0.95, 0.92 + 0.08 * b) : 1.0 + over * 0.20;
+    const localLampScale = lampNight + (lampDay - lampNight) * dayMix;
     applyStreetLightsIntensity(baseMood.streetLampIntensity * localLampScale);
     if (LRT.Materials && LRT.Materials.mats) {
       const m = LRT.Materials.mats;
-      const tubeFactor = baseMood.isDaylight
-        ? (b <= 1.0 ? (0.30 + 0.70 * b) : (1.0 + over * 0.55))
-        : (b <= 1.0 ? (0.72 + 0.28 * b) : (1.0 + over * 0.45));
+      const tubeDay = b <= 1.0 ? (0.30 + 0.70 * b) : (1.0 + over * 0.55);
+      const tubeNight = b <= 1.0 ? (0.72 + 0.28 * b) : (1.0 + over * 0.45);
+      const tubeFactor = tubeNight + (tubeDay - tubeNight) * dayMix;
       if (m.flickerTube) {
         m.flickerTube.emissiveIntensity = 1.65 * baseMood.tubeIntensity * tubeFactor;
       }
@@ -626,7 +655,8 @@
         m.tubeHalo.opacity = Math.min(0.28, 0.12 * baseMood.tubeIntensity * tubeFactor);
       }
       if (m.skylineBuilding) {
-        m.skylineBuilding.emissiveIntensity = baseMood.isDaylight ? 0.08 : (0.14 + 0.14 * Math.min(1.2, b));
+        const skyNight = 0.14 + 0.14 * Math.min(1.2, b);
+        m.skylineBuilding.emissiveIntensity = skyNight + (0.08 - skyNight) * dayMix;
       }
     }
     if (LRT.Train && typeof LRT.Train.syncLights === 'function') {
@@ -650,13 +680,26 @@
     return CORE.currentBrightness;
   }
 
+  function _computeMoodFar(moodKey, m) {
+    if (moodKey === 'DAYLIGHT_CLEAR' || (m.isDaylight && m.fogDensity < 0.006)) return 400;
+    if (!m.isDaylight && m.fogDensity >= 0.014) return 220;
+    if (!m.isDaylight) return 260;
+    return 300;
+  }
+
   function applyMoodLighting(stats, atmos) {
     const requestedKey = (atmos && atmos.moodKey) || CORE.currentLightingKey || (stats && (stats.moodKey || stats.atmosphere)) || 'DAYLIGHT_CLEAR';
     const moodKey = (requestedKey in C.MOODS) ? requestedKey : 'DAYLIGHT_CLEAR';
     const m = C.MOODS[moodKey] || C.MOODS.DAYLIGHT_CLEAR;
     CORE.currentLightingKey = moodKey;
+    CORE.isMoodLerping = false;
+    _moodBlendOut.active = false;
+    _moodBlendOut.fromKey = moodKey;
+    _moodBlendOut.toKey = moodKey;
+    _moodBlendOut.t = 1.0;
 
     baseMood.isDaylight = !!m.isDaylight;
+    baseMood.daylightBlend = m.isDaylight ? 1.0 : 0.0;
     baseMood.hemiIntensity = m.hemiIntensity;
     baseMood.sunIntensity = m.sunIntensity;
     baseMood.fogColor.setHex(m.fogColor);
@@ -666,6 +709,11 @@
     baseMood.envIntensity = m.envIntensity !== undefined ? m.envIntensity : (m.isDaylight ? 1.0 : 0.62);
     baseMood.exposure = m.exposure !== undefined ? m.exposure : 1.05;
     baseMood.bloomStrength = m.bloomStrength !== undefined ? m.bloomStrength : (m.isDaylight ? 0.24 : 0.42);
+    baseMood.wetness = m.wetness !== undefined ? m.wetness : 0.5;
+    _moodBlendOut.daylightBlend = baseMood.daylightBlend;
+    _moodBlendOut.tubeIntensity = baseMood.tubeIntensity;
+    _moodBlendOut.streetLampIntensity = baseMood.streetLampIntensity;
+    _moodBlendOut.wetness = baseMood.wetness;
 
     if (CORE.scene) {
       if (CORE.scene.background && CORE.scene.background.isColor) CORE.scene.background.setHex(m.fogColor);
@@ -703,26 +751,18 @@
     if (CORE.sunLight) {
       CORE.sunLight.color.setHex(m.sunColor);
     }
+    const targetHdri = m.hdri || (m.isDaylight ? 'day_clear' : 'night_station');
     if (LRT.Materials) {
       LRT.Materials.uGlobals.uFogHazeColor.value.setHex(m.fogColor);
       LRT.Materials.uGlobals.uWetness.value = m.wetness;
       if (typeof LRT.Materials.setEnvironmentTexture === 'function') {
-        LRT.Materials.setEnvironmentTexture(m.hdri || (m.isDaylight ? 'day_clear' : 'night_station'), CORE.scene, CORE.renderer);
+        LRT.Materials.setEnvironmentTexture(targetHdri, CORE.scene, CORE.renderer);
+        _currentEnvHdriKey = targetHdri;
       }
     }
 
     if (CORE.camera) {
-      let farDist = 300;
-      if (moodKey === 'DAYLIGHT_CLEAR' || (m.isDaylight && m.fogDensity < 0.006)) {
-        farDist = 400;
-      } else if (!m.isDaylight && m.fogDensity >= 0.014) {
-        farDist = 220;
-      } else if (!m.isDaylight) {
-        farDist = 260;
-      } else {
-        farDist = 300;
-      }
-      CORE.camera.far = farDist;
+      CORE.camera.far = _computeMoodFar(moodKey, m);
       CORE.camera.updateProjectionMatrix();
       updateFrustum();
     }
@@ -738,6 +778,148 @@
     }
 
     applyBrightness();
+  }
+
+  function lerpMoodLighting(fromKey, toKey, rawT) {
+    const validFrom = (fromKey && fromKey in C.MOODS) ? fromKey : (CORE.currentLightingKey || 'DAYLIGHT_CLEAR');
+    const validTo = (toKey && toKey in C.MOODS) ? toKey : validFrom;
+    const mA = C.MOODS[validFrom] || C.MOODS.DAYLIGHT_CLEAR;
+    const mB = C.MOODS[validTo] || mA;
+
+    const c = rawT <= 0 ? 0.0 : (rawT >= 1 ? 1.0 : rawT);
+    const s = c * c * (3.0 - 2.0 * c);
+
+    const dayA = mA.isDaylight ? 1.0 : 0.0;
+    const dayB = mB.isDaylight ? 1.0 : 0.0;
+    const dayBlend = dayA + (dayB - dayA) * s;
+
+    const tubeA = mA.tubeIntensity !== undefined ? mA.tubeIntensity : 0.72;
+    const tubeB = mB.tubeIntensity !== undefined ? mB.tubeIntensity : 0.72;
+    const lampA = mA.streetLampIntensity !== undefined ? mA.streetLampIntensity : (mA.isDaylight ? 0.0 : 2.0);
+    const lampB = mB.streetLampIntensity !== undefined ? mB.streetLampIntensity : (mB.isDaylight ? 0.0 : 2.0);
+    const envA = mA.envIntensity !== undefined ? mA.envIntensity : (mA.isDaylight ? 1.0 : 0.62);
+    const envB = mB.envIntensity !== undefined ? mB.envIntensity : (mB.isDaylight ? 1.0 : 0.62);
+    const expA = mA.exposure !== undefined ? mA.exposure : 1.05;
+    const expB = mB.exposure !== undefined ? mB.exposure : 1.05;
+    const bloomA = mA.bloomStrength !== undefined ? mA.bloomStrength : (mA.isDaylight ? 0.24 : 0.42);
+    const bloomB = mB.bloomStrength !== undefined ? mB.bloomStrength : (mB.isDaylight ? 0.24 : 0.42);
+    const wetA = mA.wetness !== undefined ? mA.wetness : 0.5;
+    const wetB = mB.wetness !== undefined ? mB.wetness : 0.5;
+
+    const hdriA = mA.hdri || (mA.isDaylight ? 'day_clear' : 'night_station');
+    const hdriB = mB.hdri || (mB.isDaylight ? 'day_clear' : 'night_station');
+    let envBase = envA + (envB - envA) * s;
+    if (hdriA !== hdriB) {
+      const midDelta = (s - 0.5) / 0.16;
+      const envDip = 1.0 - 0.60 * Math.exp(-midDelta * midDelta);
+      envBase *= envDip;
+    }
+
+    baseMood.isDaylight = dayBlend >= 0.5;
+    baseMood.daylightBlend = dayBlend;
+    baseMood.hemiIntensity = mA.hemiIntensity + (mB.hemiIntensity - mA.hemiIntensity) * s;
+    baseMood.sunIntensity = mA.sunIntensity + (mB.sunIntensity - mA.sunIntensity) * s;
+    baseMood.fogColor.copy(_lerpFogA.setHex(mA.fogColor)).lerp(_lerpFogB.setHex(mB.fogColor), s);
+    baseMood.fogDensity = mA.fogDensity + (mB.fogDensity - mA.fogDensity) * s;
+    baseMood.tubeIntensity = tubeA + (tubeB - tubeA) * s;
+    baseMood.streetLampIntensity = lampA + (lampB - lampA) * s;
+    baseMood.envIntensity = envBase;
+    baseMood.exposure = expA + (expB - expA) * s;
+    baseMood.bloomStrength = bloomA + (bloomB - bloomA) * s;
+    baseMood.wetness = wetA + (wetB - wetA) * s;
+
+    const elevA = typeof mA.sunElevation === 'number' ? mA.sunElevation : (mA.isDaylight ? 45 : 24);
+    const elevB = typeof mB.sunElevation === 'number' ? mB.sunElevation : (mB.isDaylight ? 45 : 24);
+    const azimA = typeof mA.sunAzimuth === 'number' ? mA.sunAzimuth : 150;
+    const azimB = typeof mB.sunAzimuth === 'number' ? mB.sunAzimuth : 150;
+    let dAz = azimB - azimA;
+    if (dAz > 180) dAz -= 360;
+    else if (dAz < -180) dAz += 360;
+    const azim = azimA + dAz * s;
+    const elev = elevA + (elevB - elevA) * s;
+    const theta = THREE.MathUtils.degToRad(azim);
+    _sunDir.setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - elev), theta).normalize();
+
+    if (CORE.sky) {
+      const su = CORE.sky.material && CORE.sky.material.uniforms;
+      if (!mA.isDaylight && !mB.isDaylight) {
+        CORE.sky.visible = false;
+      } else {
+        const skyVisible = (mA.isDaylight && mB.isDaylight)
+          ? true
+          : (mA.isDaylight ? (s < 0.78) : (s >= 0.22));
+        CORE.sky.visible = skyVisible;
+        if (su && skyVisible) {
+          const skyElevA = mA.isDaylight ? elevA : -8.0;
+          const skyElevB = mB.isDaylight ? elevB : -8.0;
+          const skyElev = skyElevA + (skyElevB - skyElevA) * s;
+          _skySunDir.setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - skyElev), theta).normalize();
+
+          const turbA = mA.skyTurbidity !== undefined ? mA.skyTurbidity : (mA.isDaylight ? 4.0 : 2.0);
+          const turbB = mB.skyTurbidity !== undefined ? mB.skyTurbidity : (mB.isDaylight ? 4.0 : 2.0);
+          const rayA = mA.isDaylight ? (mA.skyRayleigh !== undefined ? mA.skyRayleigh : 1.5) : 0.05;
+          const rayB = mB.isDaylight ? (mB.skyRayleigh !== undefined ? mB.skyRayleigh : 1.5) : 0.05;
+          const mieA = mA.skyMie !== undefined ? mA.skyMie : 0.005;
+          const mieB = mB.skyMie !== undefined ? mB.skyMie : 0.005;
+          const mieGA = mA.skyMieG !== undefined ? mA.skyMieG : 0.8;
+          const mieGB = mB.skyMieG !== undefined ? mB.skyMieG : 0.8;
+
+          if (su.turbidity) su.turbidity.value = turbA + (turbB - turbA) * s;
+          if (su.rayleigh) su.rayleigh.value = rayA + (rayB - rayA) * s;
+          if (su.mieCoefficient) su.mieCoefficient.value = mieA + (mieB - mieA) * s;
+          if (su.mieDirectionalG) su.mieDirectionalG.value = mieGA + (mieGB - mieGA) * s;
+          if (su.sunPosition) su.sunPosition.value.copy(_skySunDir).multiplyScalar(400);
+        }
+      }
+    }
+
+    if (CORE.hemiLight) {
+      CORE.hemiLight.color.copy(_lerpHemiSkyA.setHex(mA.hemiSky)).lerp(_lerpHemiSkyB.setHex(mB.hemiSky), s);
+      CORE.hemiLight.groundColor.copy(_lerpHemiGndA.setHex(mA.hemiGround)).lerp(_lerpHemiGndB.setHex(mB.hemiGround), s);
+    }
+    if (CORE.sunLight) {
+      CORE.sunLight.color.copy(_lerpSunColA.setHex(mA.sunColor)).lerp(_lerpSunColB.setHex(mB.sunColor), s);
+    }
+
+    if (LRT.Materials) {
+      LRT.Materials.uGlobals.uWetness.value = baseMood.wetness;
+      LRT.Materials.uGlobals.uFogHazeColor.value.copy(baseMood.fogColor);
+      if (typeof LRT.Materials.setEnvironmentTexture === 'function') {
+        const targetHdri = (hdriA === hdriB || s < 0.50) ? hdriA : hdriB;
+        if (targetHdri !== _currentEnvHdriKey || (CORE.scene && !CORE.scene.environment)) {
+          LRT.Materials.setEnvironmentTexture(targetHdri, CORE.scene, CORE.renderer);
+          _currentEnvHdriKey = targetHdri;
+        }
+      }
+    }
+
+    if (CORE.camera) {
+      const farA = _computeMoodFar(validFrom, mA);
+      const farB = _computeMoodFar(validTo, mB);
+      const nextFar = farA + (farB - farA) * s;
+      if (Math.abs(CORE.camera.far - nextFar) > 0.25) {
+        CORE.camera.far = nextFar;
+        CORE.camera.updateProjectionMatrix();
+        updateFrustum();
+      }
+    }
+
+    CORE.isMoodLerping = true;
+    _moodBlendOut.active = true;
+    _moodBlendOut.fromKey = validFrom;
+    _moodBlendOut.toKey = validTo;
+    _moodBlendOut.t = s;
+    _moodBlendOut.daylightBlend = dayBlend;
+    _moodBlendOut.tubeIntensity = baseMood.tubeIntensity;
+    _moodBlendOut.streetLampIntensity = baseMood.streetLampIntensity;
+    _moodBlendOut.wetness = baseMood.wetness;
+
+    applyBrightness();
+    return _moodBlendOut;
+  }
+
+  function getMoodBlendState() {
+    return _moodBlendOut;
   }
 
   async function warmupAllVariants() {
@@ -819,13 +1001,14 @@
 
       CORE.scene.add(warmupGroup);
 
-      // Snapshot & force all scene meshes temporarily visible & unculled so every material/GLTF shader compiles at boot
+      // Snapshot & force all scene groups/meshes temporarily visible & unculled so every hidden Group (viaduct/train/chunks) & GLTF shader compiles at boot
       const restoredVis = [];
       CORE.scene.traverse((obj) => {
-        if (obj.isMesh && !obj.userData?.isShadowProxy) {
+        if (!obj || obj === CORE.scene || obj.isLight || obj.isCamera || obj.userData?.isShadowProxy) return;
+        if (obj.isMesh || !obj.visible) {
           restoredVis.push({ obj, vis: obj.visible, fc: obj.frustumCulled });
           obj.visible = true;
-          obj.frustumCulled = false;
+          if (obj.isMesh) obj.frustumCulled = false;
         }
       });
       try {
@@ -834,6 +1017,9 @@
         } else {
           CORE.renderer.compile(CORE.scene, CORE.camera);
         }
+        // Also execute one live render pass through EffectComposer while all objects/groups
+        // are unculled & visible so half-float (srgb-linear, samples=0) shaders & InstancedMeshes compile at boot.
+        renderFrame();
       } finally {
         for (let i = 0; i < restoredVis.length; i++) {
           const rec = restoredVis[i];
@@ -858,6 +1044,8 @@
   function setLightingMode(key) {
     const validKey = (key && key in C.MOODS) ? key : 'DAYLIGHT_CLEAR';
     CORE.lightingLockedByUser = true;
+    CORE.isMoodLerping = false;
+    _moodBlendOut.active = false;
     CORE.currentLightingKey = validKey;
     applyMoodLighting(null, { moodKey: validKey });
     return validKey;
@@ -926,6 +1114,8 @@
   CORE.setBrightness = setBrightness;
   CORE.getBrightness = getBrightness;
   CORE.applyMoodLighting = applyMoodLighting;
+  CORE.lerpMoodLighting = lerpMoodLighting;
+  CORE.getMoodBlendState = getMoodBlendState;
   CORE.setLightingMode = setLightingMode;
   CORE.cycleLightingMode = cycleLightingMode;
   CORE.getLightingMode = getLightingMode;

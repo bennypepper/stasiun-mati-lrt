@@ -9,6 +9,13 @@
   const _tmpLocalCam = new THREE.Vector3();
   const _chosenLampIdx = [-1, -1, -1];
   const _chosenLampDSq = [Infinity, Infinity, Infinity];
+  const _emptyArr = [];
+  const _persistentCityMats = new Map();
+  const PERSISTENT_MAT_KEYS = new Set(['cityStripeWhite', 'cityStripeYellow', 'citySkylineDistant']);
+  let _sharedInvisCollMat = null;
+  const _cityStepInProgress = Object.freeze({ done: false });
+  const _cityStepDone = Object.freeze({ done: true });
+  const _persistentCityLights = [];
 
   function evalTrafficBlink(worldX, worldZ, t) {
     return typeof P.evalTrafficSignalBlink === 'function'
@@ -46,11 +53,41 @@
     _matCache: null,
     _timeAccum: 0,
     _lightingFactor: 1.0,
+    _isBuilding: false,
+    _buildRunner: null,
+
+    _getInvisCollMat: function () {
+      if (!_sharedInvisCollMat) {
+        _sharedInvisCollMat = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
+      }
+      return _sharedInvisCollMat;
+    },
+
+    _acquirePooledLight: function (slotIdx, targetScene, colorHex, initialInt, distance, decay) {
+      let l = _persistentCityLights[slotIdx];
+      if (!l) {
+        l = new THREE.PointLight(colorHex, 0, distance, decay);
+        l.visible = true; // NEVER toggle light.visible!
+        l.castShadow = false;
+        _persistentCityLights[slotIdx] = l;
+      }
+      l.color.setHex(colorHex);
+      l.distance = distance;
+      l.decay = decay;
+      l.visible = true;
+      l.intensity = initialInt;
+      if (targetScene && l.parent !== targetScene) {
+        targetScene.add(l);
+      }
+      return l;
+    },
 
     _getMat: function (key, texKey, opts) {
       if (!this._matCache) this._matCache = new Map();
       const mats = (LRT.Materials && LRT.Materials.mats) || {};
       if (mats[key]) return mats[key];
+      const isPersistent = PERSISTENT_MAT_KEYS.has(key);
+      if (isPersistent && _persistentCityMats.has(key)) return _persistentCityMats.get(key);
       if (this._matCache.has(key)) return this._matCache.get(key);
 
       const o = opts || {};
@@ -87,8 +124,12 @@
         }
         mat = new THREE.MeshStandardMaterial(params);
       }
-      this._matCache.set(key, mat);
-      this.disposableMaterials.push(mat);
+      if (isPersistent) {
+        _persistentCityMats.set(key, mat);
+      } else {
+        this._matCache.set(key, mat);
+        this.disposableMaterials.push(mat);
+      }
       return mat;
     },
 
@@ -153,6 +194,13 @@
     },
 
     dispose: function () {
+      for (let i = 0; i < this.streetLights.length; i++) {
+        const sl = this.streetLights[i];
+        if (sl && sl.light) {
+          sl.light.visible = true; // NEVER toggle light.visible!
+          sl.light.intensity = 0;
+        }
+      }
       if (this.rootGroup && this.rootGroup.parent) {
         this.rootGroup.parent.remove(this.rootGroup);
       }
@@ -205,9 +253,11 @@
       this._matCache = null;
       this._timeAccum = 0;
       this._lightingFactor = 1.0;
+      this._isBuilding = false;
+      this._buildRunner = null;
     },
 
-    build: function (arch, rngArg, parentGroup, opts) {
+    beginIncrementalBuild: function (arch, rngArg, parentGroup, opts) {
       this.dispose();
 
       const rng = typeof rngArg === 'function' ? rngArg : P.fallbackRng(4207);
@@ -215,6 +265,7 @@
       this._usedIds = (o.usedIds) ? (o.usedIds instanceof Set ? new Set(o.usedIds) : new Set(o.usedIds)) : new Set();
       this._plnRestored = !!o.plnRestored;
       this._arch = arch;
+      this._isBuilding = true;
 
       const root = new THREE.Group();
       root.name = 'JakartaCityRoot';
@@ -252,8 +303,38 @@
       this.trackGates = [];
       this._trackGatesOpen = false;
 
-      P.buildDistrict(this, arch, rng, root, o);
+      if (typeof P.createDistrictBuilder === 'function') {
+        this._buildRunner = P.createDistrictBuilder(this, arch, rng, root, o);
+      } else {
+        P.buildDistrict(this, arch, rng, root, o);
+        this._buildRunner = null;
+        this._isBuilding = false;
+      }
 
+      return this;
+    },
+
+    stepIncrementalBuild: function () {
+      if (!this._buildRunner) {
+        this._isBuilding = false;
+        return _cityStepDone;
+      }
+      const done = !!this._buildRunner.step();
+      if (done) {
+        this._buildRunner = null;
+        this._isBuilding = false;
+        return _cityStepDone;
+      }
+      return _cityStepInProgress;
+    },
+
+    isIncrementalBuilding: function () {
+      return !!this._isBuilding;
+    },
+
+    build: function (arch, rngArg, parentGroup, opts) {
+      this.beginIncrementalBuild(arch, rngArg, parentGroup, opts);
+      while (!this.stepIncrementalBuild().done) {}
       return this;
     },
 
@@ -381,7 +462,11 @@
         if (sl.kind === 'traffic') {
           if (bestSig >= 0) {
             const sp = sigs[bestSig];
-            sl.light.position.set(sp.x, sp.y, sp.z);
+            sl.light.position.set(
+              sp.x + _tmpWorldOffset.x,
+              sp.y + _tmpWorldOffset.y,
+              sp.z + _tmpWorldOffset.z
+            );
             sl._worldX = sp.x + _tmpWorldOffset.x;
             sl._worldZ = sp.z + _tmpWorldOffset.z;
             if (suppressLights) {
@@ -405,7 +490,11 @@
         const idx = _chosenLampIdx[slotIdx];
         if (idx < 0 || !lamps) continue;
         const lp = lamps[idx];
-        sl.light.position.set(lp.x, lp.y, lp.z);
+        sl.light.position.set(
+          lp.x + _tmpWorldOffset.x,
+          lp.y + _tmpWorldOffset.y,
+          lp.z + _tmpWorldOffset.z
+        );
         sl.flicker = !!lp.flicker;
         if (suppressLights) {
           sl._distScale = 0.0;
@@ -420,7 +509,7 @@
     },
 
     update: function (dt, t, camPos, camForward, difficultyKey) {
-      if (!this.rootGroup) return;
+      if (!this.rootGroup || this._isBuilding) return;
       this._timeAccum = t !== undefined ? t : (this._timeAccum + dt);
       if (typeof P.updateTrafficSignalTime === 'function') {
         P.updateTrafficSignalTime(this._timeAccum);
@@ -472,7 +561,7 @@
     },
 
     updateVisibility: function (camPos, qualityKey, frustum, playerContext) {
-      if (!this.rootGroup) return;
+      if (!this.rootGroup || this._isBuilding) return;
 
       if (camPos) {
         if (!this._lastCamPos) this._lastCamPos = new THREE.Vector3();
@@ -566,23 +655,23 @@
     },
 
     getBVHMeshes: function () {
-      return this.bvhMeshes;
+      return this._isBuilding ? _emptyArr : this.bvhMeshes;
     },
 
     getBVHMesh: function () {
-      return this.bvhMeshes[0] || null;
+      return this._isBuilding ? null : (this.bvhMeshes[0] || null);
     },
 
     getColliders: function () {
-      return this.colliders;
+      return this._isBuilding ? _emptyArr : this.colliders;
     },
 
     getStreetLights: function () {
-      return this.streetLights;
+      return this._isBuilding ? _emptyArr : this.streetLights;
     },
 
     getLights: function () {
-      return this.streetLights;
+      return this._isBuilding ? _emptyArr : this.streetLights;
     },
 
     getSpawnNodes: function () {
@@ -594,7 +683,7 @@
     },
 
     getInteractableNear: function (pos, lookDir) {
-      if (!this.interactables || !pos) return null;
+      if (this._isBuilding || !this.interactables || !pos) return null;
       let best = null;
       let bestScore = -999;
       for (let i = 0; i < this.interactables.length; i++) {
@@ -774,7 +863,7 @@
     },
 
     damageAt: function (worldPos, radius, dmg, isExplosion) {
-      if (!this.rootGroup || !worldPos) return null;
+      if (!this.rootGroup || this._isBuilding || !worldPos) return null;
       const oz = this.rootGroup.position.z || 0;
       const lx = worldPos.x;
       const ly = worldPos.y;
@@ -825,7 +914,7 @@
     },
 
     raycastHydrants: function (origin, dir, maxDist) {
-      if (!this.hydrants || !origin || !dir) return null;
+      if (this._isBuilding || !this.hydrants || !origin || !dir) return null;
       let best = null;
       let bestDist = maxDist || 200;
 

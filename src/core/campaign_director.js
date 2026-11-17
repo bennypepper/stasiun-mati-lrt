@@ -556,6 +556,20 @@
     );
   }
 
+  function initRideMoodTransition() {
+    if (CORE.gameMode !== MODES.SURVIVAL || CORE.lightingLockedByUser) return;
+    const fromIdx = CORE.stationIndex;
+    const toIdx = Math.max(0, fromIdx + CORE.activeTravelDir);
+    const moods = CORE.CAMPAIGN_MOODS || [];
+    const fromMood = moods[fromIdx % 6] || CORE.currentLightingKey || 'GOLDEN_DUSK';
+    const toMood = (fromIdx === 5 && CORE.activeTravelDir === 1)
+      ? fromMood
+      : (moods[toIdx % 6] || fromMood);
+    CORE._rideFromMoodKey = fromMood;
+    CORE._rideToMoodKey = toMood;
+    CORE.isMoodLerping = true;
+  }
+
   function departTrainNow() {
     if (CORE.gameState !== STATES.TRAIN_BOARDING) return;
     if (!LRT.Train) return;
@@ -569,6 +583,7 @@
     LRT.Train.departNow();
     CORE.gameState = STATES.TRAIN_DEPARTING;
     CORE.boardingCloseTimer = 0;
+    initRideMoodTransition();
     LRT.PlayerUI.setNotice('PINTU DITUTUP — BERANGKAT!', '#4ade80');
     campaignState.voTriggered.add('VO_24_DOOR_CLOSE');
     if (LRT.Audio && typeof LRT.Audio.playVoice === 'function') {
@@ -1002,7 +1017,7 @@
           if (LRT.Station && LRT.Station.dispose) LRT.Station.dispose(CORE.scene);
         },
         (incomingZ) => {
-          // Spawn next/previous station along corridor dynamically
+          // Spawn next/previous station along corridor dynamically (incremental build during cruise)
           saveCurrentStationUsedIds();
           const nextIdx = Math.max(0, CORE.stationIndex + CORE.activeTravelDir);
           const isBacktrack = CORE.activeTravelDir === -1;
@@ -1015,11 +1030,19 @@
             CORE.currentWave += 1;
           }
           CORE.wavesPerStation = 1;
-          if (CORE.buildStation) {
-            CORE.buildStation(CORE.stationIndex, incomingZ !== undefined ? incomingZ : (215 * CORE.activeTravelDir));
+          const spawnZ = incomingZ !== undefined ? incomingZ : (215 * CORE.activeTravelDir);
+          if (typeof CORE.beginBuildStation === 'function') {
+            CORE.beginBuildStation(CORE.stationIndex, spawnZ);
+          } else if (CORE.buildStation) {
+            CORE.buildStation(CORE.stationIndex, spawnZ);
           }
           CORE.rideCompleteReady = true;
           return LRT.Station;
+        },
+        (builtStats, builtZ) => {
+          if (typeof CORE.finishBuildStation === 'function') {
+            CORE.finishBuildStation(CORE.stationIndex, builtZ || 0, builtStats);
+          }
         }
       );
 
@@ -1037,6 +1060,18 @@
             if (LRT.Station && LRT.Station.setPsdOpen) LRT.Station.setPsdOpen(1, CORE.activeTravelDir);
             LRT.Train.openDoors();
             if (wasArrival) {
+              if (CORE.gameMode === MODES.SURVIVAL && !CORE.lightingLockedByUser) {
+                const finalMoodKey = CORE._rideToMoodKey || (CORE.CAMPAIGN_MOODS && CORE.CAMPAIGN_MOODS[CORE.stationIndex % 6]) || CORE.currentLightingKey;
+                if (finalMoodKey && typeof CORE.applyMoodLighting === 'function') {
+                  CORE.currentLightingKey = finalMoodKey;
+                  const stAtmos = (LRT.Station && typeof LRT.Station.getAtmosphere === 'function') ? LRT.Station.getAtmosphere() : null;
+                  const stStats = (LRT.Station && typeof LRT.Station.getStats === 'function') ? LRT.Station.getStats() : null;
+                  CORE.applyMoodLighting(stStats, stAtmos ? { ...stAtmos, moodKey: finalMoodKey } : { moodKey: finalMoodKey });
+                }
+              }
+              CORE._rideFromMoodKey = null;
+              CORE._rideToMoodKey = null;
+              CORE.isMoodLerping = false;
               const isNewStop = !campaignState.visitedStations.has(CORE.stationIndex);
               campaignState.visitedStations.add(CORE.stationIndex);
               if (isNewStop) {
@@ -1078,13 +1113,25 @@
           }
         } else if (trState === 'DEPARTING') {
           CORE.gameState = STATES.TRAIN_DEPARTING;
+          if (!CORE.isMoodLerping || !CORE._rideFromMoodKey || !CORE._rideToMoodKey) {
+            initRideMoodTransition();
+          }
           if (LRT.Station && LRT.Station.setPsdOpen) LRT.Station.setPsdOpen(0, CORE.activeTravelDir);
         } else if (trState === 'CRUISE') {
           CORE.gameState = STATES.TRAIN_CRUISE;
         } else if (trState === 'ARRIVING') {
           CORE.gameState = STATES.TRAIN_ARRIVING;
+          if (typeof CORE.markShadowDirty === 'function') CORE.markShadowDirty();
         }
         CORE.prevTrainState = trState;
+      }
+
+      if ((trState === 'DEPARTING' || trState === 'CRUISE' || trState === 'ARRIVING') &&
+          CORE.gameMode === MODES.SURVIVAL && !CORE.lightingLockedByUser &&
+          CORE._rideFromMoodKey && CORE._rideToMoodKey &&
+          typeof CORE.lerpMoodLighting === 'function' &&
+          typeof LRT.Train.getRideProgress === 'function') {
+        CORE.lerpMoodLighting(CORE._rideFromMoodKey, CORE._rideToMoodKey, LRT.Train.getRideProgress());
       }
 
       // Sync PSD smooth slide & disembark flow across both Peron 1 and Peron 2

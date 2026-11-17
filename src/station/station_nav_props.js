@@ -3,6 +3,7 @@
 
   window.__LRT_INTERNAL__ = window.__LRT_INTERNAL__ || {};
   const S = (window.__LRT_INTERNAL__.station = window.__LRT_INTERNAL__.station || {});
+  const _pooledStationLights = [];
 
   function buildStallsAndTubes(station, ctx) {
     const { UPPER_FLOOR_Y } = S.CONST;
@@ -329,7 +330,12 @@
     ctx.tubeCoords = tubeCoords;
   }
 
-  function buildDestructiblesAndNav(station, ctx) {
+  function buildDestructiblesAndNav(station, ctx, opts) {
+    const o = opts || {};
+    const doDestruct = !o.onlyFinalizeNav;
+    const doCitySync = !o.onlyDestructibles && !o.onlyFinalizeNav && !o.skipCity;
+    const doFinalizeNav = !o.onlyDestructibles;
+
     const {
       STREET_GROUND_Y, SIDEWALK_Y, TRACK_BED_Y, UPPER_FLOOR_Y,
       CROSSING_Z_SOUTH, CROSSING_Z_NORTH
@@ -353,6 +359,7 @@
       supX, supZ, rotioX, rotioZ, turnstileList, tubeCoords
     } = ctx;
 
+    if (doDestruct) {
     // =========================================================
     // 8. DESTRUCTIBLE PILLARS + SHATTERABLE GLASS + TUBES + DYNAMIC PROPS
     // =========================================================
@@ -791,18 +798,39 @@
     }
 
     // =========================================================
-    // 10. STATION POOLED POINTLIGHTS (2 DYNAMIC LIGHTS, NEVER TOGGLED VIA .visible!)
+    // 10. STATION POOLED POINTLIGHTS (2 PERSISTENT SCENE LIGHTS, NEVER REMOVED OR TOGGLED VIA .visible!)
     // =========================================================
     station.stationLights = [];
     const tubeInt = mood && mood.tubeIntensity !== undefined ? mood.tubeIntensity : 0.85;
     const pwr = station._powerRestored ? 1.0 : 0.22;
+    const poolScene = (ctx && ctx.scene) || (window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core && window.__LRT_INTERNAL__.core.scene) || root;
+    const stationOffsetZ = (station.rootGroup && station.rootGroup.position.z) || 0;
     const addPooledLight = (lx, ly, lz, colorHex, baseInt, dist, kind) => {
-      const l = new THREE.PointLight(colorHex, baseInt * tubeInt * station._lightingFactor * pwr, dist, 1.35);
-      l.position.set(lx, ly, lz);
-      l.visible = true; // NEVER toggle light.visible at runtime!
-      l.castShadow = false;
-      root.add(l);
-      station.stationLights.push({ light: l, baseIntensity: baseInt, kind: kind });
+      const slotIdx = station.stationLights.length;
+      let l = _pooledStationLights[slotIdx];
+      if (!l) {
+        l = new THREE.PointLight(colorHex, 0, dist, 1.35);
+        l.visible = true; // NEVER toggle light.visible at runtime!
+        l.castShadow = false;
+        _pooledStationLights[slotIdx] = l;
+      }
+      l.color.setHex(colorHex);
+      l.distance = dist;
+      l.decay = 1.35;
+      l.visible = true;
+      l.position.set(lx, ly, lz + stationOffsetZ);
+      l.intensity = station._isBuilding ? 0.0 : (baseInt * tubeInt * station._lightingFactor * pwr);
+      if (poolScene && l.parent !== poolScene) {
+        poolScene.add(l);
+      }
+      station.stationLights.push({
+        light: l,
+        baseIntensity: baseInt,
+        kind: kind,
+        homeX: lx,
+        homeY: ly,
+        homeZ: lz
+      });
     };
     addPooledLight(rotioX, 2.45, rotioZ + 1.35, 0xffb45a, 7.2, 26, 'warm');
     addPooledLight(p1MinX + 2.8, 3.85, 0.0, 0xd8ecff, 6.8, 30, 'cool');
@@ -841,22 +869,31 @@
     if (!isIsland) endApronSpans.push([p2MinX, p2MaxX]);
     else if (isCawang) endApronSpans.push([i2MinX, i2MaxX]);
 
-    if (LRT.City && typeof LRT.City.build === 'function') {
-      LRT.City.build(arch, rng, root, {
-        corridorMinX: corridorMinX,
-        corridorMaxX: corridorMaxX,
-        platMinZ: platMinZ,
-        platMaxZ: platMaxZ,
-        trackXs: trackXs,
-        endApronSpans: endApronSpans,
-        isIsland: isIsland,
-        isCawang: isCawang,
-        moodKey: chosenMoodKey,
-        tubeIntensity: tubeInt,
-        streetLampIntensity: mood && mood.streetLampIntensity !== undefined ? mood.streetLampIntensity : (mood && mood.isDaylight ? 0.0 : 2.0),
-        usedIds: station._usedIds
-      });
-      const cityCols = LRT.City.getColliders ? LRT.City.getColliders() : [];
+    ctx.cityBuildOpts = {
+      corridorMinX: corridorMinX,
+      corridorMaxX: corridorMaxX,
+      platMinZ: platMinZ,
+      platMaxZ: platMaxZ,
+      trackXs: trackXs,
+      endApronSpans: endApronSpans,
+      isIsland: isIsland,
+      isCawang: isCawang,
+      moodKey: chosenMoodKey,
+      tubeIntensity: tubeInt,
+      streetLampIntensity: mood && mood.streetLampIntensity !== undefined ? mood.streetLampIntensity : (mood && mood.isDaylight ? 0.0 : 2.0),
+      usedIds: station._usedIds,
+      scene: (ctx && ctx.scene) || null
+    };
+    }
+
+    if (doCitySync && LRT.City && typeof LRT.City.build === 'function') {
+      LRT.City.build(arch, rng, root, ctx.cityBuildOpts);
+    }
+
+    if (!doFinalizeNav) return;
+
+    if (LRT.City && typeof LRT.City.getColliders === 'function') {
+      const cityCols = LRT.City.getColliders();
       for (let ci = 0; ci < cityCols.length; ci++) {
         const cc = cityCols[ci];
         station._addCollider(cc.minX, cc.minY, cc.minZ, cc.maxX, cc.maxY, cc.maxZ, cc.tag, {
