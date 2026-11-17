@@ -588,6 +588,7 @@
   }
 
   function beginDeparture(stationRef) {
+    ejectExteriorEntities();
     T.pendingDepart = false;
     T.state = 'DEPARTING';
     T.speed = 0.0;

@@ -1612,6 +1612,11 @@
           }
         }
       }
+    } else if (
+      (CORE.gameState === STATES.TRAIN_DEPARTING || CORE.gameState === STATES.TRAIN_CRUISE || CORE.gameState === STATES.TRAIN_ARRIVING) &&
+      LRT.Enemies && typeof LRT.Enemies.updateDepartingIdle === 'function'
+    ) {
+      LRT.Enemies.updateDepartingIdle(dt);
     }
 
     // Periodic survival voice checks

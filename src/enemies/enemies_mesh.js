@@ -1100,6 +1100,18 @@
       _puddleBubbleMesh.visible = false;
       _puddleBubbleMesh.instanceMatrix.needsUpdate = true;
     }
+    if (E.enemyRoot) {
+      E.enemyRoot.position.set(0, 0, 0);
+      E.enemyRoot.updateMatrixWorld(true);
+    }
+  }
+
+  function setOffsetZ(z) {
+    const nextZ = Number.isFinite(z) ? z : 0;
+    if (E.enemyRoot) {
+      E.enemyRoot.position.z = nextZ;
+      E.enemyRoot.updateMatrixWorld(true);
+    }
   }
 
   function resolveBileFloorY(x, y, z, fallbackY) {
@@ -1776,6 +1788,7 @@
   E.flushMeshMatrices = flushMeshMatrices;
   E.setWarmupMode = setWarmupMode;
   E.resetMeshes = resetMeshes;
+  E.setOffsetZ = setOffsetZ;
   E.spawnBileProjectile = spawnBileProjectile;
   E.spawnBilePuddle = spawnBilePuddle;
   E.updateBileProjectiles = updateBileProjectiles;

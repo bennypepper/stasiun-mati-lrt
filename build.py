@@ -334,9 +334,9 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
     </div>
   </div>
 
-  <!-- Main Menu Overlay (Minimalist Transparent Aesthetic) -->
+  <!-- Main Menu Overlay (Cohesive AAA Title & Options Architecture) -->
   <div id="menu-overlay" class="overlay-screen menu-asymmetric">
-    <div class="menu-dock zenith-column">
+    <div class="menu-dock zenith-column" id="menu-main-view">
       <div class="zenith-header">
         <div class="zenith-kicker">JAKARTA LRT</div>
         <h1 class="zenith-title">STASIUN MATI</h1>
@@ -381,12 +381,26 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
       </nav>
     </div>
 
-    <!-- Right-side detail column: Settings / Controls expand here (not inside the left nav) -->
-    <div id="menu-settings-panel" class="menu-detail-panel hidden">
-      <div class="detail-title">SETTINGS</div>
+    <!-- Cohesive Full-Screen AAA Settings View (Replaces Main Menu in-place) -->
+    <div id="menu-settings-panel" class="menu-detail-panel aaa-subview-panel hidden">
+      <div class="aaa-subview-header">
+        <div class="aaa-subview-title-group">
+          <div class="zenith-kicker">STASIUN MATI &middot; OPTIONS</div>
+          <div class="detail-title">SETTINGS</div>
+        </div>
+        <div class="aaa-cat-tabs" role="tablist" aria-label="Settings Categories">
+          <button class="aaa-cat-tab active" data-settings-cat="all" type="button">ALL</button>
+          <button class="aaa-cat-tab" data-settings-cat="gameplay" type="button">GAMEPLAY</button>
+          <button class="aaa-cat-tab" data-settings-cat="display" type="button">DISPLAY</button>
+          <button class="aaa-cat-tab" data-settings-cat="graphics" type="button">GRAPHICS</button>
+          <button class="aaa-cat-tab" data-settings-cat="audio" type="button">AUDIO</button>
+        </div>
+        <button class="aaa-back-btn" id="btn-menu-settings-back" type="button">&larr; BACK</button>
+      </div>
 
-      <div class="setting-group">
-        <div class="setting-group-title">GAMEPLAY</div>
+      <div class="aaa-subview-body">
+        <div class="setting-group" data-cat="gameplay">
+          <div class="setting-group-title">GAMEPLAY</div>
           <div class="setting-row">
             <div class="setting-info">
               <span class="setting-label">DIFFICULTY</span>
@@ -409,10 +423,10 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
               <button class="zenith-tab" data-atmosphere="daylight_outbreak" type="button">DAYLIGHT&ndash;SUNSET</button>
             </div>
           </div>
-      </div>
+        </div>
 
-      <div class="setting-group">
-        <div class="setting-group-title">DISPLAY</div>
+        <div class="setting-group" data-cat="display">
+          <div class="setting-group-title">DISPLAY</div>
           <div class="setting-row">
             <div class="setting-info">
               <span class="setting-label">LIGHTING PRESET</span>
@@ -430,10 +444,10 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
             </div>
             <input type="range" id="brightness-slider" class="zenith-slider" min="0.4" max="1.8" step="0.05" value="1.0" aria-label="Atmosphere Brightness">
           </div>
-      </div>
+        </div>
 
-      <div class="setting-group">
-        <div class="setting-group-title">GRAPHICS</div>
+        <div class="setting-group" data-cat="graphics">
+          <div class="setting-group-title">GRAPHICS</div>
           <div class="setting-row">
             <div class="setting-info">
               <span class="setting-label">QUALITY PRESET</span>
@@ -489,10 +503,10 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
             </div>
             <button class="zenith-toggle is-off" id="btn-menu-fps" type="button">OFF</button>
           </div>
-      </div>
+        </div>
 
-      <div class="setting-group">
-        <div class="setting-group-title">AUDIO &amp; SUBTITLES</div>
+        <div class="setting-group" data-cat="audio">
+          <div class="setting-group-title">AUDIO &amp; SUBTITLES</div>
           <div class="setting-row">
             <div class="setting-info">
               <span class="setting-label">SOUND</span>
@@ -517,41 +531,50 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
               <button class="zenith-tab" data-sublang="en" type="button">ENGLISH</button>
             </div>
           </div>
+        </div>
       </div>
     </div>
 
-    <div id="menu-controls-panel" class="menu-detail-panel hidden">
-      <div class="detail-title">CONTROLS</div>
-      <div class="controls-list">
-        <div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-desc">Move</span></div>
-        <div class="ctrl-row"><span class="ctrl-key">SPACE</span><span class="ctrl-desc">Jump</span></div>
-        <div class="ctrl-row"><span class="ctrl-key">SHIFT / CTRL</span><span class="ctrl-desc">Sprint / Crouch</span></div>
-        <div class="ctrl-row"><span class="ctrl-key">LMB / RMB</span><span class="ctrl-desc">Fire / Aim (ADS)</span></div>
-        <div class="ctrl-row"><span class="ctrl-key">1-4 / WHEEL</span><span class="ctrl-desc">Switch Weapon</span></div>
-        <div class="ctrl-row"><span class="ctrl-key">R</span><span class="ctrl-desc">Reload</span></div>
-        <div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-desc">Melee Shove</span></div>
-        <div class="ctrl-row"><span class="ctrl-key">E</span><span class="ctrl-desc">Interact / Tap Kartu</span></div>
-        <div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-desc">Flashlight</span></div>
-        <div class="ctrl-row"><span class="ctrl-key">L</span><span class="ctrl-desc">Cycle Lighting</span></div>
-        <div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-desc">Summon / Depart LRT</span></div>
-        <div class="ctrl-row"><span class="ctrl-key">F3</span><span class="ctrl-desc">FPS Telemetry</span></div>
-        <div class="ctrl-row"><span class="ctrl-key">H</span><span class="ctrl-desc">Toggle HUD</span></div>
-        <div class="ctrl-row"><span class="ctrl-key">M</span><span class="ctrl-desc">Mute Audio</span></div>
-        <div class="ctrl-row"><span class="ctrl-key">` / ~</span><span class="ctrl-desc">Cheat Console</span></div>
+    <div id="menu-controls-panel" class="menu-detail-panel aaa-subview-panel hidden">
+      <div class="aaa-subview-header">
+        <div class="aaa-subview-title-group">
+          <div class="zenith-kicker">STASIUN MATI &middot; KEYBINDS</div>
+          <div class="detail-title">CONTROLS</div>
+        </div>
+        <button class="aaa-back-btn" id="btn-menu-controls-back" type="button">&larr; BACK</button>
+      </div>
+      <div class="aaa-subview-body">
+        <div class="controls-list">
+          <div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-desc">Move</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">SPACE</span><span class="ctrl-desc">Jump</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">SHIFT / CTRL</span><span class="ctrl-desc">Sprint / Crouch</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">LMB / RMB</span><span class="ctrl-desc">Fire / Aim (ADS)</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">1-4 / WHEEL</span><span class="ctrl-desc">Switch Weapon</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">R</span><span class="ctrl-desc">Reload</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-desc">Melee Shove</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">E</span><span class="ctrl-desc">Interact / Tap Kartu</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-desc">Flashlight</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">L</span><span class="ctrl-desc">Cycle Lighting</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-desc">Summon / Depart LRT</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">F3</span><span class="ctrl-desc">FPS Telemetry</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">H</span><span class="ctrl-desc">Toggle HUD</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">M</span><span class="ctrl-desc">Mute Audio</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">` / ~</span><span class="ctrl-desc">Cheat Console</span></div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Pause Overlay -->
-  <div id="pause-overlay" class="overlay-screen menu-asymmetric hidden">
-    <div class="zenith-column">
+  <!-- Pause Overlay (Centered AAA Pause Screen with Cohesive Subviews) -->
+  <div id="pause-overlay" class="overlay-screen overlay-centered hidden">
+    <div class="zenith-column pause-center-col" id="pause-main-view">
       <div class="zenith-header">
         <div class="zenith-kicker">JEDA PERMAINAN</div>
         <h1 class="zenith-title">PAUSED</h1>
         <div class="zenith-subtitle">STASIUN MATI</div>
       </div>
 
-      <nav class="zenith-nav" aria-label="Pause Menu">
+      <nav class="zenith-nav zenith-nav-centered" aria-label="Pause Menu">
         <button class="zenith-item" id="btn-resume" type="button">
           <span class="zenith-item-title">RESUME</span>
           <span class="zenith-item-sub">Return to station platform</span>
@@ -560,123 +583,238 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
           <span class="zenith-item-title">RESTART</span>
           <span class="zenith-item-sub">Reset current deployment</span>
         </button>
-      </nav>
-
-      <div class="zenith-subpanel pause-settings">
-        <div class="setting-row">
-          <span class="setting-label">DIFFICULTY</span>
-          <div class="zenith-tabs" id="pause-difficulty-group">
-            <button class="zenith-tab" data-difficulty="easy" type="button">EASY</button>
-            <button class="zenith-tab active" data-difficulty="medium" type="button">MEDIUM</button>
-            <button class="zenith-tab" data-difficulty="hard" type="button">HARD</button>
-            <button class="zenith-tab" data-difficulty="nightmare" type="button">NIGHTMARE</button>
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label" title="DAYLIGHT–SUNSET keeps daytime-to-sunset visibility with faster, sharper outbreak infected">TIME CYCLE</span>
-          <div class="zenith-tabs" id="pause-atmosphere-group">
-            <button class="zenith-tab active" data-atmosphere="night_horror" type="button" title="Classic dark horror progression">NIGHT HORROR</button>
-            <button class="zenith-tab" data-atmosphere="daylight_outbreak" type="button" title="Bright daytime-to-sunset lighting with faster outbreak infected">DAYLIGHT–SUNSET</button>
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">LIGHTING</span>
-          <button class="zenith-toggle" id="btn-pause-lighting" type="button">DAYLIGHT</button>
-        </div>
-
-        <div class="setting-block">
-          <div class="setting-head">
-            <span class="setting-label">BRIGHTNESS</span>
-            <span class="setting-readout" id="pause-brightness-readout">100% · DARK HORROR</span>
-          </div>
-          <input type="range" id="pause-brightness-slider" class="zenith-slider" min="0.4" max="1.8" step="0.05" value="1.0" aria-label="Pause Brightness">
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">QUALITY</span>
-          <div class="zenith-tabs" id="pause-quality-group">
-            <button class="zenith-tab" data-quality="potato" type="button">LOW</button>
-            <button class="zenith-tab active" data-quality="balanced" type="button">MEDIUM</button>
-            <button class="zenith-tab" data-quality="high" type="button">HIGH</button>
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">RENDER SCALE</span>
-          <div class="zenith-tabs" id="pause-resscale-group">
-            <button class="zenith-tab active" data-resscale="floor_720" type="button">720P</button>
-            <button class="zenith-tab" data-resscale="native" type="button">NATIVE</button>
-            <button class="zenith-tab" data-resscale="scale_125" type="button">1.25X</button>
-            <button class="zenith-tab" data-resscale="scale_150" type="button">1.5X</button>
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">SHADOWS</span>
-          <button class="zenith-toggle" id="btn-pause-shadows" type="button">ON</button>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">BLOOM</span>
-          <button class="zenith-toggle" id="btn-pause-bloom" type="button">ON</button>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">AO (N8AO)</span>
-          <div class="zenith-tabs" id="pause-ao-group">
-            <button class="zenith-tab active" data-ao="off" type="button">OFF</button>
-            <button class="zenith-tab" data-ao="half" type="button">HALF</button>
-            <button class="zenith-tab" data-ao="full" type="button">FULL</button>
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">FPS COUNTER</span>
-          <button class="zenith-toggle is-off" id="btn-pause-fps" type="button">OFF</button>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">AUDIO</span>
-          <button class="zenith-toggle" id="btn-pause-mute" type="button">ON</button>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">SUBTITLES</span>
-          <button class="zenith-toggle" id="btn-pause-subtitles" type="button">ON</button>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">SUBTITLE LANGUAGE</span>
-          <div class="zenith-tabs" id="pause-sublang-group">
-            <button class="zenith-tab active" data-sublang="id" type="button">INDONESIAN</button>
-            <button class="zenith-tab" data-sublang="en" type="button">ENGLISH</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="zenith-subpanel pause-logs-panel">
-        <div class="setting-head">
-          <span class="setting-label">CATATAN DITEMUKAN</span>
-          <span class="setting-readout" id="pause-logs-count">0 CATATAN</span>
-        </div>
-        <div class="pause-logs-list" id="pause-field-logs-list">
-          <div class="pause-log-empty">Belum ada catatan yang ditemukan.</div>
-        </div>
-      </div>
-
-      <nav class="zenith-nav zenith-nav-footer" aria-label="Pause Exit">
+        <button class="zenith-item" id="btn-pause-settings" type="button">
+          <span class="zenith-item-title">SETTINGS</span>
+          <span class="zenith-item-sub">Gameplay, display, graphics &amp; audio</span>
+        </button>
+        <button class="zenith-item" id="btn-pause-controls" type="button">
+          <span class="zenith-item-title">CONTROLS</span>
+          <span class="zenith-item-sub">Operator keybinds &amp; tactical inputs</span>
+        </button>
+        <button class="zenith-item" id="btn-pause-logs" type="button">
+          <span class="zenith-item-title">FIELD NOTES</span>
+          <span class="zenith-item-sub" id="pause-logs-nav-sub">0 Catatan ditemukan</span>
+        </button>
         <button class="zenith-item" id="btn-back-menu" type="button">
           <span class="zenith-item-title">RETURN TO MENU</span>
           <span class="zenith-item-sub">Abort deployment &amp; exit to title</span>
         </button>
       </nav>
     </div>
+
+    <!-- Pause Settings Subview (Consistent with Main Menu Settings) -->
+    <div id="pause-settings-panel" class="aaa-subview-panel pause-settings hidden">
+      <div class="aaa-subview-header">
+        <div class="aaa-subview-title-group">
+          <div class="zenith-kicker">JEDA PERMAINAN &middot; OPTIONS</div>
+          <div class="detail-title">SETTINGS</div>
+        </div>
+        <div class="aaa-cat-tabs" role="tablist" aria-label="Pause Settings Categories">
+          <button class="aaa-cat-tab active" data-settings-cat="all" type="button">ALL</button>
+          <button class="aaa-cat-tab" data-settings-cat="gameplay" type="button">GAMEPLAY</button>
+          <button class="aaa-cat-tab" data-settings-cat="display" type="button">DISPLAY</button>
+          <button class="aaa-cat-tab" data-settings-cat="graphics" type="button">GRAPHICS</button>
+          <button class="aaa-cat-tab" data-settings-cat="audio" type="button">AUDIO</button>
+        </div>
+        <button class="aaa-back-btn" id="btn-pause-settings-back" type="button">&larr; BACK</button>
+      </div>
+
+      <div class="aaa-subview-body">
+        <div class="setting-group" data-cat="gameplay">
+          <div class="setting-group-title">GAMEPLAY</div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">DIFFICULTY</span>
+              <span class="setting-desc">Controls enemy count, damage, and supply scarcity.</span>
+            </div>
+            <div class="zenith-tabs" id="pause-difficulty-group">
+              <button class="zenith-tab" data-difficulty="easy" type="button">EASY</button>
+              <button class="zenith-tab active" data-difficulty="medium" type="button">MEDIUM</button>
+              <button class="zenith-tab" data-difficulty="hard" type="button">HARD</button>
+              <button class="zenith-tab" data-difficulty="nightmare" type="button">NIGHTMARE</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">TIME CYCLE</span>
+              <span class="setting-desc">Choose dark night horror or bright daytime-to-sunset with faster enemies.</span>
+            </div>
+            <div class="zenith-tabs" id="pause-atmosphere-group">
+              <button class="zenith-tab active" data-atmosphere="night_horror" type="button">NIGHT HORROR</button>
+              <button class="zenith-tab" data-atmosphere="daylight_outbreak" type="button">DAYLIGHT&ndash;SUNSET</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="setting-group" data-cat="display">
+          <div class="setting-group-title">DISPLAY</div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">LIGHTING PRESET</span>
+              <span class="setting-desc">Cycles the sky and atmosphere mood in-game.</span>
+            </div>
+            <button class="zenith-toggle" id="btn-pause-lighting" type="button">DAYLIGHT</button>
+          </div>
+
+          <div class="setting-block">
+            <div class="setting-head">
+              <div class="setting-info">
+                <span class="setting-label">BRIGHTNESS</span>
+                <span class="setting-desc">Adjusts overall scene exposure for dark stations.</span>
+              </div>
+              <span class="setting-readout" id="pause-brightness-readout">100% DARK HORROR</span>
+            </div>
+            <input type="range" id="pause-brightness-slider" class="zenith-slider" min="0.4" max="1.8" step="0.05" value="1.0" aria-label="Pause Brightness">
+          </div>
+        </div>
+
+        <div class="setting-group" data-cat="graphics">
+          <div class="setting-group-title">GRAPHICS</div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">QUALITY PRESET</span>
+              <span class="setting-desc">Overall visual fidelity and performance balance from Low to High.</span>
+            </div>
+            <div class="zenith-tabs" id="pause-quality-group">
+              <button class="zenith-tab" data-quality="potato" type="button">LOW</button>
+              <button class="zenith-tab active" data-quality="balanced" type="button">MEDIUM</button>
+              <button class="zenith-tab" data-quality="high" type="button">HIGH</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">RENDER SCALE</span>
+              <span class="setting-desc">Internal 3D rendering resolution.</span>
+            </div>
+            <div class="zenith-tabs" id="pause-resscale-group">
+              <button class="zenith-tab active" data-resscale="floor_720" type="button">720P</button>
+              <button class="zenith-tab" data-resscale="native" type="button">NATIVE</button>
+              <button class="zenith-tab" data-resscale="scale_125" type="button">1.25X</button>
+              <button class="zenith-tab" data-resscale="scale_150" type="button">1.5X</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">SHADOWS</span>
+              <span class="setting-desc">Dynamic directional shadows from pillars and enemies.</span>
+            </div>
+            <button class="zenith-toggle" id="btn-pause-shadows" type="button">ON</button>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">BLOOM</span>
+              <span class="setting-desc">Soft light glow on lamps and muzzle flashes.</span>
+            </div>
+            <button class="zenith-toggle" id="btn-pause-bloom" type="button">ON</button>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">AMBIENT OCCLUSION</span>
+              <span class="setting-desc">Contact shading in corners and beneath objects.</span>
+            </div>
+            <div class="zenith-tabs" id="pause-ao-group">
+              <button class="zenith-tab active" data-ao="off" type="button">OFF</button>
+              <button class="zenith-tab" data-ao="half" type="button">HALF</button>
+              <button class="zenith-tab" data-ao="full" type="button">FULL</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">FPS COUNTER</span>
+              <span class="setting-desc">Displays frame rate in the top-right corner.</span>
+            </div>
+            <button class="zenith-toggle is-off" id="btn-pause-fps" type="button">OFF</button>
+          </div>
+        </div>
+
+        <div class="setting-group" data-cat="audio">
+          <div class="setting-group-title">AUDIO &amp; SUBTITLES</div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">SOUND</span>
+              <span class="setting-desc">Master audio for sound effects, ambience, and voiceover.</span>
+            </div>
+            <button class="zenith-toggle" id="btn-pause-mute" type="button">ON</button>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">SUBTITLES</span>
+              <span class="setting-desc">Show or hide voiceover subtitles at the bottom of the screen.</span>
+            </div>
+            <button class="zenith-toggle" id="btn-pause-subtitles" type="button">ON</button>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">SUBTITLE LANGUAGE</span>
+              <span class="setting-desc">Display subtitles in either Indonesian or English.</span>
+            </div>
+            <div class="zenith-tabs" id="pause-sublang-group">
+              <button class="zenith-tab active" data-sublang="id" type="button">INDONESIAN</button>
+              <button class="zenith-tab" data-sublang="en" type="button">ENGLISH</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pause Controls Subview -->
+    <div id="pause-controls-panel" class="aaa-subview-panel hidden">
+      <div class="aaa-subview-header">
+        <div class="aaa-subview-title-group">
+          <div class="zenith-kicker">JEDA PERMAINAN &middot; KEYBINDS</div>
+          <div class="detail-title">CONTROLS</div>
+        </div>
+        <button class="aaa-back-btn" id="btn-pause-controls-back" type="button">&larr; BACK</button>
+      </div>
+      <div class="aaa-subview-body">
+        <div class="controls-list">
+          <div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-desc">Move</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">SPACE</span><span class="ctrl-desc">Jump</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">SHIFT / CTRL</span><span class="ctrl-desc">Sprint / Crouch</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">LMB / RMB</span><span class="ctrl-desc">Fire / Aim (ADS)</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">1-4 / WHEEL</span><span class="ctrl-desc">Switch Weapon</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">R</span><span class="ctrl-desc">Reload</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-desc">Melee Shove</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">E</span><span class="ctrl-desc">Interact / Tap Kartu</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-desc">Flashlight</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">L</span><span class="ctrl-desc">Cycle Lighting</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-desc">Summon / Depart LRT</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">F3</span><span class="ctrl-desc">FPS Telemetry</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">H</span><span class="ctrl-desc">Toggle HUD</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">M</span><span class="ctrl-desc">Mute Audio</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">` / ~</span><span class="ctrl-desc">Cheat Console</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pause Field Notes Subview -->
+    <div id="pause-logs-panel" class="aaa-subview-panel pause-logs-panel hidden">
+      <div class="aaa-subview-header">
+        <div class="aaa-subview-title-group">
+          <div class="zenith-kicker">ARSIP LAPANGAN</div>
+          <div class="detail-title">CATATAN DITEMUKAN</div>
+        </div>
+        <span class="setting-readout" id="pause-logs-count">0 CATATAN</span>
+        <button class="aaa-back-btn" id="btn-pause-logs-back" type="button">&larr; BACK</button>
+      </div>
+      <div class="aaa-subview-body">
+        <div class="pause-logs-list" id="pause-field-logs-list">
+          <div class="pause-log-empty">Belum ada catatan yang ditemukan.</div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- Game Over Overlay -->
-  <div id="gameover-overlay" class="overlay-screen menu-asymmetric hidden">
+  <!-- Game Over Overlay (Centered Death Screen; Dual-Column when Victory Credits active) -->
+  <div id="gameover-overlay" class="overlay-screen overlay-centered hidden">
     <div class="zenith-column gameover-summary-col">
       <div class="zenith-header">
         <div class="zenith-kicker kicker-alert">JALUR TERPUTUS</div>
@@ -684,7 +822,7 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
         <div class="zenith-subtitle gameover-readout" id="gameover-stats">Stations Cleared: 0, Kills: 0</div>
       </div>
 
-      <nav class="zenith-nav" aria-label="Game Over Menu">
+      <nav class="zenith-nav zenith-nav-centered" aria-label="Game Over Menu">
         <button class="zenith-item" id="btn-retry" type="button">
           <span class="zenith-item-title">RETRY SURVIVAL</span>
           <span class="zenith-item-sub">Redeploy to Dukuh Atas BSI</span>

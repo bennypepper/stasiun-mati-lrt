@@ -2457,9 +2457,74 @@
     return ejected;
   }
 
+  // Keeps station zombies animating in-place (without chasing the moving train) while the old station scrolls away
+  function updateDepartingIdle(dt) {
+    if (!E.initialized) return;
+    const step = Math.min(dt || 0.016, 0.05);
+    _elapsed += step;
+    let anyMatrixUpdated = false;
+    let deactivationDirty = false;
+    let colorDirty = false;
+    let highWater = 0;
+    let hasBruteArmor = false;
+    let hasBio = false;
+    let hasRag = false;
+
+    for (let i = 0; i < MAX_ENEMIES; i++) {
+      const z = E.zombies[i];
+      if (!z || (!z.active && !z.dead)) continue;
+
+      if (z.hitFlashTimer > 0) {
+        z.hitFlashTimer -= step;
+        if (z.hitFlashTimer <= 0) {
+          z.hitFlashTimer = 0;
+          E.applyZombieColors(z);
+          colorDirty = true;
+        }
+      }
+
+      if (z.dead) {
+        z.deathTimer += step;
+        z.x += z.vx * step;
+        z.z += z.vz * step;
+        z.vx *= Math.max(0, 1 - step * 6.0);
+        z.vz *= Math.max(0, 1 - step * 6.0);
+        if (z.deathTimer >= 12.0) {
+          z.active = false;
+          z.dead = false;
+          E.zeroZombieMatrices(z.id);
+          deactivationDirty = true;
+          continue;
+        }
+      } else {
+        z.vx *= Math.max(0, 1 - step * 8.0);
+        z.vz *= Math.max(0, 1 - step * 8.0);
+        z.x += z.vx * step;
+        z.z += z.vz * step;
+        z.animPhase += step * 1.4;
+      }
+
+      highWater = i + 1;
+      if (z.variant === 'brute' && z.hasArmor && !z.dead) hasBruteArmor = true;
+      if ((z.variant === 'spitter' || z.variant === 'screamer') && !z.dead) hasBio = true;
+      if ((z.variant === 'walker' || z.variant === 'runner') && !z.dead) hasRag = true;
+
+      E.updateZombieMatrices(z, _elapsed);
+      z.matrixInit = true;
+      anyMatrixUpdated = true;
+    }
+
+    if (anyMatrixUpdated || deactivationDirty) {
+      E.updateOverlayVisibilityAndCounts(highWater, hasBruteArmor, hasBio, hasRag, true);
+    }
+    if (colorDirty) E.markColorsDirty();
+  }
+
   const Enemies = {
     init,
     reset,
+    setOffsetZ: E.setOffsetZ,
+    updateDepartingIdle,
     setWarmupMode: E.setWarmupMode,
     setDifficulty,
     getDifficulty,

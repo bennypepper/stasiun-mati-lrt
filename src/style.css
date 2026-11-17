@@ -772,37 +772,59 @@ html, body {
   padding: 0;
 }
 
+.overlay-screen.overlay-centered {
+  align-items: center;
+  justify-content: center;
+}
+
 #menu-overlay.menu-asymmetric {
   background: linear-gradient(
     90deg,
-    rgba(4, 6, 10, 0.86) 0%,
-    rgba(4, 6, 10, 0.48) 38%,
-    rgba(4, 6, 10, 0.08) 72%,
-    rgba(4, 6, 10, 0.30) 100%
+    rgba(4, 6, 10, 0.88) 0%,
+    rgba(4, 6, 10, 0.52) 38%,
+    rgba(4, 6, 10, 0.08) 74%,
+    rgba(4, 6, 10, 0.28) 100%
   );
   backdrop-filter: none;
+  transition: background 0.22s ease;
+}
+
+#menu-overlay.menu-asymmetric.subview-open {
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(6, 8, 13, 0.86) 0%,
+    rgba(3, 5, 8, 0.95) 100%
+  );
+  backdrop-filter: blur(6px);
 }
 
 #pause-overlay {
-  background: linear-gradient(
-    90deg,
-    rgba(4, 6, 10, 0.92) 0%,
-    rgba(4, 6, 10, 0.70) 44%,
-    rgba(4, 6, 10, 0.46) 100%
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(6, 8, 13, 0.82) 0%,
+    rgba(3, 4, 7, 0.94) 100%
   );
-  backdrop-filter: none;
+  backdrop-filter: blur(5px);
 }
 
 #gameover-overlay {
+  align-items: center;
+  justify-content: center;
   background: radial-gradient(
-    circle at 30% 45%,
-    rgba(32, 8, 10, 0.72) 0%,
-    rgba(4, 5, 8, 0.94) 76%
+    circle at 50% 46%,
+    rgba(38, 8, 10, 0.76) 0%,
+    rgba(4, 5, 8, 0.95) 74%
   );
-  backdrop-filter: none;
+  backdrop-filter: blur(3px);
 }
 
 #gameover-overlay.is-victory {
+  align-items: stretch;
+  justify-content: flex-start;
   background: radial-gradient(
     circle at 26% 44%,
     rgba(36, 28, 14, 0.74) 0%,
@@ -1044,21 +1066,36 @@ html, body {
   color: var(--bone-soft);
 }
 
-/* Completely transparent left column — NO card box, NO borders */
+/* Completely transparent column — NO card box, NO borders, NO AI-slop stroke bars */
 .zenith-column,
 .menu-dock {
   width: clamp(390px, 42vw, 540px);
   height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  padding: clamp(22px, 3.8vh, 44px) clamp(26px, 3.5vw, 48px) clamp(18px, 3vh, 28px);
+  justify-content: center;
+  padding: clamp(28px, 5vh, 56px) clamp(36px, 5vw, 76px);
   background: transparent;
   border: none;
   box-shadow: none;
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: none;
+}
+
+.menu-dock.subview-hidden {
+  display: none !important;
+}
+
+.pause-center-col,
+#gameover-overlay:not(.is-victory) .gameover-summary-col {
+  width: min(560px, 90vw);
+  height: auto;
+  max-height: 92vh;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: clamp(24px, 4vh, 44px) clamp(24px, 4vw, 48px);
 }
 
 #menu-overlay .menu-dock {
@@ -1076,15 +1113,23 @@ html, body {
 }
 
 .zenith-header {
-  margin-bottom: clamp(16px, 2.8vh, 32px);
+  margin-bottom: clamp(22px, 3.6vh, 40px);
+}
+
+.pause-center-col .zenith-header,
+#gameover-overlay:not(.is-victory) .zenith-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
 .zenith-kicker {
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.24em;
-  color: var(--ash);
+  letter-spacing: 0.28em;
+  color: rgba(212, 208, 198, 0.48);
   text-transform: uppercase;
   margin-bottom: 10px;
 }
@@ -1095,21 +1140,21 @@ html, body {
 
 .zenith-title {
   margin: 0;
-  font-size: clamp(30px, 3.3vw, 44px);
+  font-size: clamp(32px, 3.5vw, 48px);
   font-weight: 300;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.24em;
   line-height: 1.1;
   color: var(--bone);
   text-transform: uppercase;
-  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.65);
+  text-shadow: 0 2px 28px rgba(0, 0, 0, 0.75);
 }
 
 .zenith-subtitle {
   margin-top: 8px;
   font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.34em;
-  color: var(--ash);
+  font-weight: 400;
+  letter-spacing: 0.36em;
+  color: rgba(212, 208, 198, 0.46);
   text-transform: uppercase;
 }
 
@@ -1117,15 +1162,20 @@ html, body {
   margin-top: 14px;
   font-family: var(--font-mono);
   font-size: 12px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   color: var(--bone-soft);
 }
 
-/* Vertical Borderless Menu Options */
+/* Vertical Borderless Menu Options — Pure AAA Typographic Hierarchy (No left stroke bar, no box) */
 .zenith-nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
+  width: 100%;
+}
+
+.zenith-nav-centered {
+  align-items: center;
 }
 
 .zenith-nav-footer {
@@ -1140,14 +1190,19 @@ html, body {
   width: 100%;
   max-width: 100%;
   overflow: hidden;
-  padding: 6px 18px 6px 14px;
+  padding: 5px 0;
   background: transparent;
   border: none;
-  border-left: 2px solid transparent;
   text-align: left;
   cursor: pointer;
-  color: rgba(242, 240, 234, 0.72);
-  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+  color: rgba(242, 240, 234, 0.50);
+  transition: color 0.18s ease, transform 0.18s ease, text-shadow 0.18s ease;
+}
+
+.zenith-nav-centered .zenith-item,
+#gameover-overlay:not(.is-victory) .zenith-item {
+  align-items: center;
+  text-align: center;
 }
 
 .zenith-item > * {
@@ -1156,9 +1211,9 @@ html, body {
 
 .zenith-item-title {
   font-family: var(--font-sans);
-  font-size: clamp(15px, 1.35vw, 19px);
-  font-weight: 400;
-  letter-spacing: 0.20em;
+  font-size: clamp(16px, 1.4vw, 20px);
+  font-weight: 300;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   line-height: 1.25;
   max-width: 100%;
@@ -1167,9 +1222,9 @@ html, body {
 .zenith-item-sub {
   font-family: var(--font-sans);
   font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0.04em;
-  color: var(--ash);
+  font-weight: 300;
+  letter-spacing: 0.05em;
+  color: rgba(212, 208, 198, 0.54);
   width: 100%;
   max-width: 100%;
   height: 16px;
@@ -1187,68 +1242,29 @@ html, body {
 .zenith-item.active {
   outline: none;
   color: #ffffff;
-  border-left-color: rgba(242, 240, 234, 0.78);
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.08) 0%,
-    rgba(255, 255, 255, 0.02) 65%,
-    transparent 100%
-  );
+  background: transparent;
+  transform: translateX(4px);
+  text-shadow: 0 0 22px rgba(255, 255, 255, 0.28), 0 2px 12px rgba(0, 0, 0, 0.92);
+}
+
+.zenith-nav-centered .zenith-item:hover,
+.zenith-nav-centered .zenith-item:focus-visible,
+.zenith-nav-centered .zenith-item.active,
+#gameover-overlay:not(.is-victory) .zenith-item:hover,
+#gameover-overlay:not(.is-victory) .zenith-item:focus-visible,
+#gameover-overlay:not(.is-victory) .zenith-item.active {
+  transform: none;
 }
 
 .zenith-item:hover .zenith-item-sub,
 .zenith-item:focus-visible .zenith-item-sub,
 .zenith-item.active .zenith-item-sub {
-  opacity: 0.85;
+  opacity: 0.82;
 }
 
-/* Collapsible Minimalist Sub-panels (Settings & Controls) */
-.zenith-subpanel {
-  margin: 4px 0 10px 12px;
-  padding: 12px 18px;
-  border-left: 2px solid rgba(242, 240, 234, 0.28);
-  background: linear-gradient(
-    90deg,
-    rgba(6, 8, 12, 0.72) 0%,
-    rgba(6, 8, 12, 0.34) 75%,
-    transparent 100%
-  );
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.pause-settings {
-  margin-top: 12px;
-}
-
-#menu-settings-panel,
-.pause-settings {
-  max-height: min(64vh, 520px);
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(242, 240, 234, 0.20) transparent;
-}
-
-#menu-settings-panel::-webkit-scrollbar,
-.pause-settings::-webkit-scrollbar {
-  width: 3px;
-}
-
-#menu-settings-panel::-webkit-scrollbar-track,
-.pause-settings::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-#menu-settings-panel::-webkit-scrollbar-thumb,
-.pause-settings::-webkit-scrollbar-thumb,
 .pause-logs-list::-webkit-scrollbar-thumb {
   background: rgba(242, 240, 234, 0.20);
   border-radius: 2px;
-}
-
-.pause-logs-panel {
-  margin-top: 10px;
 }
 .pause-logs-list {
   display: flex;
@@ -1867,101 +1883,239 @@ html, body {
 }
 
 /* =========================================================
-   MAIN MENU — right-side expanding detail panels (Settings / Controls)
+   COHESIVE AAA FULL-SCREEN SUBVIEWS (Settings / Controls / Logs)
+   — Single unified screen, NO floating right square box, NO border/stroke slop
    ========================================================= */
+.aaa-subview-panel,
 .menu-detail-panel {
-  position: absolute;
-  top: 50%;
-  right: clamp(24px, 4vw, 72px);
-  transform: translateY(-50%);
-  width: min(610px, 47vw);
-  max-height: 85vh;
-  overflow-y: auto;
-  padding: 30px 36px 34px;
-  background: rgba(6, 8, 12, 0.72);
-  backdrop-filter: blur(6px);
-  border: 1px solid rgba(242, 240, 234, 0.08);
-  border-radius: 2px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.58);
-  scrollbar-width: thin;
-  scrollbar-color: rgba(242, 240, 234, 0.22) transparent;
+  position: relative;
+  width: min(820px, 88vw);
+  max-height: min(84vh, 760px);
+  display: flex;
+  flex-direction: column;
+  padding: clamp(20px, 3vh, 36px) 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
   z-index: 31;
 }
-.menu-detail-panel.hidden { display: none; }
-.menu-detail-panel::-webkit-scrollbar { width: 4px; }
-.menu-detail-panel::-webkit-scrollbar-thumb { background: rgba(242, 240, 234, 0.22); }
 
-.menu-detail-panel .detail-title {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.30em;
-  color: var(--bone);
-  padding-bottom: 14px;
-  margin-bottom: 6px;
+.aaa-subview-panel.hidden,
+.menu-detail-panel.hidden {
+  display: none !important;
+}
+
+.aaa-subview-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  padding-bottom: 18px;
+  margin-bottom: 10px;
   border-bottom: 1px solid rgba(242, 240, 234, 0.14);
+  flex-shrink: 0;
+}
+
+.aaa-subview-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.aaa-subview-title-group .zenith-kicker {
+  margin-bottom: 0;
+}
+
+.aaa-subview-header .detail-title {
+  font-family: var(--font-sans);
+  font-size: clamp(24px, 2.4vw, 32px);
+  font-weight: 300;
+  letter-spacing: 0.24em;
+  color: var(--bone);
+  text-transform: uppercase;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.aaa-cat-tabs {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.aaa-cat-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  padding: 4px 0;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 400;
+  letter-spacing: 0.20em;
+  color: rgba(212, 208, 198, 0.44);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.aaa-cat-tab:hover,
+.aaa-cat-tab:focus-visible {
+  outline: none;
+  color: rgba(242, 240, 234, 0.85);
+}
+
+.aaa-cat-tab.active {
+  color: #ffffff;
+  border-bottom-color: rgba(242, 240, 234, 0.85);
+}
+
+.aaa-back-btn {
+  background: transparent;
+  border: none;
+  padding: 4px 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.22em;
+  color: rgba(242, 240, 234, 0.62);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.16s ease, transform 0.16s ease;
+}
+
+.aaa-back-btn:hover,
+.aaa-back-btn:focus-visible {
+  outline: none;
+  color: #ffffff;
+  transform: translateX(-3px);
+}
+
+.aaa-subview-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(242, 240, 234, 0.18) transparent;
+}
+
+.aaa-subview-body::-webkit-scrollbar {
+  width: 3px;
+}
+
+.aaa-subview-body::-webkit-scrollbar-thumb {
+  background: rgba(242, 240, 234, 0.18);
 }
 
 .setting-group {
-  margin-top: 28px;
+  margin-top: 24px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
 }
+
+.setting-group:first-child {
+  margin-top: 8px;
+}
+
 .setting-group-title {
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.26em;
-  color: var(--amber-muted, #c2a062);
-  padding-bottom: 8px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  color: rgba(212, 208, 198, 0.42);
+  padding-bottom: 6px;
   margin-bottom: 2px;
   border-bottom: 1px solid rgba(242, 240, 234, 0.08);
 }
 
-.menu-detail-panel .setting-row,
-.menu-detail-panel .setting-block {
-  padding-bottom: 14px;
-  border-bottom: 1px solid rgba(242, 240, 234, 0.045);
+.aaa-subview-panel .setting-row,
+.aaa-subview-panel .setting-block {
+  padding: 6px 0 12px;
+  border-bottom: 1px solid rgba(242, 240, 234, 0.05);
 }
-.menu-detail-panel .setting-row:last-child,
-.menu-detail-panel .setting-block:last-child {
-  padding-bottom: 0;
+
+.aaa-subview-panel .setting-row:last-child,
+.aaa-subview-panel .setting-block:last-child {
   border-bottom: none;
 }
 
-.menu-detail-panel .setting-row,
-.menu-detail-panel .setting-head {
+.aaa-subview-panel .setting-row,
+.aaa-subview-panel .setting-head {
   align-items: center;
   flex-wrap: nowrap;
   gap: 24px;
 }
-.setting-info { display: flex; flex-direction: column; gap: 5px; min-width: 0; flex: 1 1 auto; }
+
+.setting-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: left;
+}
+
 .setting-desc {
   font-family: var(--font-sans);
   font-size: 11.5px;
   font-weight: 300;
-  line-height: 1.48;
+  line-height: 1.45;
   letter-spacing: 0.01em;
-  color: rgba(242, 240, 234, 0.52);
+  color: rgba(212, 208, 198, 0.48);
   text-transform: none;
 }
-.menu-detail-panel .zenith-tabs { flex: 0 0 auto; max-width: 56%; gap: 14px; }
-.menu-detail-panel .zenith-toggle { flex: 0 0 auto; }
-.menu-detail-panel .setting-label { flex-shrink: 1; font-size: 11px; letter-spacing: 0.20em; }
+
+.aaa-subview-panel .zenith-tabs {
+  flex: 0 0 auto;
+  max-width: 58%;
+  gap: 16px;
+}
+
+.aaa-subview-panel .zenith-toggle {
+  flex: 0 0 auto;
+}
+
+.aaa-subview-panel .setting-label {
+  flex-shrink: 1;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  color: rgba(242, 240, 234, 0.88);
+}
+
+.aaa-subview-panel .controls-list {
+  margin-top: 12px;
+  gap: 12px 36px;
+}
+
+.aaa-subview-panel .ctrl-row {
+  padding: 8px 0;
+  font-size: 12px;
+}
+
+.aaa-subview-panel .pause-logs-list {
+  max-height: 62vh;
+  margin-top: 10px;
+}
 
 @media (max-width: 900px) {
+  .aaa-subview-panel,
   .menu-detail-panel {
-    position: fixed;
-    top: auto;
-    bottom: 12px;
-    left: 12px;
-    right: 12px;
-    transform: none;
-    width: auto;
-    max-height: 58vh;
+    width: 92vw;
+    max-height: 88vh;
   }
-  .menu-detail-panel .setting-row,
-  .menu-detail-panel .setting-head { flex-wrap: wrap; }
-  .menu-detail-panel .zenith-tabs { max-width: 100%; justify-content: flex-start; }
+  .aaa-subview-panel .setting-row,
+  .aaa-subview-panel .setting-head {
+    flex-wrap: wrap;
+  }
+  .aaa-subview-panel .zenith-tabs {
+    max-width: 100%;
+    justify-content: flex-start;
+  }
 }

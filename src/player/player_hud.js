@@ -121,7 +121,12 @@
       'btn-menu-shadows', 'btn-pause-shadows',
       'btn-menu-bloom', 'btn-pause-bloom',
       'menu-ao-group', 'pause-ao-group',
-      'btn-menu-fps', 'btn-pause-fps'
+      'btn-menu-fps', 'btn-pause-fps',
+      'menu-main-view', 'btn-menu-settings-back', 'btn-menu-controls-back',
+      'pause-main-view', 'btn-pause-settings', 'btn-pause-controls', 'btn-pause-logs',
+      'pause-settings-panel', 'pause-controls-panel', 'pause-logs-panel',
+      'btn-pause-settings-back', 'btn-pause-controls-back', 'btn-pause-logs-back',
+      'pause-logs-nav-sub'
     ];
     for (const id of ids) {
       dom[id] = document.getElementById(id);
@@ -159,13 +164,48 @@
     }
   }
 
+  function applySettingsCategoryFilter(panelEl, catKey) {
+    if (!panelEl) return;
+    const activeCat = catKey || 'all';
+    panelEl.querySelectorAll('[data-settings-cat]').forEach((tab) => {
+      tab.classList.toggle('active', tab.dataset.settingsCat === activeCat);
+    });
+    panelEl.querySelectorAll('.setting-group[data-cat]').forEach((grp) => {
+      grp.classList.toggle('hidden', activeCat !== 'all' && grp.dataset.cat !== activeCat);
+    });
+  }
+
   function setMenuSubpanel(panelName) {
     const showSettings = panelName === 'settings';
     const showControls = panelName === 'controls';
-    if (dom['menu-settings-panel']) dom['menu-settings-panel'].classList.toggle('hidden', !showSettings);
+    const anySub = showSettings || showControls;
+    if (dom['menu-overlay']) dom['menu-overlay'].classList.toggle('subview-open', anySub);
+    if (dom['menu-main-view']) dom['menu-main-view'].classList.toggle('subview-hidden', anySub);
+    if (dom['menu-settings-panel']) {
+      dom['menu-settings-panel'].classList.toggle('hidden', !showSettings);
+      if (showSettings) applySettingsCategoryFilter(dom['menu-settings-panel'], 'all');
+    }
     if (dom['menu-controls-panel']) dom['menu-controls-panel'].classList.toggle('hidden', !showControls);
     if (dom['btn-menu-settings']) dom['btn-menu-settings'].classList.toggle('active', showSettings);
     if (dom['btn-menu-controls']) dom['btn-menu-controls'].classList.toggle('active', showControls);
+  }
+
+  function setPauseSubpanel(panelName) {
+    const showSettings = panelName === 'settings';
+    const showControls = panelName === 'controls';
+    const showLogs = panelName === 'logs';
+    const anySub = showSettings || showControls || showLogs;
+    if (dom['pause-overlay']) dom['pause-overlay'].classList.toggle('subview-open', anySub);
+    if (dom['pause-main-view']) dom['pause-main-view'].classList.toggle('hidden', anySub);
+    if (dom['pause-settings-panel']) {
+      dom['pause-settings-panel'].classList.toggle('hidden', !showSettings);
+      if (showSettings) applySettingsCategoryFilter(dom['pause-settings-panel'], 'all');
+    }
+    if (dom['pause-controls-panel']) dom['pause-controls-panel'].classList.toggle('hidden', !showControls);
+    if (dom['pause-logs-panel']) dom['pause-logs-panel'].classList.toggle('hidden', !showLogs);
+    if (dom['btn-pause-settings']) dom['btn-pause-settings'].classList.toggle('active', showSettings);
+    if (dom['btn-pause-controls']) dom['btn-pause-controls'].classList.toggle('active', showControls);
+    if (dom['btn-pause-logs']) dom['btn-pause-logs'].classList.toggle('active', showLogs);
   }
 
   function setNotice(text, color) {
@@ -251,6 +291,9 @@
       : [];
     if (countEl) {
       countEl.textContent = `${logs.length} Catatan`;
+    }
+    if (dom['pause-logs-nav-sub']) {
+      dom['pause-logs-nav-sub'].textContent = `${logs.length} Catatan ditemukan`;
     }
     listEl.innerHTML = '';
     if (logs.length === 0) {
@@ -693,6 +736,61 @@
         setMenuSubpanel(isOpen ? null : 'controls');
       });
     }
+    if (dom['btn-menu-settings-back']) {
+      dom['btn-menu-settings-back'].addEventListener('click', () => setMenuSubpanel(null));
+    }
+    if (dom['btn-menu-controls-back']) {
+      dom['btn-menu-controls-back'].addEventListener('click', () => setMenuSubpanel(null));
+    }
+    if (dom['btn-pause-settings']) {
+      dom['btn-pause-settings'].addEventListener('click', () => {
+        const isOpen = dom['pause-settings-panel'] && !dom['pause-settings-panel'].classList.contains('hidden');
+        setPauseSubpanel(isOpen ? null : 'settings');
+      });
+    }
+    if (dom['btn-pause-controls']) {
+      dom['btn-pause-controls'].addEventListener('click', () => {
+        const isOpen = dom['pause-controls-panel'] && !dom['pause-controls-panel'].classList.contains('hidden');
+        setPauseSubpanel(isOpen ? null : 'controls');
+      });
+    }
+    if (dom['btn-pause-logs']) {
+      dom['btn-pause-logs'].addEventListener('click', () => {
+        const isOpen = dom['pause-logs-panel'] && !dom['pause-logs-panel'].classList.contains('hidden');
+        setPauseSubpanel(isOpen ? null : 'logs');
+      });
+    }
+    if (dom['btn-pause-settings-back']) {
+      dom['btn-pause-settings-back'].addEventListener('click', () => setPauseSubpanel(null));
+    }
+    if (dom['btn-pause-controls-back']) {
+      dom['btn-pause-controls-back'].addEventListener('click', () => setPauseSubpanel(null));
+    }
+    if (dom['btn-pause-logs-back']) {
+      dom['btn-pause-logs-back'].addEventListener('click', () => setPauseSubpanel(null));
+    }
+    [dom['menu-settings-panel'], dom['pause-settings-panel']].forEach((panel) => {
+      if (!panel) return;
+      panel.addEventListener('click', (e) => {
+        const catBtn = e.target.closest('[data-settings-cat]');
+        if (catBtn) {
+          applySettingsCategoryFilter(panel, catBtn.dataset.settingsCat);
+        }
+      });
+    });
+    window.addEventListener('keydown', (e) => {
+      if ((e.code === 'Escape' || e.key === 'Escape') && !PL.state.docViewerOpen && !PL.state.cheatOpen) {
+        if (dom['menu-overlay'] && !dom['menu-overlay'].classList.contains('hidden') && dom['menu-overlay'].classList.contains('subview-open')) {
+          e.preventDefault();
+          e.stopPropagation();
+          setMenuSubpanel(null);
+        } else if (dom['pause-overlay'] && !dom['pause-overlay'].classList.contains('hidden') && dom['pause-overlay'].classList.contains('subview-open')) {
+          e.preventDefault();
+          e.stopPropagation();
+          setPauseSubpanel(null);
+        }
+      }
+    });
     [dom['brightness-slider'], dom['pause-brightness-slider']].forEach((slider) => {
       if (!slider) return;
       slider.addEventListener('input', (e) => applyBrightness(e.target.value));
@@ -1248,6 +1346,7 @@
     if (screenName !== 'menu') {
       setMenuSubpanel(null);
     }
+    setPauseSubpanel(null);
     if (screenName === 'gameover') {
       const ov = dom['gameover-overlay'];
       const titleEl = ov ? ov.querySelector('.zenith-title') : null;

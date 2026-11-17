@@ -535,6 +535,9 @@
       }
       if (this.rootGroup) this.rootGroup.updateMatrixWorld(true);
       const finalOz = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
+      if (LRT.Enemies && typeof LRT.Enemies.setOffsetZ === 'function') {
+        LRT.Enemies.setOffsetZ(finalOz);
+      }
       for (let i = 0; i < this.stationLights.length; i++) {
         const sl = this.stationLights[i];
         if (sl && sl.light) {
@@ -1309,6 +1312,9 @@
         if (sl && sl.light && sl.homeZ !== undefined) {
           sl.light.position.z = sl.homeZ + nextZ;
         }
+      }
+      if (LRT.Enemies && typeof LRT.Enemies.setOffsetZ === 'function') {
+        LRT.Enemies.setOffsetZ(nextZ);
       }
     },
 
