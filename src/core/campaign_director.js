@@ -1056,7 +1056,8 @@
 
   function handlePlayerHit(dmg, srcPos) {
     const pState = (LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function') ? LRT.PlayerUI.getState() : null;
-    if ((pState && pState.fastTravelOpen) || CORE.gameMode === MODES.EXPLORATION || CORE.gameState === STATES.GAME_OVER) return;
+    const plFlags = I.player && I.player.flags ? I.player.flags : null;
+    if ((pState && (pState.docViewerOpen || pState.fastTravelOpen)) || (plFlags && plFlags.paused) || CORE.gameMode === MODES.EXPLORATION || CORE.gameState === STATES.GAME_OVER) return;
     const died = LRT.PlayerUI.takeDamage(dmg, srcPos);
     if (died) {
       CORE.gameState = STATES.GAME_OVER;
@@ -1490,7 +1491,8 @@
   }
 
   function updateTrainCampaign(dt, pState) {
-    if (pState && pState.fastTravelOpen) return false;
+    const plFlags = I.player && I.player.flags ? I.player.flags : null;
+    if ((pState && (pState.docViewerOpen || pState.fastTravelOpen)) || (plFlags && plFlags.paused)) return false;
     // Victory check 1.5s into cruise from Station 5 heading forward
     if (CORE.gameState === STATES.TRAIN_CRUISE && CORE.stationIndex === 5 && CORE.activeTravelDir === 1 && !campaignState.campaignVictory) {
       CORE.victoryCruiseTimer += dt;
@@ -1694,7 +1696,8 @@
   }
 
   function updateSurvivalAndVoChecks(dt, pState, stationGrid, trainCols, enemyOpts) {
-    if (pState && pState.fastTravelOpen) return;
+    const plFlags = I.player && I.player.flags ? I.player.flags : null;
+    if ((pState && (pState.docViewerOpen || pState.fastTravelOpen)) || (plFlags && plFlags.paused)) return;
     if (!CORE.tutorialActive) tickAutosave(dt);
     // Survival wave logic (plus animate/update any manually spawned zombies in exploration mode)
     const hasCustomZombies = LRT.Enemies && typeof LRT.Enemies.getAliveCount === 'function' && LRT.Enemies.getAliveCount() > 0;

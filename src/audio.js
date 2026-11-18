@@ -34,6 +34,7 @@
   let decodeDone = false;
   let decodePromise = null;
   let muted = false;
+  let gameplayPaused = false;
   let masterVolume = 0.85;
   let sfxVolume = 0.90;
 
@@ -196,7 +197,7 @@
   }
 
   function play(key, opts) {
-    if (!ctx || muted) return null;
+    if (!ctx || muted || gameplayPaused) return null;
     if (ctx.state === 'suspended') {
       ctx.resume().catch(() => {});
     }
@@ -249,6 +250,9 @@
 
   function startLoop(key, gain = 0.75, fadeSec = 0.35, rate = 1.0) {
     if (!ctx) return null;
+    if (gameplayPaused && ctx.state === 'running' && typeof ctx.suspend === 'function') {
+      ctx.suspend().catch(() => {});
+    }
     const existing = activeLoops.get(key);
     if (existing) {
       setLoopVolume(key, gain, fadeSec, rate);
@@ -312,7 +316,39 @@
   function setMute(flag) {
     muted = !!flag;
     if (masterGain && ctx) {
-      masterGain.gain.setTargetAtTime(muted ? 0 : masterVolume, ctx.currentTime, 0.03);
+      masterGain.gain.setTargetAtTime((muted || gameplayPaused) ? 0 : masterVolume, ctx.currentTime, 0.03);
+    }
+  }
+
+  function setGameplayPaused(flag) {
+    const next = !!flag;
+    if (next === gameplayPaused) return;
+    gameplayPaused = next;
+    if (gameplayPaused) {
+      for (let i = 0; i < activeVoices.length; i++) {
+        try {
+          if (activeVoices[i] && activeVoices[i].src) activeVoices[i].src.stop();
+        } catch (_) {}
+      }
+      activeVoices.length = 0;
+      stopVoice();
+      if (ctx && masterGain) {
+        const now = ctx.currentTime;
+        masterGain.gain.cancelScheduledValues(now);
+        masterGain.gain.setValueAtTime(0, now);
+      }
+      if (ctx && ctx.state === 'running' && typeof ctx.suspend === 'function') {
+        ctx.suspend().catch(() => {});
+      }
+    } else {
+      if (ctx && masterGain) {
+        const now = ctx.currentTime;
+        masterGain.gain.cancelScheduledValues(now);
+        masterGain.gain.setValueAtTime(muted ? 0 : masterVolume, now);
+      }
+      if (ctx && ctx.state === 'suspended' && !muted && typeof ctx.resume === 'function') {
+        ctx.resume().catch(() => {});
+      }
     }
   }
 
@@ -320,7 +356,7 @@
     if (typeof master === 'number') masterVolume = Math.max(0, Math.min(1, master));
     if (typeof sfx === 'number') sfxVolume = Math.max(0, Math.min(1, sfx));
     if (ctx && masterGain) {
-      masterGain.gain.setTargetAtTime(muted ? 0 : masterVolume, ctx.currentTime, 0.03);
+      masterGain.gain.setTargetAtTime((muted || gameplayPaused) ? 0 : masterVolume, ctx.currentTime, 0.03);
     }
     if (ctx && sfxGain && loopGain) {
       sfxGain.gain.setTargetAtTime(sfxVolume, ctx.currentTime, 0.03);
@@ -436,7 +472,7 @@
   }
 
   function playVoice(voId, opts) {
-    if (!voId) return null;
+    if (!voId || gameplayPaused) return null;
     const entry = voiceManifest[voId];
     if (!entry) return null;
 
@@ -511,7 +547,7 @@
       }
 
       const startPlayback = (buf) => {
-        if (currentVoice !== handle || handle.ended) return;
+        if (gameplayPaused || currentVoice !== handle || handle.ended) return;
         if (handle.timerId) {
           clearTimeout(handle.timerId);
           handle.timerId = null;
@@ -566,7 +602,7 @@
   }
 
   function tickVoice(dt) {
-    if (!currentVoice || currentVoice.ended) return;
+    if (gameplayPaused || !currentVoice || currentVoice.ended) return;
     if (currentVoice.src) return; // audio buffer is driving timing
     currentVoice.elapsed += dt;
     if (currentVoice.elapsed >= currentVoice.durationSec) {
@@ -580,6 +616,7 @@
       loadedClips: buffers.size,
       expectedClips: Object.keys(window.__SFX_BANK__ || {}).length,
       muted,
+      gameplayPaused,
       masterVolume,
       sfxVolume,
       activeVoices: activeVoices.length,
@@ -605,6 +642,8 @@
     stopAllLoops,
     setMute,
     isMuted: () => muted,
+    setGameplayPaused,
+    isGameplayPaused: () => gameplayPaused,
     setVolumes,
     getStatus,
     playVoice,

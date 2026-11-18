@@ -165,6 +165,7 @@
     CORE._rideToMoodKey = null;
     _lastActiveObjKey = null;
     if (LRT.Audio) {
+      if (typeof LRT.Audio.setGameplayPaused === 'function') LRT.Audio.setGameplayPaused(false);
       LRT.Audio.unlock();
       if (typeof LRT.Audio.stopVoice === 'function') LRT.Audio.stopVoice();
       if (typeof LRT.Audio.stopAllLoops === 'function') LRT.Audio.stopAllLoops();
@@ -407,9 +408,14 @@
       CORE.updateMenuCamera(simTime);
     } else if (CORE.gameState !== STATES.GAME_OVER) {
       const dom = LRT.PlayerUI.getDom();
+      const pState = LRT.PlayerUI && LRT.PlayerUI.getState ? LRT.PlayerUI.getState() : null;
+      const plFlags = I.player && I.player.flags ? I.player.flags : null;
       const pauseVisible = dom['pause-overlay'] && !dom['pause-overlay'].classList.contains('hidden');
       const tutCompleteVisible = dom['tutorial-complete-overlay'] && !dom['tutorial-complete-overlay'].classList.contains('hidden');
-      if (!pauseVisible && !tutCompleteVisible) {
+      const docVisible = (dom['document-viewer-modal'] && !dom['document-viewer-modal'].classList.contains('hidden')) || !!(pState && pState.docViewerOpen);
+      const ftVisible = (dom['fast-travel-modal'] && !dom['fast-travel-modal'].classList.contains('hidden')) || !!(pState && pState.fastTravelOpen);
+      const isSimPaused = pauseVisible || tutCompleteVisible || docVisible || ftVisible || !!(plFlags && plFlags.paused);
+      if (!isSimPaused) {
         stepSimulation(dt);
       }
     }
@@ -540,6 +546,7 @@
       LRT.PlayerUI.setPaused(true, false);
       LRT.PlayerUI.releaseLock();
       if (LRT.Audio) {
+        if (typeof LRT.Audio.setGameplayPaused === 'function') LRT.Audio.setGameplayPaused(false);
         if (typeof LRT.Audio.stopVoice === 'function') LRT.Audio.stopVoice();
         LRT.Audio.stopAllLoops();
       }
@@ -621,6 +628,7 @@
 
   function pause() {
     if (CORE.gameState === STATES.MENU || CORE.gameState === STATES.GAME_OVER) return;
+    if (LRT.Audio && typeof LRT.Audio.setGameplayPaused === 'function') LRT.Audio.setGameplayPaused(true);
     LRT.PlayerUI.setPaused(true, false);
     LRT.PlayerUI.showScreen('pause');
     if (LRT.PlayerUI && typeof LRT.PlayerUI.syncAllSettingsUi === 'function' && typeof CORE.getSettings === 'function') {
@@ -630,6 +638,7 @@
 
   function resume() {
     if (CORE.gameState === STATES.MENU || CORE.gameState === STATES.GAME_OVER) return;
+    if (LRT.Audio && typeof LRT.Audio.setGameplayPaused === 'function') LRT.Audio.setGameplayPaused(false);
     if (LRT.Audio) LRT.Audio.unlock();
     LRT.PlayerUI.showScreen('play');
     LRT.PlayerUI.setPaused(false, true);

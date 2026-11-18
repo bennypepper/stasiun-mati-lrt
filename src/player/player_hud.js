@@ -406,8 +406,8 @@
     const bodyWrap = modal.querySelector('.doc-body-wrap');
     if (bodyWrap) bodyWrap.scrollTop = 0;
 
-    if (LRT.Audio && typeof LRT.Audio.play === 'function') {
-      LRT.Audio.play('paper_rustle', { gain: 0.78, pitchVar: 0.04 });
+    if (LRT.Audio && typeof LRT.Audio.setGameplayPaused === 'function') {
+      LRT.Audio.setGameplayPaused(true);
     }
 
     PL.state.docViewerOpen = true;
@@ -431,15 +431,16 @@
 
     if (!wasOpen) return false;
 
-    if (!silent && LRT.Audio && typeof LRT.Audio.play === 'function') {
-      LRT.Audio.play('paper_rustle', { gain: 0.66, pitchVar: 0.06 });
-    }
     for (const k of Object.keys(PL.keys)) PL.keys[k] = false;
 
     if (!fromPause) {
       if (shouldUnpause) {
         if (PL.suppressPauseAfterUnlock) PL.suppressPauseAfterUnlock(900);
         LRT.PlayerUI.setPaused(false, true);
+      }
+      const pauseHidden = !dom['pause-overlay'] || dom['pause-overlay'].classList.contains('hidden');
+      if (pauseHidden && LRT.Audio && typeof LRT.Audio.setGameplayPaused === 'function') {
+        LRT.Audio.setGameplayPaused(false);
       }
       if (refocusGame !== false && PL.flags.allowActionInput && !PL.flags.paused) {
         if (PL.relockAfterOverlay) PL.relockAfterOverlay();
@@ -803,6 +804,7 @@
       if (PL.suppressPauseAfterUnlock) PL.suppressPauseAfterUnlock(900);
       showScreen('play');
       LRT.PlayerUI.setPaused(false, true);
+      if (LRT.Audio && typeof LRT.Audio.setGameplayPaused === 'function') LRT.Audio.setGameplayPaused(false);
       if (PL.relockAfterOverlay) PL.relockAfterOverlay();
       else if (PL.requestLock) PL.requestLock();
     }
@@ -974,7 +976,9 @@
     if (PL.state) PL.state.fastTravelOpen = true;
     renderFastTravelModal();
     modal.classList.remove('hidden');
-    if (LRT.Audio) LRT.Audio.play('turnstile_beep', { gain: 0.35 });
+    if (LRT.Audio && typeof LRT.Audio.setGameplayPaused === 'function') {
+      LRT.Audio.setGameplayPaused(true);
+    }
     return true;
   }
 
@@ -990,7 +994,6 @@
     pausedByFastTravel = false;
 
     if (!wasOpen && !forceExitPause) return false;
-    if (!silent && LRT.Audio) LRT.Audio.play('turnstile_beep', { gain: 0.30 });
     for (const k of Object.keys(PL.keys)) PL.keys[k] = false;
 
     if (forceExitPause) {
@@ -1001,9 +1004,11 @@
         }
         showScreen('play');
         LRT.PlayerUI.setPaused(false, true);
+        if (LRT.Audio && typeof LRT.Audio.setGameplayPaused === 'function') LRT.Audio.setGameplayPaused(false);
       } else if (shouldUnpause) {
         if (PL.suppressPauseAfterUnlock) PL.suppressPauseAfterUnlock(900);
         LRT.PlayerUI.setPaused(false, true);
+        if (LRT.Audio && typeof LRT.Audio.setGameplayPaused === 'function') LRT.Audio.setGameplayPaused(false);
       }
       if (refocusGame !== false && PL.flags.allowActionInput && !PL.flags.paused) {
         if (PL.relockAfterOverlay) PL.relockAfterOverlay();
@@ -1017,10 +1022,17 @@
         if (PL.suppressPauseAfterUnlock) PL.suppressPauseAfterUnlock(900);
         LRT.PlayerUI.setPaused(false, true);
       }
+      const pauseHidden = !dom['pause-overlay'] || dom['pause-overlay'].classList.contains('hidden');
+      if (pauseHidden && LRT.Audio && typeof LRT.Audio.setGameplayPaused === 'function') {
+        LRT.Audio.setGameplayPaused(false);
+      }
       if (refocusGame !== false && PL.flags.allowActionInput && !PL.flags.paused) {
         if (PL.relockAfterOverlay) PL.relockAfterOverlay();
         else if (PL.requestLock) PL.requestLock();
       }
+    }
+    if (!silent && LRT.Audio && (!LRT.Audio.isGameplayPaused || !LRT.Audio.isGameplayPaused())) {
+      LRT.Audio.play('turnstile_beep', { gain: 0.30 });
     }
     return true;
   }
