@@ -395,6 +395,8 @@
     slot.fallSign = Math.random() > 0.5 ? 1 : -1;
     slot.animPhase = Math.random() * Math.PI * 2;
     slot.moveBlend = 0;
+    slot.actualSpeed = 0;
+    slot.actualSpeedSmooth = 0;
     slot.smoothSteerX = 0;
     slot.smoothSteerZ = 0;
     slot.seed = Math.random() * 100;
@@ -1705,6 +1707,9 @@
 
       if (z.dead) {
         z.deathTimer += step;
+        z.actualSpeed = 0;
+        z.actualSpeedSmooth = 0;
+        z.moveBlend = 0;
         z.x += z.vx * step;
         z.z += z.vz * step;
         z.vx *= Math.max(0, 1 - step * 6.0);
@@ -1813,7 +1818,9 @@
       const preMoveZ = z.z;
 
       if (z.aggroState === 'IDLE' && !hasLure) {
-        z.moveBlend += (0 - z.moveBlend) * Math.min(1, moveStep * 10.0);
+        z.actualSpeed = 0;
+        z.actualSpeedSmooth += (0 - (z.actualSpeedSmooth || 0)) * Math.min(1, moveStep * 12.0);
+        z.moveBlend = Math.min(1.0, z.actualSpeedSmooth / Math.max(0.25, z.speed));
         z.smoothSteerX *= 0.5;
         z.smoothSteerZ *= 0.5;
         z.animPhase += moveStep * 0.85;
@@ -1825,7 +1832,9 @@
       } else if (z.aggroState === 'PATROL' && !hasLure) {
         if (z.patrolWaitTimer > 0) {
           z.patrolWaitTimer -= moveStep;
-          z.moveBlend += (0 - z.moveBlend) * Math.min(1, moveStep * 10.0);
+          z.actualSpeed = 0;
+          z.actualSpeedSmooth += (0 - (z.actualSpeedSmooth || 0)) * Math.min(1, moveStep * 12.0);
+          z.moveBlend = Math.min(1.0, z.actualSpeedSmooth / Math.max(0.25, z.speed));
           z.smoothSteerX = 0;
           z.smoothSteerZ = 0;
           z.animPhase += moveStep * 0.85;
@@ -1843,7 +1852,9 @@
           const pDist = Math.hypot(pdx, pdz);
           if (pDist <= 1.25) {
             z.patrolWaitTimer = 1.5 + Math.random() * 2.5;
-            z.moveBlend += (0 - z.moveBlend) * Math.min(1, moveStep * 10.0);
+            z.actualSpeed = 0;
+            z.actualSpeedSmooth += (0 - (z.actualSpeedSmooth || 0)) * Math.min(1, moveStep * 12.0);
+            z.moveBlend = Math.min(1.0, z.actualSpeedSmooth / Math.max(0.25, z.speed));
             z.smoothSteerX = 0;
             z.smoothSteerZ = 0;
             z.animPhase += moveStep * 0.85;
@@ -1853,10 +1864,11 @@
             steerAndMove(z, i, z.patrolTargetX, z.patrolTargetZ, patrolSpd, moveStep, false, pDist, pDist, pdx, pdz);
             E.resolveCollisions(z, 0.38 * z.scale, moveStep);
             z.groundedOnce = true;
-            const actualSpd = Math.hypot(z.x - preMoveX, z.z - preMoveZ) / Math.max(0.001, moveStep);
-            const targetBlend = Math.min(1.0, actualSpd / Math.max(0.1, z.speed));
-            z.moveBlend += (targetBlend - z.moveBlend) * Math.min(1.0, moveStep * 10.0);
-            z.animPhase += moveStep * (1.2 + actualSpd * 2.35);
+            const frameDist = Math.hypot(z.x - preMoveX, z.z - preMoveZ);
+            z.actualSpeed = moveStep > 1e-4 ? (frameDist / moveStep) : 0;
+            z.actualSpeedSmooth += (z.actualSpeed - (z.actualSpeedSmooth || 0)) * Math.min(1.0, moveStep * 12.0);
+            z.moveBlend = Math.min(1.0, z.actualSpeedSmooth / Math.max(0.25, z.speed));
+            z.animPhase += moveStep * (1.2 + z.actualSpeedSmooth * 2.35);
             E.updateStuckRecovery(z, moveStep, pDist, 1.25);
           }
         }
@@ -1879,7 +1891,9 @@
           z.patrolOriginX = z.x;
           z.patrolOriginZ = z.z;
           z.patrolWaitTimer = 1.6 + Math.random() * 1.5;
-          z.moveBlend += (0 - z.moveBlend) * Math.min(1, moveStep * 10.0);
+          z.actualSpeed = 0;
+          z.actualSpeedSmooth += (0 - (z.actualSpeedSmooth || 0)) * Math.min(1, moveStep * 12.0);
+          z.moveBlend = Math.min(1.0, z.actualSpeedSmooth / Math.max(0.25, z.speed));
           z.smoothSteerX = 0;
           z.smoothSteerZ = 0;
           z.animPhase += moveStep * 0.85;
@@ -1899,14 +1913,17 @@
             steerAndMove(z, i, goalX, goalZ, invSpd, moveStep, false, dist3D, distHoriz, pdx, pdz);
             E.resolveCollisions(z, 0.38 * z.scale, moveStep);
             z.groundedOnce = true;
-            const actualSpd = Math.hypot(z.x - preMoveX, z.z - preMoveZ) / Math.max(0.001, moveStep);
-            const targetBlend = Math.min(1.0, actualSpd / Math.max(0.1, z.speed));
-            z.moveBlend += (targetBlend - z.moveBlend) * Math.min(1.0, moveStep * 10.0);
-            z.animPhase += moveStep * (1.2 + actualSpd * 2.35);
+            const frameDist = Math.hypot(z.x - preMoveX, z.z - preMoveZ);
+            z.actualSpeed = moveStep > 1e-4 ? (frameDist / moveStep) : 0;
+            z.actualSpeedSmooth += (z.actualSpeed - (z.actualSpeedSmooth || 0)) * Math.min(1.0, moveStep * 12.0);
+            z.moveBlend = Math.min(1.0, z.actualSpeedSmooth / Math.max(0.25, z.speed));
+            z.animPhase += moveStep * (1.2 + z.actualSpeedSmooth * 2.35);
             E.updateStuckRecovery(z, moveStep, dist3D, 1.5);
           } else {
             rotateYawToward(z, Math.atan2(goalX - z.x, goalZ - z.z), tier.yawRate, moveStep);
-            z.moveBlend += (0 - z.moveBlend) * Math.min(1, moveStep * 10.0);
+            z.actualSpeed = 0;
+            z.actualSpeedSmooth += (0 - (z.actualSpeedSmooth || 0)) * Math.min(1, moveStep * 12.0);
+            z.moveBlend = Math.min(1.0, z.actualSpeedSmooth / Math.max(0.25, z.speed));
             z.smoothSteerX = 0;
             z.smoothSteerZ = 0;
             z.animPhase += moveStep * 1.4;
@@ -2111,7 +2128,9 @@
             if (faceDx * faceDx + faceDz * faceDz > 1e-4) {
               rotateYawToward(z, Math.atan2(faceDx, faceDz), tier.yawRate * 1.15, moveStep);
             }
-            z.moveBlend += (0 - z.moveBlend) * Math.min(1.0, moveStep * 12.0);
+            z.actualSpeed = 0;
+            z.actualSpeedSmooth += (0 - (z.actualSpeedSmooth || 0)) * Math.min(1.0, moveStep * 12.0);
+            z.moveBlend = Math.min(1.0, z.actualSpeedSmooth / Math.max(0.25, z.speed));
             z.smoothSteerX = 0;
             z.smoothSteerZ = 0;
             z.animPhase += moveStep * 1.4;
@@ -2121,10 +2140,11 @@
             E.resolveCollisions(z, 0.38 * z.scale, moveStep);
             z.groundedOnce = true;
             if (shouldMove) {
-              const actualSpd = Math.hypot(z.x - preMoveX, z.z - preMoveZ) / Math.max(0.001, moveStep);
-              const targetBlend = Math.min(1.0, actualSpd / Math.max(0.1, z.speed));
-              z.moveBlend += (targetBlend - z.moveBlend) * Math.min(1.0, moveStep * 10.0);
-              z.animPhase += moveStep * (1.2 + actualSpd * 2.35);
+              const frameDist = Math.hypot(z.x - preMoveX, z.z - preMoveZ);
+              z.actualSpeed = moveStep > 1e-4 ? (frameDist / moveStep) : 0;
+              z.actualSpeedSmooth += (z.actualSpeed - (z.actualSpeedSmooth || 0)) * Math.min(1.0, moveStep * 12.0);
+              z.moveBlend = Math.min(1.0, z.actualSpeedSmooth / Math.max(0.25, z.speed));
+              z.animPhase += moveStep * (1.2 + z.actualSpeedSmooth * 2.35);
             }
             E.updateStuckRecovery(z, moveStep, moveCheckDist, effStopDist);
           } else if (!z.groundedOnce) {
@@ -2537,6 +2557,9 @@
 
       if (z.dead) {
         z.deathTimer += step;
+        z.actualSpeed = 0;
+        z.actualSpeedSmooth = 0;
+        z.moveBlend = 0;
         z.x += z.vx * step;
         z.z += z.vz * step;
         z.vx *= Math.max(0, 1 - step * 6.0);
@@ -2550,7 +2573,9 @@
         }
       } else {
         if (z.spitAnimTimer > 0) z.spitAnimTimer = Math.max(0, z.spitAnimTimer - step);
-        z.moveBlend += (0 - (z.moveBlend || 0)) * Math.min(1, step * 8.0);
+        z.actualSpeed = 0;
+        z.actualSpeedSmooth += (0 - (z.actualSpeedSmooth || 0)) * Math.min(1, step * 8.0);
+        z.moveBlend = Math.min(1.0, z.actualSpeedSmooth / Math.max(0.25, z.speed));
         z.smoothSteerX = 0;
         z.smoothSteerZ = 0;
         z.vx *= Math.max(0, 1 - step * 8.0);

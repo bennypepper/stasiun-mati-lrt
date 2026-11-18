@@ -5,7 +5,7 @@
   "summary": {
     "hdriCount": 4,
     "textureCount": 12,
-    "modelCount": 32,
+    "modelCount": 33,
     "skippedModelCount": 2,
     "hdriMB": 6.14,
     "texturesMB": 24.6,
@@ -449,12 +449,20 @@
       "totalBytes": 269148,
       "files": 5
     },
+    "zombie_commuter": {
+      "id": "zombie_commuter",
+      "category": "enemy",
+      "gltf": "assets/models/zombie_commuter/zombie_commuter.glb",
+      "binBytes": 357072,
+      "totalBytes": 357072,
+      "files": 1
+    },
     "zombie_infected": {
       "id": "zombie_infected",
       "category": "enemy",
       "gltf": "assets/models/zombie_infected/zombie_infected.glb",
-      "binBytes": 611124,
-      "totalBytes": 611124,
+      "binBytes": 773060,
+      "totalBytes": 773060,
       "files": 1
     },
     "zombie_soldier": {

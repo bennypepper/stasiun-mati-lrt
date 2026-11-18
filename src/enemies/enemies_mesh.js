@@ -99,12 +99,24 @@
   let _overlayPartMeshes = [];
   let _allPartMeshes = [];
 
-  // Real rigged THREE.SkinnedMesh + AnimationMixer pool (loaded from zombie_infected.glb & zombie_soldier.glb)
+  // Real rigged THREE.SkinnedMesh + AnimationMixer pool (loaded from zombie_infected.glb, zombie_commuter.glb & zombie_soldier.glb)
   let _useSkinnedRigs = false;
   const _rigPool = [];
   const _axisX = new THREE.Vector3(1, 0, 0);
+  const _axisY = new THREE.Vector3(0, 1, 0);
+  const _axisZ = new THREE.Vector3(0, 0, 1);
+  const _qRootInv = new THREE.Quaternion();
+  const _qParentW = new THREE.Quaternion();
+  const _qParentChar = new THREE.Quaternion();
+  const _qParentCharInv = new THREE.Quaternion();
+  const _qBoneChar = new THREE.Quaternion();
+  const _qTargetChar = new THREE.Quaternion();
+  const _qDelta = new THREE.Quaternion();
+  const _vCurDir = new THREE.Vector3();
+  const _vTgtDir = new THREE.Vector3();
   let _spitterCystMat = null;
   let _screamerCystMat = null;
+  let _runnerEyeMat = null;
   let _cystGeo = null;
 
   E.MAX_ENEMIES = MAX_ENEMIES;
@@ -1301,8 +1313,9 @@
     }
   }
 
-  function cloneSkinnedGltf(gltf, isSoldier) {
+  function cloneSkinnedGltf(gltf, kind) {
     if (!gltf || !gltf.scene) return null;
+    const isSoldier = (kind === 'soldier');
     const root = gltf.scene.clone(true);
     const srcToDst = new Map();
     mapClonedHierarchy(gltf.scene, root, srcToDst);
@@ -1340,7 +1353,10 @@
         if (!m) return m;
         if (!matCache.has(m)) {
           const cm = m.clone();
-          const isVisor = isSoldier && (sm === visorMesh || (cm.name || '').toLowerCase().includes('visor'));
+          const mName = (cm.name || '').toLowerCase();
+          const isVisor = isSoldier && (sm === visorMesh || mName.includes('visor'));
+          const isPants = !isSoldier && mName.includes('pants');
+          const isSkin = !isSoldier && mName.includes('skin');
           if ('envMapIntensity' in cm) cm.envMapIntensity = isVisor ? 0.95 : 0.72;
           if (!isVisor && typeof cm.roughness === 'number') {
             cm.roughness = Math.max(isSoldier ? 0.62 : 0.78, cm.roughness);
@@ -1353,6 +1369,8 @@
           materials.push({
             mat: cm,
             isVisor,
+            isPants,
+            isSkin,
             baseColor: cm.color ? cm.color.clone() : new THREE.Color(0xffffff),
             baseEmissive: cm.emissive ? cm.emissive.clone() : new THREE.Color(0x000000),
             baseEmissiveIntensity: cm.emissiveIntensity !== undefined ? cm.emissiveIntensity : 1.0
@@ -1395,8 +1413,9 @@
     return null;
   }
 
-  function createRigEntry(gltf, isSoldier) {
-    const cloned = cloneSkinnedGltf(gltf, isSoldier);
+  function createRigEntry(gltf, kind) {
+    const isSoldier = (kind === 'soldier');
+    const cloned = cloneSkinnedGltf(gltf, kind);
     if (!cloned) return null;
 
     const mixer = new THREE.AnimationMixer(cloned.root);
@@ -1428,20 +1447,30 @@
       actions.zombieWalk = actions.walk;
     }
 
-    const bones = {
-      hips: cloned.nodesByName.get('mixamorig:Hips') || null,
-      spine: cloned.nodesByName.get('mixamorig:Spine') || null,
-      spine1: cloned.nodesByName.get('mixamorig:Spine1') || null,
-      spine2: cloned.nodesByName.get('mixamorig:Spine2') || null,
-      neck: cloned.nodesByName.get('mixamorig:Neck') || null,
-      head: cloned.nodesByName.get('mixamorig:Head') || null,
-      leftArm: cloned.nodesByName.get('mixamorig:LeftArm') || null,
-      rightArm: cloned.nodesByName.get('mixamorig:RightArm') || null
+    const findBone = (shortName) => {
+      return cloned.nodesByName.get('mixamorig:' + shortName)
+        || cloned.nodesByName.get('mixamorig' + shortName)
+        || cloned.nodesByName.get(shortName)
+        || null;
     };
 
-    // Attach bone-mounted bioluminescent blisters/cysts for Spitter & Screamer variants
+    const bones = {
+      hips: findBone('Hips'),
+      spine: findBone('Spine'),
+      spine1: findBone('Spine1'),
+      spine2: findBone('Spine2'),
+      neck: findBone('Neck'),
+      head: findBone('Head'),
+      leftArm: findBone('LeftArm'),
+      leftForeArm: findBone('LeftForeArm'),
+      rightArm: findBone('RightArm'),
+      rightForeArm: findBone('RightForeArm')
+    };
+
+    // Attach bone-mounted bioluminescent cysts & glowing feral eyes for infected/commuter variants
     let spitterNodes = null;
     let screamerNodes = null;
+    let runnerEyes = null;
     if (!isSoldier) {
       if (!_cystGeo) _cystGeo = new THREE.SphereGeometry(1.0, 8, 6);
       if (!_spitterCystMat) {
@@ -1462,15 +1491,22 @@
           metalness: 0.05
         });
       }
+      if (!_runnerEyeMat) {
+        _runnerEyeMat = new THREE.MeshStandardMaterial({
+          color: 0xff5a18,
+          emissive: new THREE.Color(0xff3408),
+          emissiveIntensity: 2.8,
+          roughness: 0.18,
+          metalness: 0.0
+        });
+      }
 
-      // Compute cm-vs-meter local bone scale compensation
       cloned.root.updateMatrixWorld(true);
-      const refBone = bones.spine2 || bones.neck || cloned.root;
-      refBone.getWorldScale(_v1);
-      const invS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
 
       const addCystCluster = (parentBone, mat, specs) => {
         if (!parentBone) return null;
+        parentBone.getWorldScale(_v1);
+        const invS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
         const grp = new THREE.Group();
         grp.visible = false;
         for (let i = 0; i < specs.length; i++) {
@@ -1486,19 +1522,28 @@
         return grp;
       };
 
+      const isComm = (kind === 'commuter');
+      const eyeZ = isComm ? 0.102 : 0.132;
+      const eyeY = isComm ? 0.085 : 0.080;
+      const eyeX = isComm ? 0.031 : 0.032;
+      runnerEyes = addCystCluster(bones.head, _runnerEyeMat, [
+        { x: -eyeX, y: eyeY, z: eyeZ, sx: 0.0085, sy: 0.0065, sz: 0.0065 },
+        { x:  eyeX, y: eyeY, z: eyeZ, sx: 0.0085, sy: 0.0065, sz: 0.0065 }
+      ]);
+
       spitterNodes = [];
       const spChest = addCystCluster(bones.spine2, _spitterCystMat, [
-        { x: -0.09, y: 0.06, z: 0.11, sx: 0.048, sy: 0.042, sz: 0.036 },
-        { x: 0.08, y: 0.02, z: 0.12, sx: 0.056, sy: 0.048, sz: 0.040 },
-        { x: -0.10, y: 0.05, z: -0.11, sx: 0.065, sy: 0.060, sz: 0.052 },
-        { x: 0.06, y: 0.09, z: -0.12, sx: 0.052, sy: 0.050, sz: 0.046 }
+        { x: -0.085, y: 0.05, z: 0.115, sx: 0.048, sy: 0.042, sz: 0.036 },
+        { x:  0.080, y: 0.02, z: 0.120, sx: 0.056, sy: 0.048, sz: 0.040 },
+        { x: -0.095, y: 0.05, z: -0.122, sx: 0.065, sy: 0.060, sz: 0.052 },
+        { x:  0.060, y: 0.08, z: -0.128, sx: 0.052, sy: 0.050, sz: 0.046 }
       ]);
       const spNeck = addCystCluster(bones.neck, _spitterCystMat, [
-        { x: -0.045, y: 0.03, z: 0.055, sx: 0.036, sy: 0.032, sz: 0.030 },
-        { x: 0.050, y: 0.01, z: 0.045, sx: 0.038, sy: 0.034, sz: 0.032 }
+        { x: -0.045, y: 0.025, z: 0.072, sx: 0.036, sy: 0.032, sz: 0.030 },
+        { x:  0.048, y: 0.012, z: 0.068, sx: 0.038, sy: 0.034, sz: 0.032 }
       ]);
       const spHead = addCystCluster(bones.head, _spitterCystMat, [
-        { x: 0.055, y: 0.04, z: 0.065, sx: 0.030, sy: 0.026, sz: 0.026 }
+        { x: 0.055, y: 0.04, z: 0.085, sx: 0.030, sy: 0.026, sz: 0.026 }
       ]);
       if (spChest) spitterNodes.push(spChest);
       if (spNeck) spitterNodes.push(spNeck);
@@ -1506,13 +1551,13 @@
 
       screamerNodes = [];
       const scNeck = addCystCluster(bones.neck, _screamerCystMat, [
-        { x: -0.042, y: 0.035, z: 0.062, sx: 0.042, sy: 0.038, sz: 0.036 },
-        { x: 0.042, y: 0.025, z: 0.064, sx: 0.045, sy: 0.040, sz: 0.038 },
-        { x: 0.0, y: 0.005, z: 0.072, sx: 0.036, sy: 0.032, sz: 0.032 }
+        { x: -0.036, y: 0.025, z: 0.045, sx: 0.038, sy: 0.034, sz: 0.032 },
+        { x:  0.036, y: 0.020, z: 0.045, sx: 0.040, sy: 0.036, sz: 0.034 },
+        { x:  0.000, y: 0.010, z: 0.052, sx: 0.034, sy: 0.030, sz: 0.030 }
       ]);
       const scSpine = addCystCluster(bones.spine1, _screamerCystMat, [
-        { x: -0.06, y: 0.05, z: 0.11, sx: 0.044, sy: 0.036, sz: 0.032 },
-        { x: 0.06, y: 0.04, z: 0.11, sx: 0.044, sy: 0.036, sz: 0.032 }
+        { x: -0.055, y: 0.04, z: 0.118, sx: 0.042, sy: 0.034, sz: 0.030 },
+        { x:  0.055, y: 0.03, z: 0.118, sx: 0.042, sy: 0.034, sz: 0.030 }
       ]);
       if (scNeck) screamerNodes.push(scNeck);
       if (scSpine) screamerNodes.push(scSpine);
@@ -1522,25 +1567,39 @@
     E.enemyRoot.add(cloned.root);
 
     return {
+      kind,
       root: cloned.root,
       mixer,
       actions,
       bones,
       materials: cloned.materials,
       visorMesh: cloned.visorMesh,
+      runnerEyes,
       spitterNodes,
       screamerNodes
     };
   }
 
-  function buildSkinnedRigPool(infectedGltf, soldierGltf) {
+  function buildSkinnedRigPool(infectedGltf, commuterGltf, soldierGltf) {
     _rigPool.length = 0;
     for (let i = 0; i < MAX_ENEMIES; i++) {
-      const infected = createRigEntry(infectedGltf, false);
-      const soldier = createRigEntry(soldierGltf, true);
-      _rigPool.push({ infected, soldier });
+      const infected = createRigEntry(infectedGltf, 'infected');
+      const commuter = (commuterGltf && commuterGltf.scene) ? createRigEntry(commuterGltf, 'commuter') : null;
+      const soldier = createRigEntry(soldierGltf, 'soldier');
+      _rigPool.push({ infected, commuter, soldier });
     }
     _useSkinnedRigs = true;
+  }
+
+  function getSlotRigForVariant(z, slot) {
+    if (!slot) return null;
+    if (z.variant === 'brute') return slot.soldier;
+    if (z.variant === 'spitter') return slot.infected;
+    if (z.variant === 'runner') return slot.commuter || slot.infected;
+    if (z.variant === 'screamer') return slot.commuter || slot.infected;
+    // Walker alternates cleanly between clothed urban commuter and torn-vest infected
+    if ((z.id & 1) === 0 && slot.commuter) return slot.commuter;
+    return slot.infected;
   }
 
   function initZombiePool() {
@@ -1578,6 +1637,8 @@
         hornVulnTimer: 0,
         animPhase: Math.random() * 6.28,
         moveBlend: 0,
+        actualSpeed: 0,
+        actualSpeedSmooth: 0,
         smoothSteerX: 0,
         smoothSteerZ: 0,
         seed: Math.random() * 100,
@@ -1727,15 +1788,33 @@
     if (_useSkinnedRigs) {
       const slot = _rigPool[idx];
       if (!slot) return;
-      const rig = z.variant === 'brute' ? slot.soldier : slot.infected;
+      const rig = getSlotRigForVariant(z, slot);
       if (!rig || !rig.materials) return;
 
-      let tintHex = 0xdad5cc;
+      let tintHex = 0xd6d3cb;
+      let pantsHex = 0x9aa2aa;
       let emHex = 0x000000;
-      if (z.variant === 'runner') { tintHex = 0xd28480; emHex = 0x160404; }
-      else if (z.variant === 'spitter') { tintHex = 0xb8ca6a; emHex = 0x182604; }
-      else if (z.variant === 'screamer') { tintHex = 0xcfc4cc; emHex = 0x200608; }
-      else if (z.variant === 'brute') { tintHex = z.hasArmor ? 0x627084 : 0x868a90; }
+      if (z.variant === 'runner') {
+        // Pale ash skin + dark blood-soaked commuter attire (NO pink wash!)
+        tintHex = 0xd4d1c8;
+        emHex = 0x080202;
+      } else if (z.variant === 'spitter') {
+        tintHex = 0xc2ce8e;
+        pantsHex = 0x76824e;
+        emHex = 0x162404;
+      } else if (z.variant === 'screamer') {
+        tintHex = 0xcec8d0;
+        pantsHex = 0x7a727a;
+        emHex = 0x1a0406;
+      } else if (z.variant === 'brute') {
+        tintHex = z.hasArmor ? 0x627084 : 0x868a90;
+      } else {
+        // Gritty neutral urban commuter wardrobe variants (never neon/pastel)
+        const wPalette = [0xc8c5bc, 0xb8bec6, 0xc2bdb2, 0xb2b8ac];
+        tintHex = (rig.kind === 'commuter') ? wPalette[idx % wPalette.length] : 0xdad7cf;
+        const pPalette = [0x949ca6, 0x868c82, 0x9e968c, 0x7c848e];
+        pantsHex = pPalette[idx % pPalette.length];
+      }
 
       for (let i = 0; i < rig.materials.length; i++) {
         const info = rig.materials[i];
@@ -1745,7 +1824,7 @@
           if (info.isVisor) {
             m.color.setHex(0x18222e);
           } else {
-            _color.setHex(tintHex);
+            _color.setHex(info.isPants ? pantsHex : tintHex);
             m.color.copy(info.baseColor).multiply(_color);
             if (isHit) m.color.setRGB(m.color.r * 1.25, m.color.g * 0.52, m.color.b * 0.52);
           }
@@ -1766,6 +1845,9 @@
       }
       if (rig.visorMesh) {
         rig.visorMesh.visible = !!(z.hasArmor && !z.dead);
+      }
+      if (rig.runnerEyes) {
+        rig.runnerEyes.visible = !z.dead && (z.variant === 'runner' || z.variant === 'screamer');
       }
       return;
     }
@@ -1846,12 +1928,18 @@
   function setHeadEyeDead(idx) {
     if (_useSkinnedRigs) {
       const slot = _rigPool[idx];
-      if (slot && slot.infected) {
-        if (slot.infected.spitterNodes) {
-          for (let i = 0; i < slot.infected.spitterNodes.length; i++) slot.infected.spitterNodes[i].visible = false;
-        }
-        if (slot.infected.screamerNodes) {
-          for (let i = 0; i < slot.infected.screamerNodes.length; i++) slot.infected.screamerNodes[i].visible = false;
+      if (slot) {
+        const rigs = [slot.infected, slot.commuter];
+        for (let r = 0; r < rigs.length; r++) {
+          const rig = rigs[r];
+          if (!rig) continue;
+          if (rig.runnerEyes) rig.runnerEyes.visible = false;
+          if (rig.spitterNodes) {
+            for (let i = 0; i < rig.spitterNodes.length; i++) rig.spitterNodes[i].visible = false;
+          }
+          if (rig.screamerNodes) {
+            for (let i = 0; i < rig.screamerNodes.length; i++) rig.screamerNodes[i].visible = false;
+          }
         }
       }
       return;
@@ -1867,6 +1955,7 @@
       const slot = _rigPool[idx];
       if (slot) {
         if (slot.infected && slot.infected.root) slot.infected.root.visible = false;
+        if (slot.commuter && slot.commuter.root) slot.commuter.root.visible = false;
         if (slot.soldier && slot.soldier.root) slot.soldier.root.visible = false;
       }
       return;
@@ -1895,26 +1984,28 @@
     if (_useSkinnedRigs) {
       const slot0 = _rigPool[0];
       if (slot0) {
-        if (slot0.infected && slot0.infected.root) {
-          slot0.infected.root.visible = E.warmupActive || (E.zombies[0] && E.zombies[0].active && E.zombies[0].variant !== 'brute');
-          if (E.warmupActive && (!E.zombies[0] || !E.zombies[0].active)) {
-            slot0.infected.root.position.set(0, -100, 0);
+        const z0 = E.zombies[0];
+        const activeRig = (z0 && z0.active) ? getSlotRigForVariant(z0, slot0) : null;
+        const rigs = [slot0.infected, slot0.commuter, slot0.soldier];
+        for (let r = 0; r < rigs.length; r++) {
+          const rig = rigs[r];
+          if (!rig || !rig.root) continue;
+          rig.root.visible = E.warmupActive || (activeRig === rig);
+          if (E.warmupActive && (!z0 || !z0.active)) {
+            rig.root.position.set(0, -100, 0);
           }
-          if (slot0.infected.spitterNodes) {
-            for (let i = 0; i < slot0.infected.spitterNodes.length; i++) {
-              slot0.infected.spitterNodes[i].visible = E.warmupActive || (E.zombies[0] && E.zombies[0].active && E.zombies[0].variant === 'spitter');
+          if (rig.runnerEyes) {
+            rig.runnerEyes.visible = E.warmupActive || (activeRig === rig && !z0.dead && (z0.variant === 'runner' || z0.variant === 'screamer'));
+          }
+          if (rig.spitterNodes) {
+            for (let i = 0; i < rig.spitterNodes.length; i++) {
+              rig.spitterNodes[i].visible = E.warmupActive || (activeRig === rig && !z0.dead && z0.variant === 'spitter');
             }
           }
-          if (slot0.infected.screamerNodes) {
-            for (let i = 0; i < slot0.infected.screamerNodes.length; i++) {
-              slot0.infected.screamerNodes[i].visible = E.warmupActive || (E.zombies[0] && E.zombies[0].active && E.zombies[0].variant === 'screamer');
+          if (rig.screamerNodes) {
+            for (let i = 0; i < rig.screamerNodes.length; i++) {
+              rig.screamerNodes[i].visible = E.warmupActive || (activeRig === rig && !z0.dead && z0.variant === 'screamer');
             }
-          }
-        }
-        if (slot0.soldier && slot0.soldier.root) {
-          slot0.soldier.root.visible = E.warmupActive || (E.zombies[0] && E.zombies[0].active && E.zombies[0].variant === 'brute');
-          if (E.warmupActive && (!E.zombies[0] || !E.zombies[0].active)) {
-            slot0.soldier.root.position.set(0, -100, 0);
           }
         }
       }
@@ -1946,6 +2037,8 @@
       E.zombies[i].matrixInit = false;
       E.zombies[i].groundedOnce = false;
       E.zombies[i].moveBlend = 0;
+      E.zombies[i].actualSpeed = 0;
+      E.zombies[i].actualSpeedSmooth = 0;
       E.zombies[i].smoothSteerX = 0;
       E.zombies[i].smoothSteerZ = 0;
       E.zombies[i].spitAnimTimer = 0;
@@ -2506,17 +2599,52 @@
     }
   }
 
+  function applyCharSpaceDelta(bone, rootQuatInv, axisVec, angle) {
+    if (!bone || !bone.parent || Math.abs(angle) < 1e-4) return;
+    bone.parent.getWorldQuaternion(_qParentW);
+    _qParentChar.copy(rootQuatInv).multiply(_qParentW);
+    _qBoneChar.copy(_qParentChar).multiply(bone.quaternion);
+    _qDelta.setFromAxisAngle(axisVec, angle);
+    _qBoneChar.premultiply(_qDelta);
+    _qParentCharInv.copy(_qParentChar).invert();
+    bone.quaternion.copy(_qParentCharInv).multiply(_qBoneChar);
+    bone.updateMatrixWorld(true);
+  }
+
+  function aimBoneInCharSpace(bone, rootQuatInv, targetX, targetY, targetZ, blendAlpha) {
+    if (!bone || !bone.parent || blendAlpha <= 0.001) return;
+    bone.parent.getWorldQuaternion(_qParentW);
+    _qParentChar.copy(rootQuatInv).multiply(_qParentW);
+    _qBoneChar.copy(_qParentChar).multiply(bone.quaternion);
+
+    // In Mixamo skeletons, bone local +Y always runs down the bone length (shoulder->elbow, elbow->wrist)
+    _vCurDir.set(0, 1, 0).applyQuaternion(_qBoneChar).normalize();
+    _vTgtDir.set(targetX, targetY, targetZ).normalize();
+    _qDelta.setFromUnitVectors(_vCurDir, _vTgtDir);
+    _qTargetChar.copy(_qDelta).multiply(_qBoneChar);
+
+    if (blendAlpha < 0.999) {
+      _qBoneChar.slerp(_qTargetChar, blendAlpha);
+    } else {
+      _qBoneChar.copy(_qTargetChar);
+    }
+    _qParentCharInv.copy(_qParentChar).invert();
+    bone.quaternion.copy(_qParentCharInv).multiply(_qBoneChar);
+    bone.updateMatrixWorld(true);
+  }
+
   function updateSkinnedZombie(z, timeSec, dt) {
     const idx = z.id;
     const slot = _rigPool[idx];
     if (!slot) return;
 
-    const isBrute = (z.variant === 'brute');
-    const rig = isBrute ? slot.soldier : slot.infected;
-    const otherRig = isBrute ? slot.infected : slot.soldier;
-    if (otherRig && otherRig.root) otherRig.root.visible = false;
+    const rig = getSlotRigForVariant(z, slot);
     if (!rig || !rig.root) return;
+    if (slot.infected && slot.infected !== rig && slot.infected.root) slot.infected.root.visible = false;
+    if (slot.commuter && slot.commuter !== rig && slot.commuter.root) slot.commuter.root.visible = false;
+    if (slot.soldier && slot.soldier !== rig && slot.soldier.root) slot.soldier.root.visible = false;
 
+    const isBrute = (z.variant === 'brute');
     rig.root.visible = true;
     const sc = z.scale || 1.0;
     const animDt = (typeof dt === 'number' && dt >= 0)
@@ -2552,6 +2680,9 @@
     if (rig.visorMesh) {
       rig.visorMesh.visible = !!(z.hasArmor && !z.dead);
     }
+    if (rig.runnerEyes) {
+      rig.runnerEyes.visible = !z.dead && (z.variant === 'runner' || z.variant === 'screamer');
+    }
 
     if (rig.spitterNodes) {
       const showSp = (z.variant === 'spitter' && !z.dead);
@@ -2572,7 +2703,9 @@
 
     const acts = rig.actions;
     const mb = z.dead ? 0 : Math.max(0, Math.min(1, z.moveBlend !== undefined ? z.moveBlend : 0));
-    const crippleMult = z.legCrippled ? 0.65 : 1.0;
+    const spdSmooth = z.dead ? 0 : (typeof z.actualSpeedSmooth === 'number' ? z.actualSpeedSmooth : (z.speed * mb));
+    const walkTimeScale = Math.max(0.05, spdSmooth / (1.24 * sc));
+    const runTimeScale = Math.max(0.10, spdSmooth / (3.15 * sc));
 
     if (z.dead) {
       if (acts.idle) acts.idle.paused = true;
@@ -2585,99 +2718,136 @@
         acts.idle.setEffectiveWeight(1.0 - mb);
         acts.idle.timeScale = 1.0;
       }
+      if (acts.zombieWalk && acts.zombieWalk !== acts.walk) {
+        acts.zombieWalk.paused = false;
+        acts.zombieWalk.setEffectiveWeight(0);
+      }
+
       if (isBrute) {
         const isCharging = z.chargeTimer > 0;
         if (acts.walk) {
           acts.walk.paused = false;
           acts.walk.setEffectiveWeight(isCharging ? 0 : mb);
-          acts.walk.timeScale = Math.max(0.75, (z.speed / 1.85) * 0.95 * crippleMult);
+          acts.walk.timeScale = walkTimeScale;
         }
         if (acts.run) {
           acts.run.paused = false;
           acts.run.setEffectiveWeight(isCharging ? mb : 0);
-          acts.run.timeScale = 1.35;
+          acts.run.timeScale = runTimeScale;
         }
-      } else if (z.variant === 'runner') {
+      } else if (z.variant === 'runner' || z.variant === 'screamer') {
         if (acts.run) {
           acts.run.paused = false;
           acts.run.setEffectiveWeight(mb);
-          acts.run.timeScale = Math.max(0.85, (z.speed / 3.35) * 1.15 * crippleMult);
-        }
-        if (acts.walk) { acts.walk.paused = false; acts.walk.setEffectiveWeight(0); }
-        if (acts.zombieWalk && acts.zombieWalk !== acts.walk) {
-          acts.zombieWalk.paused = false;
-          acts.zombieWalk.setEffectiveWeight(0);
-        }
-      } else if (z.variant === 'screamer') {
-        if (acts.run) {
-          acts.run.paused = false;
-          acts.run.setEffectiveWeight(mb * 0.80);
-          acts.run.timeScale = Math.max(0.85, (z.speed / 3.45) * 1.12 * crippleMult);
+          acts.run.timeScale = runTimeScale;
         }
         if (acts.walk) {
           acts.walk.paused = false;
-          acts.walk.setEffectiveWeight(mb * 0.20);
-          acts.walk.timeScale = 1.15;
-        }
-        if (acts.zombieWalk && acts.zombieWalk !== acts.walk) {
-          acts.zombieWalk.paused = false;
-          acts.zombieWalk.setEffectiveWeight(0);
-        }
-      } else if (z.variant === 'spitter') {
-        if (acts.zombieWalk) {
-          acts.zombieWalk.paused = false;
-          acts.zombieWalk.setEffectiveWeight(mb * 0.65);
-          acts.zombieWalk.timeScale = Math.max(0.70, (z.speed / 2.05) * 1.05 * crippleMult);
-        }
-        if (acts.walk && acts.walk !== acts.zombieWalk) {
-          acts.walk.paused = false;
-          acts.walk.setEffectiveWeight(mb * 0.35);
-          acts.walk.timeScale = 1.0;
-        }
-        if (acts.run) { acts.run.paused = false; acts.run.setEffectiveWeight(0); }
-      } else {
-        // Walker: ZombieWalk shamble
-        if (acts.zombieWalk) {
-          acts.zombieWalk.paused = false;
-          acts.zombieWalk.setEffectiveWeight(mb);
-          acts.zombieWalk.timeScale = Math.max(0.65, (z.speed / 1.32) * 1.15 * crippleMult);
-        }
-        if (acts.walk && acts.walk !== acts.zombieWalk) {
-          acts.walk.paused = false;
           acts.walk.setEffectiveWeight(0);
         }
-        if (acts.run) { acts.run.paused = false; acts.run.setEffectiveWeight(0); }
+      } else {
+        // Walker & Spitter: lock full-stride 1.042s Walk clip to actual ground velocity (eliminates foot sliding!)
+        if (acts.walk) {
+          acts.walk.paused = false;
+          acts.walk.setEffectiveWeight(mb);
+          acts.walk.timeScale = walkTimeScale;
+        }
+        if (acts.run) {
+          acts.run.paused = false;
+          acts.run.setEffectiveWeight(0);
+        }
       }
 
       if (rig.mixer) {
         rig.mixer.update(animDt);
       }
 
-      // Additive procedural bone poses applied AFTER mixer.update so mixer resets cleanly each frame
+      // Character-space scary zombie upper-body & arm poses applied AFTER mixer.update
+      rig.root.updateMatrixWorld(true);
+      rig.root.getWorldQuaternion(_qRootInv);
+      _qRootInv.invert();
+
       const b = rig.bones;
-      if (z.variant === 'spitter' && z.spitAnimTimer > 0) {
-        const spitT = 1.0 - Math.max(0, Math.min(1, z.spitAnimTimer / 0.50));
-        const heave = spitT < 0.35
-          ? -Math.sin((spitT / 0.35) * Math.PI) * 0.28
-          : Math.sin(((spitT - 0.35) / 0.65) * Math.PI) * 0.42;
-        if (b.spine1) { _qLocal.setFromAxisAngle(_axisX, heave * 0.55); b.spine1.quaternion.multiply(_qLocal); }
-        if (b.spine2) { _qLocal.setFromAxisAngle(_axisX, heave * 0.65); b.spine2.quaternion.multiply(_qLocal); }
-        if (b.head) { _qLocal.setFromAxisAngle(_axisX, heave * 0.55); b.head.quaternion.multiply(_qLocal); }
-      }
-      if (z.variant === 'screamer' && z.shriekTimer > 0) {
-        if (b.spine1) { _qLocal.setFromAxisAngle(_axisX, -0.22); b.spine1.quaternion.multiply(_qLocal); }
-        if (b.spine2) { _qLocal.setFromAxisAngle(_axisX, -0.24); b.spine2.quaternion.multiply(_qLocal); }
-        if (b.neck) { _qLocal.setFromAxisAngle(_axisX, -0.26); b.neck.quaternion.multiply(_qLocal); }
-        if (b.head) { _qLocal.setFromAxisAngle(_axisX, -0.35); b.head.quaternion.multiply(_qLocal); }
-      }
-      if (z.attackTimer > z.attackCooldown - 0.30) {
-        const lunge = Math.sin(((z.attackCooldown - z.attackTimer) / 0.30) * Math.PI) * 0.32;
-        if (b.spine2) { _qLocal.setFromAxisAngle(_axisX, lunge); b.spine2.quaternion.multiply(_qLocal); }
-        if (b.rightArm) { _qLocal.setFromAxisAngle(_axisX, -lunge * 1.4); b.rightArm.quaternion.multiply(_qLocal); }
-      }
-      if (z.staggerTimer > 0) {
-        const stag = -0.18 * Math.min(1.0, z.staggerTimer / 0.35);
-        if (b.spine2) { _qLocal.setFromAxisAngle(_axisX, stag); b.spine2.quaternion.multiply(_qLocal); }
+      const limp = z.limbBias || 1;
+      const lungeWave = (z.attackTimer > z.attackCooldown - 0.30)
+        ? Math.sin(((z.attackCooldown - z.attackTimer) / 0.30) * Math.PI)
+        : 0;
+      const stagAngle = z.staggerTimer > 0 ? (-0.22 * Math.min(1.0, z.staggerTimer / 0.35)) : 0;
+
+      if (z.variant === 'runner' || z.variant === 'screamer') {
+        if (z.variant === 'screamer' && z.shriekTimer > 0) {
+          // Skyward spine-arched shriek + arms flung wide
+          applyCharSpaceDelta(b.spine, _qRootInv, _axisX, -0.18);
+          applyCharSpaceDelta(b.spine1, _qRootInv, _axisX, -0.20);
+          applyCharSpaceDelta(b.spine2, _qRootInv, _axisX, -0.22);
+          applyCharSpaceDelta(b.neck, _qRootInv, _axisX, -0.24);
+          applyCharSpaceDelta(b.head, _qRootInv, _axisX, -0.32);
+          aimBoneInCharSpace(b.leftArm, _qRootInv, 0.72, 0.42, 0.55, 0.90);
+          aimBoneInCharSpace(b.leftForeArm, _qRootInv, 0.58, 0.65, 0.48, 0.85);
+          aimBoneInCharSpace(b.rightArm, _qRootInv, -0.72, 0.42, 0.55, 0.90);
+          aimBoneInCharSpace(b.rightForeArm, _qRootInv, -0.58, 0.65, 0.48, 0.85);
+        } else {
+          // Terrifying feral chase: ~35 deg deep forward lunge, head pitched UP locking eyes forward, BOTH arms thrust forward (+Z) clawing!
+          const thrash = Math.sin(timeSec * 10.5 + z.seed) * 0.09;
+          const swayL = Math.sin(timeSec * 13.0 + z.seed) * 0.14;
+          const swayR = Math.cos(timeSec * 13.0 + z.seed) * 0.14;
+          applyCharSpaceDelta(b.spine, _qRootInv, _axisX, 0.20 + stagAngle * 0.4);
+          applyCharSpaceDelta(b.spine1, _qRootInv, _axisX, 0.21);
+          applyCharSpaceDelta(b.spine2, _qRootInv, _axisX, 0.21 + lungeWave * 0.24);
+          applyCharSpaceDelta(b.spine2, _qRootInv, _axisZ, thrash);
+          applyCharSpaceDelta(b.neck, _qRootInv, _axisX, -0.22);
+          applyCharSpaceDelta(b.head, _qRootInv, _axisX, -0.26);
+          applyCharSpaceDelta(b.head, _qRootInv, _axisZ, limp * 0.10 - thrash * 0.7);
+
+          // Override upright waist-jogging Run arms completely: extend BOTH arms FORWARD toward player (+Z)!
+          aimBoneInCharSpace(b.leftArm, _qRootInv, 0.12, -0.02 + swayL, 0.99, 0.92);
+          aimBoneInCharSpace(b.leftForeArm, _qRootInv, -0.10, 0.12 + swayL, 0.98, 0.95);
+          aimBoneInCharSpace(b.rightArm, _qRootInv, -0.12, -0.02 + swayR, 0.99, 0.92);
+          aimBoneInCharSpace(b.rightForeArm, _qRootInv, 0.10, 0.12 + swayR, 0.98, 0.95);
+        }
+      } else if (isBrute) {
+        const chgPitch = z.chargeTimer > 0 ? 0.22 : (z.chargeWindup > 0 ? 0.14 : 0.06);
+        applyCharSpaceDelta(b.spine, _qRootInv, _axisX, 0.08 + chgPitch * 0.5 + stagAngle * 0.4);
+        applyCharSpaceDelta(b.spine2, _qRootInv, _axisX, 0.08 + chgPitch * 0.5 + lungeWave * 0.22);
+        applyCharSpaceDelta(b.head, _qRootInv, _axisX, -0.12);
+        if (z.chargeTimer > 0 || lungeWave > 0.05) {
+          aimBoneInCharSpace(b.rightArm, _qRootInv, -0.18, -0.22, 0.96, 0.75);
+          aimBoneInCharSpace(b.rightForeArm, _qRootInv, 0.20, 0.28, 0.94, 0.75);
+        }
+      } else {
+        // Walker & Spitter: ~24 deg hunched shamble, asymmetric limp roll, head cocked & leering up, reaching claw arm(s)
+        let spitHeave = 0;
+        if (z.variant === 'spitter' && z.spitAnimTimer > 0) {
+          const spitT = 1.0 - Math.max(0, Math.min(1, z.spitAnimTimer / 0.50));
+          spitHeave = spitT < 0.35
+            ? -Math.sin((spitT / 0.35) * Math.PI) * 0.32
+            : Math.sin(((spitT - 0.35) / 0.65) * Math.PI) * 0.46;
+        }
+        const shambleRoll = limp * 0.09 + Math.sin(timeSec * 3.0 + z.seed) * 0.05;
+        const headCock = limp * 0.24 + Math.sin(timeSec * 2.1 + z.seed) * 0.06;
+
+        applyCharSpaceDelta(b.spine, _qRootInv, _axisX, 0.14 + spitHeave * 0.35 + stagAngle * 0.4);
+        applyCharSpaceDelta(b.spine1, _qRootInv, _axisX, 0.14 + spitHeave * 0.45);
+        applyCharSpaceDelta(b.spine2, _qRootInv, _axisX, 0.14 + spitHeave * 0.55 + lungeWave * 0.25);
+        applyCharSpaceDelta(b.spine2, _qRootInv, _axisZ, shambleRoll);
+        applyCharSpaceDelta(b.neck, _qRootInv, _axisX, -0.11 + spitHeave * 0.3);
+        applyCharSpaceDelta(b.head, _qRootInv, _axisX, -0.13 + spitHeave * 0.4);
+        applyCharSpaceDelta(b.head, _qRootInv, _axisZ, headCock);
+
+        const reachWave = Math.sin(timeSec * 2.8 + z.seed) * 0.08 + lungeWave * 0.22;
+        if (limp < 0) {
+          // Strong Left arm reaching forward (+Z) clawing; Right arm hanging/dragging lower
+          aimBoneInCharSpace(b.leftArm, _qRootInv, 0.12, -0.16 + reachWave, 0.98, 0.88);
+          aimBoneInCharSpace(b.leftForeArm, _qRootInv, -0.12, -0.02 + reachWave, 0.99, 0.90);
+          aimBoneInCharSpace(b.rightArm, _qRootInv, -0.16, -0.78, 0.60, 0.62);
+          aimBoneInCharSpace(b.rightForeArm, _qRootInv, -0.08, -0.50, 0.86, 0.62);
+        } else {
+          // Strong Right arm reaching forward (+Z) clawing; Left arm hanging/dragging lower
+          aimBoneInCharSpace(b.rightArm, _qRootInv, -0.12, -0.16 + reachWave, 0.98, 0.88);
+          aimBoneInCharSpace(b.rightForeArm, _qRootInv, 0.12, -0.02 + reachWave, 0.99, 0.90);
+          aimBoneInCharSpace(b.leftArm, _qRootInv, 0.16, -0.78, 0.60, 0.62);
+          aimBoneInCharSpace(b.leftForeArm, _qRootInv, 0.08, -0.50, 0.86, 0.62);
+        }
       }
     }
   }
@@ -3021,12 +3191,15 @@
       const infectedGltf = (LRT.AssetLoader && typeof LRT.AssetLoader.getModelGltf === 'function')
         ? LRT.AssetLoader.getModelGltf('zombie_infected')
         : null;
+      const commuterGltf = (LRT.AssetLoader && typeof LRT.AssetLoader.getModelGltf === 'function')
+        ? LRT.AssetLoader.getModelGltf('zombie_commuter')
+        : null;
       const soldierGltf = (LRT.AssetLoader && typeof LRT.AssetLoader.getModelGltf === 'function')
         ? LRT.AssetLoader.getModelGltf('zombie_soldier')
         : null;
 
       if (infectedGltf && infectedGltf.scene && soldierGltf && soldierGltf.scene) {
-        buildSkinnedRigPool(infectedGltf, soldierGltf);
+        buildSkinnedRigPool(infectedGltf, commuterGltf, soldierGltf);
       } else {
         _useSkinnedRigs = false;
         buildZombieMeshes();
