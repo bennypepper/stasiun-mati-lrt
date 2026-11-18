@@ -41,7 +41,9 @@
     card: null,
     els: null,
     voPlayed: new Set(),
-    origWeapons: null
+    origWeapons: null,
+    origStationInteract: null,
+    completedOverlayOpen: false
   };
 
   const _marker = { id: 'tutorial_marker', pos: { x: 0, y: 0, z: 0 }, label: '', color: '#e0b422', active: true };
@@ -198,20 +200,34 @@
     },
     {
       title: 'BOARD',
-      text: 'Wait for the train and open doors, then step inside. Do not linger: infected can follow you through open doors.',
+      text: 'Wait for the train and open doors, then walk inside toward the front cabin. Do not linger: infected can follow you through open doors.',
       marker: () => {
         if (!LRT.Train || typeof LRT.Train.getTrackX !== 'function') return null;
-        const z = (typeof LRT.Train.getOffsetZ === 'function') ? LRT.Train.getOffsetZ() : 0;
         if (LRT.Train.getState && LRT.Train.getState() === 'AWAY') return null;
-        return { x: LRT.Train.getTrackX(), y: 1.4, z: z, label: 'KERETA' };
+        if (typeof LRT.Train.localToWorld === 'function') {
+          const pW = LRT.Train.localToWorld({ x: 0.25, y: 1.35, z: 17.75 });
+          return { x: pW.x, y: pW.y, z: pW.z, label: 'BERGERAK MASUK KERETA' };
+        }
+        const z = (typeof LRT.Train.getOffsetZ === 'function') ? LRT.Train.getOffsetZ() : 0;
+        return { x: LRT.Train.getTrackX() + 0.25, y: 1.35, z: z + 17.75, label: 'BERGERAK MASUK KERETA' };
       },
       check: (p) => !!(LRT.Train && LRT.Train.isPlayerInside && LRT.Train.isPlayerInside(p.pos) && LRT.Train.getState && LRT.Train.getState() === 'BOARDED_WAIT')
     },
     {
-      title: 'DEPART',
-      text: 'Close the doors and leave: <kbd>E</kbd> at the front cab panel, or <kbd>T</kbd>. Briefing completes as the train departs.',
+      title: 'CONTROL ROOM',
+      text: 'Move forward to the <b>Front Control Room</b> and press <kbd>E</kbd> on the door lock / depart console (or press <kbd>T</kbd>) to seal the doors and complete the briefing.',
       voice: 'TUT_07_DEPART',
-      check: () => CORE.gameState === STATES.TRAIN_DEPARTING || CORE.gameState === STATES.TRAIN_CRUISE
+      marker: () => {
+        if (!LRT.Train || typeof LRT.Train.getTrackX !== 'function') return null;
+        if (LRT.Train.getState && LRT.Train.getState() === 'AWAY') return null;
+        if (typeof LRT.Train.localToWorld === 'function') {
+          const pW = LRT.Train.localToWorld({ x: 0.0, y: 1.35, z: 24.8 });
+          return { x: pW.x, y: pW.y, z: pW.z, label: 'RUANG KONTROL' };
+        }
+        const z = (typeof LRT.Train.getOffsetZ === 'function') ? LRT.Train.getOffsetZ() : 0;
+        return { x: LRT.Train.getTrackX(), y: 1.35, z: z + 24.8, label: 'RUANG KONTROL' };
+      },
+      check: () => !!T.completedOverlayOpen
     }
   ];
 
@@ -283,6 +299,32 @@
     T.origWeapons = null;
   }
 
+  function wrapStationInteract() {
+    const S = LRT.Station;
+    if (!S || T.origStationInteract || typeof S.interact !== 'function') return;
+    T.origStationInteract = S.interact;
+    S.interact = function (id) {
+      if (CORE.tutorialActive) {
+        if (id === 'portable_generator' && T.step < 7) {
+          if (LRT.Audio && typeof LRT.Audio.play === 'function') LRT.Audio.play('station_chime', { gain: 0.55 });
+          return { ok: false, blocked: true, message: 'IKUTI LANGKAH BRIEFING TERLEBIH DAHULU' };
+        }
+        if ((id === 'call_train' || id === 'call_train_prev' || id === 'call_train_p2') && T.step < 8) {
+          if (LRT.Audio && typeof LRT.Audio.play === 'function') LRT.Audio.play('station_chime', { gain: 0.55 });
+          return { ok: false, blocked: true, message: 'IKUTI LANGKAH BRIEFING TERLEBIH DAHULU' };
+        }
+      }
+      return T.origStationInteract.apply(S, arguments);
+    };
+  }
+
+  function unwrapStationInteract() {
+    const S = LRT.Station;
+    if (!S || !T.origStationInteract) return;
+    S.interact = T.origStationInteract;
+    T.origStationInteract = null;
+  }
+
   function onKeyDown(e) {
     if (!CORE.tutorialActive) return;
     if (e.code === 'Backspace') {
@@ -321,6 +363,7 @@
     T.walkersSpawned = false;
     T.walkerWait = 0;
     T.endTimer = -1;
+    T.completedOverlayOpen = false;
     T.voPlayed.clear();
 
     T.prevDifficulty = CORE.difficultyKey;
@@ -333,6 +376,7 @@
     if (noticeEl) noticeEl.style.opacity = '0';
 
     wrapWeapons();
+    wrapStationInteract();
     window.addEventListener('keydown', onKeyDown, true);
     CORE.tutorialActive = true;
     ensureCard();
@@ -351,8 +395,41 @@
     if (st.voice) playVoice(st.voice);
   }
 
+  function completeTutorialStep11() {
+    if (!CORE.tutorialActive || T.completedOverlayOpen) return false;
+    T.completedOverlayOpen = true;
+    _marker.active = false;
+    markDone();
+
+    if (LRT.Station && typeof LRT.Station.setPsdOpen === 'function') {
+      LRT.Station.setPsdOpen(0, CORE.activeTravelDir || 1);
+    }
+    if (LRT.Train && typeof LRT.Train.closeDoors === 'function') {
+      LRT.Train.closeDoors();
+    }
+    if (LRT.Train && typeof LRT.Train.ejectExteriorEntities === 'function') {
+      LRT.Train.ejectExteriorEntities();
+    }
+
+    ensureCard();
+    if (T.els) {
+      T.els.bar.style.width = '100%';
+      T.els.done.classList.remove('hidden');
+      T.els.title.textContent = 'BRIEFING SELESAI';
+      T.els.text.textContent = 'Pintu kereta terkunci di Ruang Kontrol. Pilih operasi selanjutnya.';
+    }
+    if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+      LRT.Audio.play('loot_chime', { gain: 0.75 });
+    }
+    if (LRT.PlayerUI && typeof LRT.PlayerUI.openTutorialCompleteModal === 'function') {
+      LRT.PlayerUI.openTutorialCompleteModal();
+    }
+    return true;
+  }
+
   function tutorialUpdate(dt, p) {
     if (!CORE.tutorialActive || !p) return;
+    if (T.completedOverlayOpen) return;
     T.stepTime += dt;
 
     if (p.sprinting) T.sprinted = true;
@@ -382,27 +459,26 @@
 
     if (st.check(p, dt)) {
       if (T.step >= STEPS.length - 1) {
-        // Finished: celebrate for a moment, then return to the menu.
-        T.els.bar.style.width = '100%';
-        T.els.done.classList.remove('hidden');
-        T.els.title.textContent = 'BRIEFING SELESAI';
-        T.els.text.textContent = 'You are ready, Gagak-03. Start a new game when you are.';
-        if (LRT.Audio && typeof LRT.Audio.play === 'function') LRT.Audio.play('loot_chime', { gain: 0.7 });
-        T.endTimer = 3.2;
-        _marker.active = false;
+        completeTutorialStep11();
       } else {
         advanceTo(T.step + 1);
       }
     }
   }
 
-  function endTutorial(reason) {
+  function endTutorial(reason, opts) {
     if (!CORE.tutorialActive) return;
+    const o = opts || {};
     CORE.tutorialActive = false;
+    T.completedOverlayOpen = false;
     window.removeEventListener('keydown', onKeyDown, true);
     unwrapWeapons();
+    unwrapStationInteract();
     _marker.active = false;
     if (T.card) T.card.classList.add('hidden');
+    if (LRT.PlayerUI && typeof LRT.PlayerUI.closeTutorialCompleteModal === 'function') {
+      LRT.PlayerUI.closeTutorialCompleteModal();
+    }
 
     if (reason === 'complete' || reason === 'skip') markDone();
 
@@ -413,6 +489,16 @@
     if (LRT.Audio) {
       if (typeof LRT.Audio.stopVoice === 'function') LRT.Audio.stopVoice();
       if (typeof LRT.Audio.stopAllLoops === 'function') LRT.Audio.stopAllLoops();
+    }
+
+    if (o.stayInGame) {
+      const starter = (LRT.Main && typeof LRT.Main.startGame === 'function')
+        ? LRT.Main.startGame
+        : CORE.startGame;
+      if (typeof starter === 'function') {
+        starter(C.MODES.SURVIVAL);
+        return;
+      }
     }
 
     // Reset the world and send the player back to the main menu with a fresh Station 0 backdrop.
@@ -436,11 +522,14 @@
     if (!CORE.tutorialActive) return;
     if (kind === 'interact' && item && item.type === 'turnstile') T.turnstileTapped = true;
     else if (kind === 'doc') T.docOpened = true;
+    else if (kind === 'door_lock' && T.step >= 10) completeTutorialStep11();
   };
 
   CORE.beginTutorial = beginTutorial;
   CORE.endTutorial = endTutorial;
   CORE.tutorialUpdate = tutorialUpdate;
+  CORE.completeTutorialStep11 = completeTutorialStep11;
+  CORE.getTutorialStep = function () { return T.step; };
   CORE.isTutorialDone = isDone;
   CORE.getTutorialMarkers = function () { return _marker.active ? _markers : _noMarkers; };
   CORE.getTutorialInfo = function () {

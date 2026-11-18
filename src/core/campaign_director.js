@@ -16,6 +16,7 @@
   CORE.wavesPerStation = 1;
   CORE.waveClearTimer = 0;
   CORE.boardingCloseTimer = 0;
+  CORE.manualDoorHold = false;
   CORE.rideCompleteReady = false;
   CORE.stationsCleared = 0;
   CORE.totalKills = 0;
@@ -595,7 +596,48 @@
 
   function handleInteractResult(res, item) {
     if (!res || !item) return;
+    if (res && res.blocked) {
+      if (res.message && LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
+        LRT.PlayerUI.setNotice(res.message, '#e0b422');
+      }
+      return;
+    }
     if (CORE.tutorialActive && typeof CORE.onTutorialEvent === 'function') CORE.onTutorialEvent('interact', item, res);
+
+    if (res.action === 'depart') {
+      departTrainNow(false);
+      return;
+    }
+
+    if (res.action === 'toggle_doors' || item.action === 'toggle_doors' || item.id === 'train_door_lock_front' || item.id === 'train_door_lock_rear') {
+      if (CORE.gameState !== STATES.TRAIN_BOARDING || !LRT.Train || (LRT.Train.getState && LRT.Train.getState() !== 'BOARDED_WAIT')) {
+        return;
+      }
+      const doorsWereOpen = typeof LRT.Train.areDoorsOpen === 'function'
+        ? LRT.Train.areDoorsOpen()
+        : (typeof LRT.Train.getDoorOpen === 'function' ? LRT.Train.getDoorOpen() > 0.5 : true);
+      if (doorsWereOpen) {
+        if (typeof LRT.Train.closeDoors === 'function') LRT.Train.closeDoors();
+        if (LRT.Station && typeof LRT.Station.setPsdOpen === 'function') LRT.Station.setPsdOpen(0, CORE.activeTravelDir);
+        CORE.boardingCloseTimer = 999;
+        CORE.manualDoorHold = true;
+        if (LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
+          LRT.PlayerUI.setNotice('🔒 PINTU KERETA DIKUNCI — TEKAN PANEL BERANGKAT UNTUK JALAN', '#22c55e');
+        }
+        if (CORE.tutorialActive && typeof CORE.getTutorialStep === 'function' && CORE.getTutorialStep() >= 10 && typeof CORE.completeTutorialStep11 === 'function') {
+          CORE.completeTutorialStep11();
+        }
+      } else {
+        if (typeof LRT.Train.openDoors === 'function') LRT.Train.openDoors();
+        if (LRT.Station && typeof LRT.Station.setPsdOpen === 'function') LRT.Station.setPsdOpen(1, CORE.activeTravelDir);
+        CORE.boardingCloseTimer = 999;
+        CORE.manualDoorHold = true;
+        if (LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
+          LRT.PlayerUI.setNotice('🔓 PINTU KERETA DIBUKA', '#f59e0b');
+        }
+      }
+      return;
+    }
 
     const s0 = campaignState.stationObjectives[0];
     const s1 = campaignState.stationObjectives[1];
@@ -608,6 +650,12 @@
     }
 
     if (item.id === 'portable_generator' || res.action === 'generator') {
+      if (CORE.tutorialActive && typeof CORE.getTutorialStep === 'function' && CORE.getTutorialStep() < 7) {
+        if (LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
+          LRT.PlayerUI.setNotice('IKUTI LANGKAH BRIEFING TERLEBIH DAHULU', '#e0b422');
+        }
+        return;
+      }
       if (s0) {
         s0.genOn = true;
       }
@@ -615,7 +663,7 @@
         LRT.Station.setLightingFactor(1.0);
       }
       CORE.applyBrightness();
-      if (!campaignState.voTriggered.has('VO_02_GEN_ON')) {
+      if (!CORE.tutorialActive && !campaignState.voTriggered.has('VO_02_GEN_ON')) {
         campaignState.voTriggered.add('VO_02_GEN_ON');
         if (LRT.Audio && typeof LRT.Audio.playVoice === 'function') {
           LRT.Audio.playVoice('VO_02_GEN_ON');
@@ -630,7 +678,7 @@
       if (s1) {
         s1.fuseFound = true;
       }
-      if (!campaignState.voTriggered.has('VO_08_FUSE_FOUND')) {
+      if (!CORE.tutorialActive && !campaignState.voTriggered.has('VO_08_FUSE_FOUND')) {
         campaignState.voTriggered.add('VO_08_FUSE_FOUND');
         if (LRT.Audio && typeof LRT.Audio.playVoice === 'function') {
           LRT.Audio.playVoice('VO_08_FUSE_FOUND');
@@ -645,7 +693,7 @@
       if (campaignState.stationObjectives[2]) {
         campaignState.stationObjectives[2].vaxFound = true;
       }
-      if (!campaignState.voTriggered.has('VO_12_VAX_FOUND')) {
+      if (!CORE.tutorialActive && !campaignState.voTriggered.has('VO_12_VAX_FOUND')) {
         campaignState.voTriggered.add('VO_12_VAX_FOUND');
         if (LRT.Audio && typeof LRT.Audio.playVoice === 'function') {
           LRT.Audio.playVoice('VO_12_VAX_FOUND');
@@ -698,7 +746,7 @@
     }
 
     if (item.id === 'train_horn_front' || res.action === 'horn') {
-      if (!campaignState.voTriggered.has('VO_14_HORN_HINT')) {
+      if (!CORE.tutorialActive && !campaignState.voTriggered.has('VO_14_HORN_HINT')) {
         campaignState.voTriggered.add('VO_14_HORN_HINT');
         if (LRT.Audio && typeof LRT.Audio.playVoice === 'function') {
           LRT.Audio.playVoice('VO_14_HORN_HINT');
@@ -771,6 +819,11 @@
   function summonTrain(dirOverride, isDirectDebugCall) {
     if (CORE.gameState !== STATES.STATION_ACTIVE) return;
     if (!LRT.Train || !LRT.Train.startApproach) return;
+    if (CORE.tutorialActive && !isDirectDebugCall && typeof CORE.getTutorialStep === 'function' && CORE.getTutorialStep() < 8) {
+      if (LRT.Audio) LRT.Audio.play('station_chime', { gain: 0.55 });
+      LRT.PlayerUI.setNotice('IKUTI LANGKAH BRIEFING TERLEBIH DAHULU', '#e0b422');
+      return;
+    }
     const rail = (LRT.Station && typeof LRT.Station.getRailConfig === 'function')
       ? LRT.Station.getRailConfig()
       : { isIsland: false, track1X: 0.0, track2X: -4.70, platEdge1X: 1.46, platEdge2X: -6.16 };
@@ -802,7 +855,7 @@
           LRT.PlayerUI.setNotice(`OBJEKTIF BELUM SELESAI: ${hint}`, '#e0b422');
           return;
         }
-        if (!campaignState.voTriggered.has('VO_04_CALL_HOLD')) {
+        if (!CORE.tutorialActive && !campaignState.voTriggered.has('VO_04_CALL_HOLD')) {
           campaignState.voTriggered.add('VO_04_CALL_HOLD');
           if (LRT.Audio && typeof LRT.Audio.playVoice === 'function') {
             LRT.Audio.playVoice('VO_04_CALL_HOLD');
@@ -820,6 +873,7 @@
       ? `ZONA EVAKUASI (${(targetArch && targetArch.name) || 'Dukuh Atas BSI'})`
       : ((targetArch && targetArch.name) || (dir === -1 ? 'Stasiun Sebelumnya' : 'Stasiun Berikutnya'));
 
+    CORE.manualDoorHold = false;
     CORE.activeTravelDir = dir;
     CORE.gameState = STATES.TRAIN_APPROACHING;
     LRT.Train.startApproach({
@@ -834,7 +888,7 @@
         : `🟢 KERETA MAJU (PERON 1) MENUJU ${targetName} SEDANG MENDEKAT`,
       dir === -1 ? '#f59e0b' : '#22c55e'
     );
-    if (dir === 1 && CORE.gameMode === MODES.SURVIVAL) {
+    if (dir === 1 && CORE.gameMode === MODES.SURVIVAL && !CORE.tutorialActive) {
       campaignState.trainCallActive = true;
       campaignState.trainCallWaitElapsed = 0;
       campaignState.trainCallTrickleStage = 0;
@@ -860,14 +914,51 @@
     CORE.isMoodLerping = true;
   }
 
-  function departTrainNow() {
-    if (CORE.gameState !== STATES.TRAIN_BOARDING) return;
-    if (!LRT.Train) return;
+  function departTrainNow(isDirectDebugCall) {
+    if (CORE.gameState !== STATES.TRAIN_BOARDING) return false;
+    if (!LRT.Train) return false;
+    if (LRT.Train.getState && LRT.Train.getState() !== 'BOARDED_WAIT') return false;
+    if (typeof LRT.Train.isPendingDepart === 'function' && LRT.Train.isPendingDepart()) return false;
+
     const pState = LRT.PlayerUI.getState();
     if (!LRT.Train.isPlayerInside(pState.pos)) {
       LRT.PlayerUI.setNotice('MASUK KE DALAM KERETA TERLEBIH DAHULU', '#e0b422');
-      return;
+      return false;
     }
+
+    if (CORE.tutorialActive) {
+      if (!isDirectDebugCall && typeof CORE.getTutorialStep === 'function' && CORE.getTutorialStep() < 10) {
+        if (LRT.Audio) LRT.Audio.play('station_chime', { gain: 0.55 });
+        LRT.PlayerUI.setNotice('IKUTI LANGKAH BRIEFING TERLEBIH DAHULU', '#e0b422');
+        return false;
+      }
+      if (typeof CORE.completeTutorialStep11 === 'function') {
+        return CORE.completeTutorialStep11();
+      }
+      return true;
+    }
+
+    // Guard 1: Newly arrived train before player disembarks onto the new station
+    if (CORE.rideCompleteReady === true && !isDirectDebugCall) {
+      if (typeof LRT.Train.openDoors === 'function') LRT.Train.openDoors();
+      if (LRT.Station && typeof LRT.Station.setPsdOpen === 'function') {
+        LRT.Station.setPsdOpen(1, CORE.activeTravelDir);
+      }
+      CORE.manualDoorHold = true;
+      CORE.boardingCloseTimer = 999;
+      if (LRT.Audio) LRT.Audio.play('station_chime', { gain: 0.65 });
+      LRT.PlayerUI.setNotice('TURUN KE PERON & SELESAIKAN MISI STASIUN INI TERLEBIH DAHULU!', '#e0b422');
+      return false;
+    }
+
+    // Guard 2: Incomplete station mission in Survival Mode
+    if (CORE.gameMode === MODES.SURVIVAL && !CORE.tutorialActive && !isDirectDebugCall && CORE.activeTravelDir === 1 && !isStationPrimaryObjectiveComplete(CORE.stationIndex)) {
+      if (LRT.Audio) LRT.Audio.play('station_chime', { gain: 0.55 });
+      LRT.PlayerUI.setNotice('OBJEKTIF UTAMA STASIUN BELUM SELESAI — SELESAIKAN MISI DULU!', '#e0b422');
+      return false;
+    }
+
+    CORE.manualDoorHold = false;
     if (LRT.Station && LRT.Station.setPsdOpen) LRT.Station.setPsdOpen(0, CORE.activeTravelDir);
     LRT.Train.closeDoors();
     if (typeof LRT.Train.ejectExteriorEntities === 'function') LRT.Train.ejectExteriorEntities();
@@ -876,11 +967,19 @@
     CORE.gameState = STATES.TRAIN_DEPARTING;
     CORE.boardingCloseTimer = 0;
     initRideMoodTransition();
-    LRT.PlayerUI.setNotice('PINTU DITUTUP — BERANGKAT!', '#4ade80');
-    campaignState.voTriggered.add('VO_24_DOOR_CLOSE');
-    if (LRT.Audio && typeof LRT.Audio.playVoice === 'function') {
-      LRT.Audio.playVoice('VO_24_DOOR_CLOSE');
+    LRT.PlayerUI.setNotice(
+      CORE.activeTravelDir < 0
+        ? '🟠 PINTU DITUTUP — KERETA KEMBALI BERANGKAT!'
+        : '🟢 PINTU DITUTUP — BERANGKAT!',
+      CORE.activeTravelDir < 0 ? '#f59e0b' : '#4ade80'
+    );
+    if (!CORE.tutorialActive) {
+      campaignState.voTriggered.add('VO_24_DOOR_CLOSE');
+      if (LRT.Audio && typeof LRT.Audio.playVoice === 'function') {
+        LRT.Audio.playVoice('VO_24_DOOR_CLOSE');
+      }
     }
+    return true;
   }
 
   function collectEnemyDrop(dropType, dropMeta) {
@@ -1063,7 +1162,9 @@
         stationSub: sub,
         objectiveTitle: inside ? 'BOARDED — READY TO DEPART' : 'BOARD LRT TRAIN',
         objectiveDetail: inside
-          ? `Press [E] / [T] in front cab to Depart (Auto-seal: ${Math.max(0, CORE.boardingCloseTimer).toFixed(1)}s)`
+          ? (CORE.manualDoorHold
+            ? 'Gunakan Panel Ruang Kontrol untuk Kunci/Buka Pintu & Berangkat'
+            : `Press [E] / [T] in Control Room to Depart (Auto-seal: ${Math.max(0, CORE.boardingCloseTimer).toFixed(1)}s)`)
           : `Enter open doors on Peron ${CORE.activeTravelDir === -1 ? 2 : 1}`
       };
     }
@@ -1450,6 +1551,7 @@
           if (CORE.gameState === STATES.TRAIN_APPROACHING || CORE.gameState === STATES.TRAIN_ARRIVING) {
             const wasArrival = CORE.gameState === STATES.TRAIN_ARRIVING;
             CORE.gameState = STATES.TRAIN_BOARDING;
+            CORE.manualDoorHold = false;
             CORE.boardingCloseTimer = 16.0;
             if (LRT.Station && LRT.Station.setPsdOpen) LRT.Station.setPsdOpen(1, CORE.activeTravelDir);
             LRT.Train.openDoors();
@@ -1485,7 +1587,7 @@
                 5: 'VO_18_SETIA_ARR'
               };
               const aVo = arrivalVoMap[CORE.stationIndex];
-              if (aVo && !campaignState.voTriggered.has(aVo)) {
+              if (!CORE.tutorialActive && aVo && !campaignState.voTriggered.has(aVo)) {
                 campaignState.voTriggered.add(aVo);
                 if (LRT.Audio && typeof LRT.Audio.playVoice === 'function') {
                   LRT.Audio.playVoice(aVo);
@@ -1497,7 +1599,7 @@
               }
             } else {
               LRT.PlayerUI.setNotice(`PINTU PERON ${CORE.activeTravelDir === -1 ? 2 : 1} TERBUKA — NAIK KE KERETA`, '#4ade80');
-              if (!campaignState.voTriggered.has('VO_05_TRAIN_DOCK')) {
+              if (!CORE.tutorialActive && !campaignState.voTriggered.has('VO_05_TRAIN_DOCK')) {
                 campaignState.voTriggered.add('VO_05_TRAIN_DOCK');
                 if (LRT.Audio && typeof LRT.Audio.playVoice === 'function') {
                   LRT.Audio.playVoice('VO_05_TRAIN_DOCK');
@@ -1546,7 +1648,7 @@
 
       // Sync PSD smooth slide & disembark flow across both Peron 1 and Peron 2
       if (CORE.gameState === STATES.TRAIN_BOARDING) {
-        if (CORE.gameMode === MODES.SURVIVAL && !campaignState.voTriggered.has('VO_06_BOARD_WARN')) {
+        if (CORE.gameMode === MODES.SURVIVAL && !CORE.tutorialActive && !campaignState.voTriggered.has('VO_06_BOARD_WARN')) {
           const aliveNow = getWaveRemainingCountSafe();
           if (aliveNow > 0) {
             campaignState.voTriggered.add('VO_06_BOARD_WARN');
@@ -1563,6 +1665,7 @@
         if (CORE.rideCompleteReady && !LRT.Train.isPlayerInside(pState.pos) && onPlat) {
           // Player stepped safely onto the newly arrived station platform
           CORE.rideCompleteReady = false;
+          CORE.manualDoorHold = false;
           if (LRT.Station && LRT.Station.setPsdOpen) LRT.Station.setPsdOpen(0, CORE.activeTravelDir);
           LRT.Train.closeDoors();
           LRT.Train.reset(CORE.gameMode);
@@ -1577,7 +1680,7 @@
           } else {
             LRT.PlayerUI.setNotice('JELAJAHI STASIUN — TEKAN [T] UNTUK PANGGIL LRT', '#e0b422');
           }
-        } else if (CORE.gameMode === MODES.SURVIVAL && !CORE.rideCompleteReady && LRT.Train.isPlayerInside(pState.pos)) {
+        } else if (CORE.gameMode === MODES.SURVIVAL && !CORE.tutorialActive && !CORE.rideCompleteReady && !CORE.manualDoorHold && LRT.Train.isPlayerInside(pState.pos)) {
           CORE.boardingCloseTimer = CORE.boardingCloseTimer > 0 ? CORE.boardingCloseTimer - dt : 16.0;
           if (CORE.boardingCloseTimer <= 0) {
             CORE.boardingCloseTimer = 0;
@@ -1600,7 +1703,7 @@
         const beforeAlive = LRT.Enemies.getAliveCount();
         LRT.Enemies.update(dt, pState.pos, stationGrid, trainCols, handlePlayerHit, handleEnemyDrop, enemyOpts);
         const afterAlive = LRT.Enemies.getAliveCount();
-        if (CORE.gameMode === MODES.SURVIVAL) {
+        if (CORE.gameMode === MODES.SURVIVAL && !CORE.tutorialActive) {
           if (afterAlive < beforeAlive) {
             CORE.totalKills += (beforeAlive - afterAlive);
           }
@@ -1622,7 +1725,7 @@
     }
 
     // Periodic survival voice checks
-    if (CORE.gameMode === MODES.SURVIVAL) {
+    if (CORE.gameMode === MODES.SURVIVAL && !CORE.tutorialActive) {
       CORE.enemySightTimer += dt;
       if (CORE.enemySightTimer >= 0.5) {
         CORE.enemySightTimer = 0;
@@ -1875,6 +1978,7 @@
       CORE.stationIndex = targetIdx;
       CORE.activeTravelDir = 1;
       CORE.prevTrainState = 'AWAY';
+      CORE.manualDoorHold = false;
       CORE.rideCompleteReady = false;
       CORE.gameState = STATES.STATION_ACTIVE;
       if (typeof CORE.syncMenuLights === 'function') CORE.syncMenuLights();

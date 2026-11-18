@@ -259,6 +259,7 @@
       }
     }
   }
+  CORE.startGame = startGame;
 
   function stepSimulation(dt) {
     simTime += dt;
@@ -405,8 +406,10 @@
       if (LRT.Station && LRT.Station.update) LRT.Station.update(dt);
       CORE.updateMenuCamera(simTime);
     } else if (CORE.gameState !== STATES.GAME_OVER) {
-      const pauseVisible = LRT.PlayerUI.getDom()['pause-overlay'] && !LRT.PlayerUI.getDom()['pause-overlay'].classList.contains('hidden');
-      if (!pauseVisible) {
+      const dom = LRT.PlayerUI.getDom();
+      const pauseVisible = dom['pause-overlay'] && !dom['pause-overlay'].classList.contains('hidden');
+      const tutCompleteVisible = dom['tutorial-complete-overlay'] && !dom['tutorial-complete-overlay'].classList.contains('hidden');
+      if (!pauseVisible && !tutCompleteVisible) {
         stepSimulation(dt);
       }
     }
@@ -726,7 +729,7 @@
           if (CORE.gameState === STATES.STATION_ACTIVE) {
             CORE.summonTrain(dirOverride, false);
           } else if (CORE.gameState === STATES.TRAIN_BOARDING) {
-            CORE.departTrainNow();
+            CORE.departTrainNow(false);
           }
         }
       });
@@ -873,7 +876,7 @@
         cycleLightingMode: CORE.cycleLightingMode,
         getLightingMode: CORE.getLightingMode,
         summonTrain: (dir) => CORE.summonTrain(dir, true),
-        departTrainNow: CORE.departTrainNow,
+        departTrainNow: () => CORE.departTrainNow(true),
         triggerInteract: (itemId) => {
           if (itemId) {
             let item = null;

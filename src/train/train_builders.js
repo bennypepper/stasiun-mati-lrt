@@ -190,6 +190,8 @@
   T.texDestCtx = null;
   T.texDestMap = null;
   T.destBoardMat = null;
+  T.texDoorLockPanel = null;
+  T.doorLockLedMat = null;
   T.texScorchFallback = null;
   T.baseLcdMat = null;
 
@@ -534,6 +536,52 @@
 
     repaintPisLcd(T.currentStationName, T.travelDir);
 
+    // 3c. Cab Door Lock Control Panel Texture ('PANEL KUNCI PINTU')
+    const cDL = makeCanvas(256, 192);
+    const ctxDL = cDL.getContext('2d');
+    ctxDL.fillStyle = '#141920';
+    ctxDL.fillRect(0, 0, 256, 192);
+    ctxDL.strokeStyle = '#334155';
+    ctxDL.lineWidth = 4;
+    ctxDL.strokeRect(4, 4, 248, 184);
+    ctxDL.fillStyle = '#0f172a';
+    ctxDL.fillRect(10, 10, 236, 44);
+    ctxDL.fillStyle = '#f8fafc';
+    ctxDL.font = 'bold 18px sans-serif';
+    ctxDL.textAlign = 'center';
+    ctxDL.fillText('PANEL KUNCI PINTU', 128, 34);
+    ctxDL.fillStyle = '#94a3b8';
+    ctxDL.font = 'bold 10px monospace';
+    ctxDL.fillText('GOA-3 CAB DOOR INTERLOCK', 128, 49);
+    // Lock & Unlock button graphics
+    ctxDL.fillStyle = '#166534';
+    ctxDL.beginPath(); ctxDL.arc(76, 114, 28, 0, Math.PI * 2); ctxDL.fill();
+    ctxDL.strokeStyle = '#4ade80'; ctxDL.lineWidth = 3; ctxDL.stroke();
+    ctxDL.fillStyle = '#ecfdf5'; ctxDL.font = 'bold 13px monospace';
+    ctxDL.fillText('KUNCI', 76, 118);
+    ctxDL.fillStyle = '#991b1b';
+    ctxDL.beginPath(); ctxDL.arc(180, 114, 28, 0, Math.PI * 2); ctxDL.fill();
+    ctxDL.strokeStyle = '#f87171'; ctxDL.lineWidth = 3; ctxDL.stroke();
+    ctxDL.fillStyle = '#fef2f2';
+    ctxDL.fillText('BUKA', 180, 118);
+    ctxDL.fillStyle = '#cbd5e1';
+    ctxDL.font = 'bold 11px monospace';
+    ctxDL.fillText('[E] RUANG KONTROL', 128, 170);
+    T.texDoorLockPanel = new THREE.CanvasTexture(cDL);
+    T.texDoorLockPanel.colorSpace = THREE.SRGBColorSpace;
+    T.texDoorLockPanel.anisotropy = 4;
+
+    if (!T.doorLockLedMat) {
+      T.doorLockLedMat = new THREE.MeshStandardMaterial({
+        color: 0x22c55e,
+        emissive: 0x16a34a,
+        emissiveIntensity: 1.65,
+        roughness: 0.22,
+        metalness: 0.15
+      });
+    }
+    syncDoorLockPanels(false);
+
     // 4. Fallback Scorch Decal Texture (in case LRT.Materials.mats.scorchDecal absent)
     const cS = makeCanvas(128, 128);
     const ctxS = cS.getContext('2d');
@@ -546,6 +594,18 @@
     ctxS.fillRect(0, 0, 128, 128);
     T.texScorchFallback = new THREE.CanvasTexture(cS);
     T.texScorchFallback.colorSpace = THREE.SRGBColorSpace;
+  }
+
+  function syncDoorLockPanels(doorsOpen) {
+    if (!T.doorLockLedMat) return;
+    if (doorsOpen) {
+      T.doorLockLedMat.color.setHex(0xef4444);
+      T.doorLockLedMat.emissive.setHex(0xdc2626);
+    } else {
+      T.doorLockLedMat.color.setHex(0x22c55e);
+      T.doorLockLedMat.emissive.setHex(0x16a34a);
+    }
+    T.doorLockLedMat.needsUpdate = true;
   }
 
   function repaintDestBoard(stationName, travelDir, isArrival) {
@@ -1440,6 +1500,35 @@
     }
     group.add(new THREE.Mesh(mergeStaticGeoms(consoleGeoms), consoleMat));
 
+    // Physical Door Lock Control Panels ('PANEL KUNCI PINTU') inside BOTH front (+0.68, 24.75) and rear (-0.68, -24.75) cabs
+    const doorLockPlateMat = new THREE.MeshStandardMaterial({
+      map: T.texDoorLockPanel,
+      emissive: new THREE.Color(0x94a3b8),
+      emissiveMap: T.texDoorLockPanel,
+      emissiveIntensity: 0.55,
+      roughness: 0.35,
+      metalness: 0.30
+    });
+    const doorLockFaceGeoms = [];
+    const doorLockLedGeoms = [];
+    for (const s of [-1, 1]) {
+      const px = s * 0.80;
+      const pz = s * 24.75;
+      const rotY = s > 0 ? -Math.PI * 0.5 : Math.PI * 0.5;
+      // Angled dark steel pedestal/box mounted on inner cabinet shoulder
+      pushMatGeom(col.steelDarkGeoms, new THREE.BoxGeometry(0.14, 0.16, 0.38), px, 1.13, pz, 0, 0, s * 0.28);
+      // Printed 'PANEL KUNCI PINTU' plate facing cab aisle
+      pushMatGeom(doorLockFaceGeoms, new THREE.PlaneGeometry(0.32, 0.20), px - s * 0.072, 1.14, pz, 0, rotY, 0);
+      // Glowing status indicator LED pill right above faceplate (Red = Unlocked/Open, Green = Locked)
+      pushMatGeom(doorLockLedGeoms, new THREE.BoxGeometry(0.055, 0.042, 0.20), px - s * 0.05, 1.24, pz, 0, 0, 0);
+      // Tactile chrome push bezel
+      pushMatGeom(col.metalGeoms, new THREE.BoxGeometry(0.025, 0.015, 0.36), px - s * 0.06, 1.21, pz);
+    }
+    group.add(new THREE.Mesh(mergeStaticGeoms(doorLockFaceGeoms), doorLockPlateMat));
+    if (T.doorLockLedMat) {
+      group.add(new THREE.Mesh(mergeStaticGeoms(doorLockLedGeoms), T.doorLockLedMat));
+    }
+
     // Inter-car Ribbed Accordion Gangways (30 ribs merged into col.steelDarkGeoms!)
     for (const gz of [-8.775, 8.775]) {
       for (let rib = -2; rib <= 2; rib++) {
@@ -2175,6 +2264,7 @@
   T.mergeStaticGeoms = mergeStaticGeoms;
   T.pushMatGeom = pushMatGeom;
   T.buildProceduralTrainTextures = buildProceduralTrainTextures;
+  T.syncDoorLockPanels = syncDoorLockPanels;
   T.repaintDestBoard = repaintDestBoard;
   T.repaintPisLcd = repaintPisLcd;
   T.createMeshBuilder = createMeshBuilder;

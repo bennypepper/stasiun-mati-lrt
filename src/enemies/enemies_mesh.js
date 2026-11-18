@@ -99,6 +99,14 @@
   let _overlayPartMeshes = [];
   let _allPartMeshes = [];
 
+  // Real rigged THREE.SkinnedMesh + AnimationMixer pool (loaded from zombie_infected.glb & zombie_soldier.glb)
+  let _useSkinnedRigs = false;
+  const _rigPool = [];
+  const _axisX = new THREE.Vector3(1, 0, 0);
+  let _spitterCystMat = null;
+  let _screamerCystMat = null;
+  let _cystGeo = null;
+
   E.MAX_ENEMIES = MAX_ENEMIES;
   E.MAX_BILE = MAX_BILE;
   E.MAX_PUDDLES = MAX_PUDDLES;
@@ -1088,6 +1096,9 @@
       _overlayPartMeshes[i].visible = false;
     }
     _allPartMeshes = _corePartMeshes.concat(_overlayPartMeshes);
+  }
+
+  function buildBileAndPuddleMeshes() {
 
     const createVomitPuddleTex = () => {
       if (typeof document === 'undefined') return null;
@@ -1282,6 +1293,256 @@
     E.enemyRoot.add(_puddleBubbleMesh);
   }
 
+  function mapClonedHierarchy(src, dst, map) {
+    map.set(src, dst);
+    const len = Math.min(src.children.length, dst.children.length);
+    for (let i = 0; i < len; i++) {
+      mapClonedHierarchy(src.children[i], dst.children[i], map);
+    }
+  }
+
+  function cloneSkinnedGltf(gltf, isSoldier) {
+    if (!gltf || !gltf.scene) return null;
+    const root = gltf.scene.clone(true);
+    const srcToDst = new Map();
+    mapClonedHierarchy(gltf.scene, root, srcToDst);
+
+    const nodesByName = new Map();
+    root.traverse((node) => {
+      if (node.name && !nodesByName.has(node.name)) {
+        nodesByName.set(node.name, node);
+      }
+    });
+
+    const sourceSkinned = [];
+    gltf.scene.traverse((src) => {
+      if (src.isSkinnedMesh) sourceSkinned.push(src);
+    });
+
+    const clonedSkinned = [];
+    const materials = [];
+    const matCache = new Map();
+    let visorMesh = null;
+
+    for (let i = 0; i < sourceSkinned.length; i++) {
+      const srcSm = sourceSkinned[i];
+      const sm = srcToDst.get(srcSm);
+      if (!sm || !sm.isSkinnedMesh) continue;
+
+      sm.frustumCulled = false;
+      sm.castShadow = true;
+      sm.receiveShadow = true;
+      if (isSoldier && (sm.name || '').toLowerCase().includes('visor')) {
+        visorMesh = sm;
+      }
+
+      const cloneMat = (m) => {
+        if (!m) return m;
+        if (!matCache.has(m)) {
+          const cm = m.clone();
+          const isVisor = isSoldier && (sm === visorMesh || (cm.name || '').toLowerCase().includes('visor'));
+          if ('envMapIntensity' in cm) cm.envMapIntensity = isVisor ? 0.95 : 0.72;
+          if (!isVisor && typeof cm.roughness === 'number') {
+            cm.roughness = Math.max(isSoldier ? 0.62 : 0.78, cm.roughness);
+          }
+          if (isVisor && typeof cm.roughness === 'number') {
+            cm.roughness = 0.16;
+            cm.metalness = 0.45;
+          }
+          matCache.set(m, cm);
+          materials.push({
+            mat: cm,
+            isVisor,
+            baseColor: cm.color ? cm.color.clone() : new THREE.Color(0xffffff),
+            baseEmissive: cm.emissive ? cm.emissive.clone() : new THREE.Color(0x000000),
+            baseEmissiveIntensity: cm.emissiveIntensity !== undefined ? cm.emissiveIntensity : 1.0
+          });
+        }
+        return matCache.get(m);
+      };
+
+      if (Array.isArray(sm.material)) {
+        sm.material = sm.material.map(cloneMat);
+      } else if (sm.material) {
+        sm.material = cloneMat(sm.material);
+      }
+
+      if (srcSm.skeleton) {
+        const origBones = srcSm.skeleton.bones;
+        const newBones = new Array(origBones.length);
+        for (let b = 0; b < origBones.length; b++) {
+          const origBone = origBones[b];
+          newBones[b] = srcToDst.get(origBone) || nodesByName.get(origBone.name) || origBone;
+        }
+        const newSkeleton = new THREE.Skeleton(newBones, srcSm.skeleton.boneInverses);
+        sm.bind(newSkeleton, sm.bindMatrix);
+      }
+
+      clonedSkinned.push(sm);
+    }
+
+    return { root, nodesByName, skinnedMeshes: clonedSkinned, materials, visorMesh };
+  }
+
+  function findClipCaseInsensitive(animations, name) {
+    if (!animations || !animations.length) return null;
+    const exact = THREE.AnimationClip.findByName(animations, name);
+    if (exact) return exact;
+    const low = name.toLowerCase();
+    for (let i = 0; i < animations.length; i++) {
+      if ((animations[i].name || '').toLowerCase() === low) return animations[i];
+    }
+    return null;
+  }
+
+  function createRigEntry(gltf, isSoldier) {
+    const cloned = cloneSkinnedGltf(gltf, isSoldier);
+    if (!cloned) return null;
+
+    const mixer = new THREE.AnimationMixer(cloned.root);
+    const anims = gltf.animations || [];
+    const idleClip = findClipCaseInsensitive(anims, 'Idle') || anims[0] || null;
+    const walkClip = findClipCaseInsensitive(anims, 'Walk') || idleClip;
+    const runClip = findClipCaseInsensitive(anims, 'Run') || walkClip;
+    const zombieWalkClip = findClipCaseInsensitive(anims, 'ZombieWalk')
+      || findClipCaseInsensitive(anims, 'ANIMATION ZOMBIE')
+      || walkClip;
+
+    const setupAction = (clip, initialWeight) => {
+      if (!clip) return null;
+      const act = mixer.clipAction(clip);
+      act.setLoop(THREE.LoopRepeat, Infinity);
+      act.enabled = true;
+      act.setEffectiveWeight(initialWeight);
+      act.play();
+      return act;
+    };
+
+    const actions = {
+      idle: setupAction(idleClip, 1),
+      walk: setupAction(walkClip, 0),
+      run: setupAction(runClip, 0),
+      zombieWalk: (!isSoldier && zombieWalkClip && zombieWalkClip !== walkClip) ? setupAction(zombieWalkClip, 0) : null
+    };
+    if (!actions.zombieWalk && !isSoldier) {
+      actions.zombieWalk = actions.walk;
+    }
+
+    const bones = {
+      hips: cloned.nodesByName.get('mixamorig:Hips') || null,
+      spine: cloned.nodesByName.get('mixamorig:Spine') || null,
+      spine1: cloned.nodesByName.get('mixamorig:Spine1') || null,
+      spine2: cloned.nodesByName.get('mixamorig:Spine2') || null,
+      neck: cloned.nodesByName.get('mixamorig:Neck') || null,
+      head: cloned.nodesByName.get('mixamorig:Head') || null,
+      leftArm: cloned.nodesByName.get('mixamorig:LeftArm') || null,
+      rightArm: cloned.nodesByName.get('mixamorig:RightArm') || null
+    };
+
+    // Attach bone-mounted bioluminescent blisters/cysts for Spitter & Screamer variants
+    let spitterNodes = null;
+    let screamerNodes = null;
+    if (!isSoldier) {
+      if (!_cystGeo) _cystGeo = new THREE.SphereGeometry(1.0, 8, 6);
+      if (!_spitterCystMat) {
+        _spitterCystMat = new THREE.MeshStandardMaterial({
+          color: 0xa8e024,
+          emissive: new THREE.Color(0x6da610),
+          emissiveIntensity: 1.15,
+          roughness: 0.24,
+          metalness: 0.05
+        });
+      }
+      if (!_screamerCystMat) {
+        _screamerCystMat = new THREE.MeshStandardMaterial({
+          color: 0xd92638,
+          emissive: new THREE.Color(0x991422),
+          emissiveIntensity: 1.25,
+          roughness: 0.26,
+          metalness: 0.05
+        });
+      }
+
+      // Compute cm-vs-meter local bone scale compensation
+      cloned.root.updateMatrixWorld(true);
+      const refBone = bones.spine2 || bones.neck || cloned.root;
+      refBone.getWorldScale(_v1);
+      const invS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
+
+      const addCystCluster = (parentBone, mat, specs) => {
+        if (!parentBone) return null;
+        const grp = new THREE.Group();
+        grp.visible = false;
+        for (let i = 0; i < specs.length; i++) {
+          const sp = specs[i];
+          const m = new THREE.Mesh(_cystGeo, mat);
+          m.position.set(sp.x * invS, sp.y * invS, sp.z * invS);
+          m.scale.set(sp.sx * invS, sp.sy * invS, sp.sz * invS);
+          m.castShadow = false;
+          m.receiveShadow = false;
+          grp.add(m);
+        }
+        parentBone.add(grp);
+        return grp;
+      };
+
+      spitterNodes = [];
+      const spChest = addCystCluster(bones.spine2, _spitterCystMat, [
+        { x: -0.09, y: 0.06, z: 0.11, sx: 0.048, sy: 0.042, sz: 0.036 },
+        { x: 0.08, y: 0.02, z: 0.12, sx: 0.056, sy: 0.048, sz: 0.040 },
+        { x: -0.10, y: 0.05, z: -0.11, sx: 0.065, sy: 0.060, sz: 0.052 },
+        { x: 0.06, y: 0.09, z: -0.12, sx: 0.052, sy: 0.050, sz: 0.046 }
+      ]);
+      const spNeck = addCystCluster(bones.neck, _spitterCystMat, [
+        { x: -0.045, y: 0.03, z: 0.055, sx: 0.036, sy: 0.032, sz: 0.030 },
+        { x: 0.050, y: 0.01, z: 0.045, sx: 0.038, sy: 0.034, sz: 0.032 }
+      ]);
+      const spHead = addCystCluster(bones.head, _spitterCystMat, [
+        { x: 0.055, y: 0.04, z: 0.065, sx: 0.030, sy: 0.026, sz: 0.026 }
+      ]);
+      if (spChest) spitterNodes.push(spChest);
+      if (spNeck) spitterNodes.push(spNeck);
+      if (spHead) spitterNodes.push(spHead);
+
+      screamerNodes = [];
+      const scNeck = addCystCluster(bones.neck, _screamerCystMat, [
+        { x: -0.042, y: 0.035, z: 0.062, sx: 0.042, sy: 0.038, sz: 0.036 },
+        { x: 0.042, y: 0.025, z: 0.064, sx: 0.045, sy: 0.040, sz: 0.038 },
+        { x: 0.0, y: 0.005, z: 0.072, sx: 0.036, sy: 0.032, sz: 0.032 }
+      ]);
+      const scSpine = addCystCluster(bones.spine1, _screamerCystMat, [
+        { x: -0.06, y: 0.05, z: 0.11, sx: 0.044, sy: 0.036, sz: 0.032 },
+        { x: 0.06, y: 0.04, z: 0.11, sx: 0.044, sy: 0.036, sz: 0.032 }
+      ]);
+      if (scNeck) screamerNodes.push(scNeck);
+      if (scSpine) screamerNodes.push(scSpine);
+    }
+
+    cloned.root.visible = false;
+    E.enemyRoot.add(cloned.root);
+
+    return {
+      root: cloned.root,
+      mixer,
+      actions,
+      bones,
+      materials: cloned.materials,
+      visorMesh: cloned.visorMesh,
+      spitterNodes,
+      screamerNodes
+    };
+  }
+
+  function buildSkinnedRigPool(infectedGltf, soldierGltf) {
+    _rigPool.length = 0;
+    for (let i = 0; i < MAX_ENEMIES; i++) {
+      const infected = createRigEntry(infectedGltf, false);
+      const soldier = createRigEntry(soldierGltf, true);
+      _rigPool.push({ infected, soldier });
+    }
+    _useSkinnedRigs = true;
+  }
+
   function initZombiePool() {
     E.zombies.length = 0;
     for (let i = 0; i < MAX_ENEMIES; i++) {
@@ -1463,6 +1724,54 @@
     const rTint = isHit ? 1.15 : 1.0;
     const gbTint = isHit ? 0.58 : 1.0;
 
+    if (_useSkinnedRigs) {
+      const slot = _rigPool[idx];
+      if (!slot) return;
+      const rig = z.variant === 'brute' ? slot.soldier : slot.infected;
+      if (!rig || !rig.materials) return;
+
+      let tintHex = 0xdad5cc;
+      let emHex = 0x000000;
+      if (z.variant === 'runner') { tintHex = 0xd28480; emHex = 0x160404; }
+      else if (z.variant === 'spitter') { tintHex = 0xb8ca6a; emHex = 0x182604; }
+      else if (z.variant === 'screamer') { tintHex = 0xcfc4cc; emHex = 0x200608; }
+      else if (z.variant === 'brute') { tintHex = z.hasArmor ? 0x627084 : 0x868a90; }
+
+      for (let i = 0; i < rig.materials.length; i++) {
+        const info = rig.materials[i];
+        const m = info.mat;
+        if (!m) continue;
+        if (m.color) {
+          if (info.isVisor) {
+            m.color.setHex(0x18222e);
+          } else {
+            _color.setHex(tintHex);
+            m.color.copy(info.baseColor).multiply(_color);
+            if (isHit) m.color.setRGB(m.color.r * 1.25, m.color.g * 0.52, m.color.b * 0.52);
+          }
+        }
+        if (m.emissive) {
+          if (isHit) {
+            m.emissive.setHex(0x6e1410);
+            m.emissiveIntensity = 1.0;
+          } else if (info.isVisor) {
+            m.emissive.setHex(0x0c1622);
+            m.emissiveIntensity = 0.5;
+          } else {
+            m.emissive.copy(info.baseEmissive);
+            if (emHex) m.emissive.setHex(emHex);
+            m.emissiveIntensity = info.baseEmissiveIntensity;
+          }
+        }
+      }
+      if (rig.visorMesh) {
+        rig.visorMesh.visible = !!(z.hasArmor && !z.dead);
+      }
+      return;
+    }
+
+    if (!_headMesh) return;
+
     _color.copy(z.skinColor);
     if (isHit) _color.setRGB(_color.r * rTint, _color.g * gbTint, _color.b * gbTint);
     _headMesh.setColorAt(idx, _color);
@@ -1526,6 +1835,7 @@
   }
 
   function markColorsDirty() {
+    if (_useSkinnedRigs) return;
     for (let i = 0; i < _allPartMeshes.length; i++) {
       const m = _allPartMeshes[i];
       if (m && m.instanceColor) m.instanceColor.needsUpdate = true;
@@ -1534,6 +1844,18 @@
   }
 
   function setHeadEyeDead(idx) {
+    if (_useSkinnedRigs) {
+      const slot = _rigPool[idx];
+      if (slot && slot.infected) {
+        if (slot.infected.spitterNodes) {
+          for (let i = 0; i < slot.infected.spitterNodes.length; i++) slot.infected.spitterNodes[i].visible = false;
+        }
+        if (slot.infected.screamerNodes) {
+          for (let i = 0; i < slot.infected.screamerNodes.length; i++) slot.infected.screamerNodes[i].visible = false;
+        }
+      }
+      return;
+    }
     if (_headEyeAttr) {
       _headEyeAttr.setXYZ(idx, 0, 0, 0);
       _headEyeAttr.needsUpdate = true;
@@ -1541,18 +1863,28 @@
   }
 
   function zeroZombieMatrices(idx) {
+    if (_useSkinnedRigs) {
+      const slot = _rigPool[idx];
+      if (slot) {
+        if (slot.infected && slot.infected.root) slot.infected.root.visible = false;
+        if (slot.soldier && slot.soldier.root) slot.soldier.root.visible = false;
+      }
+      return;
+    }
     for (let i = 0; i < _allPartMeshes.length; i++) {
       if (_allPartMeshes[i]) _allPartMeshes[i].setMatrixAt(idx, _zeroMat);
     }
   }
 
   function syncMeshCounts(highWater) {
+    if (_useSkinnedRigs) return;
     for (let m = 0; m < _allPartMeshes.length; m++) {
       if (_allPartMeshes[m]) _allPartMeshes[m].count = highWater;
     }
   }
 
   function flushMeshMatrices() {
+    if (_useSkinnedRigs) return;
     for (let m = 0; m < _allPartMeshes.length; m++) {
       if (_allPartMeshes[m]) _allPartMeshes[m].instanceMatrix.needsUpdate = true;
     }
@@ -1560,6 +1892,34 @@
 
   function setWarmupMode(active) {
     E.warmupActive = !!active;
+    if (_useSkinnedRigs) {
+      const slot0 = _rigPool[0];
+      if (slot0) {
+        if (slot0.infected && slot0.infected.root) {
+          slot0.infected.root.visible = E.warmupActive || (E.zombies[0] && E.zombies[0].active && E.zombies[0].variant !== 'brute');
+          if (E.warmupActive && (!E.zombies[0] || !E.zombies[0].active)) {
+            slot0.infected.root.position.set(0, -100, 0);
+          }
+          if (slot0.infected.spitterNodes) {
+            for (let i = 0; i < slot0.infected.spitterNodes.length; i++) {
+              slot0.infected.spitterNodes[i].visible = E.warmupActive || (E.zombies[0] && E.zombies[0].active && E.zombies[0].variant === 'spitter');
+            }
+          }
+          if (slot0.infected.screamerNodes) {
+            for (let i = 0; i < slot0.infected.screamerNodes.length; i++) {
+              slot0.infected.screamerNodes[i].visible = E.warmupActive || (E.zombies[0] && E.zombies[0].active && E.zombies[0].variant === 'screamer');
+            }
+          }
+        }
+        if (slot0.soldier && slot0.soldier.root) {
+          slot0.soldier.root.visible = E.warmupActive || (E.zombies[0] && E.zombies[0].active && E.zombies[0].variant === 'brute');
+          if (E.warmupActive && (!E.zombies[0] || !E.zombies[0].active)) {
+            slot0.soldier.root.position.set(0, -100, 0);
+          }
+        }
+      }
+      return;
+    }
     for (let i = 0; i < _overlayPartMeshes.length; i++) {
       const m = _overlayPartMeshes[i];
       if (m) {
@@ -1589,6 +1949,7 @@
       E.zombies[i].smoothSteerX = 0;
       E.zombies[i].smoothSteerZ = 0;
       E.zombies[i].spitAnimTimer = 0;
+      E.zombies[i]._lastAnimTime = undefined;
       zeroZombieMatrices(i);
     }
     for (let i = 0; i < MAX_BILE; i++) {
@@ -2080,6 +2441,7 @@
 
   function updateOverlayVisibilityAndCounts(highWater, hasBruteArmor, hasBio, hasRag, needsMatFlush, hasSpitterOpt, hasScreamerOpt) {
     E.activeHighWater = highWater;
+    if (_useSkinnedRigs) return;
 
     for (let m = 0; m < _corePartMeshes.length; m++) {
       if (_corePartMeshes[m]) {
@@ -2144,8 +2506,188 @@
     }
   }
 
-  function updateZombieMatrices(z, timeSec) {
+  function updateSkinnedZombie(z, timeSec, dt) {
+    const idx = z.id;
+    const slot = _rigPool[idx];
+    if (!slot) return;
+
+    const isBrute = (z.variant === 'brute');
+    const rig = isBrute ? slot.soldier : slot.infected;
+    const otherRig = isBrute ? slot.infected : slot.soldier;
+    if (otherRig && otherRig.root) otherRig.root.visible = false;
+    if (!rig || !rig.root) return;
+
+    rig.root.visible = true;
+    const sc = z.scale || 1.0;
+    const animDt = (typeof dt === 'number' && dt >= 0)
+      ? Math.min(0.20, dt)
+      : Math.max(0.0, Math.min(0.05, timeSec - (z._lastAnimTime !== undefined ? z._lastAnimTime : timeSec)));
+    z._lastAnimTime = timeSec;
+
+    let sinkY = 0;
+    let deadStage1 = 0;
+    let deadStage2 = 0;
+    const deadDir = z.fallPitchSign || z.fallSign || 1;
+    if (z.dead) {
+      deadStage1 = Math.min(1.0, z.deathTimer / 0.22);
+      const raw2 = Math.max(0.0, Math.min(1.0, (z.deathTimer - 0.18) / 0.36));
+      deadStage2 = 1.0 - (1.0 - raw2) * (1.0 - raw2);
+      z.fallAngle = deadStage2 * (Math.PI * 0.48) * deadDir + deadStage1 * (1.0 - deadStage2) * 0.25 * deadDir;
+      if (z.deathTimer > 10.8) {
+        const fadeT = Math.min(1.0, (z.deathTimer - 10.8) / 1.2);
+        sinkY = -0.35 * sc * fadeT;
+      }
+    }
+
+    const deadLiftY = z.dead ? (0.11 * sc * deadStage2) : 0;
+    rig.root.position.set(z.x, z.y + deadLiftY + sinkY, z.z);
+    rig.root.rotation.order = 'YXZ';
+    rig.root.rotation.set(
+      z.dead ? z.fallAngle : 0,
+      z.yaw || 0,
+      z.dead ? (deadDir * 0.08 * deadStage2 * (z.fallSign || 1)) : 0
+    );
+    rig.root.scale.setScalar(sc);
+
+    if (rig.visorMesh) {
+      rig.visorMesh.visible = !!(z.hasArmor && !z.dead);
+    }
+
+    if (rig.spitterNodes) {
+      const showSp = (z.variant === 'spitter' && !z.dead);
+      const spPulse = 1.0 + Math.sin(timeSec * 5.2 + z.seed) * 0.14 + (z.spitAnimTimer > 0 ? 0.18 : 0);
+      for (let i = 0; i < rig.spitterNodes.length; i++) {
+        rig.spitterNodes[i].visible = showSp;
+        if (showSp) rig.spitterNodes[i].scale.setScalar(spPulse);
+      }
+    }
+    if (rig.screamerNodes) {
+      const showSc = (z.variant === 'screamer' && !z.dead);
+      const scPulse = 1.0 + Math.sin(timeSec * 7.6 + z.seed) * 0.16 + (z.shriekTimer > 0 ? 0.22 : 0);
+      for (let i = 0; i < rig.screamerNodes.length; i++) {
+        rig.screamerNodes[i].visible = showSc;
+        if (showSc) rig.screamerNodes[i].scale.setScalar(scPulse);
+      }
+    }
+
+    const acts = rig.actions;
+    const mb = z.dead ? 0 : Math.max(0, Math.min(1, z.moveBlend !== undefined ? z.moveBlend : 0));
+    const crippleMult = z.legCrippled ? 0.65 : 1.0;
+
+    if (z.dead) {
+      if (acts.idle) acts.idle.paused = true;
+      if (acts.walk) acts.walk.paused = true;
+      if (acts.run) acts.run.paused = true;
+      if (acts.zombieWalk) acts.zombieWalk.paused = true;
+    } else {
+      if (acts.idle) {
+        acts.idle.paused = false;
+        acts.idle.setEffectiveWeight(1.0 - mb);
+        acts.idle.timeScale = 1.0;
+      }
+      if (isBrute) {
+        const isCharging = z.chargeTimer > 0;
+        if (acts.walk) {
+          acts.walk.paused = false;
+          acts.walk.setEffectiveWeight(isCharging ? 0 : mb);
+          acts.walk.timeScale = Math.max(0.75, (z.speed / 1.85) * 0.95 * crippleMult);
+        }
+        if (acts.run) {
+          acts.run.paused = false;
+          acts.run.setEffectiveWeight(isCharging ? mb : 0);
+          acts.run.timeScale = 1.35;
+        }
+      } else if (z.variant === 'runner') {
+        if (acts.run) {
+          acts.run.paused = false;
+          acts.run.setEffectiveWeight(mb);
+          acts.run.timeScale = Math.max(0.85, (z.speed / 3.35) * 1.15 * crippleMult);
+        }
+        if (acts.walk) { acts.walk.paused = false; acts.walk.setEffectiveWeight(0); }
+        if (acts.zombieWalk && acts.zombieWalk !== acts.walk) {
+          acts.zombieWalk.paused = false;
+          acts.zombieWalk.setEffectiveWeight(0);
+        }
+      } else if (z.variant === 'screamer') {
+        if (acts.run) {
+          acts.run.paused = false;
+          acts.run.setEffectiveWeight(mb * 0.80);
+          acts.run.timeScale = Math.max(0.85, (z.speed / 3.45) * 1.12 * crippleMult);
+        }
+        if (acts.walk) {
+          acts.walk.paused = false;
+          acts.walk.setEffectiveWeight(mb * 0.20);
+          acts.walk.timeScale = 1.15;
+        }
+        if (acts.zombieWalk && acts.zombieWalk !== acts.walk) {
+          acts.zombieWalk.paused = false;
+          acts.zombieWalk.setEffectiveWeight(0);
+        }
+      } else if (z.variant === 'spitter') {
+        if (acts.zombieWalk) {
+          acts.zombieWalk.paused = false;
+          acts.zombieWalk.setEffectiveWeight(mb * 0.65);
+          acts.zombieWalk.timeScale = Math.max(0.70, (z.speed / 2.05) * 1.05 * crippleMult);
+        }
+        if (acts.walk && acts.walk !== acts.zombieWalk) {
+          acts.walk.paused = false;
+          acts.walk.setEffectiveWeight(mb * 0.35);
+          acts.walk.timeScale = 1.0;
+        }
+        if (acts.run) { acts.run.paused = false; acts.run.setEffectiveWeight(0); }
+      } else {
+        // Walker: ZombieWalk shamble
+        if (acts.zombieWalk) {
+          acts.zombieWalk.paused = false;
+          acts.zombieWalk.setEffectiveWeight(mb);
+          acts.zombieWalk.timeScale = Math.max(0.65, (z.speed / 1.32) * 1.15 * crippleMult);
+        }
+        if (acts.walk && acts.walk !== acts.zombieWalk) {
+          acts.walk.paused = false;
+          acts.walk.setEffectiveWeight(0);
+        }
+        if (acts.run) { acts.run.paused = false; acts.run.setEffectiveWeight(0); }
+      }
+
+      if (rig.mixer) {
+        rig.mixer.update(animDt);
+      }
+
+      // Additive procedural bone poses applied AFTER mixer.update so mixer resets cleanly each frame
+      const b = rig.bones;
+      if (z.variant === 'spitter' && z.spitAnimTimer > 0) {
+        const spitT = 1.0 - Math.max(0, Math.min(1, z.spitAnimTimer / 0.50));
+        const heave = spitT < 0.35
+          ? -Math.sin((spitT / 0.35) * Math.PI) * 0.28
+          : Math.sin(((spitT - 0.35) / 0.65) * Math.PI) * 0.42;
+        if (b.spine1) { _qLocal.setFromAxisAngle(_axisX, heave * 0.55); b.spine1.quaternion.multiply(_qLocal); }
+        if (b.spine2) { _qLocal.setFromAxisAngle(_axisX, heave * 0.65); b.spine2.quaternion.multiply(_qLocal); }
+        if (b.head) { _qLocal.setFromAxisAngle(_axisX, heave * 0.55); b.head.quaternion.multiply(_qLocal); }
+      }
+      if (z.variant === 'screamer' && z.shriekTimer > 0) {
+        if (b.spine1) { _qLocal.setFromAxisAngle(_axisX, -0.22); b.spine1.quaternion.multiply(_qLocal); }
+        if (b.spine2) { _qLocal.setFromAxisAngle(_axisX, -0.24); b.spine2.quaternion.multiply(_qLocal); }
+        if (b.neck) { _qLocal.setFromAxisAngle(_axisX, -0.26); b.neck.quaternion.multiply(_qLocal); }
+        if (b.head) { _qLocal.setFromAxisAngle(_axisX, -0.35); b.head.quaternion.multiply(_qLocal); }
+      }
+      if (z.attackTimer > z.attackCooldown - 0.30) {
+        const lunge = Math.sin(((z.attackCooldown - z.attackTimer) / 0.30) * Math.PI) * 0.32;
+        if (b.spine2) { _qLocal.setFromAxisAngle(_axisX, lunge); b.spine2.quaternion.multiply(_qLocal); }
+        if (b.rightArm) { _qLocal.setFromAxisAngle(_axisX, -lunge * 1.4); b.rightArm.quaternion.multiply(_qLocal); }
+      }
+      if (z.staggerTimer > 0) {
+        const stag = -0.18 * Math.min(1.0, z.staggerTimer / 0.35);
+        if (b.spine2) { _qLocal.setFromAxisAngle(_axisX, stag); b.spine2.quaternion.multiply(_qLocal); }
+      }
+    }
+  }
+
+  function updateZombieMatrices(z, timeSec, dt) {
     if (!z.active) return;
+    if (_useSkinnedRigs) {
+      updateSkinnedZombie(z, timeSec, dt);
+      return;
+    }
     const idx = z.id;
 
     const sc = z.scale;
@@ -2474,13 +3016,28 @@
       E.enemyRoot.name = 'LRT_Enemies';
       scene.add(E.enemyRoot);
       initZombiePool();
-      buildZombieMeshes();
+      buildBileAndPuddleMeshes();
+
+      const infectedGltf = (LRT.AssetLoader && typeof LRT.AssetLoader.getModelGltf === 'function')
+        ? LRT.AssetLoader.getModelGltf('zombie_infected')
+        : null;
+      const soldierGltf = (LRT.AssetLoader && typeof LRT.AssetLoader.getModelGltf === 'function')
+        ? LRT.AssetLoader.getModelGltf('zombie_soldier')
+        : null;
+
+      if (infectedGltf && infectedGltf.scene && soldierGltf && soldierGltf.scene) {
+        buildSkinnedRigPool(infectedGltf, soldierGltf);
+      } else {
+        _useSkinnedRigs = false;
+        buildZombieMeshes();
+      }
       E.initialized = true;
     } else if (E.enemyRoot && E.enemyRoot.parent !== scene) {
       scene.add(E.enemyRoot);
     }
   }
 
+  E.isUsingSkinnedRigs = () => _useSkinnedRigs;
   E.getEnemyCfg = getEnemyCfg;
   E.play3D = play3D;
   E.assignVariantVisuals = assignVariantVisuals;

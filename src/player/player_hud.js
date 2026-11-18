@@ -107,6 +107,7 @@
       'pill-flashlight', 'pill-lighting', 'pill-hud',
       'pill-mute', 'pill-fast-travel', 'weapon-name', 'weapon-skin-tag', 'ammo-mag', 'ammo-reserve', 'weapon-slots',
       'menu-overlay', 'pause-overlay', 'gameover-overlay', 'gameover-stats',
+      'tutorial-complete-overlay', 'btn-tut-start-survival', 'btn-tut-back-menu',
       'fast-travel-modal', 'ft-active-meta', 'ft-atmos-group', 'btn-fast-travel-close',
       'ft-station-list', 'ft-zones-sub', 'ft-zone-grid', 'btn-pause-fast-travel',
       'victory-credits', 'credits-viewport', 'btn-credits-pause', 'btn-credits-skip', 'btn-credits-toggle',
@@ -1458,6 +1459,26 @@
         setNotice(`LIGHTING: ${moodObj ? moodObj.name.toUpperCase() : moodKey}`, moodObj && moodObj.isDaylight ? '#38bdf8' : '#e0b422');
       });
     }
+    if (dom['btn-tut-start-survival']) {
+      dom['btn-tut-start-survival'].addEventListener('click', () => {
+        closeTutorialCompleteModal();
+        if (I.core && typeof I.core.endTutorial === 'function') {
+          I.core.endTutorial('complete', { stayInGame: true });
+        } else if (LRT.Main && typeof LRT.Main.startGame === 'function') {
+          LRT.Main.startGame(C.MODES.SURVIVAL);
+        }
+      });
+    }
+    if (dom['btn-tut-back-menu']) {
+      dom['btn-tut-back-menu'].addEventListener('click', () => {
+        closeTutorialCompleteModal();
+        if (I.core && typeof I.core.endTutorial === 'function') {
+          I.core.endTutorial('complete');
+        } else if (I.core && typeof I.core.backToMenu === 'function') {
+          I.core.backToMenu();
+        }
+      });
+    }
   }
 
   function update(dt, worldCtx) {
@@ -1917,10 +1938,33 @@
     }
   }
 
+  function openTutorialCompleteModal() {
+    const ov = dom['tutorial-complete-overlay'];
+    if (!ov) return false;
+    if (PL.closeCheatConsole) PL.closeCheatConsole(false);
+    if (PL.state && PL.state.docViewerOpen) closeDocViewer(false, true);
+    if (PL.state && PL.state.fastTravelOpen) closeFastTravelModal(false, true);
+    if (PL.suppressPauseAfterUnlock) PL.suppressPauseAfterUnlock(900);
+    if (LRT.PlayerUI && typeof LRT.PlayerUI.setPaused === 'function') {
+      LRT.PlayerUI.setPaused(true, false);
+    }
+    if (PL.callbacks && PL.callbacks.onWeaponShootUp) PL.callbacks.onWeaponShootUp();
+    if (PL.releaseLock) PL.releaseLock();
+    if (dom['pause-overlay']) dom['pause-overlay'].classList.add('hidden');
+    ov.classList.remove('hidden');
+    return true;
+  }
+
+  function closeTutorialCompleteModal() {
+    const ov = dom['tutorial-complete-overlay'];
+    if (ov) ov.classList.add('hidden');
+  }
+
   function showScreen(screenName) {
     if (dom['menu-overlay']) dom['menu-overlay'].classList.toggle('hidden', screenName !== 'menu');
     if (dom['pause-overlay']) dom['pause-overlay'].classList.toggle('hidden', screenName !== 'pause');
     if (dom['gameover-overlay']) dom['gameover-overlay'].classList.toggle('hidden', screenName !== 'gameover');
+    if (dom['tutorial-complete-overlay']) dom['tutorial-complete-overlay'].classList.add('hidden');
     if (dom.hud) dom.hud.classList.toggle('hidden', screenName !== 'play');
     if (screenName !== 'play' && PL.closeCheatConsole) {
       PL.closeCheatConsole(false);
@@ -2024,6 +2068,7 @@
   function reset(spawnPos, invulnerable, mode) {
     closeDocViewer(false, true);
     closeFastTravelModal(false, true);
+    closeTutorialCompleteModal();
     PL.resetPhysics(spawnPos, invulnerable, mode);
     _hudCache.armorVal = null;
     _hudCache.armorPct = null;
@@ -2058,6 +2103,8 @@
   PL.closeDocViewer = closeDocViewer;
   PL.openFastTravelModal = openFastTravelModal;
   PL.closeFastTravelModal = closeFastTravelModal;
+  PL.openTutorialCompleteModal = openTutorialCompleteModal;
+  PL.closeTutorialCompleteModal = closeTutorialCompleteModal;
   PL.toggleHud = toggleHud;
   PL.syncMuteUi = syncMuteUi;
   PL.syncAtmosphereUi = syncAtmosphereUi;
@@ -2100,6 +2147,8 @@
     closeDocViewer,
     openFastTravelModal,
     closeFastTravelModal,
+    openTutorialCompleteModal,
+    closeTutorialCompleteModal,
     setOnInteractResult: (fn) => { PL.callbacks.onInteractResult = fn; },
     setPaused: (flag, allowInput) => {
       PL.flags.paused = !!flag;

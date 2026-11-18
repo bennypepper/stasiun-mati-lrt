@@ -177,6 +177,9 @@
                 if (child.isMesh) {
                   child.castShadow = true;
                   child.receiveShadow = true;
+                  if (child.isSkinnedMesh) {
+                    child.frustumCulled = false;
+                  }
                   if (Array.isArray(child.material)) {
                     child.material.forEach(applyTextureAnisotropy);
                   } else {
@@ -259,6 +262,9 @@
       if (!node.isMesh) return;
       node.castShadow = castShadow;
       node.receiveShadow = receiveShadow;
+      if (node.isSkinnedMesh) {
+        node.frustumCulled = false;
+      }
 
       if (cloneMaterials || envMapIntensity !== null) {
         if (Array.isArray(node.material)) {
@@ -300,6 +306,15 @@
     return gltf ? gltf.scene : null;
   }
 
+  function getModelGltf(key) {
+    const gltf = models.get(key);
+    if (!gltf) return null;
+    return {
+      scene: gltf.scene || null,
+      animations: Array.isArray(gltf.animations) ? gltf.animations : []
+    };
+  }
+
   function getManifest() {
     return manifest;
   }
@@ -328,6 +343,7 @@
     getHdri,
     instantiateModel,
     getModelRaw,
+    getModelGltf,
     getManifest,
     getStats,
     isReady,

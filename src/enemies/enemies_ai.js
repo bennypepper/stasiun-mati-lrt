@@ -437,6 +437,7 @@
     slot.coarseDt = 0;
     slot.matrixInit = false;
     slot.groundedOnce = false;
+    slot._lastAnimTime = undefined;
 
     if (isRoamer && initAggro === 'PATROL' && !o.patrolTarget) {
       pickPatrolTargetFor(slot, o.navGraph);
@@ -445,6 +446,8 @@
     E.assignVariantVisuals(slot);
     E.applyZombieColors(slot);
     E.markColorsDirty();
+    E.updateZombieMatrices(slot, _elapsed, 0);
+    slot.matrixInit = true;
 
     if (slot.id + 1 > E.activeHighWater) {
       E.activeHighWater = slot.id + 1;
@@ -1713,7 +1716,7 @@
           deactivationDirty = true;
           continue;
         }
-        E.updateZombieMatrices(z, _elapsed);
+        E.updateZombieMatrices(z, _elapsed, step);
         anyMatrixUpdated = true;
         continue;
       }
@@ -1757,7 +1760,7 @@
       if (isVeryFarOffFov && !isTickFrame) {
         z.coarseDt += step;
         if (!z.matrixInit) {
-          E.updateZombieMatrices(z, _elapsed);
+          E.updateZombieMatrices(z, _elapsed, 0);
           z.matrixInit = true;
           anyMatrixUpdated = true;
         }
@@ -2218,7 +2221,7 @@
       }
 
       if (!isFarOffFov || !z.matrixInit) {
-        E.updateZombieMatrices(z, _elapsed);
+        E.updateZombieMatrices(z, _elapsed, moveStep);
         z.matrixInit = true;
         anyMatrixUpdated = true;
       }
@@ -2481,7 +2484,7 @@
         z.chargeWindup = 0;
         z.lastProgX = z.x;
         z.lastProgZ = z.z;
-        E.updateZombieMatrices(z, _elapsed);
+        E.updateZombieMatrices(z, _elapsed, 0);
         z.matrixInit = true;
         ejected++;
       }
@@ -2562,7 +2565,7 @@
       if ((z.variant === 'spitter' || z.variant === 'screamer') && !z.dead) hasBio = true;
       if ((z.variant === 'walker' || z.variant === 'runner') && !z.dead) hasRag = true;
 
-      E.updateZombieMatrices(z, _elapsed);
+      E.updateZombieMatrices(z, _elapsed, step);
       z.matrixInit = true;
       anyMatrixUpdated = true;
     }
@@ -2576,6 +2579,7 @@
   const Enemies = {
     init,
     reset,
+    isUsingSkinnedRigs: () => (typeof E.isUsingSkinnedRigs === 'function' ? E.isUsingSkinnedRigs() : false),
     setOffsetZ: E.setOffsetZ,
     updateDepartingIdle,
     setWarmupMode: E.setWarmupMode,

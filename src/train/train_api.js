@@ -14,6 +14,7 @@
 
   const _v1 = T._v1;
   const _v2 = T._v2;
+  const _eyePos = new THREE.Vector3();
 
   const dentHulls = T.dentHulls;
   const dentSeats = T.dentSeats;
@@ -66,11 +67,22 @@
       : `🟠 [E] KEMBALI KE STASIUN SEBELUMNYA ← TUJUAN: ${prevName} (Kereta Peron 2)`;
   }
 
+  function formatDoorLockPrompt() {
+    return T.doorsTarget > 0.5
+      ? '🔒 [E] KUNCI & TUTUP PINTU KERETA (RUANG KONTROL)'
+      : '🔓 [E] BUKA KUNCI PINTU KERETA (TURUN KE PERON)';
+  }
+
   function syncDepartPrompts() {
     const txt = formatDepartPrompt();
+    const lockTxt = formatDoorLockPrompt();
     for (let i = 0; i < localInteractables.length; i++) {
-      if (localInteractables[i] && localInteractables[i].action === 'depart') {
-        localInteractables[i].promptBoarded = txt;
+      const it = localInteractables[i];
+      if (!it) continue;
+      if (it.action === 'depart') {
+        it.promptBoarded = txt;
+      } else if (it.action === 'toggle_doors') {
+        it.promptBoarded = lockTxt;
       }
     }
   }
@@ -274,31 +286,37 @@
       }
     }
 
-    // 8. Interactables inside the train (GoA 3 front/rear consoles + 3 center door depart panels + horn)
+    // 8. Interactables inside the train (GoA 3 front/rear Master Depart consoles + Door Lock panels + horn)
     const initialDepartPrompt = formatDepartPrompt(1);
+    const initialLockPrompt = formatDoorLockPrompt();
     localInteractables.push({
       id: 'train_depart_front',
       action: 'depart',
-      pos: new THREE.Vector3(0.0, 1.05, 25.25),
+      pos: new THREE.Vector3(0.0, 1.05, 25.15),
       promptBoarded: initialDepartPrompt,
       promptCruise: null
     });
     localInteractables.push({
       id: 'train_depart_rear',
       action: 'depart',
-      pos: new THREE.Vector3(0.0, 1.05, -25.25),
+      pos: new THREE.Vector3(0.0, 1.05, -25.15),
       promptBoarded: initialDepartPrompt,
       promptCruise: null
     });
-    for (let c = 0; c < 3; c++) {
-      localInteractables.push({
-        id: 'train_depart_door_' + c,
-        action: 'depart',
-        pos: new THREE.Vector3(1.12, 1.25, TD.carCentersZ[c] + 0.76),
-        promptBoarded: initialDepartPrompt,
-        promptCruise: null
-      });
-    }
+    localInteractables.push({
+      id: 'train_door_lock_front',
+      action: 'toggle_doors',
+      pos: new THREE.Vector3(0.68, 1.05, 24.75),
+      promptBoarded: initialLockPrompt,
+      promptCruise: null
+    });
+    localInteractables.push({
+      id: 'train_door_lock_rear',
+      action: 'toggle_doors',
+      pos: new THREE.Vector3(-0.68, 1.05, -24.75),
+      promptBoarded: initialLockPrompt,
+      promptCruise: null
+    });
     localInteractables.push({
       id: 'train_horn_front',
       action: 'horn',
@@ -506,6 +524,8 @@
 
     T.resetDamage();
     T.updateDoorTransforms();
+    if (typeof T.syncDoorLockPanels === 'function') T.syncDoorLockPanels(false);
+    syncDepartPrompts();
   }
 
   function setHeadlights(on, intensity) {
@@ -614,12 +634,18 @@
     return _ejectInfoOut;
   }
 
+  function areDoorsOpen() {
+    return T.doorsTarget > 0.5 || T.doorOpen > 0.5;
+  }
+
   function openDoors() {
     if (T.doorsTarget < 0.5) {
       T.doorsTarget = 1.0;
       T.safeAudioPlay('door_chime', { gain: 0.85 });
       T.safeAudioPlay('door_open', { gain: 0.85 });
     }
+    if (typeof T.syncDoorLockPanels === 'function') T.syncDoorLockPanels(true);
+    syncDepartPrompts();
   }
 
   function closeDoors() {
@@ -628,14 +654,24 @@
       T.safeAudioPlay('door_chime', { gain: 0.85 });
       T.safeAudioPlay('door_close', { gain: 0.85 });
     }
+    if (typeof T.syncDoorLockPanels === 'function') T.syncDoorLockPanels(false);
+    syncDepartPrompts();
     if (T.state === 'BOARDED_WAIT') {
       ejectExteriorEntities();
     }
   }
 
+  function toggleDoors() {
+    if (T.doorsTarget > 0.5) {
+      closeDoors();
+      return false;
+    }
+    openDoors();
+    return true;
+  }
+
   function departNow() {
-    if (T.state !== 'BOARDED_WAIT' && T.state !== 'APPROACHING') return false;
-    if (T.state === 'APPROACHING') return false;
+    if (T.state !== 'BOARDED_WAIT' || T.pendingDepart) return false;
     T.pendingDepart = true;
     if (T.doorsTarget > 0.5) closeDoors();
     else ejectExteriorEntities();
@@ -946,7 +982,9 @@
     if (!isPlayerInside(pos)) return null;
 
     let best = null;
-    let bestDist = 2.65;
+    let bestScore = Infinity;
+    const maxDist = 3.25;
+    _eyePos.set(pos.x, pos.y + 1.5, pos.z);
 
     for (let i = 0; i < localInteractables.length; i++) {
       const item = localInteractables[i];
@@ -955,24 +993,36 @@
       if (item.action === 'depart' && T.state === 'BOARDED_WAIT') {
         prompt = formatDepartPrompt();
         item.promptBoarded = prompt;
+      } else if (item.action === 'toggle_doors' && T.state === 'BOARDED_WAIT') {
+        prompt = formatDoorLockPrompt();
+        item.promptBoarded = prompt;
       }
 
       _v1.set(T.localXToWorld(item.pos.x), item.pos.y, T.localZToWorld(item.pos.z));
-      const d = _v1.distanceTo(pos);
-      if (d < bestDist) {
+      const d = _v1.distanceTo(_eyePos);
+      if (d < maxDist) {
+        let dot = 1.0;
         if (lookDir) {
-          _v2.copy(_v1).sub(pos).normalize();
-          if (_v2.dot(lookDir) < 0.20 && d > 1.35) continue;
+          _v2.copy(_v1).sub(_eyePos);
+          const lenSq = _v2.lengthSq();
+          if (lenSq > 1e-4) {
+            _v2.multiplyScalar(1 / Math.sqrt(lenSq));
+            dot = _v2.dot(lookDir);
+            if (dot < 0.0 && d > 1.8) continue;
+          }
         }
-        bestDist = d;
-        best = {
-          id: item.id,
-          action: item.action,
-          label: prompt,
-          prompt: prompt.indexOf('[E]') !== -1 ? prompt : ('[E] ' + prompt),
-          pos: _v1.clone(),
-          distance: d
-        };
+        const score = lookDir ? (d - Math.max(0, dot) * 0.45) : d;
+        if (score < bestScore) {
+          bestScore = score;
+          best = {
+            id: item.id,
+            action: item.action,
+            label: prompt,
+            prompt: prompt.indexOf('[E]') !== -1 ? prompt : ('[E] ' + prompt),
+            pos: _v1.clone(),
+            distance: d
+          };
+        }
       }
     }
     return best;
@@ -984,13 +1034,15 @@
       const item = localInteractables[i];
       if (item.id === id) {
         if (item.action === 'depart' && T.state === 'BOARDED_WAIT') {
-          departNow();
           return {
             handled: true,
-            action: 'depart',
-            message: T.travelDir < 0
-              ? '🟠 Pintu ditutup — LRT kembali ke stasiun sebelumnya!'
-              : '🟢 Pintu ditutup — LRT berangkat ke stasiun berikutnya!'
+            action: 'depart'
+          };
+        }
+        if (item.action === 'toggle_doors' && T.state === 'BOARDED_WAIT') {
+          return {
+            handled: true,
+            action: 'toggle_doors'
           };
         }
         if (item.action === 'horn') {
@@ -1040,6 +1092,9 @@
     startApproach,
     openDoors,
     closeDoors,
+    toggleDoors,
+    areDoorsOpen,
+    isPendingDepart: () => !!T.pendingDepart,
     departNow,
     update,
     stepRide: update,

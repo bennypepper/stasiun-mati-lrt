@@ -993,6 +993,32 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
         </div>
       </div>
     </section>
+  </div>
+
+  <!-- Dedicated Tutorial Completion Modal -->
+  <div id="tutorial-complete-overlay" class="overlay-screen overlay-centered hidden" role="dialog" aria-modal="true" aria-labelledby="tut-complete-title">
+    <div class="zenith-column tut-complete-col">
+      <div class="zenith-header">
+        <div class="zenith-kicker tut-complete-kicker">BRIEFING SELESAI</div>
+        <h1 class="zenith-title" id="tut-complete-title">TUTORIAL COMPLETE</h1>
+        <div class="zenith-subtitle">Gagak-03 siap beroperasi &middot; Sistem LRT &amp; protokol evakuasi dikuasai</div>
+      </div>
+
+      <div class="tut-complete-summary">
+        <span class="tut-complete-badge">&#10003; DUKUH ATAS BSI &middot; KONTROL KERETA TERVERIFIKASI</span>
+      </div>
+
+      <nav class="zenith-nav zenith-nav-centered" aria-label="Tutorial Completion Actions">
+        <button class="zenith-item tut-complete-primary" id="btn-tut-start-survival" type="button">
+          <span class="zenith-item-title">MULAI OPERASI SURVIVAL</span>
+          <span class="zenith-item-sub">Terjun langsung ke Stasiun Dukuh Atas BSI (Misi Utama)</span>
+        </button>
+        <button class="zenith-item" id="btn-tut-back-menu" type="button">
+          <span class="zenith-item-title">KEMBALI KE MENU UTAMA</span>
+          <span class="zenith-item-sub">Kembali ke layar judul &amp; pengaturan</span>
+        </button>
+      </nav>
+    </div>
   </div>"""
 
 
