@@ -122,27 +122,87 @@
   function createBloodDecalTex() {
     if (typeof document === 'undefined') return null;
     const c = document.createElement('canvas');
-    c.width = 128;
-    c.height = 128;
+    c.width = 256;
+    c.height = 256;
     const ctx = c.getContext('2d');
-    const g = ctx.createRadialGradient(64, 64, 6, 64, 64, 50);
-    g.addColorStop(0.0, 'rgba(72,4,6,0.96)');
-    g.addColorStop(0.55, 'rgba(98,8,10,0.85)');
-    g.addColorStop(0.85, 'rgba(56,4,6,0.38)');
-    g.addColorStop(1.0, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(64, 64, 52, 0, Math.PI * 2);
-    ctx.fill();
-    for (let i = 0; i < 14; i++) {
-      const a = (i / 14) * Math.PI * 2 + 0.25;
-      const d = 24 + (i % 4) * 9;
-      const rad = 4 + (i % 3) * 3.5;
-      ctx.fillStyle = i % 2 === 0 ? 'rgba(82,6,8,0.82)' : 'rgba(110,10,12,0.72)';
+    const cx = 128;
+    const cy = 128;
+
+    const traceHarmonicLoop = (steps, radiusFn) => {
       ctx.beginPath();
-      ctx.arc(64 + Math.cos(a) * d, 64 + Math.sin(a) * d, rad, 0, Math.PI * 2);
+      for (let i = 0; i <= steps; i++) {
+        const a = (i / steps) * Math.PI * 2;
+        const r = radiusFn(a);
+        const x = cx + Math.cos(a) * r;
+        const y = cy + Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+    };
+
+    // 1. Outer wet arterial puddle (contiguous multi-lobed harmonic contour with soft feathered perimeter)
+    traceHarmonicLoop(72, (a) => (
+      86 + 15 * Math.sin(a * 3 + 0.4) + 11 * Math.cos(a * 5 - 0.8) + 7 * Math.sin(a * 7 + 1.7) + 4 * Math.cos(a * 11)
+    ));
+    const gOuter = ctx.createRadialGradient(cx, cy, 8, cx, cy, 118);
+    gOuter.addColorStop(0.0, 'rgba(30, 1, 2, 0.96)');
+    gOuter.addColorStop(0.45, 'rgba(77, 4, 7, 0.92)');
+    gOuter.addColorStop(0.76, 'rgba(117, 9, 14, 0.78)');
+    gOuter.addColorStop(0.92, 'rgba(92, 6, 10, 0.35)');
+    gOuter.addColorStop(1.0, 'rgba(60, 2, 4, 0)');
+    ctx.fillStyle = gOuter;
+    ctx.fill();
+
+    // 2. Connected arterial rivulets / tongues tapering smoothly from the main pool core
+    const rivCount = 9;
+    for (let i = 0; i < rivCount; i++) {
+      const a = (i / rivCount) * Math.PI * 2 + Math.sin(i * 2.3) * 0.18;
+      const cos = Math.cos(a);
+      const sin = Math.sin(a);
+      const px = -sin;
+      const py = cos;
+      const rStart = 42;
+      const rTip = 94 + ((i * 7) % 19);
+      const halfBase = 9 + (i % 3) * 3;
+      const midR = (rStart + rTip) * 0.55;
+      const bend = ((i % 2 === 0 ? 1 : -1) * (4 + (i % 3) * 2.5));
+
+      const gRiv = ctx.createLinearGradient(
+        cx + cos * rStart, cy + sin * rStart,
+        cx + cos * rTip, cy + sin * rTip
+      );
+      gRiv.addColorStop(0.0, 'rgba(77, 4, 7, 0.88)');
+      gRiv.addColorStop(0.65, 'rgba(112, 8, 12, 0.72)');
+      gRiv.addColorStop(1.0, 'rgba(70, 4, 6, 0.0)');
+      ctx.fillStyle = gRiv;
+      ctx.beginPath();
+      ctx.moveTo(cx + cos * rStart + px * halfBase, cy + sin * rStart + py * halfBase);
+      ctx.quadraticCurveTo(
+        cx + cos * midR + px * (halfBase * 0.55 + bend),
+        cy + sin * midR + py * (halfBase * 0.55 + bend),
+        cx + cos * rTip + px * bend * 0.35,
+        cy + sin * rTip + py * bend * 0.35
+      );
+      ctx.quadraticCurveTo(
+        cx + cos * midR - px * (halfBase * 0.55 - bend),
+        cy + sin * midR - py * (halfBase * 0.55 - bend),
+        cx + cos * rStart - px * halfBase,
+        cy + sin * rStart - py * halfBase
+      );
+      ctx.closePath();
       ctx.fill();
     }
+
+    // 3. Dark coagulated inner core
+    traceHarmonicLoop(56, (a) => 48 + 9 * Math.cos(a * 4 + 1.2) + 5 * Math.sin(a * 6));
+    const gCore = ctx.createRadialGradient(cx, cy, 4, cx, cy, 62);
+    gCore.addColorStop(0.0, 'rgba(18, 0, 1, 0.96)');
+    gCore.addColorStop(0.60, 'rgba(34, 2, 4, 0.80)');
+    gCore.addColorStop(1.0, 'rgba(48, 3, 5, 0)');
+    ctx.fillStyle = gCore;
+    ctx.fill();
+
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
@@ -332,7 +392,16 @@
     });
     _bloodDecalMesh = makeInstanced(_scorchGeo, _bloodDecalMat, BLOOD_DECAL_CAP);
     for (let i = 0; i < BLOOD_DECAL_CAP; i++) {
-      _bloodDecals.push({ active: false });
+      _bloodDecals.push({
+        active: false,
+        pos: new THREE.Vector3(),
+        quat: new THREE.Quaternion(),
+        startScale: 0.2,
+        targetScale: 1.0,
+        aspect: 1.0,
+        life: 0,
+        growDuration: 0.18
+      });
     }
 
     for (let i = 0; i < ATTACHED_SCORCH_CAP; i++) {
@@ -364,6 +433,10 @@
     clearList(_casings, _casingMesh);
     clearList(_scorches, _scorchMesh);
     clearList(_bloodDecals, _bloodDecalMesh);
+    for (let i = 0; i < _bloodDecals.length; i++) {
+      _bloodDecals[i].life = 0;
+      _bloodDecals[i].growDuration = 0.18;
+    }
 
     for (let i = 0; i < _attachedScorches.length; i++) {
       const m = _attachedScorches[i];
@@ -479,6 +552,36 @@
       );
       b.scale = 0.6 + Math.random() * 0.9;
       b.color.setHex(Math.random() > 0.35 ? 0x7e0a0e : 0x4d0608);
+    }
+  }
+
+  function spawnGoreBurst(pos, dir, count) {
+    if (!pos) return;
+    spawnBlood(pos, dir, count || 26);
+    if (!_rubbleMesh) return;
+    const d = dir || _upVec;
+    const chunkColors = [0x5a0609, 0x3a0204, 0x7a0b10];
+    const chunkCount = 9;
+    for (let i = 0; i < chunkCount; i++) {
+      const r = _rubbles[_rubbleCursor];
+      _rubbleCursor = (_rubbleCursor + 1) % RUBBLE_CAP;
+      r.active = true;
+      r.life = 0;
+      r.maxLife = 1.35 + Math.random() * 0.75;
+      r.pos.set(
+        pos.x + (Math.random() - 0.5) * 0.22,
+        pos.y + (Math.random() - 0.5) * 0.22,
+        pos.z + (Math.random() - 0.5) * 0.22
+      );
+      r.vel.set(
+        d.x * 3.0 + (Math.random() - 0.5) * 5.8,
+        1.8 + Math.random() * 4.4,
+        d.z * 3.0 + (Math.random() - 0.5) * 5.8
+      );
+      r.rot.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+      r.rotVel.set((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14);
+      r.scale = 0.26 + Math.random() * 0.34;
+      r.color.setHex(chunkColors[i % chunkColors.length]);
     }
   }
 
@@ -649,20 +752,82 @@
     _scorchMesh.instanceMatrix.needsUpdate = true;
   }
 
-  function spawnBloodDecal(pos, normal, size) {
+  function spawnBloodDecal(pos, normal, size, isCorpsePool) {
     if (!_bloodDecalMesh || !pos) return;
-    const decalSize = size || 0.95;
+    let decalSize = size || 0.95;
     const norm = normal ? _v1.copy(normal).normalize() : _v1.set(0, 1, 0);
+    _v2.copy(pos);
+
+    if (Math.abs(norm.y) > 0.75 && LRT.Station && typeof LRT.Station.raycastWorld === 'function') {
+      _v3.set(_v2.x, _v2.y + 0.45, _v2.z);
+      const downHit = LRT.Station.raycastWorld(_v3, _downVec, 1.6);
+      if (downHit && downHit.point && Math.abs(downHit.point.y - _v2.y) <= 0.35) {
+        if (!downHit.normal || downHit.normal.y > 0.85) {
+          const floorY = downHit.point.y;
+          _v2.y = floorY;
+
+          // Sample 4 cardinal probes around (pos.x, pos.z) to detect stair treads / ledge drops
+          const probeOffsets = [[0.42, 0], [-0.42, 0], [0, 0.42], [0, -0.42]];
+          const dropped = [false, false, false, false];
+          let dropCount = 0;
+          let nudgeX = 0;
+          let nudgeZ = 0;
+          for (let pi = 0; pi < 4; pi++) {
+            const ox = probeOffsets[pi][0];
+            const oz = probeOffsets[pi][1];
+            _v3.set(_v2.x + ox, floorY + 0.45, _v2.z + oz);
+            const pHit = LRT.Station.raycastWorld(_v3, _downVec, 1.6);
+            const isStepOrDrop = !pHit || !pHit.point || Math.abs(pHit.point.y - floorY) > 0.08 || (pHit.normal && pHit.normal.y <= 0.85);
+            if (isStepOrDrop) {
+              dropped[pi] = true;
+              dropCount++;
+              nudgeX -= ox;
+              nudgeZ -= oz;
+            }
+          }
+          const opposingDrop = (dropped[0] && dropped[1]) || (dropped[2] && dropped[3]);
+          if (opposingDrop) {
+            decalSize = Math.min(decalSize, 0.34);
+          } else if (dropCount === 1) {
+            const nLen = Math.hypot(nudgeX, nudgeZ) || 1;
+            _v2.x += (nudgeX / nLen) * 0.25;
+            _v2.z += (nudgeZ / nLen) * 0.25;
+            decalSize = Math.min(decalSize, 0.72);
+          } else if (dropCount >= 2) {
+            const nLen = Math.hypot(nudgeX, nudgeZ);
+            if (nLen > 0.01) {
+              _v2.x += (nudgeX / nLen) * 0.22;
+              _v2.z += (nudgeZ / nLen) * 0.22;
+            }
+            decalSize = Math.min(decalSize, 0.54);
+          }
+        } else {
+          decalSize = Math.min(decalSize, 0.36);
+        }
+      }
+    }
+
     const idx = _bloodDecalCursor;
     _bloodDecalCursor = (_bloodDecalCursor + 1) % BLOOD_DECAL_CAP;
-    _bloodDecals[idx].active = true;
-
-    _v2.copy(pos).addScaledVector(norm, 0.024);
+    const d = _bloodDecals[idx];
+    d.active = true;
+    d.pos.copy(_v2).addScaledVector(norm, 0.024);
     _q1.setFromUnitVectors(_fwdVec, norm);
     _q2.setFromAxisAngle(_fwdVec, Math.random() * Math.PI * 2);
-    _q1.multiply(_q2);
-    _scaleV.set(decalSize, decalSize * (0.85 + Math.random() * 0.3), 1);
-    _m4.compose(_v2, _q1, _scaleV);
+    d.quat.copy(_q1).multiply(_q2);
+    d.targetScale = decalSize;
+    d.aspect = 0.88 + Math.random() * 0.24;
+    d.life = 0;
+    if (isCorpsePool) {
+      d.startScale = decalSize * 0.18;
+      d.growDuration = 2.0;
+    } else {
+      d.startScale = decalSize * 0.68;
+      d.growDuration = 0.16;
+    }
+
+    _scaleV.set(d.startScale, d.startScale * d.aspect, 1);
+    _m4.compose(d.pos, d.quat, _scaleV);
     _bloodDecalMesh.setMatrixAt(idx, _m4);
     _bloodDecalMesh.instanceMatrix.needsUpdate = true;
   }
@@ -1682,6 +1847,26 @@
         if (_casingMesh.instanceColor) _casingMesh.instanceColor.needsUpdate = true;
       }
     }
+
+    // 10. Blood decals (expanding arterial pool)
+    if (_bloodDecalMesh) {
+      let dirty = false;
+      for (let i = 0; i < BLOOD_DECAL_CAP; i++) {
+        const d = _bloodDecals[i];
+        if (!d.active || d.life >= d.growDuration) continue;
+        dirty = true;
+        d.life = Math.min(d.growDuration, d.life + dt);
+        const u = d.growDuration > 1e-4 ? (d.life / d.growDuration) : 1.0;
+        const ease = 1.0 - Math.pow(1.0 - u, 3);
+        const s = d.startScale + (d.targetScale - d.startScale) * ease;
+        _scaleV.set(s, s * d.aspect, 1);
+        _m4.compose(d.pos, d.quat, _scaleV);
+        _bloodDecalMesh.setMatrixAt(i, _m4);
+      }
+      if (dirty) {
+        _bloodDecalMesh.instanceMatrix.needsUpdate = true;
+      }
+    }
   }
 
   function update(dt, playerState, trainSpeed) {
@@ -2228,6 +2413,7 @@
     spawnSparks,
     spawnBlood,
     spawnBloodDecal,
+    spawnGoreBurst,
     spawnRubble,
     spawnScorchDecal,
     consumeCameraKick: W.consumeCameraKick,

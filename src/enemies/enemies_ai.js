@@ -393,6 +393,10 @@
     slot.deathTimer = 0;
     slot.fallAngle = 0;
     slot.fallSign = Math.random() > 0.5 ? 1 : -1;
+    slot.decapitated = false;
+    slot.bloodPoolSpawned = false;
+    slot.neckSpurtCount = 0;
+    slot.headDmg = 0;
     slot.animPhase = Math.random() * Math.PI * 2;
     slot.moveBlend = 0;
     slot.actualSpeed = 0;
@@ -941,6 +945,8 @@
     z.dead = true;
     z.deathTimer = 0;
     z.fallAngle = 0;
+    z.bloodPoolSpawned = false;
+    z.neckSpurtCount = 0;
     _totalKills++;
     E.setHeadEyeDead(z.id);
 
@@ -959,13 +965,18 @@
     _v1.set(z.x, z.y + 1.1, z.z);
     E.play3D('zombie_death', _v1, 0.14, 0.95);
 
-    if (LRT.Weapons && typeof LRT.Weapons.spawnBloodDecal === 'function') {
-      _v2.set(z.x, z.y + 0.025, z.z);
-      _v3.set(0, 1, 0);
-      LRT.Weapons.spawnBloodDecal(_v2, _v3, (z.variant === 'brute' ? 1.55 : 1.15) + Math.random() * 0.25);
+    if (z.decapitated) {
+      _v1.set(z.x, z.y + 1.52 * z.scale, z.z);
+      if (LRT.Weapons && typeof LRT.Weapons.spawnGoreBurst === 'function') {
+        LRT.Weapons.spawnGoreBurst(_v1, hitDir, 26);
+      } else if (LRT.Weapons && typeof LRT.Weapons.spawnBlood === 'function') {
+        LRT.Weapons.spawnBlood(_v1, hitDir, 24);
+      }
+      E.play3D('headshot_crit', _v1, 0.06, 0.9);
     }
 
     if (z.variant === 'spitter') {
+      _v1.set(z.x, z.y + 1.1, z.z);
       const cfg = E.getEnemyCfg('spitter');
       if (LRT.Weapons && typeof LRT.Weapons.applyExplosion === 'function') {
         LRT.Weapons.applyExplosion(_v1, cfg.deathBlastRadius || 3.6, cfg.deathBlastDmg || 32, 9.0, true);
@@ -1041,6 +1052,9 @@
       z.hitSide = 0;
     }
 
+    if (isHead && !armoredHit) {
+      z.headDmg = (z.headDmg || 0) + finalDmg;
+    }
     if (zone === 'legs' && !armoredHit) {
       z.legDmg = (z.legDmg || 0) + finalDmg;
       if (!z.legCrippled && (z.legDmg >= 22 || finalDmg >= 24)) {
@@ -1082,6 +1096,8 @@
     E.markColorsDirty();
 
     if (z.hp <= 0) {
+      z.decapitated = !!(isHead || ((knockbackForce || 0) >= 5.0 && (z.headDmg || 0) >= 28))
+        && !(z.variant === 'brute' && z.hasArmor);
       handleZombieDeath(z, hitDir, onDropPickup);
       return { hit: true, killed: true, armored: armoredHit, hitZone: zone, legCrippledNow };
     }
@@ -1419,6 +1435,64 @@
     }
   }
 
+  function stepDeadZombie(z, step, spatialGrid, tc) {
+    z.deathTimer += step;
+    z.actualSpeed = 0;
+    z.actualSpeedSmooth = 0;
+    z.moveBlend = 0;
+    z.x += z.vx * step;
+    z.z += z.vz * step;
+    const damp = Math.max(0, 1 - step * 6.0);
+    z.vx *= damp;
+    z.vz *= damp;
+
+    if (z.deathTimer < 0.45 && (spatialGrid || tc)
+      && typeof E.gatherNearbyColliders === 'function'
+      && typeof E.resolveCollisions === 'function') {
+      E.gatherNearbyColliders(z.x, z.z, 1.5, spatialGrid, tc);
+      E.resolveCollisions(z, 0.35 * z.scale, step);
+    }
+
+    const willSpurt = z.decapitated && z.neckSpurtCount < 2 && z.deathTimer >= (z.neckSpurtCount + 1) * 0.14;
+    const willPool = z.deathTimer >= 0.32 && !z.bloodPoolSpawned;
+    if ((willSpurt || willPool) && typeof E.updateZombieMatrices === 'function') {
+      E.updateZombieMatrices(z, _elapsed, 0);
+    }
+
+    if (willSpurt) {
+      z.neckSpurtCount++;
+      if (LRT.Weapons && typeof LRT.Weapons.spawnBlood === 'function' && typeof E.getZombieCorpsePoolPos === 'function') {
+        E.getZombieCorpsePoolPos(z, _v1);
+        const dirSign = z.fallPitchSign || 1;
+        _v3.set(Math.sin(z.yaw || 0) * dirSign * 0.55, 0.65, Math.cos(z.yaw || 0) * dirSign * 0.55);
+        LRT.Weapons.spawnBlood(_v1, _v3, 9);
+      }
+    }
+
+    if (willPool) {
+      z.bloodPoolSpawned = true;
+      if (LRT.Weapons && typeof LRT.Weapons.spawnBloodDecal === 'function') {
+        if (typeof E.getZombieCorpsePoolPos === 'function') {
+          E.getZombieCorpsePoolPos(z, _v2);
+        } else {
+          _v2.set(z.x, z.y, z.z);
+        }
+        _v2.y = z.y + 0.022;
+        _v3.set(0, 1, 0);
+        const poolSize = (z.decapitated ? 1.55 : (z.variant === 'brute' ? 1.50 : 1.18)) + Math.random() * 0.22;
+        LRT.Weapons.spawnBloodDecal(_v2, _v3, poolSize, true);
+      }
+    }
+
+    if (z.deathTimer >= 12.0) {
+      z.active = false;
+      z.dead = false;
+      E.zeroZombieMatrices(z.id);
+      return true;
+    }
+    return false;
+  }
+
   function update(dt, playerPos, spatialGrid, trainColliders, onPlayerHit, onDropPickup, opts) {
     if (!E.initialized) return;
     const step = Math.min(dt || 0.016, 0.05);
@@ -1706,18 +1780,7 @@
       }
 
       if (z.dead) {
-        z.deathTimer += step;
-        z.actualSpeed = 0;
-        z.actualSpeedSmooth = 0;
-        z.moveBlend = 0;
-        z.x += z.vx * step;
-        z.z += z.vz * step;
-        z.vx *= Math.max(0, 1 - step * 6.0);
-        z.vz *= Math.max(0, 1 - step * 6.0);
-        if (z.deathTimer >= 12.0) {
-          z.active = false;
-          z.dead = false;
-          E.zeroZombieMatrices(z.id);
+        if (stepDeadZombie(z, step, spatialGrid, tc)) {
           deactivationDirty = true;
           continue;
         }
@@ -2556,18 +2619,7 @@
       }
 
       if (z.dead) {
-        z.deathTimer += step;
-        z.actualSpeed = 0;
-        z.actualSpeedSmooth = 0;
-        z.moveBlend = 0;
-        z.x += z.vx * step;
-        z.z += z.vz * step;
-        z.vx *= Math.max(0, 1 - step * 6.0);
-        z.vz *= Math.max(0, 1 - step * 6.0);
-        if (z.deathTimer >= 12.0) {
-          z.active = false;
-          z.dead = false;
-          E.zeroZombieMatrices(z.id);
+        if (stepDeadZombie(z, step, null, null)) {
           deactivationDirty = true;
           continue;
         }

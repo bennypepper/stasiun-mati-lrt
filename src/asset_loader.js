@@ -61,12 +61,23 @@
         while (cursor < tasks.length) {
           const idx = cursor++;
           const task = tasks[idx];
-          try {
-            await task.run();
-          } catch (err) {
-            const msg = String(err && err.message ? err.message : err);
+          let lastErr = null;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              await task.run();
+              lastErr = null;
+              break;
+            } catch (err) {
+              lastErr = err;
+              if (attempt < 2) {
+                await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)));
+              }
+            }
+          }
+          if (lastErr) {
+            const msg = String(lastErr && lastErr.message ? lastErr.message : lastErr);
             stats.failed.push({ type: task.type, key: task.key, error: msg });
-            console.error(`[AssetLoader] Failed ${task.type}:${task.key}`, err);
+            console.error(`[AssetLoader] Failed ${task.type}:${task.key}`, lastErr);
           }
           onTaskDone(task);
         }
@@ -198,7 +209,7 @@
       let loaded = 0;
       report(0, Math.max(1, total), total > 0 ? `Loading ${total} asset bundles...` : 'No assets queued');
 
-      await runWithConcurrency(tasks, 3, (task) => {
+      await runWithConcurrency(tasks, 2, (task) => {
         loaded++;
         report(loaded, Math.max(1, total), task.label);
       });

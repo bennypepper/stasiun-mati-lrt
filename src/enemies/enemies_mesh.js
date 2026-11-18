@@ -118,6 +118,10 @@
   let _screamerCystMat = null;
   let _runnerEyeMat = null;
   let _cystGeo = null;
+  let _neckStumpMat = null;
+  let _neckBoneMat = null;
+  let _neckCollarGeo = null;
+  let _neckSpineGeo = null;
 
   E.MAX_ENEMIES = MAX_ENEMIES;
   E.MAX_BILE = MAX_BILE;
@@ -1464,8 +1468,76 @@
       leftArm: findBone('LeftArm'),
       leftForeArm: findBone('LeftForeArm'),
       rightArm: findBone('RightArm'),
-      rightForeArm: findBone('RightForeArm')
+      rightForeArm: findBone('RightForeArm'),
+      leftUpLeg: findBone('LeftUpLeg'),
+      leftLeg: findBone('LeftLeg'),
+      leftFoot: findBone('LeftFoot'),
+      rightUpLeg: findBone('RightUpLeg'),
+      rightLeg: findBone('RightLeg'),
+      rightFoot: findBone('RightFoot')
     };
+
+    // Attach 3D bloody neck-stump gore cap for lethal headshot decapitations
+    let neckStumpNode = null;
+    if (bones.neck) {
+      if (!_cystGeo) _cystGeo = new THREE.SphereGeometry(1.0, 8, 6);
+      if (!_neckStumpMat) {
+        _neckStumpMat = new THREE.MeshStandardMaterial({
+          color: 0x4a0407,
+          emissive: new THREE.Color(0x1a0102),
+          roughness: 0.22,
+          metalness: 0.05
+        });
+      }
+      if (!_neckBoneMat) {
+        _neckBoneMat = new THREE.MeshStandardMaterial({
+          color: 0xd8cfc2,
+          roughness: 0.55,
+          metalness: 0.02
+        });
+      }
+      if (!_neckCollarGeo) _neckCollarGeo = new THREE.CylinderGeometry(0.058, 0.068, 0.065, 10);
+      if (!_neckSpineGeo) _neckSpineGeo = new THREE.CylinderGeometry(0.017, 0.019, 0.032, 8);
+
+      cloned.root.updateMatrixWorld(true);
+      bones.neck.getWorldScale(_v1);
+      const nInvS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
+
+      neckStumpNode = new THREE.Group();
+      neckStumpNode.visible = false;
+
+      const collar = new THREE.Mesh(_neckCollarGeo, _neckStumpMat);
+      collar.position.set(0, 0.045 * nInvS, 0);
+      collar.scale.setScalar(nInvS);
+      collar.castShadow = false;
+      collar.receiveShadow = false;
+      neckStumpNode.add(collar);
+
+      const spineDisc = new THREE.Mesh(_neckSpineGeo, _neckBoneMat);
+      spineDisc.position.set(0, 0.072 * nInvS, -0.012 * nInvS);
+      spineDisc.scale.setScalar(nInvS);
+      spineDisc.castShadow = false;
+      spineDisc.receiveShadow = false;
+      neckStumpNode.add(spineDisc);
+
+      // 4 irregular crimson flesh/clot lobes around the severed rim
+      const clotOffsets = [
+        { x: -0.042, y: 0.066, z:  0.022, sx: 0.024, sy: 0.018, sz: 0.022 },
+        { x:  0.040, y: 0.068, z:  0.018, sx: 0.022, sy: 0.020, sz: 0.024 },
+        { x: -0.025, y: 0.065, z: -0.038, sx: 0.026, sy: 0.019, sz: 0.020 },
+        { x:  0.032, y: 0.070, z: -0.034, sx: 0.021, sy: 0.022, sz: 0.023 }
+      ];
+      for (let i = 0; i < clotOffsets.length; i++) {
+        const cl = clotOffsets[i];
+        const m = new THREE.Mesh(_cystGeo, _neckStumpMat);
+        m.position.set(cl.x * nInvS, cl.y * nInvS, cl.z * nInvS);
+        m.scale.set(cl.sx * nInvS, cl.sy * nInvS, cl.sz * nInvS);
+        m.castShadow = false;
+        m.receiveShadow = false;
+        neckStumpNode.add(m);
+      }
+      bones.neck.add(neckStumpNode);
+    }
 
     // Attach bone-mounted bioluminescent cysts & glowing feral eyes for infected/commuter variants
     let spitterNodes = null;
@@ -1574,6 +1646,7 @@
       bones,
       materials: cloned.materials,
       visorMesh: cloned.visorMesh,
+      neckStumpNode,
       runnerEyes,
       spitterNodes,
       screamerNodes
@@ -1630,6 +1703,10 @@
         fallAngle: 0,
         fallSign: 1,
         fallPitchSign: 1,
+        decapitated: false,
+        bloodPoolSpawned: false,
+        neckSpurtCount: 0,
+        headDmg: 0,
         legDmg: 0,
         legCrippled: false,
         hitZone: 'torso',
@@ -1954,9 +2031,21 @@
     if (_useSkinnedRigs) {
       const slot = _rigPool[idx];
       if (slot) {
-        if (slot.infected && slot.infected.root) slot.infected.root.visible = false;
-        if (slot.commuter && slot.commuter.root) slot.commuter.root.visible = false;
-        if (slot.soldier && slot.soldier.root) slot.soldier.root.visible = false;
+        if (slot.infected && slot.infected.root) {
+          slot.infected.root.visible = false;
+          if (slot.infected.neckStumpNode) slot.infected.neckStumpNode.visible = false;
+          if (slot.infected.bones && slot.infected.bones.head) slot.infected.bones.head.scale.set(1, 1, 1);
+        }
+        if (slot.commuter && slot.commuter.root) {
+          slot.commuter.root.visible = false;
+          if (slot.commuter.neckStumpNode) slot.commuter.neckStumpNode.visible = false;
+          if (slot.commuter.bones && slot.commuter.bones.head) slot.commuter.bones.head.scale.set(1, 1, 1);
+        }
+        if (slot.soldier && slot.soldier.root) {
+          slot.soldier.root.visible = false;
+          if (slot.soldier.neckStumpNode) slot.soldier.neckStumpNode.visible = false;
+          if (slot.soldier.bones && slot.soldier.bones.head) slot.soldier.bones.head.scale.set(1, 1, 1);
+        }
       }
       return;
     }
@@ -2031,6 +2120,10 @@
     for (let i = 0; i < MAX_ENEMIES; i++) {
       E.zombies[i].active = false;
       E.zombies[i].dead = false;
+      E.zombies[i].decapitated = false;
+      E.zombies[i].bloodPoolSpawned = false;
+      E.zombies[i].neckSpurtCount = 0;
+      E.zombies[i].headDmg = 0;
       E.zombies[i].isRoamer = false;
       E.zombies[i].aggroState = 'CHASE';
       E.zombies[i].coarseDt = 0;
@@ -2653,27 +2746,27 @@
     z._lastAnimTime = timeSec;
 
     let sinkY = 0;
-    let deadStage1 = 0;
-    let deadStage2 = 0;
+    let buckleT = 0;
+    let layFlatT = 0;
     const deadDir = z.fallPitchSign || z.fallSign || 1;
     if (z.dead) {
-      deadStage1 = Math.min(1.0, z.deathTimer / 0.22);
-      const raw2 = Math.max(0.0, Math.min(1.0, (z.deathTimer - 0.18) / 0.36));
-      deadStage2 = 1.0 - (1.0 - raw2) * (1.0 - raw2);
-      z.fallAngle = deadStage2 * (Math.PI * 0.48) * deadDir + deadStage1 * (1.0 - deadStage2) * 0.25 * deadDir;
+      buckleT = Math.min(1.0, z.deathTimer / 0.22);
+      const raw2 = Math.max(0.0, Math.min(1.0, (z.deathTimer - 0.14) / 0.34));
+      layFlatT = 1.0 - (1.0 - raw2) * (1.0 - raw2);
+      z.fallAngle = layFlatT * (Math.PI * 0.49) * deadDir + buckleT * (1.0 - layFlatT) * 0.32 * deadDir;
       if (z.deathTimer > 10.8) {
         const fadeT = Math.min(1.0, (z.deathTimer - 10.8) / 1.2);
         sinkY = -0.35 * sc * fadeT;
       }
     }
 
-    const deadLiftY = z.dead ? (0.11 * sc * deadStage2) : 0;
+    const deadLiftY = z.dead ? (0.095 * sc * layFlatT) : 0;
     rig.root.position.set(z.x, z.y + deadLiftY + sinkY, z.z);
     rig.root.rotation.order = 'YXZ';
     rig.root.rotation.set(
       z.dead ? z.fallAngle : 0,
       z.yaw || 0,
-      z.dead ? (deadDir * 0.08 * deadStage2 * (z.fallSign || 1)) : 0
+      z.dead ? (deadDir * 0.08 * layFlatT * (z.fallSign || 1)) : 0
     );
     rig.root.scale.setScalar(sc);
 
@@ -2708,10 +2801,27 @@
     const runTimeScale = Math.max(0.10, spdSmooth / (3.15 * sc));
 
     if (z.dead) {
-      if (acts.idle) acts.idle.paused = true;
-      if (acts.walk) acts.walk.paused = true;
-      if (acts.run) acts.run.paused = true;
-      if (acts.zombieWalk) acts.zombieWalk.paused = true;
+      // Blend immediately out of Walk/Run stride into Idle before laying corpse flat
+      if (acts.idle) {
+        acts.idle.paused = false;
+        acts.idle.setEffectiveWeight(1.0);
+        acts.idle.timeScale = 1.0;
+      }
+      if (acts.walk) {
+        acts.walk.paused = false;
+        acts.walk.setEffectiveWeight(0);
+      }
+      if (acts.run) {
+        acts.run.paused = false;
+        acts.run.setEffectiveWeight(0);
+      }
+      if (acts.zombieWalk && acts.zombieWalk !== acts.walk) {
+        acts.zombieWalk.paused = false;
+        acts.zombieWalk.setEffectiveWeight(0);
+      }
+      if (rig.mixer) {
+        rig.mixer.update(z.deathTimer < 0.35 ? animDt : 0);
+      }
     } else {
       if (acts.idle) {
         acts.idle.paused = false;
@@ -2761,14 +2871,46 @@
       if (rig.mixer) {
         rig.mixer.update(animDt);
       }
+    }
 
-      // Character-space scary zombie upper-body & arm poses applied AFTER mixer.update
-      rig.root.updateMatrixWorld(true);
-      rig.root.getWorldQuaternion(_qRootInv);
-      _qRootInv.invert();
+    // Character-space bone posing (head decapitation stump, articulated death collapse, or alive combat poses)
+    rig.root.updateMatrixWorld(true);
+    rig.root.getWorldQuaternion(_qRootInv);
+    _qRootInv.invert();
 
-      const b = rig.bones;
-      const limp = z.limbBias || 1;
+    const b = rig.bones;
+    const limp = z.limbBias || 1;
+    if (b.head) {
+      if (z.dead && z.decapitated) {
+        b.head.scale.set(0.0001, 0.0001, 0.0001);
+        if (rig.neckStumpNode) rig.neckStumpNode.visible = true;
+      } else {
+        b.head.scale.set(1, 1, 1);
+        if (rig.neckStumpNode) rig.neckStumpNode.visible = false;
+      }
+    }
+
+    if (z.dead) {
+      const buckleBlend = buckleT * (1.0 - layFlatT);
+      if (buckleBlend > 0.01) {
+        applyCharSpaceDelta(b.spine2, _qRootInv, _axisX, 0.24 * deadDir * buckleBlend);
+        applyCharSpaceDelta(b.leftUpLeg, _qRootInv, _axisX, -0.35 * deadDir * buckleBlend);
+        applyCharSpaceDelta(b.rightUpLeg, _qRootInv, _axisX, -0.30 * deadDir * buckleBlend);
+        applyCharSpaceDelta(b.leftLeg, _qRootInv, _axisX, 0.52 * deadDir * buckleBlend);
+        applyCharSpaceDelta(b.rightLeg, _qRootInv, _axisX, 0.45 * deadDir * buckleBlend);
+      }
+      const flatAlpha = layFlatT * 0.96;
+      if (flatAlpha > 0.005) {
+        aimBoneInCharSpace(b.leftUpLeg, _qRootInv, 0.20 + limp * 0.05, -0.97, 0.04 * deadDir, flatAlpha);
+        aimBoneInCharSpace(b.leftLeg, _qRootInv, 0.06, -0.99, 0.05 * deadDir, flatAlpha);
+        aimBoneInCharSpace(b.rightUpLeg, _qRootInv, -0.22 + limp * 0.05, -0.97, 0.04 * deadDir, flatAlpha);
+        aimBoneInCharSpace(b.rightLeg, _qRootInv, -0.10, -0.99, 0.05 * deadDir, flatAlpha);
+        aimBoneInCharSpace(b.leftArm, _qRootInv, 0.84, -0.46 + limp * 0.16, 0.05 * deadDir, flatAlpha);
+        aimBoneInCharSpace(b.leftForeArm, _qRootInv, 0.65, 0.72, 0.05 * deadDir, flatAlpha);
+        aimBoneInCharSpace(b.rightArm, _qRootInv, -0.84, -0.42 - limp * 0.16, 0.05 * deadDir, flatAlpha);
+        aimBoneInCharSpace(b.rightForeArm, _qRootInv, -0.70, 0.68, 0.05 * deadDir, flatAlpha);
+      }
+    } else {
       const lungeWave = (z.attackTimer > z.attackCooldown - 0.30)
         ? Math.sin(((z.attackCooldown - z.attackTimer) / 0.30) * Math.PI)
         : 0;
@@ -2850,6 +2992,32 @@
         }
       }
     }
+  }
+
+  function getZombieCorpsePoolPos(z, outVec) {
+    const target = outVec || new THREE.Vector3();
+    if (!z) return target.set(0, 0, 0);
+    if (_useSkinnedRigs) {
+      const slot = _rigPool[z.id];
+      const rig = getSlotRigForVariant(z, slot);
+      if (rig && rig.root && rig.bones) {
+        const bone = (z.decapitated && rig.bones.neck)
+          ? rig.bones.neck
+          : (rig.bones.spine2 || rig.bones.spine1 || rig.bones.hips);
+        if (bone) {
+          rig.root.updateMatrixWorld(true);
+          bone.getWorldPosition(target);
+          return target;
+        }
+      }
+    }
+    const dist = (z.decapitated ? 1.32 : 1.05) * (z.scale || 1.0) * (z.fallPitchSign || 1);
+    target.set(
+      z.x + Math.sin(z.yaw || 0) * dist,
+      z.y,
+      z.z + Math.cos(z.yaw || 0) * dist
+    );
+    return target;
   }
 
   function updateZombieMatrices(z, timeSec, dt) {
@@ -2972,9 +3140,13 @@
     if (z.shriekTimer > 0 && !z.dead) headPitch = -0.72;
     _e1.set(headPitch, z.yaw + chestYaw * 0.5 + headTwitchY, torsoRoll * 0.6 + headCockZ, 'YXZ');
     _qHead.setFromEuler(_e1);
-    _scale.set(s, s, s);
-    _m4.compose(_vHeadPos, _qHead, _scale);
-    _headMesh.setMatrixAt(idx, _m4);
+    if (z.dead && z.decapitated) {
+      _headMesh.setMatrixAt(idx, _zeroMat);
+    } else {
+      _scale.set(s, s, s);
+      _m4.compose(_vHeadPos, _qHead, _scale);
+      _headMesh.setMatrixAt(idx, _m4);
+    }
 
     // 2b. Variant Head Overlays (Brute Helmet, Spitter Hanging Gas Mask, Screamer Split-Open Howling Jaw)
     if (z.variant === 'brute' && z.hasArmor && !z.dead) {
@@ -3228,5 +3400,6 @@
   E.updateBileProjectiles = updateBileProjectiles;
   E.updateOverlayVisibilityAndCounts = updateOverlayVisibilityAndCounts;
   E.updateZombieMatrices = updateZombieMatrices;
+  E.getZombieCorpsePoolPos = getZombieCorpsePoolPos;
   E.initMeshRoot = initMeshRoot;
 })(window.LRT = window.LRT || {});
