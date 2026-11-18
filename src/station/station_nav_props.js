@@ -518,25 +518,81 @@
     const indoX = isIsland ? (p1MinX + p1MaxX) * 0.5 : concMaxX - 2.1;
     const indoZ = isIsland ? 12.5 : concMaxZ - 3.6;
     const indoYaw = isIsland ? 0 : -Math.PI * 0.5;
-    addAtlasBox(bStall, 5.4, 0.72, 2.2, indoX, 2.55, indoZ, indoYaw, null, STALL_UV.indomaretHeader);
-    addBox(bSteelDark, 5.2, 2.15, 0.85, indoX + (isIsland ? 0 : 0.7), 1.08, indoZ, 0, indoYaw, 0);
-    for (let cb = -1; cb <= 1; cb += 2) {
-      const off = cb * 1.28;
-      const bx = isIsland ? indoX + off : indoX + 0.7;
-      const bz = isIsland ? indoZ : indoZ - off;
-      addAtlasBox(bStall, 2.48, 2.02, 0.88, bx, 1.08, bz, indoYaw,
+    const indoCos = Math.cos(indoYaw);
+    const indoSin = Math.sin(indoYaw);
+    const inW = (lx, lz) => [indoX + lx * indoCos + lz * indoSin, indoZ - lx * indoSin + lz * indoCos];
+
+    // 1) Recessed dark-steel floor reveal & interior minimarket slab
+    addBox(bSteelDark, 5.48, 0.10, 2.38, indoX, 0.05, indoZ, 0, indoYaw, 0);
+    addBox(bStall, 5.26, 0.12, 2.16, indoX, 0.06, indoZ, 0, indoYaw, 0);
+    // 2) Subway-tiled rear wall & cream/steel end walls + structural storefront mullions
+    const inBack = inW(0, -1.04);
+    addAtlasBox(bStall, 5.52, 2.30, 0.18, inBack[0], 1.21, inBack[1], indoYaw, null, STALL_UV.rotioSubwayTile);
+    for (const sSide of [-1, 1]) {
+      const inEnd = inW(sSide * 2.66, 0);
+      addAtlasBox(bStall, 0.20, 2.30, 2.26, inEnd[0], 1.21, inEnd[1], indoYaw, null, STALL_UV.rotioCreamSolid);
+      const colF = inW(sSide * 2.68, 1.05);
+      addBox(bSteelDark, 0.14, 2.36, 0.14, colF[0], 1.22, colF[1], 0, indoYaw, 0);
+    }
+    const midCol = inW(0.0, 1.05);
+    addBox(bSteelDark, 0.14, 2.36, 0.14, midCol[0], 1.22, midCol[1], 0, indoYaw, 0);
+
+    // 3) Left bay (-2.5..-0.1): Recessed 2-door glass beverage chiller housing + snack gondola shelves
+    const chillBack = inW(-1.32, -0.72);
+    addBox(bSteelDark, 2.42, 2.14, 0.54, chillBack[0], 1.15, chillBack[1], 0, indoYaw, 0);
+    for (const cd of [-0.58, 0.58]) {
+      const doorP = inW(-1.32 + cd, -0.44);
+      addAtlasBox(bStall, 1.08, 1.82, 0.06, doorP[0], 1.08, doorP[1], indoYaw,
         { 4: STALL_UV.indomaretCooler, 5: STALL_UV.indomaretCooler }, STALL_UV.rotioCreamSolid);
     }
-    station._addCollider(indoX - 1.5, 0, indoZ - 2.6, indoX + 1.5, 2.9, indoZ + 2.6, 'metal');
-    for (let cg = -1; cg <= 1; cg++) {
-      const gx = isIsland ? indoX + cg * 1.65 : indoX - 0.45;
-      const gz = isIsland ? indoZ + 0.5 : indoZ + cg * 1.65;
-      const cid = station._addCollider(gx - 0.5, 0.2, gz - 0.5, gx + 0.5, 2.0, gz + 0.5, 'glass', { blocksWalk: false });
+    const gondolaP = inW(-1.30, 0.24);
+    addBox(bSteelDark, 1.88, 1.12, 0.44, gondolaP[0], 0.62, gondolaP[1], 0, indoYaw, 0);
+    for (const sy of [0.34, 0.68, 1.02]) {
+      addAtlasBox(bStall, 1.94, 0.05, 0.50, gondolaP[0], sy, gondolaP[1], indoYaw, null, STALL_UV.rotioCreamSolid);
+    }
+
+    // 4) Right bay (+0.1..+2.5): Open Point Coffee counter, espresso machine, pastry case, POS & menu board
+    const barApron = inW(1.32, 0.62);
+    addAtlasBox(bStall, 2.48, 0.88, 0.52, barApron[0], 0.50, barApron[1], indoYaw, null, STALL_UV.loketWood);
+    addBox(bTruss, 2.56, 0.06, 0.64, barApron[0], 0.97, barApron[1], 0, indoYaw, 0);
+    // Point Coffee espresso machine + cup stack + pastry case + cash register
+    const espPos = inW(0.68, 0.54);
+    addBox(bSteelDark, 0.48, 0.42, 0.38, espPos[0], 1.21, espPos[1], 0, indoYaw, 0);
+    addBox(bTruss, 0.44, 0.08, 0.28, espPos[0], 1.44, espPos[1], 0, indoYaw, 0);
+    const cupPos = inW(1.06, 0.52);
+    addAtlasBox(bStall, 0.14, 0.30, 0.14, cupPos[0], 1.15, cupPos[1], indoYaw, null, STALL_UV.rotioCreamSolid);
+    const posM = inW(1.42, 0.56);
+    addBox(bSteelDark, 0.36, 0.24, 0.24, posM[0], 1.12, posM[1], 0, indoYaw, 0);
+    const pastPos = inW(1.98, 0.58);
+    addAtlasBox(bStall, 0.64, 0.18, 0.38, pastPos[0], 1.09, pastPos[1], indoYaw, null, STALL_UV.rotioBuns);
+    const menuP = inW(1.32, -0.90);
+    addAtlasBox(bStall, 2.10, 0.78, 0.08, menuP[0], 1.72, menuP[1], indoYaw,
+      { 4: STALL_UV.rotioMenuBoard, 5: STALL_UV.rotioMenuBoard }, STALL_UV.rotioCreamSolid);
+    const ceilStrip = inW(0, -0.10);
+    addBox(bTruss, 4.40, 0.04, 0.36, ceilStrip[0], 2.33, ceilStrip[1], 0, indoYaw, 0);
+
+    // 5) Overhanging canopy soffit + Indomaret Point backlit fascia header + dark coping trim
+    const roofP = inW(0, 0.08);
+    addBox(bSteelDark, 5.72, 0.12, 2.60, roofP[0], 2.40, roofP[1], 0, indoYaw, 0);
+    addAtlasBox(bStall, 5.56, 0.58, 2.32, indoX, 2.75, indoZ, indoYaw, null, STALL_UV.indomaretHeader);
+    addBox(bSteelDark, 5.66, 0.06, 2.42, indoX, 3.06, indoZ, 0, indoYaw, 0);
+
+    station._addCollider(indoX - 1.5, 0, indoZ - 2.6, indoX + 1.5, 3.1, indoZ + 2.6, 'metal');
+    // Framed shatterable storefront glass panes
+    for (const gxOff of [-1.85, -0.75]) {
+      const gp = inW(gxOff, 1.04);
+      const cid = station._addCollider(gp[0] - 0.5, 0.2, gp[1] - 0.5, gp[0] + 0.5, 2.3, gp[1] + 0.5, 'glass', { blocksWalk: false });
       glassRecords.push({
-        cx: gx, cy: 1.15, cz: gz, w: 1.45, h: 1.85, d: 0.04,
+        cx: gp[0], cy: 1.24, cz: gp[1], w: 1.04, h: 2.04, d: 0.04,
         ry: indoYaw, hp: 20, isPsdDoor: false, psdDoorIdx: -1, slideSign: 0, colliderIdx: cid
       });
     }
+    const gCoffee = inW(1.98, 0.80);
+    const cidC = station._addCollider(gCoffee[0] - 0.35, 1.0, gCoffee[1] - 0.35, gCoffee[0] + 0.35, 1.6, gCoffee[1] + 0.35, 'glass', { blocksWalk: false });
+    glassRecords.push({
+      cx: gCoffee[0], cy: 1.22, cz: gCoffee[1], w: 0.64, h: 0.44, d: 0.04,
+      ry: indoYaw, hp: 14, isPsdDoor: false, psdDoorIdx: -1, slideSign: 0, colliderIdx: cidC
+    });
 
     // Access by KAI Turnstiles (chamfered purple cabinets, brushed stainless plinth/bezel, angled RFID reader, 3-arm chrome tripod)
     const gateBaseX = isIsland ? (p1MinX + 2.2) : (concMinX + 2.2);
@@ -1183,9 +1239,11 @@
     station._cawangHazardRing = null;
     if (isCawang && ctx.cawangWreckX !== undefined) {
       const hx = ctx.cawangWreckX;
-      amberPositions.push([hx, 2.8, -10.5, 0.24, 0.24, 0.24]);
+      const hazTaken = !!(station._usedIds && station._usedIds.has('cawang_derelict_cab'));
       const hazGroup = new THREE.Group();
       hazGroup.position.set(hx, 2.8, -10.5);
+      hazGroup.visible = !hazTaken;
+      const coreGeo = new THREE.BoxGeometry(0.24, 0.24, 0.24);
       const ringGeo = new THREE.RingGeometry(0.32, 0.72, 24);
       ringGeo.rotateX(-Math.PI * 0.5);
       const flareGeo = new THREE.PlaneGeometry(1.15, 1.15);
@@ -1205,11 +1263,13 @@
         depthWrite: false,
         side: THREE.DoubleSide
       });
-      station.disposableGeometries.push(ringGeo, flareGeo);
+      station.disposableGeometries.push(coreGeo, ringGeo, flareGeo);
       station.disposableMaterials.push(ringMat, flareMat);
+      const coreMesh = new THREE.Mesh(coreGeo, mats.amberBeacon);
       const ringMesh = new THREE.Mesh(ringGeo, ringMat);
       const flareMesh = new THREE.Mesh(flareGeo, flareMat);
       flareMesh.rotation.y = Math.PI * 0.25;
+      hazGroup.add(coreMesh);
       hazGroup.add(ringMesh);
       hazGroup.add(flareMesh);
       root.add(hazGroup);
@@ -1287,7 +1347,7 @@
     }
     if (arch.hasGardenTerrace) {
       const gCX = (track2X + 1.85 + gardenMaxX) * 0.5;
-      placeFieldLogProp(station, root, 'garden_supply', gCX, 0.855, -47.8, 0.12, station._usedIds.has('garden_supply'));
+      placeFieldLogProp(station, root, 'garden_supply', gCX + 0.22, 0.785, -47.8, 0.12, station._usedIds.has('garden_supply'));
     }
     if (arch.hasDepotShed) {
       placeFieldLogProp(station, root, 'depot_supply', depotMaxX - 1.2, 1.16, 54.0, -Math.PI * 0.5 + 0.14, station._usedIds.has('depot_supply'));
@@ -1582,38 +1642,144 @@
       const bcZ = -48.0;
       const cleared = !!(station._usedIds && station._usedIds.has('cikoko_barricade'));
 
-      const bcConcGeo = new THREE.BoxGeometry(2.0, 1.05, 0.72);
-      const bcBeamGeo = new THREE.BoxGeometry(6.2, 0.24, 0.16);
-      const bcDrumGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.88, 12);
-      const bcGlowGeo = new THREE.BoxGeometry(1.1, 0.16, 0.18);
-      const bcConcMat = new THREE.MeshStandardMaterial({ color: 0x5c6066, roughness: 0.90, metalness: 0.08 });
-      const bcHazMat = new THREE.MeshStandardMaterial({ color: 0xd94826, emissive: 0x3b1206, roughness: 0.55, metalness: 0.35 });
-      const bcGlowMat = new THREE.MeshBasicMaterial({ color: 0xff6b2b });
-      station.disposableGeometries.push(bcConcGeo, bcBeamGeo, bcDrumGeo, bcGlowGeo);
-      station.disposableMaterials.push(bcConcMat, bcHazMat, bcGlowMat);
+      // Quarantine warning banner Canvas texture
+      const bnrCvs = document.createElement('canvas');
+      bnrCvs.width = 512;
+      bnrCvs.height = 128;
+      const bctx = bnrCvs.getContext('2d');
+      bctx.fillStyle = '#18181b';
+      bctx.fillRect(0, 0, 512, 128);
+      for (let sx = -40; sx < 560; sx += 44) {
+        bctx.fillStyle = '#eab308';
+        bctx.beginPath();
+        bctx.moveTo(sx, 0); bctx.lineTo(sx + 22, 0); bctx.lineTo(sx + 4, 24); bctx.lineTo(sx - 18, 24); bctx.closePath();
+        bctx.fill();
+        bctx.beginPath();
+        bctx.moveTo(sx, 104); bctx.lineTo(sx + 22, 104); bctx.lineTo(sx + 4, 128); bctx.lineTo(sx - 18, 128); bctx.closePath();
+        bctx.fill();
+      }
+      bctx.fillStyle = '#dc2626';
+      bctx.fillRect(14, 28, 484, 72);
+      bctx.fillStyle = '#ffffff';
+      bctx.font = 'bold 21px sans-serif';
+      bctx.textAlign = 'center';
+      bctx.textBaseline = 'middle';
+      bctx.fillText('ZONA KARANTINA - DILARANG MELINTAS', 256, 65);
+      const bnrTex = new THREE.CanvasTexture(bnrCvs);
+      bnrTex.colorSpace = THREE.SRGBColorSpace;
+
+      const bcConcGeo = new THREE.BoxGeometry(2.15, 1.12, 0.84);
+      const bcTopConcGeo = new THREE.BoxGeometry(2.05, 0.78, 0.68);
+      const bcSandGeo = new THREE.BoxGeometry(0.95, 0.34, 0.56);
+      const bcBeamGeo = new THREE.BoxGeometry(9.8, 0.24, 0.16);
+      const bcPostGeo = new THREE.BoxGeometry(0.24, 3.35, 0.24);
+      const bcSignGeo = new THREE.BoxGeometry(7.2, 0.92, 0.10);
+      const bcHedgeGeo = new THREE.BoxGeometry(0.14, 1.85, 0.14);
+      const bcDrumGeo = new THREE.CylinderGeometry(0.30, 0.30, 0.92, 12);
+      const bcTankGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.68, 10);
+      const bcCrateGeo = new THREE.BoxGeometry(1.05, 0.52, 0.58);
+      const bcGlowGeo = new THREE.BoxGeometry(0.38, 0.22, 0.24);
+      const bcScorchGeo = new THREE.CircleGeometry(4.4, 20);
+      bcScorchGeo.rotateX(-Math.PI * 0.5);
+
+      const bcConcMat = new THREE.MeshStandardMaterial({ color: 0x5c6066, roughness: 0.92, metalness: 0.08 });
+      const bcSandMat = new THREE.MeshStandardMaterial({ color: 0x8a7d5c, roughness: 0.95, metalness: 0.02 });
+      const bcSteelMat = new THREE.MeshStandardMaterial({ color: 0x272a30, roughness: 0.55, metalness: 0.76 });
+      const bcHazMat = new THREE.MeshStandardMaterial({ color: 0xd9381e, emissive: 0x3b0f06, roughness: 0.48, metalness: 0.35 });
+      const bcCrateMat = new THREE.MeshStandardMaterial({ color: 0x4b5332, roughness: 0.80, metalness: 0.15 });
+      const bcSignMat = new THREE.MeshStandardMaterial({ map: bnrTex, emissive: 0x441108, emissiveMap: bnrTex, roughness: 0.45 });
+      const bcGlowMat = new THREE.MeshBasicMaterial({ color: 0xff5a1f });
+      const bcScorchMat = new THREE.MeshBasicMaterial({ color: 0x111111, transparent: true, opacity: 0.78, depthWrite: false });
+
+      station.disposableTextures.push(bnrTex);
+      station.disposableGeometries.push(bcConcGeo, bcTopConcGeo, bcSandGeo, bcBeamGeo, bcPostGeo, bcSignGeo, bcHedgeGeo, bcDrumGeo, bcTankGeo, bcCrateGeo, bcGlowGeo, bcScorchGeo);
+      station.disposableMaterials.push(bcConcMat, bcSandMat, bcSteelMat, bcHazMat, bcCrateMat, bcSignMat, bcGlowMat, bcScorchMat);
 
       const bcGroup = new THREE.Group();
       bcGroup.position.set(bcX, bcY, bcZ);
       bcGroup.visible = !cleared;
-      for (const dx of [-2.1, 0.0, 2.1]) {
+
+      // 1) Full-width 5-block lower concrete Jersey barricade wall (10.5m span) + stacked upper central bunker blocks
+      for (const dx of [-4.4, -2.2, 0.0, 2.2, 4.4]) {
         const blk = new THREE.Mesh(bcConcGeo, bcConcMat);
-        blk.position.set(dx, 0.525, 0);
+        blk.position.set(dx, 0.56, 0);
         blk.castShadow = true;
         blk.receiveShadow = true;
         bcGroup.add(blk);
       }
-      const rail1 = new THREE.Mesh(bcBeamGeo, bcHazMat);
-      rail1.position.set(0, 1.25, 0);
-      bcGroup.add(rail1);
-      const drum = new THREE.Mesh(bcDrumGeo, bcHazMat);
-      drum.position.set(0, 0.44, 0.65);
-      bcGroup.add(drum);
-      const beaconStrip = new THREE.Mesh(bcGlowGeo, bcGlowMat);
-      beaconStrip.position.set(0, 1.44, 0.05);
-      bcGroup.add(beaconStrip);
+      for (const dx of [-2.2, 0.0, 2.2]) {
+        const topBlk = new THREE.Mesh(bcTopConcGeo, bcConcMat);
+        topBlk.position.set(dx, 1.50, 0);
+        bcGroup.add(topBlk);
+      }
+      // 2) Twin sandbag defensive wings in front of barricade flanks
+      for (const sx of [-3.6, -2.6, 2.6, 3.6]) {
+        for (const layer of [0, 1, 2]) {
+          const sb = new THREE.Mesh(bcSandGeo, bcSandMat);
+          sb.position.set(sx + (layer % 2 ? 0.12 : -0.12), 0.17 + layer * 0.30, 0.66 - layer * 0.06);
+          sb.rotation.y = (layer - 1) * 0.08;
+          bcGroup.add(sb);
+        }
+      }
+      // 3) Heavy steel Czech Hedgehog anti-vehicle spikes flanking approaches
+      for (const hx of [-4.2, -1.5, 1.5, 4.2]) {
+        for (const rotZ of [0.68, -0.68, 0.0]) {
+          const beam = new THREE.Mesh(bcHedgeGeo, bcSteelMat);
+          beam.position.set(hx, 0.72, 1.18);
+          beam.rotation.set(rotZ === 0 ? 0.72 : 0.25, 0.4, rotZ);
+          bcGroup.add(beam);
+        }
+      }
+      // 4) Overhead steel quarantine gantry portal + illuminated Quarantine Banner + twin strobes
+      for (const px of [-4.7, 4.7]) {
+        const post = new THREE.Mesh(bcPostGeo, bcSteelMat);
+        post.position.set(px, 1.67, 0);
+        bcGroup.add(post);
+        const beacon = new THREE.Mesh(bcGlowGeo, bcGlowMat);
+        beacon.position.set(px, 3.38, 0);
+        bcGroup.add(beacon);
+      }
+      const rail1 = new THREE.Mesh(bcBeamGeo, bcHazMat); rail1.position.set(0, 2.15, 0); bcGroup.add(rail1);
+      const qSign = new THREE.Mesh(bcSignGeo, bcSignMat); qSign.position.set(0, 2.86, 0); bcGroup.add(qSign);
+
+      // 5) Volatile payload cluster at center weak point: 5 fuel drums, 2 pressurized tanks, ordnance crates & C4 flasher
+      for (const [dx, dz] of [[-1.05, 0.72], [-0.45, 0.92], [0.0, 0.68], [0.48, 0.92], [1.05, 0.72]]) {
+        const dr = new THREE.Mesh(bcDrumGeo, bcHazMat);
+        dr.position.set(dx, 0.46, dz);
+        bcGroup.add(dr);
+      }
+      for (const tx of [-0.24, 0.24]) {
+        const tk = new THREE.Mesh(bcTankGeo, bcGlowMat);
+        tk.position.set(tx, 1.24, 0.64);
+        bcGroup.add(tk);
+      }
+      for (const cx of [-0.72, 0.72]) {
+        const cr = new THREE.Mesh(bcCrateGeo, bcCrateMat);
+        cr.position.set(cx, 0.26, 1.38);
+        cr.rotation.y = cx * 0.22;
+        bcGroup.add(cr);
+      }
+      const c4Beacon = new THREE.Mesh(bcGlowGeo, bcGlowMat);
+      c4Beacon.position.set(0, 1.10, 0.44);
+      bcGroup.add(c4Beacon);
       root.add(bcGroup);
 
-      station._addCollider(bcX - 3.3, bcY, bcZ - 0.55, bcX + 3.3, bcY + 1.55, bcZ + 0.85, 'barricade', {
+      // Charred scorched blast aftermath (hidden until breached, leaves central highway completely clear!)
+      const bcAftermathGroup = new THREE.Group();
+      bcAftermathGroup.position.set(bcX, bcY, bcZ);
+      bcAftermathGroup.visible = cleared;
+      const scorchDisk = new THREE.Mesh(bcScorchGeo, bcScorchMat);
+      scorchDisk.position.set(0, 0.025, 0.4);
+      bcAftermathGroup.add(scorchDisk);
+      for (const [sx, sz, sry] of [[-4.8, -0.4, 0.45], [-4.4, 1.1, -0.6], [4.7, -0.3, -0.5], [4.3, 1.2, 0.7]]) {
+        const rubbleBlk = new THREE.Mesh(bcTopConcGeo, bcConcMat);
+        rubbleBlk.position.set(sx, 0.34, sz);
+        rubbleBlk.rotation.set(0.18, sry, 0.24);
+        bcAftermathGroup.add(rubbleBlk);
+      }
+      root.add(bcAftermathGroup);
+
+      station._addCollider(bcX - 5.2, bcY, bcZ - 0.85, bcX + 5.2, bcY + 2.4, bcZ + 1.55, 'barricade', {
         disabled: cleared,
         blocksWalk: !cleared,
         blocksBullets: !cleared,
@@ -1624,8 +1790,8 @@
         id: 'cikoko_barricade',
         type: 'barricade_breach',
         x: bcX,
-        y: bcY + 0.90,
-        z: bcZ + 1.15,
+        y: bcY + 1.05,
+        z: bcZ + 1.45,
         used: cleared,
         label: cleared ? '[E] Barikade Jalan Tol Ditembus' : '[E / Tembak] Ledakkan Barikade Tol Cikoko',
         prompt: cleared ? '[E] Barikade Jalan Tol Ditembus' : '[E / Tembak] Ledakkan Barikade Tol Cikoko'
@@ -1636,10 +1802,11 @@
         x: bcX,
         y: bcY,
         z: bcZ,
-        hp: 90,
-        maxHp: 90,
+        hp: 110,
+        maxHp: 110,
         cleared: cleared,
         group: bcGroup,
+        aftermathGroup: bcAftermathGroup,
         colliderIdx: bcCollIdx,
         interactItem: bcItem
       };

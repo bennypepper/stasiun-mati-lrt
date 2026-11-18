@@ -599,7 +599,7 @@
       const isBalanced = qKey === 'balanced';
 
       let bldgMaxDist = isPotato ? 95 : (isBalanced ? 105 : 160);
-      const clutterMaxDist = isPotato ? 0 : (isBalanced ? 45 : 75);
+      const clutterMaxDist = isPotato ? 36 : (isBalanced ? 54 : 84);
 
       const ctx = playerContext || null;
       const trainCruising = !!(ctx && ctx.trainCruising);
@@ -664,7 +664,7 @@
         const cm = this.clutterMeshes[i];
         const ud = cm.userData || {};
         const isStruct = !!ud._alwaysStructural;
-        if ((!isStruct && isPotato) || trainCruising) {
+        if (trainCruising) {
           cm.visible = false;
           continue;
         }
@@ -682,7 +682,7 @@
         if (ud._lodTier !== undefined) {
           const d1 = ud._lod1Dist || 22;
           const d2 = ud._lod2Dist || 46;
-          const activeTier = dist <= d1 ? 0 : (dist <= d2 ? 1 : 2);
+          const activeTier = isPotato ? (dist <= 10 ? 1 : 2) : (dist <= d1 ? 0 : (dist <= d2 ? 1 : 2));
           cm.visible = (ud._lodTier === activeTier);
           continue;
         }

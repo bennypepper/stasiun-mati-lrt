@@ -533,8 +533,20 @@
         for (const hpz of [haltZ - 5.2, haltZ, haltZ + 5.2]) {
           addCylinder(bSteelDark, 0.10, 0.12, 3.1, 8, hxMin + 0.35, SIDEWALK_Y + 1.55, hpz);
         }
-        addAtlasBox(bStall, 0.95, 0.85, 0.55, hxMin + 0.9, SIDEWALK_Y + 0.66, haltZ, Math.PI * 0.5, null, STALL_UV.jaklingko);
-        station._addCollider(hxMin + 0.5, SIDEWALK_Y, haltZ - 0.5, hxMin + 1.3, SIDEWALK_Y + 1.1, haltZ + 0.5, 'metal');
+        // Realistic TransJakarta Security Tactical Locker Cabinet (dual steel doors, louver grille, keypad & blue header)
+        const lkBaseY = SIDEWALK_Y + 0.24;
+        const lkXPos = hxMin + 0.85;
+        addBox(bSteelDark, 0.58, 0.12, 1.12, lkXPos, lkBaseY + 0.06, haltZ);
+        addBox(bSteelDark, 0.52, 1.58, 1.06, lkXPos, lkBaseY + 0.91, haltZ);
+        for (const dz of [-0.25, 0.25]) {
+          addAtlasBox(bStall, 0.05, 1.24, 0.44, lkXPos + 0.26, lkBaseY + 0.88, haltZ + dz, 0, null, STALL_UV.rotioCreamSolid);
+          addBox(bTruss, 0.06, 0.14, 0.05, lkXPos + 0.28, lkBaseY + 0.88, haltZ + dz + (dz < 0 ? 0.14 : -0.14));
+        }
+        addBox(bTactile, 0.54, 0.06, 1.08, lkXPos, lkBaseY + 1.50, haltZ);
+        addBox(bTruss, 0.54, 0.14, 1.06, lkXPos, lkBaseY + 1.60, haltZ);
+        addAtlasBox(bStall, 0.06, 0.18, 0.12, lkXPos + 0.27, lkBaseY + 1.12, haltZ - 0.06, 0, null, STALL_UV.turnstilePurple);
+        addBox(bTruss, 0.60, 0.08, 1.14, lkXPos, lkBaseY + 1.72, haltZ);
+        station._addCollider(lkXPos - 0.34, SIDEWALK_Y, haltZ - 0.60, lkXPos + 0.34, lkBaseY + 1.82, haltZ + 0.60, 'metal');
         const fdrUsed = station._usedIds.has('feeder_supply');
         station.interactables.push({
           id: 'feeder_supply', type: 'balcony_supply', x: hxMin + 1.6, y: SIDEWALK_Y + 1.1, z: haltZ,
@@ -1032,8 +1044,16 @@
         );
       }
 
-      addAtlasBox(bStall, 0.95, 0.85, 0.55, gCX, 0.425, gZ0 + 2.2, 0, null, STALL_UV.jaklingko);
-      station._addCollider(gCX - 0.5, 0, gZ0 + 1.9, gCX + 0.5, 0.9, gZ0 + 2.5, 'metal');
+      // Detailed Field Medical Station Cabinet + Red Cross Emblem + 3-LOD medical_box GLTF on top
+      addBox(bSteelDark, 1.04, 0.10, 0.62, gCX, 0.05, gZ0 + 2.2);
+      addAtlasBox(bStall, 0.98, 0.62, 0.56, gCX, 0.41, gZ0 + 2.2, 0, null, STALL_UV.rotioCreamSolid);
+      addBox(bTruss, 1.06, 0.06, 0.64, gCX, 0.75, gZ0 + 2.2);
+      addBox(bTruss, 0.04, 0.58, 0.04, gCX, 0.41, gZ0 + 2.48);
+      addBox(bTruss, 0.12, 0.04, 0.04, gCX - 0.30, 0.44, gZ0 + 2.49);
+      addAtlasBox(bSign, 0.28, 0.10, 0.04, gCX + 0.18, 0.44, gZ0 + 2.49, 0, null, SIGN_UV.hydrantRedSolid);
+      addAtlasBox(bSign, 0.10, 0.28, 0.04, gCX + 0.18, 0.44, gZ0 + 2.49, 0, null, SIGN_UV.hydrantRedSolid);
+      station._placeNormalizedModel('medical_box', gCX - 0.14, 0.78, gZ0 + 2.2, 0.22, 0.14);
+      station._addCollider(gCX - 0.55, 0, gZ0 + 1.85, gCX + 0.55, 1.05, gZ0 + 2.55, 'metal');
       const garUsed = station._usedIds.has('garden_supply');
       station.interactables.push({
         id: 'garden_supply', type: 'balcony_supply', x: gCX, y: 1.0, z: gZ0 + 2.7,

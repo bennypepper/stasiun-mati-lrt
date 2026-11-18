@@ -1926,8 +1926,8 @@
     regDestruct(barrierPlacements, 'concrete', 1.4);
     regDestruct(lampPlacements, 'lamp', 1.2);
 
-    // CoffeeCart_01 vendor cart on East Concourse outer promenade plaza (3-tier LOD instanced)
-    emitSpatialLodBatches(protosCoffeeCart, [{ x: eastInnerSwMinX + 4.4, y: SIDEWALK_Y, z: 10.5, ry: -Math.PI * 0.5 }], 'CoffeeCart', false, 0, 0, null);
+    // CoffeeCart_01 vendor cart on East Concourse outer promenade plaza (3-tier LOD instanced, always preserved)
+    emitSpatialLodBatches(protosCoffeeCart, [{ x: eastInnerSwMinX + 4.4, y: SIDEWALK_Y, z: 10.5, ry: -Math.PI * 0.5 }], 'CoffeeCart', true, 0, 0, null);
     city._addCollider(eastInnerSwMinX + 3.6, SIDEWALK_Y, 9.2, eastInnerSwMinX + 5.2, SIDEWALK_Y + 1.8, 11.8, 'wood', { blocksBullets: false });
 
     // Alpha-masked Tropical Foliage variants (~12 tris each; zero multi-hundred-thousand-poly bloat!)
@@ -2110,36 +2110,140 @@
     const plnUsed = usedSet.has('city_pln_box') || city._plnRestored;
     const plnX = eastOuterSwMinX + 2.45;
     const plnZ = -16.2;
-    // Dedicated grounded PLN Substation Relay Cabinet (24m south of East Pocket Park Gerobak)
+    // Detailed Canvas-Textured PLN Substation Distribution Cabinet (Gardu Distribusi TM/TR)
     const plnGroup = new THREE.Group();
     plnGroup.position.set(plnX, SIDEWALK_Y, plnZ);
-    const plnPadGeo = new THREE.BoxGeometry(0.92, 0.24, 1.38);
-    const plnBodyGeo = new THREE.BoxGeometry(0.64, 1.56, 1.16);
-    const plnRoofGeo = new THREE.BoxGeometry(0.74, 0.10, 1.26);
-    const plnStripeGeo = new THREE.BoxGeometry(0.66, 0.14, 1.18);
-    const plnLeverGeo = new THREE.BoxGeometry(0.10, 0.28, 0.18);
-    const plnBeaconGeo = new THREE.BoxGeometry(0.06, 0.14, 0.44);
-    const plnPadMat = city._getMat('cityPlnPad', null, { color: 0x6b7280, roughness: 0.9, metalness: 0.1 });
-    const plnBodyMat = city._getMat('cityPlnBody', null, { color: 0x334155, roughness: 0.55, metalness: 0.65 });
-    const plnHazardMat = city._getMat('cityPlnHazard', null, { color: 0xf59e0b, roughness: 0.45, metalness: 0.2 });
+
+    const plnCvs = document.createElement('canvas');
+    plnCvs.width = 512;
+    plnCvs.height = 512;
+    const pctx = plnCvs.getContext('2d');
+    pctx.fillStyle = '#364352';
+    pctx.fillRect(0, 0, 512, 512);
+    // Subtle weathering/grime gradient at bottom + brushed metal streaks
+    const pGrad = pctx.createLinearGradient(0, 0, 0, 512);
+    pGrad.addColorStop(0, 'rgba(255,255,255,0.06)');
+    pGrad.addColorStop(0.7, 'rgba(0,0,0,0.0)');
+    pGrad.addColorStop(1, 'rgba(20,18,14,0.45)');
+    pctx.fillStyle = pGrad;
+    pctx.fillRect(0, 0, 512, 512);
+    // Double recessed panel door frames & center seam
+    pctx.strokeStyle = '#182028';
+    pctx.lineWidth = 8;
+    pctx.strokeRect(24, 34, 224, 444);
+    pctx.strokeRect(264, 34, 224, 444);
+    pctx.strokeStyle = '#536477';
+    pctx.lineWidth = 3;
+    pctx.strokeRect(30, 40, 212, 432);
+    pctx.strokeRect(270, 40, 212, 432);
+    // Hinges & latch bolts
+    pctx.fillStyle = '#111827';
+    for (const hy of [90, 250, 410]) {
+      pctx.fillRect(14, hy, 18, 28);
+      pctx.fillRect(480, hy, 18, 28);
+    }
+    // Pressed cooling louver slats (top & bottom of both doors)
+    for (let ly = 338; ly <= 446; ly += 16) {
+      pctx.fillStyle = '#141a22';
+      pctx.fillRect(48, ly, 176, 8);
+      pctx.fillRect(288, ly, 176, 8);
+      pctx.fillStyle = '#5b6c7f';
+      pctx.fillRect(48, ly + 8, 176, 2);
+      pctx.fillRect(288, ly + 8, 176, 2);
+    }
+    // PLN Corporate Header Plate + High Voltage 20kV Hazard Warning Plaque
+    pctx.fillStyle = '#0f294a';
+    pctx.fillRect(44, 54, 424, 52);
+    pctx.fillStyle = '#facc15';
+    pctx.fillRect(44, 102, 424, 8);
+    pctx.fillStyle = '#ffffff';
+    pctx.font = 'bold 24px sans-serif';
+    pctx.fillText('PT PLN (PERSERO)', 62, 84);
+    pctx.fillStyle = '#fde047';
+    pctx.font = 'bold 14px sans-serif';
+    pctx.fillText('SAKELAR PJU • JTR 20kV', 284, 83);
+    // Left door: Yellow/Black Warning Triangle + Lightning Bolt
+    pctx.fillStyle = '#eab308';
+    pctx.fillRect(54, 134, 164, 126);
+    pctx.strokeStyle = '#111827';
+    pctx.lineWidth = 5;
+    pctx.strokeRect(58, 138, 156, 118);
+    pctx.fillStyle = '#111827';
+    pctx.beginPath();
+    pctx.moveTo(136, 150); pctx.lineTo(182, 224); pctx.lineTo(90, 224); pctx.closePath();
+    pctx.fill();
+    pctx.fillStyle = '#fde047';
+    pctx.beginPath();
+    pctx.moveTo(142, 168); pctx.lineTo(124, 196); pctx.lineTo(138, 196); pctx.lineTo(128, 218); pctx.lineTo(152, 190); pctx.lineTo(136, 190); pctx.closePath();
+    pctx.fill();
+    pctx.fillStyle = '#111827';
+    pctx.font = 'bold 14px sans-serif';
+    pctx.fillText('TEGANGAN TINGGI', 68, 246);
+    // Right door: Analog kWh Meter Inspection Window & Dial
+    pctx.fillStyle = '#0b1220';
+    pctx.fillRect(294, 136, 160, 112);
+    pctx.fillStyle = '#cbd5e1';
+    pctx.fillRect(306, 148, 136, 86);
+    pctx.fillStyle = '#0f172a';
+    pctx.font = 'bold 16px monospace';
+    pctx.fillText('kWh 04821.9', 318, 178);
+    pctx.fillStyle = '#ef4444';
+    pctx.fillRect(322, 196, 104, 14);
+    pctx.fillStyle = '#1e293b';
+    pctx.font = '12px sans-serif';
+    pctx.fillText('PANEL RELAI UTAMA', 312, 226);
+
+    const plnTex = new THREE.CanvasTexture(plnCvs);
+    plnTex.colorSpace = THREE.SRGBColorSpace;
+    const plnCabMat = new THREE.MeshStandardMaterial({ map: plnTex, roughness: 0.52, metalness: 0.58 });
+    const plnPadMat = city._getMat('cityPlnPad', null, { color: 0x64748b, roughness: 0.92, metalness: 0.06 });
+    const plnDarkMat = city._getMat('cityPlnBody', null, { color: 0x1e293b, roughness: 0.55, metalness: 0.72 });
+    const plnHazardMat = city._getMat('cityPlnHazard', null, { color: 0xf59e0b, roughness: 0.42, metalness: 0.28 });
     const plnBeaconMat = new THREE.MeshStandardMaterial({
       color: plnUsed ? 0x22c55e : 0xef4444,
       emissive: plnUsed ? 0x22c55e : 0xef4444,
       emissiveIntensity: 1.4,
-      roughness: 0.3
+      roughness: 0.25
     });
-    city.disposableGeometries.push(plnPadGeo, plnBodyGeo, plnRoofGeo, plnStripeGeo, plnLeverGeo, plnBeaconGeo);
-    city.disposableMaterials.push(plnBeaconMat);
+
+    const plnPadGeo = new THREE.BoxGeometry(1.00, 0.24, 1.48);
+    const plnFlangeGeo = new THREE.BoxGeometry(0.76, 0.08, 1.26);
+    const plnBodyGeo = new THREE.BoxGeometry(0.68, 1.56, 1.20);
+    const plnRoofGeo = new THREE.BoxGeometry(0.80, 0.10, 1.32);
+    const plnConduitGeo = new THREE.CylinderGeometry(0.042, 0.042, 0.42, 8);
+    const plnFinGeo = new THREE.BoxGeometry(0.56, 1.18, 0.04);
+    const plnLeverArmGeo = new THREE.BoxGeometry(0.08, 0.32, 0.08);
+    const plnLeverGripGeo = new THREE.BoxGeometry(0.14, 0.08, 0.16);
+    const plnLatchGeo = new THREE.BoxGeometry(0.04, 0.22, 0.10);
+    const plnBeaconGeo = new THREE.BoxGeometry(0.16, 0.14, 0.28);
+    city.disposableTextures.push(plnTex);
+    city.disposableGeometries.push(plnPadGeo, plnFlangeGeo, plnBodyGeo, plnRoofGeo, plnConduitGeo, plnFinGeo, plnLeverArmGeo, plnLeverGripGeo, plnLatchGeo, plnBeaconGeo);
+    city.disposableMaterials.push(plnCabMat, plnBeaconMat);
     city._plnBeaconMat = plnBeaconMat;
+
     const plnPadM = new THREE.Mesh(plnPadGeo, plnPadMat); plnPadM.position.set(0, 0.12, 0);
-    const plnBodyM = new THREE.Mesh(plnBodyGeo, plnBodyMat); plnBodyM.position.set(0, 1.02, 0);
-    const plnRoofM = new THREE.Mesh(plnRoofGeo, plnBodyMat); plnRoofM.position.set(0, 1.84, 0);
-    const plnStripeM = new THREE.Mesh(plnStripeGeo, plnHazardMat); plnStripeM.position.set(0, 1.48, 0);
-    const plnLeverM = new THREE.Mesh(plnLeverGeo, plnHazardMat); plnLeverM.position.set(-0.34, 1.06, 0.34);
-    const plnBeaconM = new THREE.Mesh(plnBeaconGeo, plnBeaconMat); plnBeaconM.position.set(-0.32, 1.66, 0);
-    plnGroup.add(plnPadM, plnBodyM, plnRoofM, plnStripeM, plnLeverM, plnBeaconM);
+    const plnFlangeM = new THREE.Mesh(plnFlangeGeo, plnDarkMat); plnFlangeM.position.set(0, 0.28, 0);
+    const plnBodyM = new THREE.Mesh(plnBodyGeo, [plnDarkMat, plnCabMat, plnDarkMat, plnDarkMat, plnCabMat, plnCabMat]);
+    plnBodyM.position.set(0, 1.10, 0);
+    const plnRoofM = new THREE.Mesh(plnRoofGeo, plnDarkMat); plnRoofM.position.set(0, 1.92, 0);
+    plnGroup.add(plnPadM, plnFlangeM, plnBodyM, plnRoofM);
+    for (const cz of [-0.36, -0.12, 0.12, 0.36]) {
+      const cPipe = new THREE.Mesh(plnConduitGeo, plnDarkMat);
+      cPipe.position.set(0.18, 0.42, cz);
+      plnGroup.add(cPipe);
+    }
+    for (const fz of [-0.62, 0.62]) {
+      const fin = new THREE.Mesh(plnFinGeo, plnDarkMat);
+      fin.position.set(0, 1.10, fz);
+      plnGroup.add(fin);
+    }
+    const doorLatch = new THREE.Mesh(plnLatchGeo, plnDarkMat); doorLatch.position.set(-0.35, 1.00, 0.0);
+    const leverArm = new THREE.Mesh(plnLeverArmGeo, plnHazardMat); leverArm.position.set(0.06, 1.14, 0.66);
+    const leverGrip = new THREE.Mesh(plnLeverGripGeo, plnHazardMat); leverGrip.position.set(0.06, 1.30, 0.70);
+    const plnBeaconM = new THREE.Mesh(plnBeaconGeo, plnBeaconMat); plnBeaconM.position.set(-0.18, 2.04, 0);
+    plnGroup.add(doorLatch, leverArm, leverGrip, plnBeaconM);
     root.add(plnGroup);
-    city._addCollider(plnX - 0.46, SIDEWALK_Y, plnZ - 0.69, plnX + 0.46, SIDEWALK_Y + 1.92, plnZ + 0.69, 'metal');
+    city._addCollider(plnX - 0.50, SIDEWALK_Y, plnZ - 0.74, plnX + 0.50, SIDEWALK_Y + 1.98, plnZ + 0.74, 'metal');
 
     city.interactables.push({
       id: 'city_pln_box',

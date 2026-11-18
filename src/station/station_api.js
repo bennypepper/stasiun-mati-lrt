@@ -771,13 +771,17 @@
 
       if (this._cawangHazardRing) {
         const hz = this._cawangHazardRing;
-        const strobe = 0.45 + 0.55 * Math.abs(Math.sin(this._timeAccum * 4.8));
-        const spark = Math.sin(this._timeAccum * 29.0) > 0.72 ? 1.35 : 1.0;
-        const sc = 0.85 + 0.35 * strobe;
-        hz.ring.scale.set(sc, sc, sc);
-        hz.ringMat.opacity = Math.min(0.95, 0.35 + 0.50 * strobe * spark);
-        hz.flare.rotation.y = this._timeAccum * 2.4;
-        hz.flareMat.opacity = Math.min(0.85, 0.25 + 0.42 * strobe * spark);
+        if (this._usedIds && this._usedIds.has('cawang_derelict_cab')) {
+          if (hz.group.visible) hz.group.visible = false;
+        } else {
+          const strobe = 0.45 + 0.55 * Math.abs(Math.sin(this._timeAccum * 4.8));
+          const spark = Math.sin(this._timeAccum * 29.0) > 0.72 ? 1.35 : 1.0;
+          const sc = 0.85 + 0.35 * strobe;
+          hz.ring.scale.set(sc, sc, sc);
+          hz.ringMat.opacity = Math.min(0.95, 0.35 + 0.50 * strobe * spark);
+          hz.flare.rotation.y = this._timeAccum * 2.4;
+          hz.flareMat.opacity = Math.min(0.85, 0.25 + 0.42 * strobe * spark);
+        }
       }
 
       if (this._objectiveBeacons && this._objectiveBeacons.length > 0) {
@@ -1822,6 +1826,10 @@
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
+        this._syncObjectiveBeacons();
+        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
+          this._cawangHazardRing.group.visible = false;
+        }
         if (LRT.Enemies && LRT.Enemies.alertAllTo) {
           LRT.Enemies.alertAllTo({ x: it.x, y: it.y, z: it.z }, 45.0);
         }
@@ -1845,6 +1853,10 @@
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
+        this._syncObjectiveBeacons();
+        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
+          this._cawangHazardRing.group.visible = false;
+        }
         return {
           ok: true,
           type: 'derelict_fuse',
@@ -1863,6 +1875,10 @@
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
+        this._syncObjectiveBeacons();
+        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
+          this._cawangHazardRing.group.visible = false;
+        }
         return {
           ok: true,
           type: 'field_log',
@@ -1880,6 +1896,10 @@
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
+        this._syncObjectiveBeacons();
+        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
+          this._cawangHazardRing.group.visible = false;
+        }
         if (LRT.Enemies && LRT.Enemies.alertAllTo) {
           LRT.Enemies.alertAllTo({ x: it.x, y: it.y, z: it.z }, 45.0);
         }
@@ -1904,6 +1924,10 @@
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
+        this._syncObjectiveBeacons();
+        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
+          this._cawangHazardRing.group.visible = false;
+        }
         const res = {
           ok: true, type: 'rotio', heal: heal, healAmount: heal,
           message: heal > 0 ? "Roti'O Coffee Bun hangat ditemukan (+25 HP)" : "Etalase Roti'O sudah diambil."
@@ -1923,6 +1947,10 @@
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
+        this._syncObjectiveBeacons();
+        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
+          this._cawangHazardRing.group.visible = false;
+        }
         return {
           ok: true, type: 'coway', heal: heal, healAmount: heal,
           message: heal > 0 ? 'Air mineral steril Coway menyegarkan (+15 HP)' : 'Air Coway sudah diminum di stasiun ini.'
@@ -1937,6 +1965,10 @@
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
+        this._syncObjectiveBeacons();
+        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
+          this._cawangHazardRing.group.visible = false;
+        }
         const res = {
           ok: true, type: 'jaklingko',
           ammo: bonus > 0 ? { type: 'rifle', amount: 30 } : null, ammoBonus: bonus,
@@ -1958,6 +1990,10 @@
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
+        this._syncObjectiveBeacons();
+        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
+          this._cawangHazardRing.group.visible = false;
+        }
         const res = {
           ok: true, type: 'balcony_supply',
           heal: fresh ? 25 : 0, healAmount: fresh ? 25 : 0,
@@ -2007,6 +2043,10 @@
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
+        this._syncObjectiveBeacons();
+        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
+          this._cawangHazardRing.group.visible = false;
+        }
         if (this._lootboxGlows && this._lootboxGlows.has(id)) {
           const gm = this._lootboxGlows.get(id);
           if (gm) gm.visible = false;
@@ -2095,6 +2135,7 @@
       bc.cleared = true;
       bc.hp = 0;
       if (bc.group) bc.group.visible = false;
+      if (bc.aftermathGroup) bc.aftermathGroup.visible = true;
       if (bc.colliderIdx !== undefined && this.colliders[bc.colliderIdx]) {
         const col = this.colliders[bc.colliderIdx];
         col.blocksWalk = false;
@@ -2109,8 +2150,23 @@
       if (this._usedIds) this._usedIds.add('cikoko_barricade');
       this._syncObjectiveBeacons();
       const offsetZ = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
+      const centerPos = { x: bc.x, y: bc.y + 0.95, z: bc.z + offsetZ };
       if (LRT.Weapons && typeof LRT.Weapons.applyExplosion === 'function') {
-        LRT.Weapons.applyExplosion({ x: bc.x, y: bc.y + 0.65, z: bc.z + offsetZ }, 6.5, 180, 14.0, false);
+        LRT.Weapons.applyExplosion(centerPos, 12.5, 340, 26.0, false);
+        if (typeof LRT.Weapons.spawnSparks === 'function') LRT.Weapons.spawnSparks(centerPos, 72);
+        if (typeof LRT.Weapons.spawnRubble === 'function') LRT.Weapons.spawnRubble(centerPos, 48);
+        // Staggered chained fuel-drum secondary detonations across barricade width
+        const selfStation = this;
+        for (const [delayMs, dx, dy] of [[120, -2.8, 0.7], [250, 2.8, 1.05], [380, 0.2, 1.55]]) {
+          setTimeout(() => {
+            if (!selfStation._cikokoBarricade || selfStation._cikokoBarricade !== bc) return;
+            const subPos = { x: bc.x + dx, y: bc.y + dy, z: bc.z + offsetZ };
+            if (LRT.Weapons && typeof LRT.Weapons.applyExplosion === 'function') {
+              LRT.Weapons.applyExplosion(subPos, 9.5, 160, 18.0, false);
+              if (typeof LRT.Weapons.spawnRubble === 'function') LRT.Weapons.spawnRubble(subPos, 28);
+            }
+          }, delayMs);
+        }
       }
       const core = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core;
       if (core && typeof core.onCikokoBarricadeCleared === 'function') {
