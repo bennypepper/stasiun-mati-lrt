@@ -207,6 +207,10 @@
     }
     campaignState.clearedStations.add(5);
     campaignState.voTriggered.add('VO_21_VICTORY');
+    try { localStorage.setItem('lrt_campaign_completed_v1', '1'); } catch (_) {}
+    if (LRT.PlayerUI && typeof LRT.PlayerUI.syncFastTravelAvailability === 'function') {
+      LRT.PlayerUI.syncFastTravelAvailability();
+    }
 
     if (LRT.Audio && typeof LRT.Audio.playVoice === 'function') {
       LRT.Audio.playVoice('VO_21_VICTORY', { force: true });
@@ -624,7 +628,7 @@
         if (LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
           LRT.PlayerUI.setNotice('🔒 PINTU KERETA DIKUNCI — TEKAN PANEL BERANGKAT UNTUK JALAN', '#22c55e');
         }
-        if (CORE.tutorialActive && typeof CORE.getTutorialStep === 'function' && CORE.getTutorialStep() >= 10 && typeof CORE.completeTutorialStep11 === 'function') {
+        if (CORE.tutorialActive && typeof CORE.getTutorialStep === 'function' && CORE.getTutorialStep() >= 8 && typeof CORE.completeTutorialStep11 === 'function') {
           CORE.completeTutorialStep11();
         }
       } else {
@@ -754,8 +758,28 @@
       }
     }
 
-    // Lootbox roll handling
-    if ((res.type === 'lootbox' || item.type === 'lootbox') && res.fresh !== false) {
+    // Individual 3D crate variant weapon grant & armor grant (before legacy random roll)
+    if (res.variantId && res.weaponId && LRT.Weapons) {
+      if (!res._variantHandled) {
+        if (typeof LRT.Weapons.unlockOrEquipVariant === 'function') {
+          LRT.Weapons.unlockOrEquipVariant(res.weaponId, res.variantId);
+        } else if (typeof LRT.Weapons.unlockWeapon === 'function') {
+          LRT.Weapons.unlockWeapon(res.weaponId, res.ammoAmount || 0);
+        }
+        if (LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
+          const label = res.variantLabel || res.label || `${String(res.weaponId).toUpperCase()} · ${String(res.variantId).toUpperCase()}`;
+          LRT.PlayerUI.setNotice(res.message || `SENJATA VARIAN DIPEROLEH: ${String(label).toUpperCase()}`, '#22c55e');
+        }
+      }
+      return;
+    }
+    if (!res._armorHandled && (res.armorBonus > 0 || res.armor > 0) && LRT.PlayerUI && typeof LRT.PlayerUI.addArmor === 'function') {
+      LRT.PlayerUI.addArmor(res.armorBonus || res.armor, 100);
+    }
+
+    // Legacy Lootbox roll handling (skipped when 3D crate merely swings open or picks individual slot)
+    if ((res.type === 'lootbox' || item.type === 'lootbox') && res.fresh !== false
+        && !res.openedOnly && !res.individualSlot && !res.skipRandomRoll && res.action !== 'crate_open') {
       if (LRT.Weapons && typeof LRT.Weapons.rollLootbox === 'function') {
         const resRoll = LRT.Weapons.rollLootbox({
           riskLuck: res.riskLuck !== undefined ? res.riskLuck : (item.riskLuck || 0.4),
@@ -927,7 +951,7 @@
     }
 
     if (CORE.tutorialActive) {
-      if (!isDirectDebugCall && typeof CORE.getTutorialStep === 'function' && CORE.getTutorialStep() < 10) {
+      if (!isDirectDebugCall && typeof CORE.getTutorialStep === 'function' && CORE.getTutorialStep() < 8) {
         if (LRT.Audio) LRT.Audio.play('station_chime', { gain: 0.55 });
         LRT.PlayerUI.setNotice('IKUTI LANGKAH BRIEFING TERLEBIH DAHULU', '#e0b422');
         return false;

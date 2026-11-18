@@ -1488,10 +1488,35 @@
       roughness: 0.35,
       metalness: 0.25
     });
+    const consoleHousingMat = mats.steelDarkMat || consoleMat;
+    T._cabHalos = { departFront: null, departRear: null, lockFront: null, lockRear: null };
+    const attachCabHalo = (mesh) => {
+      if (LRT.Render && typeof LRT.Render.attachPerimeterHalo === 'function') {
+        return LRT.Render.attachPerimeterHalo(mesh, {
+          color: 0xfacc15,
+          hoverColor: 0xfacc15,
+          objectiveColor: 0xfde047,
+          thicknessScale: 1.15,
+          initialMode: 'off'
+        });
+      }
+      return null;
+    };
+
     const consoleGeoms = [];
     for (const s of [-1, 1]) {
       const cz = s * TD.carPitch;
       pushMatGeom(consoleGeoms, new THREE.PlaneGeometry(1.66, 0.40), 0, 1.01, cz + s * 7.86, -0.62, s > 0 ? Math.PI : 0, 0, 'YXZ');
+
+      const podGeo = new THREE.BoxGeometry(1.68, 0.05, 0.42);
+      const podMesh = new THREE.Mesh(podGeo, consoleHousingMat);
+      podMesh.rotation.order = 'YXZ';
+      podMesh.rotation.set(-0.62, s > 0 ? Math.PI : 0, 0);
+      podMesh.position.set(0, 0.99, cz + s * 7.88);
+      group.add(podMesh);
+      const podHalo = attachCabHalo(podMesh);
+      if (s > 0) T._cabHalos.departFront = podHalo;
+      else T._cabHalos.departRear = podHalo;
 
       pushMatGeom(col.metalGeoms, new THREE.CylinderGeometry(0.015, 0.018, 0.18, 8), -0.20, 1.04, cz + s * 7.82, -s * 0.22, 0, 0, 'YXZ');
       pushMatGeom(col.steelDarkGeoms, new THREE.SphereGeometry(0.032, 10, 8), -0.20, 1.13, cz + s * 7.80, 0, 0, 0, 'YXZ');
@@ -1515,8 +1540,14 @@
       const px = s * 0.80;
       const pz = s * 24.75;
       const rotY = s > 0 ? -Math.PI * 0.5 : Math.PI * 0.5;
-      // Angled dark steel pedestal/box mounted on inner cabinet shoulder
-      pushMatGeom(col.steelDarkGeoms, new THREE.BoxGeometry(0.14, 0.16, 0.38), px, 1.13, pz, 0, 0, s * 0.28);
+      // Angled dark steel pedestal/box mounted on inner cabinet shoulder (individual mesh for perimeter halo!)
+      const lockBoxMesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.38), consoleHousingMat);
+      lockBoxMesh.position.set(px, 1.13, pz);
+      lockBoxMesh.rotation.set(0, 0, s * 0.28);
+      group.add(lockBoxMesh);
+      const lockHalo = attachCabHalo(lockBoxMesh);
+      if (s > 0) T._cabHalos.lockFront = lockHalo;
+      else T._cabHalos.lockRear = lockHalo;
       // Printed 'PANEL KUNCI PINTU' plate facing cab aisle
       pushMatGeom(doorLockFaceGeoms, new THREE.PlaneGeometry(0.32, 0.20), px - s * 0.072, 1.14, pz, 0, rotY, 0);
       // Glowing status indicator LED pill right above faceplate (Red = Unlocked/Open, Green = Locked)

@@ -17,6 +17,12 @@
   const _astarOpen = new Int16Array(MAX_NAV_NODES);
   const _astarPath = new Int16Array(MAX_NAV_NODES);
 
+  function isPsdEdgePassable(ed) {
+    if (!ed || ed.gatedPsdZ === undefined || ed.gatedTrack === undefined) return true;
+    return !!(LRT.Station && typeof LRT.Station.isPsdOpeningClear === 'function'
+      && LRT.Station.isPsdOpeningClear(ed.gatedPsdZ, ed.gatedTrack));
+  }
+
   function gatherNearbyColliders(x, z, radius, spatialGrid, trainColliders) {
     _nearbyBoxes.length = 0;
 
@@ -382,6 +388,7 @@
       const curG = _astarG[cur];
       for (let i = 0; i < edges.length; i++) {
         const ed = edges[i];
+        if (!isPsdEdgePassable(ed)) continue;
         const nxt = ed.to;
         if (nxt >= count || _astarClosed[nxt]) continue;
         let edgeCost = ed.cost;
@@ -514,6 +521,7 @@
     let validCount = 0;
     let nonBackCount = 0;
     for (let i = 0; i < edges.length; i++) {
+      if (!isPsdEdgePassable(edges[i])) continue;
       const nxt = nodes[edges[i].to];
       if (!nxt) continue;
       if (Math.abs(nxt.y - y) > 1.25) continue;
@@ -528,6 +536,7 @@
     const pickIdx = Math.floor(Math.random() * (useNonBack ? nonBackCount : validCount));
     let seen = 0;
     for (let i = 0; i < edges.length; i++) {
+      if (!isPsdEdgePassable(edges[i])) continue;
       const nxt = nodes[edges[i].to];
       if (!nxt) continue;
       if (Math.abs(nxt.y - y) > 1.25) continue;

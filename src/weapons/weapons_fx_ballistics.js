@@ -1120,8 +1120,7 @@
   }
 
   function executeShot() {
-    const cfgList = W.getWeaponConfigs();
-    const wCfg = cfgList[W._activeIdx];
+    const wCfg = W.getEffectiveWeaponConfig(W._activeIdx);
     const wState = W._weaponStates[W._activeIdx];
     if (!wCfg || !wState || !wState.unlocked) return;
 
@@ -1140,10 +1139,16 @@
     wState.mag -= 1;
     W._fireCooldown = 60.0 / (wCfg.rpm || 300);
 
-    // Shotgun pump timing
-    if (wCfg.id === 'shotgun') {
+    // Shotgun pump timing (pump12g only; doublebarrel has noPump)
+    if (wCfg.id === 'shotgun' && !wCfg.noPump && wCfg.sfxPump) {
       W._pumpTimer = 0.001;
       W._pumpPlayed = false;
+    }
+
+    // Revolver cylinder index & hammer snap
+    if (wCfg.variantId === 'revolver') {
+      W._revolverCylTarget += Math.PI / 3;
+      W._revolverHammerKick = 1.0;
     }
 
     // Audio
@@ -1151,12 +1156,16 @@
 
     // Recoil + Bloom + Camera kick
     const adsFactor = W._isADS ? 0.58 : 1.0;
-    W._recoilZ = Math.min(0.14, W._recoilZ + (wCfg.id === 'shotgun' ? 0.095 : wCfg.id === 'rpg' ? 0.12 : 0.045));
-    W._recoilPitchVM = Math.min(0.26, W._recoilPitchVM + (wCfg.id === 'shotgun' ? 0.14 : wCfg.id === 'rpg' ? 0.16 : 0.065));
+    const isHeavyPistol = wCfg.variantId === 'revolver';
+    const isCoach = wCfg.variantId === 'doublebarrel';
+    const vmKickZ = isCoach ? 0.115 : (wCfg.id === 'shotgun' ? 0.095 : wCfg.id === 'rpg' ? 0.12 : isHeavyPistol ? 0.068 : 0.045);
+    const vmKickPitch = isCoach ? 0.165 : (wCfg.id === 'shotgun' ? 0.14 : wCfg.id === 'rpg' ? 0.16 : isHeavyPistol ? 0.105 : 0.065);
+    W._recoilZ = Math.min(0.15, W._recoilZ + vmKickZ);
+    W._recoilPitchVM = Math.min(0.28, W._recoilPitchVM + vmKickPitch);
     W._pendingCamPitch += (wCfg.recoilPitch || 0.02) * adsFactor;
     W._pendingCamYaw += (Math.random() - 0.5) * 2 * (wCfg.recoilYaw || 0.008) * adsFactor;
     W._bloom = Math.min(0.038, W._bloom + (wCfg.id === 'rifle' ? 0.0045 : 0.003));
-    W._trauma = Math.min(1.0, W._trauma + (wCfg.id === 'rpg' ? 0.42 : wCfg.id === 'shotgun' ? 0.28 : 0.06));
+    W._trauma = Math.min(1.0, W._trauma + (wCfg.id === 'rpg' ? 0.42 : isCoach ? 0.34 : wCfg.id === 'shotgun' ? 0.28 : isHeavyPistol ? 0.14 : 0.06));
 
     // Muzzle flash & light (significantly toned down during ADS so target stays completely clear)
     const vm = _vmModels[W._activeIdx];
@@ -1205,13 +1214,14 @@
       return;
     }
 
-    if (wCfg.id === 'pistol' || wCfg.id === 'rifle') {
+    if (!wCfg.noCasingEject && (wCfg.id === 'pistol' || wCfg.id === 'rifle')) {
       ejectShellCasing(wCfg.id);
     }
 
     // Hitscan pellets
     const pellets = wCfg.pellets || 1;
     const baseSpread = (W._isADS ? (wCfg.adsSpread || 0.003) : (wCfg.spread || 0.01)) + W._bloom * adsFactor;
+    const dismemberMult = wCfg.dismemberMult || 1.0;
     let landedAny = false;
     let anyHeadshot = false;
     let anyKill = false;
@@ -1251,9 +1261,20 @@
         if (h.isHeadshot) anyHeadshot = true;
         W._totalHits++;
         const dmg = Math.round((wCfg.damage || 25) * dmgScale * (h.isHeadshot ? (wCfg.headMult || 2.0) : 1.0));
+        const effectiveKb = (wCfg.knockback || 2.0) * (dismemberMult > 1.25 ? Math.min(1.6, 0.85 + dismemberMult * 0.25) : 1.0);
+        const hitZone = h.hitZone || (h.isHeadshot ? 'head' : 'torso');
         let hitInfo = null;
         if (LRT.Enemies && typeof LRT.Enemies.hitZombie === 'function') {
-          hitInfo = LRT.Enemies.hitZombie(h.zombieId, dmg, pt, _shotDir, wCfg.knockback || 2.0, !!h.isHeadshot, h.hitZone || (h.isHeadshot ? 'head' : 'torso'));
+          hitInfo = LRT.Enemies.hitZombie(
+            h.zombieId,
+            dmg,
+            pt,
+            _shotDir,
+            effectiveKb,
+            !!h.isHeadshot,
+            hitZone,
+            { dismemberMult, weaponId: wCfg.id, variantId: wCfg.variantId, wCfg }
+          );
         }
         if (hitInfo && hitInfo.killed) anyKill = true;
         if (h.isArmor || (hitInfo && hitInfo.armored)) {
@@ -1368,14 +1389,17 @@
       if (typeof W.ensureSkinTexCache === 'function') W.ensureSkinTexCache();
       if (typeof W.createViewmodelMaterials === 'function') W.createViewmodelMaterials();
 
-      _vmModels.length = 0;
-      _vmModels.push(W.buildPistolModel());
-      _vmModels.push(W.buildRifleModel());
-      _vmModels.push(W.buildShotgunModel());
-      _vmModels.push(W.buildRpgModel());
-
-      for (let i = 0; i < _vmModels.length; i++) {
-        W._viewmodelRoot.add(_vmModels[i].group);
+      if (typeof W.buildAllViewmodels === 'function') {
+        W.buildAllViewmodels();
+      } else {
+        _vmModels.length = 0;
+        _vmModels.push(W.buildPistolModel());
+        _vmModels.push(W.buildRifleModel());
+        _vmModels.push(W.buildShotgunModel());
+        _vmModels.push(W.buildRpgModel());
+        for (let i = 0; i < _vmModels.length; i++) {
+          W._viewmodelRoot.add(_vmModels[i].group);
+        }
       }
 
       W._muzzleFlashGroup = W.buildMuzzleFlash();
@@ -1888,8 +1912,7 @@
     if (W._killConfirmTimer > 0) W._killConfirmTimer = Math.max(0, W._killConfirmTimer - step);
 
     // Full-auto sustain
-    const cfgList = W.getWeaponConfigs();
-    const wCfg = cfgList[W._activeIdx];
+    const wCfg = W.getEffectiveWeaponConfig(W._activeIdx);
     if (W._isFiringHeld && wCfg && wCfg.fireMode === 'auto' && !W._isReloading && W._switchTimer <= 0.05 && W._fireCooldown <= 0) {
       executeShot();
     }
@@ -2070,6 +2093,7 @@
     }
 
     let unlockedWeapon = null;
+    let unlockedVariant = null;
     let ammoGranted = 0;
 
     // 1. Weapon unlock roll
@@ -2111,15 +2135,42 @@
       }
     }
 
+    // 1B. Rare weapon variant roll (if explicit variantId requested, or rare+ crate without base unlock)
+    if (o.variantId) {
+      const vRes = W.unlockOrEquipVariant(o.weaponId || o.variantId, o.variantId);
+      if (vRes && vRes.ok) unlockedVariant = vRes.variantId;
+    } else if (!unlockedWeapon && (tier.key === 'rare' || tier.key === 'epic' || tier.key === 'legendary')) {
+      const varChance = tier.key === 'legendary' ? 0.70 : (tier.key === 'epic' ? 0.45 : 0.22);
+      if (rng() < varChance) {
+        const rareCandidates = [
+          { wId: 'pistol', vId: 'revolver' },
+          { wId: 'rifle', vId: 'm4' },
+          { wId: 'rifle', vId: 'ak47' },
+          { wId: 'shotgun', vId: 'doublebarrel' }
+        ].filter((item) => {
+          const idx = W.findWeaponIndex(item.wId);
+          const ws = W._weaponStates[idx];
+          if (!ws || !ws.unlocked) return false;
+          const owned = Array.isArray(ws.unlockedVariants) ? ws.unlockedVariants : [];
+          return owned.indexOf(item.vId) === -1;
+        });
+        if (rareCandidates.length > 0) {
+          const pick = rareCandidates[Math.floor(rng() * rareCandidates.length) % rareCandidates.length];
+          const vRes = W.unlockOrEquipVariant(pick.wId, pick.vId);
+          if (vRes && vRes.ok) unlockedVariant = vRes.variantId;
+        }
+      }
+    }
+
     // 2. Weapon stat mod roll
     const targetId = pickUpgradeTargetWeapon(unlockedWeapon || o.weaponId, rng);
     const targetIdx = W.findWeaponIndex(targetId);
-    const targetCfg = W.getWeaponConfigs()[targetIdx] || FALLBACK_WEAPONS[0];
+    const targetCfg = W.getEffectiveWeaponConfig(targetIdx >= 0 ? targetIdx : 0);
     let upgradedWeapon = null;
 
     if (tier.key === 'common') {
       const magStep = targetId === 'rifle' ? 3 : targetId === 'pistol' ? 2 : 1;
-      const mod = (rng() < 0.5 && targetId !== 'rpg')
+      const mod = (!targetCfg.fixedMag && rng() < 0.5 && targetId !== 'rpg')
         ? { magBonusAdd: magStep }
         : { dmgMultAdd: 0.06 };
       upgradedWeapon = W.applyWeaponUpgrade(targetId, mod);
@@ -2128,7 +2179,7 @@
       let mod;
       if (roll < 0.34) {
         mod = { dmgMultAdd: 0.08 };
-      } else if (roll < 0.67) {
+      } else if (roll < 0.67 || targetCfg.fixedMag) {
         mod = { reloadMult: 0.90 };
       } else {
         const magStep = targetId === 'rifle' ? 4 : targetId === 'pistol' ? 3 : 1;
@@ -2138,10 +2189,10 @@
     } else if (tier.key === 'rare') {
       upgradedWeapon = W.applyWeaponUpgrade(targetId, { dmgMultAdd: 0.12, reloadMult: 0.88 });
     } else if (tier.key === 'epic') {
-      const magStep = targetId === 'rifle' ? 6 : targetId === 'shotgun' ? 2 : targetId === 'pistol' ? 3 : 0;
+      const magStep = targetCfg.fixedMag ? 0 : (targetId === 'rifle' ? 6 : targetId === 'shotgun' ? 2 : targetId === 'pistol' ? 3 : 0);
       upgradedWeapon = W.applyWeaponUpgrade(targetId, { dmgMultAdd: 0.18, reloadMult: 0.82, magBonusAdd: magStep });
     } else if (tier.key === 'legendary') {
-      const magStep = targetId === 'rpg' ? 1 : targetId === 'rifle' ? 8 : targetId === 'shotgun' ? 3 : 4;
+      const magStep = targetCfg.fixedMag ? 0 : (targetId === 'rpg' ? 1 : targetId === 'rifle' ? 8 : targetId === 'shotgun' ? 3 : 4);
       upgradedWeapon = W.applyWeaponUpgrade(targetId, { dmgMultAdd: 0.25, reloadMult: 0.78, magBonusAdd: magStep });
     }
 
@@ -2227,6 +2278,7 @@
     // 6. Summary text
     const parts = [`[${tier.label}]`];
     if (unlockedWeapon) parts.push(`UNLOCK ${unlockedWeapon.toUpperCase()}`);
+    if (unlockedVariant) parts.push(`VARIANT ${unlockedVariant.toUpperCase()}`);
     if (upgradedWeapon) parts.push(`${targetCfg.shortName} UPGRADE`);
     if (skinUnlocked && W.SKIN_PRESETS && W.SKIN_PRESETS[skinUnlocked]) {
       parts.push(`SKIN: ${W.SKIN_PRESETS[skinUnlocked].name}`);
@@ -2241,6 +2293,7 @@
       colorHex: tier.colorHex,
       effectiveLuck: probDist.effectiveLuck,
       unlockedWeapon,
+      unlockedVariant,
       upgradedWeapon,
       skinUnlocked,
       armorGranted,
@@ -2253,14 +2306,24 @@
 
   function getHudState() {
     const cfgList = W.getWeaponConfigs();
-    const wCfg = cfgList[W._activeIdx] || FALLBACK_WEAPONS[0];
-    const wState = W._weaponStates[W._activeIdx] || { mag: 0, reserve: 0, unlocked: true, magBonus: 0, dmgMult: 1.0, reloadMult: 1.0, skinId: 'pindad_standard' };
+    const wCfg = W.getEffectiveWeaponConfig(W._activeIdx);
+    const wState = W._weaponStates[W._activeIdx] || {
+      mag: 0, reserve: 0, unlocked: true, magBonus: 0, dmgMult: 1.0, reloadMult: 1.0,
+      skinId: 'pindad_standard', variantId: wCfg.variantId || wCfg.defaultVariant, unlockedVariants: []
+    };
     const effMagSize = W.getEffectiveMagSize(W._activeIdx) || wCfg.magSize;
+    const activeVarId = wState.variantId || wCfg.variantId || W.getDefaultVariantId(wCfg.id);
     return {
       slot: wCfg.slot,
       id: wCfg.id,
+      variantId: activeVarId,
+      variantName: wCfg.name,
+      variantLabel: wCfg.isDefault ? '' : wCfg.name,
+      isRareVariant: !wCfg.isDefault && wCfg.rarity !== 'common',
+      unlockedVariants: Array.isArray(wState.unlockedVariants) ? wState.unlockedVariants.slice() : [activeVarId],
       name: wCfg.name,
       shortName: wCfg.shortName,
+      dismemberMult: wCfg.dismemberMult || 1.0,
       unlocked: wState.unlocked !== false,
       ammoInMag: wState.mag,
       mag: wState.mag,
@@ -2289,21 +2352,31 @@
         cratesSinceEpic: W._cratesSinceEpic,
         cratesSinceLegendary: W._cratesSinceLegendary
       },
-      weapons: W._weaponStates.map((ws, i) => ({
-        slot: cfgList[i].slot,
-        id: cfgList[i].id,
-        shortName: cfgList[i].shortName,
-        unlocked: ws.unlocked !== false,
-        mag: ws.mag,
-        magSize: W.getEffectiveMagSize(i) || cfgList[i].magSize,
-        baseMagSize: cfgList[i].magSize,
-        magBonus: ws.magBonus || 0,
-        dmgMult: ws.dmgMult || 1.0,
-        reloadMult: ws.reloadMult || 1.0,
-        skinId: ws.skinId || 'pindad_standard',
-        reserve: cfgList[i].infiniteReserve ? Infinity : ws.reserve,
-        infReserve: !!cfgList[i].infiniteReserve
-      }))
+      weapons: W._weaponStates.map((ws, i) => {
+        const vc = W.getEffectiveWeaponConfig(i);
+        const vId = ws.variantId || vc.variantId || W.getDefaultVariantId(cfgList[i].id);
+        return {
+          slot: vc.slot,
+          id: vc.id,
+          variantId: vId,
+          variantName: vc.name,
+          variantLabel: vc.isDefault ? '' : vc.name,
+          name: vc.name,
+          shortName: vc.shortName,
+          isRareVariant: !vc.isDefault && vc.rarity !== 'common',
+          unlockedVariants: Array.isArray(ws.unlockedVariants) ? ws.unlockedVariants.slice() : [vId],
+          unlocked: ws.unlocked !== false,
+          mag: ws.mag,
+          magSize: W.getEffectiveMagSize(i) || vc.magSize,
+          baseMagSize: vc.magSize,
+          magBonus: ws.magBonus || 0,
+          dmgMult: ws.dmgMult || 1.0,
+          reloadMult: ws.reloadMult || 1.0,
+          skinId: ws.skinId || 'pindad_standard',
+          reserve: vc.infiniteReserve ? Infinity : ws.reserve,
+          infReserve: !!vc.infiniteReserve
+        };
+      })
     };
   }
 
@@ -2352,14 +2425,17 @@
     return { hitCount: hits };
   }
 
-  // Checkpoint save/restore of per-weapon progression (unlocks, ammo, upgrades). Plain data only.
+  // Checkpoint save/restore of per-weapon progression (unlocks, variants, ammo, upgrades). Plain data only.
   function getSaveState() {
     const out = { active: W._activeIdx | 0, weapons: [] };
     for (let i = 0; i < W._weaponStates.length; i++) {
       const ws = W._weaponStates[i];
       if (!ws) continue;
+      const defVar = W.getDefaultVariantId(ws.id);
       out.weapons.push({
         id: ws.id,
+        variantId: ws.variantId || defVar,
+        unlockedVariants: Array.isArray(ws.unlockedVariants) ? ws.unlockedVariants.slice() : [defVar],
         unlocked: !!ws.unlocked,
         mag: ws.mag | 0,
         reserve: Number.isFinite(ws.reserve) ? ws.reserve : 0,
@@ -2379,14 +2455,40 @@
       for (let i = 0; i < W._weaponStates.length; i++) {
         const ws = W._weaponStates[i];
         if (!ws || ws.id !== s.id) continue;
+        const defVar = W.getDefaultVariantId(ws.id);
         ws.unlocked = !!s.unlocked || i === 0;
         ws.magBonus = s.magBonus || 0;
         ws.dmgMult = s.dmgMult || 1;
         ws.reloadMult = s.reloadMult || 1;
-        if (s.skinId) ws.skinId = s.skinId;
+        if (Array.isArray(s.unlockedVariants) && s.unlockedVariants.length > 0) {
+          ws.unlockedVariants = s.unlockedVariants.slice();
+        } else {
+          ws.unlockedVariants = [defVar];
+        }
+        const targetVar = s.variantId || defVar;
+        if (ws.unlockedVariants.indexOf(targetVar) === -1) {
+          ws.unlockedVariants.push(targetVar);
+        }
+        if (typeof W.unlockOrEquipVariant === 'function' && targetVar) {
+          W.unlockOrEquipVariant(ws.id, targetVar);
+        } else {
+          ws.variantId = targetVar;
+        }
+        if (s.skinId && typeof W.applySkin === 'function') {
+          W.applySkin(ws.id, s.skinId);
+        } else if (s.skinId) {
+          ws.skinId = s.skinId;
+        }
         ws.mag = Math.max(0, s.mag | 0);
         ws.reserve = Math.max(0, +s.reserve || 0);
         break;
+      }
+    }
+    if (typeof data.active === 'number') {
+      const act = Math.max(0, Math.min(W._weaponStates.length - 1, data.active | 0));
+      if (W._weaponStates[act] && W._weaponStates[act].unlocked) {
+        W._activeIdx = act;
+        W.switchWeapon(act + 1);
       }
     }
     return true;
@@ -2418,9 +2520,14 @@
     spawnScorchDecal,
     consumeCameraKick: W.consumeCameraKick,
     getHudState,
+    getActiveWeaponConfig: W.getActiveWeaponConfig,
     unlockWeapon: W.unlockWeapon,
+    unlockOrEquipVariant: W.unlockOrEquipVariant,
+    getVariantCatalog: W.getVariantCatalog,
+    buildWorldWeaponMesh: W.buildWorldWeaponMesh,
     applyWeaponUpgrade: W.applyWeaponUpgrade,
     applySkin: W.applySkin,
+    warmupSkins: W.warmupSkins,
     getProgressionState: W.getProgressionState,
     setDifficulty: W.setDifficulty,
     rollLootbox,

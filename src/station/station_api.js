@@ -64,16 +64,15 @@
     _cachedAllBVH: null,
     _warmLightAnchors: [],
     _coolLightAnchors: [],
-    _cawangHazardRing: null,
     _lootboxGlows: null,
     _lootboxVisuals: null,
     _turnstileGates: [],
-    _fieldLogGlints: [],
-    _fieldLogPropAssets: null,
+    _placedProps: [],
+    _perimeterHalos: [],
+    _hoveredInteractableId: null,
+    _lastEyeOrigin: null,
+    _lastLookDir: null,
     _activeObjectiveIds: new Set(),
-    _objectiveBeacons: [],
-    _beaconMats: null,
-    _beaconSharedTime: { value: 0 },
     _objectiveMarkersCache: [],
     _timeAccum: 0,
     _raycaster: new THREE.Raycaster(),
@@ -129,7 +128,48 @@
     },
 
     _placeNormalizedModel: function (key, x, y, z, ry, targetHeight, filterFn, addCollTag, protoCacheKey) {
-      return S._placeNormalizedModel(this, key, x, y, z, ry, targetHeight, filterFn, addCollTag, protoCacheKey);
+      const res = S._placeNormalizedModel(this, key, x, y, z, ry, targetHeight, filterFn, addCollTag, protoCacheKey);
+      if (res) {
+        if (!this._placedProps) this._placedProps = [];
+        this._placedProps.push({ key, x, y, z, obj: res });
+      }
+      return res;
+    },
+
+    _registerHaloTarget: function (id, targetObj, opts) {
+      if (!targetObj || !LRT.Render || typeof LRT.Render.attachPerimeterHalo !== 'function') return null;
+      const o = opts || {};
+      if (!this._perimeterHalos) this._perimeterHalos = [];
+      for (let i = this._perimeterHalos.length - 1; i >= 0; i--) {
+        if (this._perimeterHalos[i].id === id) {
+          if (this._perimeterHalos[i].halo && this._perimeterHalos[i].halo !== o.halo && typeof this._perimeterHalos[i].halo.dispose === 'function') {
+            this._perimeterHalos[i].halo.dispose();
+          }
+          this._perimeterHalos.splice(i, 1);
+        }
+      }
+      const halo = o.halo || LRT.Render.attachPerimeterHalo(targetObj, {
+        color: o.color,
+        hoverColor: o.hoverColor,
+        objectiveColor: o.objectiveColor,
+        thicknessScale: o.thicknessScale,
+        includeTransparent: o.includeTransparent,
+        initialMode: o.initialMode || 'off'
+      });
+      const rec = {
+        id: id,
+        category: o.category || 'interactable',
+        obj: targetObj,
+        halo: halo,
+        x: o.x !== undefined ? o.x : (targetObj.position ? targetObj.position.x : 0),
+        y: o.y !== undefined ? o.y : (targetObj.position ? targetObj.position.y : 0),
+        z: o.z !== undefined ? o.z : (targetObj.position ? targetObj.position.z : 0),
+        hitRadius: o.hitRadius !== undefined ? o.hitRadius : 0.65,
+        isUsedFn: o.isUsedFn || null,
+        getModeFn: o.getModeFn || null
+      };
+      this._perimeterHalos.push(rec);
+      return rec;
     },
 
     _buildSpatialGrid: function () {
@@ -234,24 +274,44 @@
       this._amberInst = null;
       this._amberBasePositions = [];
       this._cachedAllBVH = null;
+      if (this._perimeterHalos && this._perimeterHalos.length > 0) {
+        for (let i = 0; i < this._perimeterHalos.length; i++) {
+          const hRec = this._perimeterHalos[i];
+          if (hRec && hRec.halo && typeof hRec.halo.dispose === 'function') hRec.halo.dispose();
+        }
+      }
+      if (this.explosiveBarrels && this.explosiveBarrels.length > 0) {
+        for (let i = 0; i < this.explosiveBarrels.length; i++) {
+          const b = this.explosiveBarrels[i];
+          if (b && b.halo && typeof b.halo.dispose === 'function') b.halo.dispose();
+        }
+      }
+      if (this._groundPickups && this._groundPickups.length > 0) {
+        for (let i = 0; i < this._groundPickups.length; i++) {
+          const pu = this._groundPickups[i];
+          if (pu && pu.variantHalos) {
+            for (const h of Object.values(pu.variantHalos)) {
+              if (h && typeof h.dispose === 'function') h.dispose();
+            }
+          }
+        }
+      }
       this._warmLightAnchors = [];
       this._coolLightAnchors = [];
-      this._cawangHazardRing = null;
       this._lootboxGlows = null;
       this._lootboxVisuals = null;
       this._turnstileGates = [];
-      this._fieldLogGlints = [];
-      this._fieldLogPropAssets = null;
+      this._placedProps = [];
+      this._perimeterHalos = [];
+      this._hoveredInteractableId = null;
+      this._lastEyeOrigin = null;
+      this._lastLookDir = null;
       this._activeObjectiveIds = new Set();
-      this._objectiveBeacons = [];
-      this._beaconMats = null;
-      this._beaconSharedTime.value = 0;
       this._objectiveMarkersCache = [];
       this._matCache = null;
       this._lightingFactor = 1.0;
       this.destructibles = null;
       this.explosiveBarrels = [];
-      this._barrelCueVisual = null;
       this._barrelCueActive = false;
       this._barrelCueMarker = null;
       this._cikokoBarricade = null;
@@ -709,7 +769,6 @@
     update: function (dt, playerPos, camForward, difficultyKey) {
       if (!this.rootGroup || this._isBuilding) return;
       this._timeAccum += dt;
-      this._beaconSharedTime.value = this._timeAccum;
 
       if (this._chillerSprintTimer > 0) {
         this._chillerSprintTimer = Math.max(0, this._chillerSprintTimer - dt);
@@ -732,9 +791,16 @@
       if (LRT.City && typeof LRT.City.update === 'function') {
         LRT.City.update(dt, this._timeAccum, pRef, camForward, difficultyKey);
       }
-      const cityInt = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.city;
-      if (this._lootboxVisuals && this._lootboxVisuals.length > 0 && cityInt && typeof cityInt.updateLootboxVisuals === 'function') {
-        cityInt.updateLootboxVisuals(this._lootboxVisuals, dt, this._timeAccum, pRef, camForward, difficultyKey, offsetZ);
+      if (this._lootboxVisuals && this._lootboxVisuals.length > 0) {
+        const lidStep = Math.min(1, (dt || 0.016) * 9.5);
+        for (let i = 0; i < this._lootboxVisuals.length; i++) {
+          const v = this._lootboxVisuals[i];
+          if (!v || !v.lidPivot) continue;
+          const targetRot = (v.opened || v.used) ? -1.72 : 0.0;
+          if (Math.abs(v.lidPivot.rotation.x - targetRot) > 0.005) {
+            v.lidPivot.rotation.x += (targetRot - v.lidPivot.rotation.x) * lidStep;
+          }
+        }
       }
 
       // Resolve local player coordinates for pooled light tracking
@@ -829,59 +895,12 @@
         this._amberInst.instanceMatrix.needsUpdate = true;
       }
 
-      if (this._cawangHazardRing) {
-        const hz = this._cawangHazardRing;
-        if (this._usedIds && this._usedIds.has('cawang_derelict_cab')) {
-          if (hz.group.visible) hz.group.visible = false;
-        } else {
-          const strobe = 0.45 + 0.55 * Math.abs(Math.sin(this._timeAccum * 4.8));
-          const spark = Math.sin(this._timeAccum * 29.0) > 0.72 ? 1.35 : 1.0;
-          const sc = 0.85 + 0.35 * strobe;
-          hz.ring.scale.set(sc, sc, sc);
-          hz.ringMat.opacity = Math.min(0.95, 0.35 + 0.50 * strobe * spark);
-          hz.flare.rotation.y = this._timeAccum * 2.4;
-          hz.flareMat.opacity = Math.min(0.85, 0.25 + 0.42 * strobe * spark);
-        }
-      }
-
-      if (this._objectiveBeacons && this._objectiveBeacons.length > 0) {
-        const t = this._timeAccum;
-        for (let i = 0; i < this._objectiveBeacons.length; i++) {
-          const b = this._objectiveBeacons[i];
-          if (b.item && b.item.used) {
-            if (b.group.visible) b.group.visible = false;
-            continue;
-          }
-          if (!b.group.visible) continue;
-          b.diamond.rotation.y = t * 2.1 + i * 0.7;
-          b.diamond.position.y = b.baseDiamondY + Math.sin(t * 3.2 + i) * 0.10;
-          b.outline.rotation.y = -t * 1.4 + i * 0.7;
-          b.outline.position.y = b.diamond.position.y;
-          const rScale = 0.92 + 0.14 * Math.sin(t * 3.8 + i);
-          b.ring.scale.set(rScale, rScale, rScale);
-        }
-      }
-
       if (this.explosiveBarrels && this.explosiveBarrels.length > 0) {
-        const t = this._timeAccum;
-        const hPulse = 0.55 + 0.45 * Math.sin(t * 4.2);
         let nearestBarrel = null;
         let nearestD2 = Infinity;
         for (let i = 0; i < this.explosiveBarrels.length; i++) {
           const b = this.explosiveBarrels[i];
-          if (b.exploded) {
-            if (b.haloGroup && b.haloGroup.visible) b.haloGroup.visible = false;
-            continue;
-          }
-          if (b.haloGroup) {
-            b.haloGroup.visible = true;
-            const rSc = 0.94 + 0.14 * hPulse;
-            if (b.haloRing) b.haloRing.scale.set(rSc, rSc, rSc);
-            if (b.haloShell) {
-              const sSc = 0.98 + 0.06 * hPulse;
-              b.haloShell.scale.set(sSc, 1.0, sSc);
-            }
-          }
+          if (b.exploded) continue;
           const dx = b.x - px;
           const dz = b.z - pz;
           const d2 = dx * dx + dz * dz;
@@ -890,35 +909,22 @@
             nearestBarrel = b;
           }
         }
-        if (this._barrelCueVisual) {
-          this._barrelCueVisual.ringMat.opacity = 0.56 + 0.30 * hPulse;
-          this._barrelCueVisual.shellMat.opacity = 0.16 + 0.14 * hPulse;
-          const showCue = !!(this._barrelCueActive && nearestBarrel);
-          this._barrelCueVisual.group.visible = showCue;
-          if (showCue) {
-            this._barrelCueVisual.group.position.set(nearestBarrel.x, nearestBarrel.y, nearestBarrel.z);
-            const orbY = 1.62 + Math.sin(t * 3.6) * 0.14;
-            this._barrelCueVisual.orb.position.y = orbY;
-            this._barrelCueVisual.orb.rotation.y = t * 1.8;
-            this._barrelCueVisual.shell.position.y = orbY;
-            this._barrelCueVisual.shell.rotation.y = -t * 2.4;
-          }
-          if (this._barrelCueMarker) {
-            if (showCue) {
-              this._barrelCueMarker.active = true;
-              this._barrelCueMarker.used = false;
-              this._barrelCueMarker.x = nearestBarrel.x;
-              this._barrelCueMarker.y = nearestBarrel.y + 1.55;
-              this._barrelCueMarker.z = nearestBarrel.z + offsetZ;
-            } else {
-              this._barrelCueMarker.active = false;
-              this._barrelCueMarker.used = true;
-            }
+        this._nearestCueBarrel = nearestBarrel;
+        if (this._barrelCueMarker) {
+          if (this._barrelCueActive && nearestBarrel) {
+            this._barrelCueMarker.active = true;
+            this._barrelCueMarker.used = false;
+            this._barrelCueMarker.x = nearestBarrel.x;
+            this._barrelCueMarker.y = nearestBarrel.y + 1.55;
+            this._barrelCueMarker.z = nearestBarrel.z + offsetZ;
+          } else {
+            this._barrelCueMarker.active = false;
+            this._barrelCueMarker.used = true;
           }
         }
-      } else if (this._barrelCueVisual && this._barrelCueVisual.group.visible) {
-        this._barrelCueVisual.group.visible = false;
-        if (this._barrelCueMarker) this._barrelCueMarker.active = false;
+      } else if (this._barrelCueMarker) {
+        this._nearestCueBarrel = null;
+        this._barrelCueMarker.active = false;
       }
 
       let paintDirty = false;
@@ -999,15 +1005,7 @@
         }
       }
 
-      // Subtle warm glint pulse on unread 3D field log folders
-      if (this._fieldLogGlints && this._fieldLogGlints.length > 0) {
-        const t = this._timeAccum;
-        for (let i = 0; i < this._fieldLogGlints.length; i++) {
-          const fg = this._fieldLogGlints[i];
-          if (fg.used || !fg.mesh || !fg.mesh.visible) continue;
-          if (fg.mat) fg.mat.opacity = 0.22 + 0.14 * Math.sin(t * 2.8 + i * 1.1);
-        }
-      }
+      this._syncPerimeterHalos(pRef, camForward, difficultyKey);
 
       // Ground enemy drop pickup rotation & proximity auto-collect
       if (this._groundPickups && this._groundPickups.length > 0) {
@@ -1025,6 +1023,11 @@
             if ((dx * dx + dz * dz) <= (1.85 * 1.85) && Math.abs(dy) < 2.3) {
               pu.active = false;
               pu.group.visible = false;
+              if (pu.variantHalos) {
+                for (const vh of Object.values(pu.variantHalos)) {
+                  if (vh) vh.setMode('off');
+                }
+              }
               if (core && typeof core.collectEnemyDrop === 'function') {
                 core.collectEnemyDrop(pu.type, pu.meta);
               }
@@ -1069,104 +1072,6 @@
 
     _buildObjectiveBeacons: function () {
       if (!this.rootGroup) return;
-      const MISSION_IDS = new Set([
-        'portable_generator', 'jaklingko_kiosk', 'balcony_supply',
-        'cawang_derelict_cab', 'island2_supply', 'garden_supply', 'depot_supply',
-        'city_pln_box', 'city_coffee_cart', 'city_convoy_car', 'city_pocket_park',
-        'cikoko_barricade',
-        'route_totem', 'setiabudi_jpo_switch', 'call_train', 'call_train_prev', 'call_train_p2'
-      ]);
-
-      const beamGeo = new THREE.CylinderGeometry(0.08, 0.36, 1.50, 16, 1, true);
-      const ringGeo = new THREE.RingGeometry(0.36, 0.54, 24);
-      ringGeo.rotateX(-Math.PI * 0.5);
-      const diamondGeo = new THREE.OctahedronGeometry(0.16, 0);
-      const outlineGeo = new THREE.OctahedronGeometry(0.22, 0);
-      this.disposableGeometries.push(beamGeo, ringGeo, diamondGeo, outlineGeo);
-
-      const vertShader = [
-        'varying vec2 vUv;',
-        'varying vec3 vViewNormal;',
-        'varying vec3 vViewPos;',
-        'void main() {',
-        '  vUv = uv;',
-        '  vViewNormal = normalize(normalMatrix * normal);',
-        '  vec4 mvPos = modelViewMatrix * vec4(position, 1.0);',
-        '  vViewPos = -mvPos.xyz;',
-        '  gl_Position = projectionMatrix * mvPos;',
-        '}'
-      ].join('\n');
-
-      const fragShader = [
-        'uniform float uTime;',
-        'uniform vec3 uColor;',
-        'uniform float uIntensity;',
-        'varying vec2 vUv;',
-        'varying vec3 vViewNormal;',
-        'varying vec3 vViewPos;',
-        'void main() {',
-        '  vec3 V = normalize(vViewPos);',
-        '  vec3 N = normalize(vViewNormal);',
-        '  float ndotv = abs(dot(N, V));',
-        '  float fresnel = pow(clamp(1.0 - ndotv, 0.0, 1.0), 1.55);',
-        '  float vertFade = smoothstep(0.0, 0.14, vUv.y) * pow(clamp(1.0 - vUv.y, 0.0, 1.0), 1.25);',
-        '  float wave = 0.65 + 0.35 * sin(uTime * 4.2 - vUv.y * 7.0);',
-        '  float pulse = 0.78 + 0.22 * sin(uTime * 3.0);',
-        '  float alpha = (0.18 + 0.82 * fresnel) * vertFade * wave * pulse * uIntensity;',
-        '  gl_FragColor = vec4(uColor * (1.1 + fresnel * 0.6), clamp(alpha, 0.0, 0.92));',
-        '}'
-      ].join('\n');
-
-      const makeTier = (hex, intensity, ringOp) => {
-        const col = new THREE.Color(hex);
-        const beamMat = new THREE.ShaderMaterial({
-          uniforms: {
-            uTime: this._beaconSharedTime,
-            uColor: { value: col },
-            uIntensity: { value: intensity }
-          },
-          vertexShader: vertShader,
-          fragmentShader: fragShader,
-          transparent: true,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-          side: THREE.DoubleSide
-        });
-        const solidMat = new THREE.MeshBasicMaterial({
-          color: hex,
-          transparent: true,
-          opacity: Math.min(0.95, 0.62 * intensity),
-          depthWrite: false,
-          blending: THREE.AdditiveBlending
-        });
-        const ringMat = new THREE.MeshBasicMaterial({
-          color: hex,
-          transparent: true,
-          opacity: ringOp,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-          side: THREE.DoubleSide
-        });
-        const outlineMat = new THREE.MeshBasicMaterial({
-          color: hex,
-          wireframe: true,
-          transparent: true,
-          opacity: Math.min(0.75, 0.42 * intensity),
-          depthWrite: false,
-          blending: THREE.AdditiveBlending
-        });
-        this.disposableMaterials.push(beamMat, solidMat, ringMat, outlineMat);
-        return { beamMat, solidMat, ringMat, outlineMat };
-      };
-
-      this._beaconMats = {
-        amber: makeTier(0xffb33a, 1.05, 0.68),
-        cyan: makeTier(0x38bdf8, 1.05, 0.72),
-        lootEmerald: makeTier(0x34d399, 0.62, 0.45),
-        lootViolet: makeTier(0xc084fc, 0.72, 0.52)
-      };
-
-      this._objectiveBeacons = [];
       this._objectiveMarkersCache = [];
 
       const cityItems = (LRT.City && typeof LRT.City.getInteractables === 'function')
@@ -1176,9 +1081,16 @@
       for (let i = 0; i < this.interactables.length; i++) allItems.push(this.interactables[i]);
       for (let i = 0; i < cityItems.length; i++) allItems.push(cityItems[i]);
 
+      const haloById = new Set();
+      if (this._perimeterHalos) {
+        for (let i = 0; i < this._perimeterHalos.length; i++) {
+          haloById.add(this._perimeterHalos[i].id);
+        }
+      }
+
       for (let i = 0; i < allItems.length; i++) {
         const it = allItems[i];
-        if (!it || it.type === 'turnstile') continue;
+        if (!it || it.type === 'turnstile' || it.type === 'bench' || it.type === 'lootbox_item') continue;
         const isTrain = it.type === 'call_train' || it.type === 'call_train_prev' || it.id === 'call_train' || it.id === 'call_train_prev' || it.id === 'call_train_p2';
         const isLootbox = it.type === 'lootbox';
 
@@ -1193,44 +1105,47 @@
           used: !!it.used,
           item: it
         });
+      }
 
-        if (isLootbox || !MISSION_IDS.has(it.id)) continue;
+      // Upgrade any station_arch / GLTF supply or generator interactable to use its 3D model perimeter halo
+      if (this._placedProps && this._placedProps.length > 0 && LRT.Render && typeof LRT.Render.attachPerimeterHalo === 'function') {
+        const preferredKeys = {
+          portable_generator: 'portable_generator',
+          balcony_supply: 'ammo_box',
+          island2_supply: 'ammo_box',
+          garden_supply: 'medical_box',
+          depot_supply: 'ammo_box'
+        };
+        for (let i = 0; i < this.interactables.length; i++) {
+          const it = this.interactables[i];
+          if (!it || it.type === 'turnstile' || it.type === 'bench' || it.type === 'lootbox' || it.type === 'lootbox_item') continue;
+          const prefKey = preferredKeys[it.id];
+          if (!prefKey && haloById.has(it.id)) continue;
 
-        const defaultTier = isTrain ? this._beaconMats.cyan : this._beaconMats.amber;
-
-        const grp = new THREE.Group();
-        grp.position.set(it.x, it.y, it.z);
-        grp.visible = false;
-
-        const baseOffsetY = isLootbox ? -0.35 : -0.45;
-        const beam = new THREE.Mesh(beamGeo, defaultTier.beamMat);
-        beam.position.y = baseOffsetY + 0.75;
-        const ring = new THREE.Mesh(ringGeo, defaultTier.ringMat);
-        ring.position.y = baseOffsetY + 0.02;
-        const diamond = new THREE.Mesh(diamondGeo, defaultTier.solidMat);
-        const baseDiamondY = isLootbox ? 0.62 : 0.92;
-        diamond.position.y = baseDiamondY;
-        const outline = new THREE.Mesh(outlineGeo, defaultTier.outlineMat);
-        outline.position.y = baseDiamondY;
-
-        grp.add(beam);
-        grp.add(ring);
-        grp.add(diamond);
-        grp.add(outline);
-        this.rootGroup.add(grp);
-
-        this._objectiveBeacons.push({
-          id: it.id,
-          item: it,
-          group: grp,
-          beam: beam,
-          ring: ring,
-          diamond: diamond,
-          outline: outline,
-          baseDiamondY: baseDiamondY,
-          isTrain: isTrain,
-          isLootbox: isLootbox
-        });
+          let bestProp = null;
+          let bestDist = 1.65;
+          for (let p = 0; p < this._placedProps.length; p++) {
+            const pp = this._placedProps[p];
+            if (prefKey && pp.key !== prefKey) continue;
+            if (pp.key === 'WetFloorSign_01' || pp.key === 'potted_plant_02' || pp.key === 'planter_box_01' || pp.key === 'mounted_fluorescent_lights') continue;
+            const d = Math.hypot(pp.x - it.x, (pp.y - (it.y - 0.45)) * 0.5, pp.z - it.z);
+            if (d < bestDist) {
+              bestDist = d;
+              bestProp = pp;
+            }
+          }
+          if (bestProp && bestProp.obj) {
+            it.targetObj = bestProp.obj;
+            this._registerHaloTarget(it.id, bestProp.obj, {
+              category: 'interactable',
+              x: bestProp.x,
+              y: it.y,
+              z: bestProp.z,
+              hitRadius: 0.72
+            });
+            haloById.add(it.id);
+          }
+        }
       }
 
       if (this.explosiveBarrels && this.explosiveBarrels.length > 0) {
@@ -1248,45 +1163,225 @@
       } else {
         this._barrelCueMarker = null;
       }
+
+      this._syncPerimeterHalos();
+    },
+
+    _syncPerimeterHalos: function (playerPos, camForward, difficultyKey) {
+      if (!this.rootGroup) return;
+      const offsetZ = this.rootGroup.position.z || 0;
+      const activeSet = this._activeObjectiveIds;
+      const pSt = (LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function') ? LRT.PlayerUI.getState() : null;
+      const eyeH = (pSt && typeof pSt.eyeHeight === 'number') ? pSt.eyeHeight : 1.52;
+
+      let eyeX = null, eyeY = null, eyeZ = null;
+      if (playerPos) {
+        eyeX = playerPos.x;
+        eyeY = playerPos.y + eyeH;
+        eyeZ = playerPos.z - offsetZ;
+      } else if (this._lastEyeOrigin) {
+        eyeX = this._lastEyeOrigin.x;
+        eyeY = this._lastEyeOrigin.y;
+        eyeZ = this._lastEyeOrigin.z - offsetZ;
+      }
+
+      let dx = 0, dy = 0, dz = -1;
+      const lookRef = camForward || this._lastLookDir;
+      if (lookRef) {
+        const len = Math.hypot(lookRef.x, lookRef.y, lookRef.z);
+        if (len > 1e-4) {
+          dx = lookRef.x / len;
+          dy = lookRef.y / len;
+          dz = lookRef.z / len;
+        }
+      }
+
+      const itemById = new Map();
+      for (let i = 0; i < this.interactables.length; i++) {
+        itemById.set(this.interactables[i].id, this.interactables[i]);
+      }
+
+      const REUSABLE_TYPES = new Set(['call_train', 'call_train_prev', 'turnstile', 'bench', 'info']);
+      let bestId = null;
+      let bestScore = 1e9;
+      let bestProj = 8.0;
+      let bestCx = 0, bestCy = 0, bestCz = 0;
+
+      if (eyeX !== null && lookRef) {
+        const testCand = (id, cx, cy, cz, hitRadius, isSlot) => {
+          const vx = cx - eyeX;
+          const vy = cy - eyeY;
+          const vz = cz - eyeZ;
+          const proj = vx * dx + vy * dy + vz * dz;
+          if (proj < 0.05 || proj > 8.0) return;
+          const d2 = vx * vx + vy * vy + vz * vz;
+          const perpSq = Math.max(0, d2 - proj * proj);
+          const r = hitRadius || 0.55;
+          if (perpSq > r * r) return;
+          const score = (Math.sqrt(perpSq) / r) + proj * 0.035 + (isSlot ? -0.18 : 0);
+          if (score < bestScore) {
+            bestScore = score;
+            bestId = id;
+            bestProj = proj;
+            bestCx = cx;
+            bestCy = cy;
+            bestCz = cz;
+          }
+        };
+
+        if (this._perimeterHalos) {
+          for (let i = 0; i < this._perimeterHalos.length; i++) {
+            const rec = this._perimeterHalos[i];
+            if (!rec || !rec.halo) continue;
+            const it = itemById.get(rec.id);
+            const used = rec.isUsedFn ? rec.isUsedFn() : !!(it && it.used && !REUSABLE_TYPES.has(it.type));
+            if (used) continue;
+            testCand(rec.id, rec.x, rec.y, rec.z, rec.hitRadius, rec.category === 'lootbox_item');
+          }
+        }
+        if (this.explosiveBarrels) {
+          for (let i = 0; i < this.explosiveBarrels.length; i++) {
+            const b = this.explosiveBarrels[i];
+            if (!b || b.exploded) continue;
+            testCand('barrel_' + b.id, b.x, b.y + 0.50, b.z, 0.56, false);
+          }
+        }
+        if (this._groundPickups) {
+          for (let i = 0; i < this._groundPickups.length; i++) {
+            const pu = this._groundPickups[i];
+            if (!pu || !pu.active) continue;
+            testCand('pickup_' + i, pu.x, pu.y + 0.34, pu.z, 0.42, false);
+          }
+        }
+
+        if (bestId && bestProj > 1.8) {
+          _tmpRayOrigin.set(eyeX, eyeY, eyeZ + offsetZ);
+          _tmpRayDir.set(dx, dy, dz);
+          const occ = this.raycastWorld(_tmpRayOrigin, _tmpRayDir, bestProj - 0.35);
+          if (occ && !occ.isGlass && occ.dist < bestProj - 0.45) {
+            const hitGap = Math.hypot(occ.point.x - bestCx, occ.point.y - bestCy, (occ.point.z - offsetZ) - bestCz);
+            if (hitGap > 1.25) bestId = null;
+          }
+        }
+      }
+      this._hoveredInteractableId = bestId;
+
+      const diff = String(difficultyKey || 'medium').toLowerCase();
+      const subtleDist = diff === 'easy' ? 28.0 : (diff === 'medium' ? 14.0 : (diff === 'hard' ? 6.0 : 2.8));
+
+      if (this._perimeterHalos) {
+        for (let i = 0; i < this._perimeterHalos.length; i++) {
+          const rec = this._perimeterHalos[i];
+          if (!rec || !rec.halo) continue;
+          const it = itemById.get(rec.id);
+          const used = rec.isUsedFn ? rec.isUsedFn() : !!(it && it.used && !REUSABLE_TYPES.has(it.type));
+          let mode = 'off';
+          if (!used) {
+            const isObj = !!(activeSet && (activeSet.has(rec.id) || (rec.id === 'call_train_prev' && activeSet.has('call_train_p2'))));
+            if (rec.id === bestId) {
+              mode = 'hover';
+            } else if (isObj) {
+              mode = 'objective';
+            } else if (rec.category === 'lootbox' || rec.category === 'lootbox_item' || rec.category === 'pickup') {
+              const dist = eyeX !== null ? Math.hypot(rec.x - eyeX, rec.y - eyeY, rec.z - eyeZ) : 0;
+              if (dist <= subtleDist) mode = 'subtle';
+            }
+          }
+          rec.halo.setMode(mode);
+          rec.halo.update(this._timeAccum);
+        }
+      }
+
+      if (this.explosiveBarrels) {
+        for (let i = 0; i < this.explosiveBarrels.length; i++) {
+          const b = this.explosiveBarrels[i];
+          if (!b || !b.halo) continue;
+          let bMode = 'off';
+          if (!b.exploded) {
+            if (bestId === ('barrel_' + b.id)) bMode = 'hover';
+            else if (this._barrelCueActive && b === this._nearestCueBarrel) bMode = 'objective';
+            else {
+              const dist = eyeX !== null ? Math.hypot(b.x - eyeX, (b.y + 0.5) - eyeY, b.z - eyeZ) : 0;
+              if (dist <= subtleDist) bMode = 'subtle';
+            }
+          }
+          b.halo.setMode(bMode);
+          b.halo.update(this._timeAccum);
+        }
+      }
+
+      if (this._groundPickups) {
+        for (let i = 0; i < this._groundPickups.length; i++) {
+          const pu = this._groundPickups[i];
+          if (!pu || !pu.variantHalos) continue;
+          for (const vk of Object.keys(pu.variantHalos)) {
+            const h = pu.variantHalos[vk];
+            if (!h) continue;
+            if (!pu.active || vk !== pu.type) {
+              h.setMode('off');
+              continue;
+            }
+            const dist = eyeX !== null ? Math.hypot(pu.x - eyeX, pu.y - eyeY, pu.z - eyeZ) : 0;
+            const pMode = (bestId === ('pickup_' + i)) ? 'hover' : (dist <= subtleDist ? 'subtle' : 'off');
+            h.setMode(pMode);
+            h.update(this._timeAccum);
+          }
+        }
+      }
+    },
+
+    getHoveredInteractable: function () {
+      if (!this._hoveredInteractableId) return null;
+      return this.interactables.find((x) => x.id === this._hoveredInteractableId) || null;
+    },
+
+    isPsdOpeningClear: function (z, track) {
+      if (this._isBuilding) return false;
+      const offsetZ = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
+      let localZ = Number(z) || 0;
+      if (Math.abs(localZ) > 65 && Math.abs(offsetZ) > 50) localZ -= offsetZ;
+
+      const checkT1 = (track === undefined || track === null || track === 1 || track === '1');
+      const checkT2 = (track === undefined || track === null || track === 2 || track === '2' || track === -1);
+
+      if (checkT1 && this.psdDoors) {
+        for (let i = 0; i < this.psdDoors.length; i++) {
+          const d = this.psdDoors[i];
+          if (Math.abs(d.z - localZ) <= 1.65) {
+            const c = this.colliders[d.colliderIdx];
+            if (c && (c.broken || c.disabled || c.blocksWalk === false || c.isOpen)) return true;
+          }
+        }
+      }
+      if (checkT2 && this.psdDoors2) {
+        for (let i = 0; i < this.psdDoors2.length; i++) {
+          const d = this.psdDoors2[i];
+          if (Math.abs(d.z - localZ) <= 1.65) {
+            const c = this.colliders[d.colliderIdx];
+            if (c && (c.broken || c.disabled || c.blocksWalk === false || c.isOpen)) return true;
+          }
+        }
+      }
+
+      const rc = this._railConfig || {};
+      const psd1X = rc.psd1X !== undefined ? rc.psd1X : 1.46;
+      const psd2X = rc.psd2X !== undefined ? rc.psd2X : -6.16;
+      for (let i = 0; i < this.colliders.length; i++) {
+        const c = this.colliders[i];
+        if (!c || c.tag !== 'glass' || c.minY > 0.5) continue;
+        if (!(c.broken || c.disabled || c.blocksWalk === false)) continue;
+        const cx = (c.minX + c.maxX) * 0.5;
+        const onT1 = checkT1 && Math.abs(cx - psd1X) <= 0.55;
+        const onT2 = checkT2 && Math.abs(cx - psd2X) <= 0.55;
+        if ((onT1 || onT2) && localZ >= c.minZ - 0.8 && localZ <= c.maxZ + 0.8) {
+          return true;
+        }
+      }
+      return false;
     },
 
     _syncObjectiveBeacons: function () {
-      if (!this._beaconMats) return;
-      const activeSet = this._activeObjectiveIds;
-      for (let i = 0; i < this._objectiveBeacons.length; i++) {
-        const b = this._objectiveBeacons[i];
-        const used = !!(b.item && b.item.used);
-        if (used) {
-          b.group.visible = false;
-          continue;
-        }
-        const isActive = activeSet && activeSet.has(b.id);
-        let tier = null;
-        if (b.isTrain) {
-          if (isActive) {
-            const isPrev = b.id === 'call_train_prev' || b.id === 'call_train_p2' || (b.item && b.item.type === 'call_train_prev');
-            tier = isPrev ? this._beaconMats.amber : this._beaconMats.cyan;
-          }
-        } else if (b.isLootbox) {
-          tier = isActive
-            ? this._beaconMats.amber
-            : ((b.item && (b.item.riskLuck || 0) >= 0.5) ? this._beaconMats.lootViolet : this._beaconMats.lootEmerald);
-        } else if (isActive) {
-          tier = this._beaconMats.amber;
-        }
-
-        if (!tier) {
-          b.group.visible = false;
-          continue;
-        }
-        if (b.beam.material !== tier.beamMat) {
-          b.beam.material = tier.beamMat;
-          b.ring.material = tier.ringMat;
-          b.diamond.material = tier.solidMat;
-          b.outline.material = tier.outlineMat;
-        }
-        b.group.visible = true;
-      }
+      this._syncPerimeterHalos();
     },
 
     setBarrelCueActive: function (active) {
@@ -1843,11 +1938,32 @@
     getInteractableNear: function (pos, lookDir) {
       if (!this.rootGroup || this._isBuilding) return null;
       const offsetZ = this.rootGroup.position.z;
+      if (pos) {
+        if (!this._lastEyeOrigin) this._lastEyeOrigin = new THREE.Vector3();
+        this._lastEyeOrigin.set(pos.x, pos.y, pos.z);
+      }
+      if (lookDir) {
+        if (!this._lastLookDir) this._lastLookDir = new THREE.Vector3();
+        this._lastLookDir.set(lookDir.x, lookDir.y, lookDir.z);
+      }
+
+      const crateMap = new Map();
+      if (this._lootboxVisuals) {
+        for (let i = 0; i < this._lootboxVisuals.length; i++) {
+          crateMap.set(this._lootboxVisuals[i].id, this._lootboxVisuals[i]);
+        }
+      }
+
       let best = null;
       let bestScore = -999;
 
       for (let i = 0; i < this.interactables.length; i++) {
         const it = this.interactables[i];
+        if (it.type === 'lootbox' && (it.opened || it.used)) continue;
+        if (it.type === 'lootbox_item') {
+          const cv = crateMap.get(it.crateId);
+          if (!cv || !cv.opened || it.used || (it._crateItemRef && it._crateItemRef.taken)) continue;
+        }
         const maxDist = (typeof it.radius === 'number' && it.radius > 0) ? it.radius : 2.75;
         const dx = it.x - pos.x;
         const dy = it.y - pos.y;
@@ -1859,7 +1975,8 @@
           dot = (dx * lookDir.x + dy * lookDir.y + dz * lookDir.z) / dist;
         }
         if (dot < 0.25 && dist > 1.2) continue;
-        const score = dot * 2.0 - dist * 0.55;
+        const hoverBoost = (it.id === this._hoveredInteractableId) ? 1.50 : 0.0;
+        const score = dot * 2.0 - dist * 0.55 + hoverBoost;
         if (score > bestScore) {
           bestScore = score;
           best = it;
@@ -1869,13 +1986,8 @@
     },
 
     _markFieldLogGlintUsed: function (id) {
-      if (!this._fieldLogGlints || !this._fieldLogGlints.length) return;
-      for (let i = 0; i < this._fieldLogGlints.length; i++) {
-        const fg = this._fieldLogGlints[i];
-        if (fg.id === id) {
-          fg.used = true;
-          if (fg.mesh) fg.mesh.visible = false;
-        }
+      if (this._perimeterHalos && this._perimeterHalos.length > 0) {
+        this._syncPerimeterHalos();
       }
     },
 
@@ -1937,9 +2049,6 @@
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
         this._syncObjectiveBeacons();
-        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
-          this._cawangHazardRing.group.visible = false;
-        }
         if (LRT.Enemies && LRT.Enemies.alertAllTo) {
           LRT.Enemies.alertAllTo({ x: it.x, y: it.y, z: it.z }, 45.0);
         }
@@ -1964,9 +2073,6 @@
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
         this._syncObjectiveBeacons();
-        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
-          this._cawangHazardRing.group.visible = false;
-        }
         return {
           ok: true,
           type: 'derelict_fuse',
@@ -1986,9 +2092,6 @@
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
         this._syncObjectiveBeacons();
-        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
-          this._cawangHazardRing.group.visible = false;
-        }
         return {
           ok: true,
           type: 'field_log',
@@ -2007,9 +2110,6 @@
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
         this._syncObjectiveBeacons();
-        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
-          this._cawangHazardRing.group.visible = false;
-        }
         if (LRT.Enemies && LRT.Enemies.alertAllTo) {
           LRT.Enemies.alertAllTo({ x: it.x, y: it.y, z: it.z }, 45.0);
         }
@@ -2035,9 +2135,6 @@
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
         this._syncObjectiveBeacons();
-        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
-          this._cawangHazardRing.group.visible = false;
-        }
         const res = {
           ok: true, type: 'rotio', heal: heal, healAmount: heal,
           message: heal > 0 ? "Roti'O Coffee Bun hangat ditemukan (+25 HP)" : "Etalase Roti'O sudah diambil."
@@ -2116,9 +2213,6 @@
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
         this._syncObjectiveBeacons();
-        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
-          this._cawangHazardRing.group.visible = false;
-        }
         return {
           ok: true, type: 'coway', heal: heal, healAmount: heal,
           message: heal > 0 ? 'Air mineral steril Coway menyegarkan (+15 HP)' : 'Air Coway sudah diminum di stasiun ini.'
@@ -2134,9 +2228,6 @@
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
         this._syncObjectiveBeacons();
-        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
-          this._cawangHazardRing.group.visible = false;
-        }
         const res = {
           ok: true, type: 'jaklingko',
           ammo: bonus > 0 ? { type: 'rifle', amount: 30 } : null, ammoBonus: bonus,
@@ -2159,9 +2250,6 @@
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
         this._syncObjectiveBeacons();
-        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
-          this._cawangHazardRing.group.visible = false;
-        }
         const res = {
           ok: true, type: 'balcony_supply',
           heal: fresh ? 25 : 0, healAmount: fresh ? 25 : 0,
@@ -2200,42 +2288,96 @@
       }
 
       if (it.type === 'lootbox') {
+        if (it.opened || it.used) {
+          return { ok: true, type: 'lootbox_open', action: 'lootbox_open', fresh: false, message: 'Peti Taktis sudah dibuka.' };
+        }
         if (LRT.Audio && LRT.Audio.play) {
           LRT.Audio.play('crate_open', { gain: 0.85 });
-          if (!it.used) LRT.Audio.play('loot_chime', { gain: 0.65 });
+          LRT.Audio.play('loot_chime', { gain: 0.55 });
         }
-        const fresh = !it.used;
-        it.used = true;
-        it.label = it.label.replace(/\([^)]+\)/, '(Sudah Dibuka)');
-        if (!it.label.includes('(Sudah Dibuka)')) it.label += ' (Sudah Dibuka)';
-        it.prompt = it.label;
-        if (this._usedIds) this._usedIds.add(id);
-        this._markFieldLogGlintUsed(id);
-        this._syncObjectiveBeacons();
-        if (id === 'cawang_derelict_cab' && this._cawangHazardRing && this._cawangHazardRing.group) {
-          this._cawangHazardRing.group.visible = false;
+        it.opened = true;
+        const cv = it._crateVisual || (this._lootboxVisuals && this._lootboxVisuals.find((v) => v.id === id));
+        if (cv) {
+          cv.opened = true;
+          if (cv.halo) cv.halo.setMode('off');
+          if (cv.items) {
+            for (let si = 0; si < cv.items.length; si++) {
+              const sItem = cv.items[si];
+              if (sItem && !sItem.taken && sItem.halo) sItem.halo.setMode('subtle');
+            }
+          }
         }
         if (this._lootboxGlows && this._lootboxGlows.has(id)) {
           const gm = this._lootboxGlows.get(id);
           if (gm) gm.visible = false;
         }
-        if (this._lootboxVisuals) {
-          for (let i = 0; i < this._lootboxVisuals.length; i++) {
-            if (this._lootboxVisuals[i].id === id) {
-              this._lootboxVisuals[i].used = true;
-            }
-          }
-        }
-        this._syncObjectiveBeacons();
+        this._syncPerimeterHalos();
         return {
           ok: true,
-          type: 'lootbox',
-          action: 'lootbox',
-          fresh: fresh,
-          riskLuck: it.riskLuck || 0,
-          message: fresh
-            ? 'Membuka Peti Taktis...'
-            : 'Peti Taktis sudah dibuka.'
+          type: 'lootbox_open',
+          action: 'lootbox_open',
+          fresh: false,
+          message: 'Peti Taktis dibuka — arahkan & tekan [E] untuk mengambil isi!'
+        };
+      }
+
+      if (it.type === 'lootbox_item') {
+        const cv = this._lootboxVisuals ? this._lootboxVisuals.find((v) => v.id === it.crateId) : null;
+        const slot = it._crateItemRef || (cv && cv.items ? cv.items.find((s) => s.slotIdx === it.slotIdx) : null);
+        if (!cv || !cv.opened || !slot || slot.taken || it.used) {
+          return { ok: false };
+        }
+        slot.taken = true;
+        it.used = true;
+        if (slot.mesh) slot.mesh.visible = false;
+        if (slot.halo) slot.halo.setMode('off');
+
+        if (LRT.Audio && LRT.Audio.play) {
+          const sfxKey = slot.itemType === 'medkit' ? 'pickup_medkit' : (slot.itemType === 'weapon_variant' ? 'loot_chime' : 'pickup_ammo');
+          LRT.Audio.play(sfxKey, { gain: 0.82 });
+        }
+
+        const allTaken = cv.items ? cv.items.every((s) => s.taken) : true;
+        if (allTaken) {
+          cv.used = true;
+          const crateIt = this.interactables.find((x) => x.id === it.crateId);
+          if (crateIt) {
+            crateIt.used = true;
+            crateIt.label = crateIt.label.replace(/\([^)]+\)/, '(Kosong)');
+            if (!crateIt.label.includes('(Kosong)')) crateIt.label += ' (Kosong)';
+            crateIt.prompt = crateIt.label;
+          }
+          if (this._usedIds) this._usedIds.add(it.crateId);
+        }
+        this._syncPerimeterHalos();
+
+        if (slot.itemType === 'weapon_variant') {
+          return {
+            ok: true,
+            type: 'lootbox_item',
+            action: 'lootbox_item',
+            weaponId: slot.weaponId,
+            variantId: slot.variantId,
+            ammo: slot.amount > 0 ? { type: slot.ammoType || slot.weaponId, amount: slot.amount } : null,
+            message: slot.label.replace('[E] ', '') + ' (+' + slot.amount + ' Amunisi)'
+          };
+        }
+        if (slot.itemType === 'medkit') {
+          return {
+            ok: true,
+            type: 'lootbox_item',
+            action: 'lootbox_item',
+            heal: slot.amount,
+            healAmount: slot.amount,
+            message: slot.label.replace('[E] ', '')
+          };
+        }
+        return {
+          ok: true,
+          type: 'lootbox_item',
+          action: 'lootbox_item',
+          ammo: { type: slot.ammoType || 'all', amount: slot.amount || 20 },
+          message: slot.label.replace('[E] ', '')
         };
       }
 
@@ -2278,8 +2420,8 @@
       const b = this.explosiveBarrels.find((x) => x.id === id);
       if (!b || b.exploded) return;
       b.exploded = true;
+      if (b.halo && typeof b.halo.setMode === 'function') b.halo.setMode('off');
       if (b.mesh) b.mesh.visible = false;
-      if (b.haloGroup) b.haloGroup.visible = false;
       if (b.colliderIdx !== undefined && this.colliders[b.colliderIdx]) {
         const c = this.colliders[b.colliderIdx];
         c.blocksWalk = false;
@@ -2474,14 +2616,6 @@
 
     _ensureGroundPickupPool: function () {
       if (this._groundPickupAssets) return this._groundPickupAssets;
-      const ringGeo = new THREE.RingGeometry(0.30, 0.44, 18);
-      ringGeo.rotateX(-Math.PI * 0.5);
-      const ringMats = {
-        health: new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.65, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
-        ammo: new THREE.MeshBasicMaterial({ color: 0xe0b422, transparent: true, opacity: 0.65, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
-        rpg: new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.65, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
-        lootcrate: new THREE.MeshBasicMaterial({ color: 0xc084fc, transparent: true, opacity: 0.72, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })
-      };
       const sharedMats = {
         medWhite: new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.42, metalness: 0.15 }),
         medGreen: new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.45, metalness: 0.25, emissive: 0x052e16, emissiveIntensity: 0.35 }),
@@ -2493,10 +2627,8 @@
         steelDark: new THREE.MeshStandardMaterial({ color: 0x2a2f36, roughness: 0.38, metalness: 0.78 }),
         cratePurple: new THREE.MeshStandardMaterial({ color: 0x3b2654, roughness: 0.44, metalness: 0.45, emissive: 0x581c87, emissiveIntensity: 0.35 })
       };
-      this.disposableGeometries.push(ringGeo);
-      for (const m of Object.values(ringMats)) this.disposableMaterials.push(m);
       for (const m of Object.values(sharedMats)) this.disposableMaterials.push(m);
-      this._groundPickupAssets = Object.assign({ ringGeo, ringMats }, sharedMats);
+      this._groundPickupAssets = Object.assign({}, sharedMats);
       return this._groundPickupAssets;
     },
 
@@ -2520,16 +2652,17 @@
           rpg: this._buildPickupVisual('rpg', assets),
           lootcrate: this._buildPickupVisual('lootcrate', assets)
         };
+        const variantHalos = {};
         for (const vk of Object.keys(variants)) {
           variants[vk].visible = false;
           meshHolder.add(variants[vk]);
+          if (LRT.Render && typeof LRT.Render.attachPerimeterHalo === 'function') {
+            variantHalos[vk] = LRT.Render.attachPerimeterHalo(variants[vk], { initialMode: 'off', thicknessScale: 0.85 });
+          }
         }
-        const ring = new THREE.Mesh(assets.ringGeo, assets.ringMats[kind]);
-        ring.position.y = 0.04;
-        grp.add(ring);
         grp.add(meshHolder);
         this.rootGroup.add(grp);
-        slot = { group: grp, mesh: meshHolder, variants, ring, active: false, age: 0, x: 0, y: 0, z: 0, type: kind, meta: null };
+        slot = { group: grp, mesh: meshHolder, variants, variantHalos, active: false, age: 0, x: 0, y: 0, z: 0, type: kind, meta: null };
         this._groundPickups.push(slot);
       }
 
@@ -2545,9 +2678,12 @@
       slot.type = kind;
       slot.meta = dropMeta || null;
       for (const vk of Object.keys(slot.variants)) {
-        slot.variants[vk].visible = (vk === kind);
+        const isMe = (vk === kind);
+        slot.variants[vk].visible = isMe;
+        if (slot.variantHalos && slot.variantHalos[vk]) {
+          slot.variantHalos[vk].setMode(isMe ? 'subtle' : 'off');
+        }
       }
-      slot.ring.material = assets.ringMats[kind];
       slot.group.position.set(lx, ly, lz);
       slot.group.visible = true;
       return slot;

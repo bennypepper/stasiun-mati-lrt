@@ -60,6 +60,7 @@
     cheatOpen: false,
     docViewerOpen: false,
     fastTravelOpen: false,
+    fastTravelCheatUnlocked: false,
     kills: 0,
     lastSafePos: new THREE.Vector3(4.0, 0.05, 6.0),
     bobPhase: 0,
@@ -132,10 +133,22 @@
       dom['pill-flashlight'].textContent = 'F Senter';
       dom['pill-flashlight'].classList.toggle('active', state.flashlightOn);
     }
+    if (I.core && typeof I.core.onTutorialEvent === 'function') {
+      I.core.onTutorialEvent('flashlight');
+    }
     if (LRT.Audio) LRT.Audio.play('flashlight_click', { gain: 0.65, pitchVar: 0.05 });
   }
 
-  const CHEAT_CODES = ['PAINKILLER', 'TURTLE', 'TOOLUP', 'CATCHME'];
+  const CAMPAIGN_COMPLETED_KEY = 'lrt_campaign_completed_v1';
+  const CHEAT_CODES = ['PAINKILLER', 'TURTLE', 'TOOLUP', 'CATCHME', 'TRAVEL'];
+
+  function isFastTravelUnlocked() {
+    if (state.fastTravelCheatUnlocked) return true;
+    try {
+      if (localStorage.getItem(CAMPAIGN_COMPLETED_KEY) === '1') return true;
+    } catch (_) {}
+    return false;
+  }
   let directCheatBuffer = '';
   let suppressPauseUntil = 0;
   let pendingRelock = false;
@@ -283,6 +296,22 @@
       } else if (res.ammoBonus && LRT.Weapons && LRT.Weapons.addAmmo) {
         LRT.Weapons.addAmmo('all', 20);
       }
+      if ((res.armorBonus > 0 || res.armor > 0) && typeof addArmor === 'function') {
+        addArmor(res.armorBonus || res.armor, 100);
+        res._armorHandled = true;
+      }
+      if (res.variantId && res.weaponId && LRT.Weapons) {
+        if (typeof LRT.Weapons.unlockOrEquipVariant === 'function') {
+          LRT.Weapons.unlockOrEquipVariant(res.weaponId, res.variantId);
+        } else if (typeof LRT.Weapons.unlockWeapon === 'function') {
+          LRT.Weapons.unlockWeapon(res.weaponId, res.ammoAmount || 0);
+        }
+        res._variantHandled = true;
+        if (PL.setNotice) {
+          const vLabel = res.variantLabel || res.label || `${String(res.weaponId).toUpperCase()} · ${String(res.variantId).toUpperCase()}`;
+          PL.setNotice(res.message || `SENJATA VARIAN: ${String(vLabel).toUpperCase()}`, '#22c55e');
+        }
+      }
       if ((res.triggerTrainCall || res.action === 'call_train' || res.action === 'call_train_prev') && callbacks.onSummonTrain) {
         callbacks.onSummonTrain(res.direction || (res.action === 'call_train_prev' ? -1 : 1));
       }
@@ -416,6 +445,14 @@
       return { ok: true, code };
     }
 
+    if (code === 'TRAVEL') {
+      state.fastTravelCheatUnlocked = true;
+      if (PL.syncFastTravelAvailability) PL.syncFastTravelAvailability();
+      if (PL.setNotice) PL.setNotice('CHEAT ACTIVATED: TRAVEL — FAST TRAVEL UNLOCKED', '#22c55e');
+      if (LRT.Audio) LRT.Audio.play('turnstile_beep', { gain: 0.7 });
+      return { ok: true, code };
+    }
+
     if (PL.setNotice) PL.setNotice(`UNKNOWN CHEAT: ${code}`, '#ef4444');
     if (LRT.Audio) LRT.Audio.play('dry_fire', { gain: 0.6 });
     return { ok: false, code };
@@ -459,11 +496,17 @@
         const inPlayState = !gs || (gs !== C.STATES.MENU && gs !== C.STATES.GAME_OVER);
         const pauseOv = PL.dom && PL.dom['pause-overlay'];
         const pauseOpen = !!(pauseOv && !pauseOv.classList.contains('hidden'));
-        if (inPlayState && !state.cheatOpen) {
+        if (inPlayState && !state.cheatOpen && !state.docViewerOpen) {
           e.preventDefault();
           e.stopPropagation();
-          if (!e.repeat && ((flags.allowActionInput && !flags.paused) || pauseOpen)) {
-            if (PL.openFastTravelModal) PL.openFastTravelModal({ fromPause: pauseOpen });
+          if (!e.repeat) {
+            if (isFastTravelUnlocked()) {
+              if (((flags.allowActionInput && !flags.paused) || pauseOpen) && PL.openFastTravelModal) {
+                PL.openFastTravelModal({ fromPause: pauseOpen });
+              }
+            } else if (!pauseOpen && flags.allowActionInput && !flags.paused && callbacks.onPause) {
+              callbacks.onPause();
+            }
           }
           return;
         }
@@ -555,7 +598,34 @@
         if (!e.repeat && callbacks.onSummonTrain) callbacks.onSummonTrain(e.shiftKey ? -1 : 0);
       } else if (e.code === 'KeyV') {
         if (!state.isSitting && LRT.Weapons && typeof LRT.Weapons.meleeShove === 'function') {
-          LRT.Weapons.meleeShove();
+          const shoveRes = LRT.Weapons.meleeShove();
+          let hitAny = !!(shoveRes && shoveRes.hitCount > 0);
+          const pool = I.enemies && Array.isArray(I.enemies.zombies) ? I.enemies.zombies : null;
+          if (!hitAny && pool && refs.camera) {
+            refs.camera.getWorldDirection(_tmpLook);
+            for (let zi = 0; zi < pool.length; zi++) {
+              const z = pool[zi];
+              if (!z || !z.active || z.dead) continue;
+              const dx = z.x - state.pos.x;
+              const dz = z.z - state.pos.z;
+              const d = Math.hypot(dx, dz);
+              if (d <= 3.25) {
+                const dot = d > 0.05 ? (dx * _tmpLook.x + dz * _tmpLook.z) / d : 1.0;
+                if (dot >= 0.20 || d <= 1.6) {
+                  if (LRT.Enemies && typeof LRT.Enemies.hitZombie === 'function') {
+                    LRT.Enemies.hitZombie(z.id, 18, { x: z.x, y: (z.y || 0) + 1.0, z: z.z }, { x: _tmpLook.x, y: 0, z: _tmpLook.z }, 6.8, false, 'torso');
+                  } else {
+                    z.vx = (_tmpLook.x || 0) * 5.0;
+                    z.vz = (_tmpLook.z || 0) * 5.0;
+                  }
+                  hitAny = true;
+                }
+              }
+            }
+          }
+          if (I.core && typeof I.core.onTutorialEvent === 'function') {
+            I.core.onTutorialEvent('shove', null, { hit: hitAny, shoveRes });
+          }
         }
       } else if (e.code === 'KeyC') {
         if (state.isSitting) standFromSeat();
@@ -1317,6 +1387,7 @@
     state.fastSprint = false;
     state.docViewerOpen = false;
     state.fastTravelOpen = false;
+    state.fastTravelCheatUnlocked = false;
     directCheatBuffer = '';
     pendingRelock = false;
     suppressPauseUntil = 0;
@@ -1370,4 +1441,5 @@
   PL.openCheatConsole = openCheatConsole;
   PL.closeCheatConsole = closeCheatConsole;
   PL.executeCheat = executeCheat;
+  PL.isFastTravelUnlocked = isFastTravelUnlocked;
 })(window.LRT = window.LRT || {});

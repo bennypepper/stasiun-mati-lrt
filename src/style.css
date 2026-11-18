@@ -392,13 +392,15 @@ html, body {
   top: 15%;
   left: 50%;
   transform: translateX(-50%);
-  background: transparent;
+  background: linear-gradient(90deg, transparent, rgba(6, 8, 13, 0.78) 18%, rgba(6, 8, 13, 0.78) 82%, transparent);
   border: none;
-  color: rgba(242, 240, 234, 0.92);
-  padding: 4px 16px;
-  font-size: 12px;
-  font-weight: 400;
-  letter-spacing: 0.12em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(4px);
+  color: rgba(232, 228, 218, 0.94);
+  padding: 5px 26px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.96), 0 0 3px rgba(0, 0, 0, 0.92);
   opacity: 0;
@@ -1794,17 +1796,20 @@ html, body {
 }
 
 /* =========================================================
-   BRIEFING / TUTORIAL HUD WHISPER (Borderless Top-Center RE Prompt)
+   BRIEFING / TUTORIAL HUD TRACKER (RE-Style Translucent Whisper)
    ========================================================= */
 #tutorial-card {
   position: fixed;
-  top: 26px;
+  top: 22px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(440px, 82vw);
-  padding: 0;
-  background: transparent;
+  width: min(460px, 84vw);
+  padding: 10px 18px 9px;
+  background: rgba(6, 8, 13, 0.76);
+  backdrop-filter: blur(8px);
   border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  border-left: 2px solid #e0b422;
   text-align: center;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.96), 0 0 3px rgba(0, 0, 0, 0.92);
   pointer-events: none;
@@ -1819,52 +1824,56 @@ html, body {
   gap: 8px;
   font-family: var(--font-mono);
   font-size: 9.5px;
-  letter-spacing: 0.16em;
-  color: rgba(212, 208, 198, 0.68);
-  margin-bottom: 2px;
+  letter-spacing: 0.18em;
+  color: #8b929a;
+  margin-bottom: 3px;
+}
+
+#tutorial-card .tut-kicker {
+  color: #e0b422;
+  font-weight: 600;
 }
 
 #tutorial-card .tut-title {
   font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  color: #e8dec8;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: #e8e4da;
   margin-bottom: 4px;
 }
 
 #tutorial-card .tut-text {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 300;
   line-height: 1.45;
-  color: rgba(242, 240, 234, 0.94);
+  color: rgba(232, 228, 218, 0.92);
 }
 
 #tutorial-card kbd {
   display: inline-block;
   padding: 1px 6px;
   margin: 0 1px;
-  font-family: var(--font-sans);
-  font-size: 10.5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 600;
-  color: #ffffff;
-  background: rgba(10, 12, 16, 0.65);
-  border: 1px solid rgba(242, 240, 234, 0.48);
-  border-radius: 3px;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.75);
+  color: #e8e4da;
+  background: rgba(6, 8, 13, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 2px;
 }
 
 #tutorial-card .tut-bar {
-  width: 140px;
+  width: 160px;
   height: 1px;
-  background: rgba(242, 240, 234, 0.18);
-  margin: 7px auto 4px;
+  background: rgba(255, 255, 255, 0.10);
+  margin: 8px auto 5px;
   overflow: hidden;
 }
 
 #tutorial-card .tut-bar-fill {
   height: 100%;
   width: 0%;
-  background: rgba(242, 240, 234, 0.78);
+  background: #e0b422;
   transition: width 0.25s ease;
 }
 
@@ -1874,12 +1883,12 @@ html, body {
   gap: 12px;
   font-family: var(--font-mono);
   font-size: 9px;
-  letter-spacing: 0.10em;
-  color: rgba(212, 208, 198, 0.55);
+  letter-spacing: 0.12em;
+  color: #8b929a;
 }
 
 #tutorial-card .tut-done {
-  color: #86efac;
+  color: #22c55e;
 }
 
 /* =========================================================
@@ -2133,8 +2142,8 @@ html, body {
   padding: clamp(14px, 2.5vw, 32px);
   background: radial-gradient(
     ellipse at center,
-    rgba(6, 10, 16, 0.78) 0%,
-    rgba(3, 5, 9, 0.93) 100%
+    rgba(6, 8, 13, 0.78) 0%,
+    rgba(3, 4, 8, 0.92) 100%
   );
   backdrop-filter: blur(8px);
   pointer-events: auto;
@@ -2145,12 +2154,13 @@ html, body {
   max-height: min(92vh, 780px);
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: clamp(14px, 2vw, 24px);
-  background: linear-gradient(165deg, rgba(11, 15, 22, 0.94) 0%, rgba(7, 9, 14, 0.96) 100%);
-  border: 1px solid rgba(225, 222, 214, 0.16);
-  border-radius: 4px;
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  gap: 14px;
+  padding: clamp(16px, 2.2vw, 26px);
+  background: rgba(6, 8, 13, 0.88);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 0;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.85);
   overflow: hidden;
 }
 
@@ -2160,8 +2170,8 @@ html, body {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 10px 20px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(225, 222, 214, 0.14);
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
   flex-shrink: 0;
 }
 
@@ -2208,11 +2218,11 @@ html, body {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 5px 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(225, 222, 214, 0.12);
-  border-radius: 3px;
+  gap: 4px;
+  padding: 3px 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 0;
 }
 
 .ft-atmos-label {
@@ -2220,19 +2230,20 @@ html, body {
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.16em;
-  color: var(--ash);
+  color: #8b929a;
   margin-right: 4px;
 }
 
 .ft-atmos-btn {
   padding: 5px 10px;
   background: transparent;
-  border: 1px solid rgba(225, 222, 214, 0.14);
-  border-radius: 2px;
-  color: var(--bone-soft);
+  border: none;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  color: #8b929a;
   font-family: var(--font-mono);
   font-size: 10.5px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.10em;
   text-transform: uppercase;
   cursor: pointer;
   transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
@@ -2241,23 +2252,22 @@ html, body {
 .ft-atmos-btn:hover,
 .ft-atmos-btn:focus-visible {
   outline: none;
-  background: rgba(242, 240, 234, 0.10);
-  border-color: rgba(242, 240, 234, 0.40);
-  color: #ffffff;
+  background: linear-gradient(90deg, rgba(224, 180, 34, 0.14), transparent);
+  color: #e8e4da;
 }
 
 .ft-atmos-btn.active {
-  background: rgba(194, 160, 98, 0.22);
-  border-color: var(--amber-muted);
-  color: #fef3c7;
+  background: linear-gradient(90deg, rgba(224, 180, 34, 0.18), transparent);
+  border-bottom-color: #e0b422;
+  color: #e0b422;
 }
 
 .ft-close-btn {
-  padding: 7px 14px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(225, 222, 214, 0.24);
-  border-radius: 2px;
-  color: var(--bone);
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0;
+  color: #e8e4da;
   font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 600;
@@ -2269,8 +2279,8 @@ html, body {
 .ft-close-btn:hover,
 .ft-close-btn:focus-visible {
   outline: none;
-  background: rgba(200, 75, 75, 0.24);
-  border-color: var(--crimson-bright);
+  background: linear-gradient(90deg, rgba(220, 38, 38, 0.22), transparent);
+  border-color: rgba(220, 38, 38, 0.65);
   color: #ffffff;
 }
 
@@ -2278,8 +2288,8 @@ html, body {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(290px, 0.92fr) minmax(340px, 1.28fr);
-  gap: 20px;
+  grid-template-columns: minmax(290px, 0.90fr) minmax(340px, 1.30fr);
+  gap: 24px;
 }
 
 .ft-col {
@@ -2294,8 +2304,8 @@ html, body {
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid rgba(225, 222, 214, 0.10);
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
 }
 
@@ -2304,13 +2314,13 @@ html, body {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.18em;
-  color: var(--bone);
+  color: #e8e4da;
 }
 
 .ft-col-sub {
   font-family: var(--font-sans);
   font-size: 11px;
-  color: var(--ash);
+  color: #8b929a;
 }
 
 .ft-station-list {
@@ -2319,10 +2329,10 @@ html, body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 2px;
   padding-right: 4px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(242, 240, 234, 0.20) transparent;
+  scrollbar-color: rgba(232, 228, 218, 0.18) transparent;
 }
 
 .ft-station-card {
@@ -2330,30 +2340,28 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 7px 11px;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(225, 222, 214, 0.11);
-  border-left: 3px solid rgba(225, 222, 214, 0.24);
-  border-radius: 3px;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 2px solid transparent;
+  border-radius: 0;
   text-align: left;
   cursor: pointer;
-  color: var(--bone);
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  color: #e8e4da;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .ft-station-card:hover,
 .ft-station-card:focus-visible {
   outline: none;
-  background: rgba(255, 255, 255, 0.075);
-  border-color: rgba(242, 240, 234, 0.36);
-  border-left-color: var(--amber-muted);
-  transform: translateX(2px);
+  background: linear-gradient(90deg, rgba(224, 180, 34, 0.14), transparent);
+  border-left-color: #e0b422;
 }
 
 .ft-station-card.is-active {
-  background: rgba(16, 185, 129, 0.10);
-  border-color: rgba(52, 211, 153, 0.42);
-  border-left-color: #10b981;
+  background: linear-gradient(90deg, rgba(34, 197, 94, 0.14), transparent);
+  border-left-color: #22c55e;
 }
 
 .ft-st-top {
@@ -2368,7 +2376,7 @@ html, body {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.12em;
-  color: var(--amber-muted);
+  color: #e0b422;
 }
 
 .ft-st-badge {
@@ -2376,30 +2384,31 @@ html, body {
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.08em;
-  padding: 1.5px 6px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--bone-soft);
+  padding: 1px 6px;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  color: #8b929a;
   text-transform: uppercase;
 }
 
 .ft-station-card.is-active .ft-st-badge {
-  background: rgba(16, 185, 129, 0.20);
-  color: #6ee7b7;
+  color: #22c55e;
+  border-bottom-color: rgba(34, 197, 94, 0.45);
 }
 
 .ft-st-name {
   font-size: 13.5px;
   font-weight: 500;
-  line-height: 1.22;
+  line-height: 1.24;
   letter-spacing: 0.04em;
-  color: var(--bone);
+  color: #e8e4da;
 }
 
 .ft-st-district {
   font-size: 11px;
-  line-height: 1.22;
-  color: var(--ash);
+  line-height: 1.24;
+  color: #8b929a;
 }
 
 .ft-zone-grid {
@@ -2408,33 +2417,34 @@ html, body {
   overflow-y: auto;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
+  gap: 2px 18px;
   align-content: start;
   padding-right: 4px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(242, 240, 234, 0.20) transparent;
+  scrollbar-color: rgba(232, 228, 218, 0.18) transparent;
 }
 
 .ft-zone-card {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  padding: 8px 11px;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(225, 222, 214, 0.11);
-  border-radius: 3px;
+  padding: 9px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 2px solid transparent;
+  border-radius: 0;
   text-align: left;
   cursor: pointer;
-  color: var(--bone);
-  transition: background 0.14s ease, border-color 0.14s ease, transform 0.14s ease;
+  color: #e8e4da;
+  transition: background 0.14s ease, border-color 0.14s ease;
 }
 
 .ft-zone-card:hover,
 .ft-zone-card:focus-visible {
   outline: none;
-  background: rgba(56, 189, 248, 0.10);
-  border-color: rgba(56, 189, 248, 0.48);
-  transform: translateY(-1px);
+  background: linear-gradient(90deg, rgba(224, 180, 34, 0.14), transparent);
+  border-left-color: #e0b422;
 }
 
 .ft-zone-head {

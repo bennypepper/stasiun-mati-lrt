@@ -900,6 +900,271 @@
     }
   };
 
+  const _smoothHaloGeoCache = new WeakMap();
+  const _haloTmpA = new THREE.Vector3();
+  const _haloTmpB = new THREE.Vector3();
+  const _haloTmpC = new THREE.Vector3();
+  const _haloTmpE1 = new THREE.Vector3();
+  const _haloTmpE2 = new THREE.Vector3();
+  const _haloTmpN = new THREE.Vector3();
+  const _haloInvMat = new THREE.Matrix4();
+  const _haloRelMat = new THREE.Matrix4();
+
+  function buildSmoothHullGeometry(srcGeo) {
+    if (!srcGeo || !srcGeo.attributes || !srcGeo.attributes.position) return null;
+    const cached = _smoothHaloGeoCache.get(srcGeo);
+    if (cached) return cached;
+
+    const pos = srcGeo.attributes.position;
+    const normAttr = srcGeo.attributes.normal || null;
+    const vCount = pos.count;
+    const acc = new Map();
+
+    const addAccum = (idx, nx, ny, nz) => {
+      const qx = Math.round(pos.getX(idx) * 10000);
+      const qy = Math.round(pos.getY(idx) * 10000);
+      const qz = Math.round(pos.getZ(idx) * 10000);
+      const key = qx + '_' + qy + '_' + qz;
+      let entry = acc.get(key);
+      if (!entry) {
+        entry = [0, 0, 0];
+        acc.set(key, entry);
+      }
+      entry[0] += nx;
+      entry[1] += ny;
+      entry[2] += nz;
+    };
+
+    const idxAttr = srcGeo.index;
+    if (idxAttr) {
+      for (let i = 0; i + 2 < idxAttr.count; i += 3) {
+        const i0 = idxAttr.getX(i);
+        const i1 = idxAttr.getX(i + 1);
+        const i2 = idxAttr.getX(i + 2);
+        _haloTmpA.fromBufferAttribute(pos, i0);
+        _haloTmpB.fromBufferAttribute(pos, i1);
+        _haloTmpC.fromBufferAttribute(pos, i2);
+        _haloTmpE1.subVectors(_haloTmpB, _haloTmpA);
+        _haloTmpE2.subVectors(_haloTmpC, _haloTmpA);
+        _haloTmpN.crossVectors(_haloTmpE1, _haloTmpE2);
+        if (_haloTmpN.lengthSq() > 1e-12) {
+          addAccum(i0, _haloTmpN.x, _haloTmpN.y, _haloTmpN.z);
+          addAccum(i1, _haloTmpN.x, _haloTmpN.y, _haloTmpN.z);
+          addAccum(i2, _haloTmpN.x, _haloTmpN.y, _haloTmpN.z);
+        }
+      }
+    } else {
+      for (let i = 0; i + 2 < vCount; i += 3) {
+        _haloTmpA.fromBufferAttribute(pos, i);
+        _haloTmpB.fromBufferAttribute(pos, i + 1);
+        _haloTmpC.fromBufferAttribute(pos, i + 2);
+        _haloTmpE1.subVectors(_haloTmpB, _haloTmpA);
+        _haloTmpE2.subVectors(_haloTmpC, _haloTmpA);
+        _haloTmpN.crossVectors(_haloTmpE1, _haloTmpE2);
+        if (_haloTmpN.lengthSq() > 1e-12) {
+          addAccum(i, _haloTmpN.x, _haloTmpN.y, _haloTmpN.z);
+          addAccum(i + 1, _haloTmpN.x, _haloTmpN.y, _haloTmpN.z);
+          addAccum(i + 2, _haloTmpN.x, _haloTmpN.y, _haloTmpN.z);
+        }
+      }
+    }
+
+    const smoothArr = new Float32Array(vCount * 3);
+    for (let i = 0; i < vCount; i++) {
+      const qx = Math.round(pos.getX(i) * 10000);
+      const qy = Math.round(pos.getY(i) * 10000);
+      const qz = Math.round(pos.getZ(i) * 10000);
+      const entry = acc.get(qx + '_' + qy + '_' + qz);
+      let nx = entry ? entry[0] : (normAttr ? normAttr.getX(i) : 0);
+      let ny = entry ? entry[1] : (normAttr ? normAttr.getY(i) : 1);
+      let nz = entry ? entry[2] : (normAttr ? normAttr.getZ(i) : 0);
+      const len = Math.hypot(nx, ny, nz);
+      if (len > 1e-8) {
+        nx /= len;
+        ny /= len;
+        nz /= len;
+      } else {
+        nx = 0; ny = 1; nz = 0;
+      }
+      smoothArr[i * 3] = nx;
+      smoothArr[i * 3 + 1] = ny;
+      smoothArr[i * 3 + 2] = nz;
+    }
+
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', pos);
+    if (idxAttr) out.setIndex(idxAttr);
+    out.setAttribute('aSmoothNormal', new THREE.BufferAttribute(smoothArr, 3));
+    _smoothHaloGeoCache.set(srcGeo, out);
+    if (typeof srcGeo.addEventListener === 'function') {
+      srcGeo.addEventListener('dispose', () => {
+        out.dispose();
+        _smoothHaloGeoCache.delete(srcGeo);
+      });
+    }
+    return out;
+  }
+
+  const HALO_VERT_SHADER = `
+    attribute vec3 aSmoothNormal;
+    uniform float uThickness;
+    void main() {
+      vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+      vec3 viewNorm = normalize(normalMatrix * aSmoothNormal);
+      float camDist = length(mvPos.xyz);
+      float distFactor = clamp(camDist * 0.14, 0.72, 2.35);
+      mvPos.xyz += viewNorm * (uThickness * distFactor);
+      gl_Position = projectionMatrix * mvPos;
+    }
+  `;
+
+  const HALO_FRAG_SHADER = `
+    uniform vec3 uColor;
+    uniform float uOpacity;
+    void main() {
+      gl_FragColor = vec4(uColor, uOpacity);
+    }
+  `;
+
+  function attachPerimeterHalo(targetObj, opts) {
+    const o = opts || {};
+    const haloGroup = new THREE.Group();
+    haloGroup.name = 'PerimeterHalo';
+    haloGroup.visible = false;
+    haloGroup.userData._isPerimeterHalo = true;
+
+    if (!targetObj) {
+      return { group: haloGroup, setMode: function () {}, update: function () {}, dispose: function () {} };
+    }
+
+    const baseColorHex = o.color !== undefined ? o.color : 0xfacc15;
+    const hoverColorHex = o.hoverColor !== undefined ? o.hoverColor : 0xfacc15;
+    const objColorHex = o.objectiveColor !== undefined ? o.objectiveColor : 0xfde047;
+    const thicknessMult = o.thicknessScale !== undefined ? o.thicknessScale : 1.0;
+    const phase = o.phase !== undefined ? o.phase : (Math.random() * Math.PI * 2);
+
+    const makeHaloMat = (side) => new THREE.ShaderMaterial({
+      uniforms: {
+        uColor: { value: new THREE.Color(baseColorHex) },
+        uOpacity: { value: 0.0 },
+        uThickness: { value: 0.012 * thicknessMult }
+      },
+      vertexShader: HALO_VERT_SHADER,
+      fragmentShader: HALO_FRAG_SHADER,
+      transparent: true,
+      depthWrite: false,
+      depthTest: true,
+      side: side
+    });
+
+    const matBack = makeHaloMat(THREE.BackSide);
+    let matFront = null;
+    const entries = [];
+
+    targetObj.updateMatrixWorld(true);
+    _haloInvMat.copy(targetObj.matrixWorld).invert();
+
+    const scanRoot = (targetObj.isLOD && Array.isArray(targetObj.levels) && targetObj.levels.length > 0 && targetObj.levels[0].object)
+      ? targetObj.levels[0].object
+      : targetObj;
+
+    scanRoot.traverse((child) => {
+      if (!child || !child.isMesh || !child.geometry) return;
+      if (child.userData && (child.userData._isPerimeterHalo || child.userData._skipHalo)) return;
+      if (!o.includeTransparent && child.material && !Array.isArray(child.material) && child.material.transparent && child.material.opacity < 0.45) {
+        return;
+      }
+      const hullGeo = buildSmoothHullGeometry(child.geometry);
+      if (!hullGeo) return;
+
+      _haloRelMat.multiplyMatrices(_haloInvMat, child.matrixWorld);
+      const isFlipped = _haloRelMat.determinant() < 0;
+      const mat = isFlipped ? (matFront || (matFront = makeHaloMat(THREE.FrontSide))) : matBack;
+      const hm = new THREE.Mesh(hullGeo, mat);
+      _haloRelMat.decompose(hm.position, hm.quaternion, hm.scale);
+      hm.castShadow = false;
+      hm.receiveShadow = false;
+      hm.frustumCulled = false;
+      hm.renderOrder = 2;
+      hm.visible = child.visible;
+      hm.userData._isPerimeterHalo = true;
+      haloGroup.add(hm);
+      entries.push({ mesh: hm, src: child });
+    });
+
+    const parentTarget = o.parent || targetObj;
+    parentTarget.add(haloGroup);
+
+    let currentMode = 'off';
+    const setMode = (mode) => {
+      const m = mode || 'off';
+      currentMode = m;
+      if (m === 'off' || entries.length === 0) {
+        haloGroup.visible = false;
+        matBack.uniforms.uOpacity.value = 0.0;
+        if (matFront) matFront.uniforms.uOpacity.value = 0.0;
+        return;
+      }
+      haloGroup.visible = true;
+      const mats = matFront ? [matBack, matFront] : [matBack];
+      for (let i = 0; i < mats.length; i++) {
+        const u = mats[i].uniforms;
+        if (m === 'subtle') {
+          u.uColor.value.setHex(baseColorHex);
+          u.uOpacity.value = 0.28;
+          u.uThickness.value = 0.011 * thicknessMult;
+        } else if (m === 'hover') {
+          u.uColor.value.setHex(hoverColorHex);
+          u.uOpacity.value = 0.90;
+          u.uThickness.value = 0.018 * thicknessMult;
+        } else if (m === 'objective') {
+          u.uColor.value.setHex(objColorHex);
+          u.uOpacity.value = 0.85;
+          u.uThickness.value = 0.022 * thicknessMult;
+        }
+      }
+    };
+
+    const update = (timeSec) => {
+      if (!haloGroup.visible || currentMode === 'off') return;
+      for (let i = 0; i < entries.length; i++) {
+        const e = entries[i];
+        if (e.src && e.mesh.visible !== e.src.visible) e.mesh.visible = e.src.visible;
+      }
+      if (currentMode === 'objective') {
+        const pulse = 0.5 + 0.5 * Math.sin((timeSec || 0) * 5.2 + phase);
+        const op = 0.52 + 0.46 * pulse;
+        const th = (0.016 + 0.011 * pulse) * thicknessMult;
+        matBack.uniforms.uOpacity.value = op;
+        matBack.uniforms.uThickness.value = th;
+        if (matFront) {
+          matFront.uniforms.uOpacity.value = op;
+          matFront.uniforms.uThickness.value = th;
+        }
+      }
+    };
+
+    const dispose = () => {
+      if (haloGroup.parent) haloGroup.parent.remove(haloGroup);
+      matBack.dispose();
+      if (matFront) matFront.dispose();
+      entries.length = 0;
+    };
+
+    if (o.initialMode) setMode(o.initialMode);
+    return {
+      group: haloGroup,
+      setMode,
+      update,
+      dispose,
+      getMode: () => currentMode
+    };
+  }
+
   LRT.Materials = Materials;
   LRT.Assets = Materials;
+  LRT.Render = Object.assign(LRT.Render || {}, {
+    attachPerimeterHalo,
+    buildSmoothHullGeometry
+  });
 })(window.LRT = window.LRT || {});

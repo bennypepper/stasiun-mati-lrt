@@ -122,6 +122,12 @@
   let _neckBoneMat = null;
   let _neckCollarGeo = null;
   let _neckSpineGeo = null;
+  let _woundMat = null;
+  let _woundGeo = null;
+  let _armCollarGeo = null;
+  let _armBoneGeo = null;
+  let _legCollarGeo = null;
+  let _legBoneGeo = null;
 
   E.MAX_ENEMIES = MAX_ENEMIES;
   E.MAX_BILE = MAX_BILE;
@@ -1539,12 +1545,135 @@
       bones.neck.add(neckStumpNode);
     }
 
+    // Attach 3D bloody arm stumps (at elbows) & 6 bullet wound hole patches on torso/arms/legs
+    if (!_cystGeo) _cystGeo = new THREE.SphereGeometry(1.0, 8, 6);
+    if (!_neckStumpMat) {
+      _neckStumpMat = new THREE.MeshStandardMaterial({
+        color: 0x4a0407,
+        emissive: new THREE.Color(0x1a0102),
+        roughness: 0.22,
+        metalness: 0.05
+      });
+    }
+    if (!_neckBoneMat) {
+      _neckBoneMat = new THREE.MeshStandardMaterial({
+        color: 0xd8cfc2,
+        roughness: 0.55,
+        metalness: 0.02
+      });
+    }
+    if (!_woundMat) {
+      _woundMat = new THREE.MeshStandardMaterial({
+        color: 0x3b0204,
+        emissive: new THREE.Color(0x180102),
+        roughness: 0.18,
+        metalness: 0.04
+      });
+    }
+    if (!_woundGeo) _woundGeo = new THREE.CylinderGeometry(0.036, 0.044, 0.016, 8);
+    if (!_armCollarGeo) _armCollarGeo = new THREE.CylinderGeometry(0.038, 0.048, 0.056, 9);
+    if (!_armBoneGeo) _armBoneGeo = new THREE.CylinderGeometry(0.013, 0.015, 0.042, 7);
+    if (!_legCollarGeo) _legCollarGeo = new THREE.CylinderGeometry(0.056, 0.066, 0.078, 10);
+    if (!_legBoneGeo) _legBoneGeo = new THREE.CylinderGeometry(0.018, 0.021, 0.046, 8);
+
+    const buildArmStump = (upperArmBone) => {
+      if (!upperArmBone) return null;
+      upperArmBone.getWorldScale(_v1);
+      const aInvS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
+      const grp = new THREE.Group();
+      grp.visible = false;
+      const collar = new THREE.Mesh(_armCollarGeo, _neckStumpMat);
+      collar.position.set(0, 0.222 * aInvS, 0);
+      collar.scale.setScalar(aInvS);
+      collar.castShadow = false;
+      grp.add(collar);
+      const boneTip = new THREE.Mesh(_armBoneGeo, _neckBoneMat);
+      boneTip.position.set(0, 0.252 * aInvS, 0);
+      boneTip.scale.setScalar(aInvS);
+      boneTip.castShadow = false;
+      grp.add(boneTip);
+      for (let c = 0; c < 4; c++) {
+        const ang = (c / 4) * Math.PI * 2 + 0.3;
+        const clot = new THREE.Mesh(_cystGeo, _neckStumpMat);
+        clot.position.set(Math.cos(ang) * 0.030 * aInvS, 0.238 * aInvS, Math.sin(ang) * 0.030 * aInvS);
+        clot.scale.set(0.020 * aInvS, 0.017 * aInvS, 0.020 * aInvS);
+        clot.castShadow = false;
+        grp.add(clot);
+      }
+      upperArmBone.add(grp);
+      return grp;
+    };
+
+    const buildLegStump = (thighBone) => {
+      if (!thighBone) return null;
+      thighBone.getWorldScale(_v1);
+      const lInvS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
+      const distalY = (kind === 'commuter') ? 0.398 : 0.442;
+      const grp = new THREE.Group();
+      grp.visible = false;
+      const collar = new THREE.Mesh(_legCollarGeo, _neckStumpMat);
+      collar.position.set(0, (distalY - 0.016) * lInvS, 0);
+      collar.scale.setScalar(lInvS);
+      collar.castShadow = false;
+      grp.add(collar);
+      const boneTip = new THREE.Mesh(_legBoneGeo, _neckBoneMat);
+      boneTip.position.set(0, (distalY + 0.026) * lInvS, 0);
+      boneTip.scale.setScalar(lInvS);
+      boneTip.castShadow = false;
+      grp.add(boneTip);
+      for (let c = 0; c < 5; c++) {
+        const ang = (c / 5) * Math.PI * 2;
+        const clot = new THREE.Mesh(_cystGeo, _neckStumpMat);
+        clot.position.set(Math.cos(ang) * 0.044 * lInvS, (distalY + 0.004) * lInvS, Math.sin(ang) * 0.044 * lInvS);
+        clot.scale.set(0.026 * lInvS, 0.020 * lInvS, 0.026 * lInvS);
+        clot.castShadow = false;
+        grp.add(clot);
+      }
+      thighBone.add(grp);
+      return grp;
+    };
+
+    cloned.root.updateMatrixWorld(true);
+    const armStumpL = buildArmStump(bones.leftArm);
+    const armStumpR = buildArmStump(bones.rightArm);
+    const legStumpL = buildLegStump(bones.leftUpLeg);
+    const legStumpR = buildLegStump(bones.rightUpLeg);
+
+    const addWoundPatch = (parentBone, lx, ly, lz, scaleMul) => {
+      if (!parentBone) return null;
+      parentBone.getWorldScale(_v1);
+      const wInvS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
+      const grp = new THREE.Group();
+      grp.visible = false;
+      const disc = new THREE.Mesh(_woundGeo, _woundMat);
+      disc.position.set(lx * wInvS, ly * wInvS, lz * wInvS);
+      disc.rotation.x = Math.PI * 0.5;
+      disc.scale.setScalar(wInvS * (scaleMul || 1.0));
+      disc.castShadow = false;
+      grp.add(disc);
+      const clot = new THREE.Mesh(_cystGeo, _neckStumpMat);
+      clot.position.set(lx * wInvS, ly * wInvS, (lz + 0.006) * wInvS);
+      clot.scale.set(0.022 * wInvS * (scaleMul || 1.0), 0.022 * wInvS * (scaleMul || 1.0), 0.010 * wInvS);
+      clot.castShadow = false;
+      grp.add(clot);
+      parentBone.add(grp);
+      return grp;
+    };
+
+    const woundNodes = [
+      addWoundPatch(bones.spine2, -0.04, 0.05, 0.125, 1.15),
+      addWoundPatch(bones.spine1,  0.05, 0.03, 0.125, 1.10),
+      addWoundPatch(bones.leftArm,  0.0, 0.13, 0.052, 0.85),
+      addWoundPatch(bones.rightArm, 0.0, 0.13, 0.052, 0.85),
+      addWoundPatch(bones.leftUpLeg,  0.0, 0.18, 0.074, 0.95),
+      addWoundPatch(bones.rightUpLeg, 0.0, 0.18, 0.074, 0.95)
+    ];
+
     // Attach bone-mounted bioluminescent cysts & glowing feral eyes for infected/commuter variants
     let spitterNodes = null;
     let screamerNodes = null;
     let runnerEyes = null;
     if (!isSoldier) {
-      if (!_cystGeo) _cystGeo = new THREE.SphereGeometry(1.0, 8, 6);
       if (!_spitterCystMat) {
         _spitterCystMat = new THREE.MeshStandardMaterial({
           color: 0xa8e024,
@@ -1573,8 +1702,6 @@
         });
       }
 
-      cloned.root.updateMatrixWorld(true);
-
       const addCystCluster = (parentBone, mat, specs) => {
         if (!parentBone) return null;
         parentBone.getWorldScale(_v1);
@@ -1594,10 +1721,10 @@
         return grp;
       };
 
-      const isComm = (kind === 'commuter');
-      const eyeZ = isComm ? 0.102 : 0.132;
-      const eyeY = isComm ? 0.085 : 0.080;
-      const eyeX = isComm ? 0.031 : 0.032;
+      // Both infected and new realistic clothed commuter share Zombie.glb facial geometry
+      const eyeZ = 0.132;
+      const eyeY = 0.080;
+      const eyeX = 0.032;
       runnerEyes = addCystCluster(bones.head, _runnerEyeMat, [
         { x: -eyeX, y: eyeY, z: eyeZ, sx: 0.0085, sy: 0.0065, sz: 0.0065 },
         { x:  eyeX, y: eyeY, z: eyeZ, sx: 0.0085, sy: 0.0065, sz: 0.0065 }
@@ -1623,9 +1750,9 @@
 
       screamerNodes = [];
       const scNeck = addCystCluster(bones.neck, _screamerCystMat, [
-        { x: -0.036, y: 0.025, z: 0.045, sx: 0.038, sy: 0.034, sz: 0.032 },
-        { x:  0.036, y: 0.020, z: 0.045, sx: 0.040, sy: 0.036, sz: 0.034 },
-        { x:  0.000, y: 0.010, z: 0.052, sx: 0.034, sy: 0.030, sz: 0.030 }
+        { x: -0.040, y: 0.025, z: 0.070, sx: 0.038, sy: 0.034, sz: 0.032 },
+        { x:  0.040, y: 0.020, z: 0.070, sx: 0.040, sy: 0.036, sz: 0.034 },
+        { x:  0.000, y: 0.010, z: 0.078, sx: 0.034, sy: 0.030, sz: 0.030 }
       ]);
       const scSpine = addCystCluster(bones.spine1, _screamerCystMat, [
         { x: -0.055, y: 0.04, z: 0.118, sx: 0.042, sy: 0.034, sz: 0.030 },
@@ -1647,6 +1774,11 @@
       materials: cloned.materials,
       visorMesh: cloned.visorMesh,
       neckStumpNode,
+      armStumpL,
+      armStumpR,
+      legStumpL,
+      legStumpR,
+      woundNodes,
       runnerEyes,
       spitterNodes,
       screamerNodes
@@ -1707,6 +1839,20 @@
         bloodPoolSpawned: false,
         neckSpurtCount: 0,
         headDmg: 0,
+        armLDmg: 0,
+        armRDmg: 0,
+        legLDmg: 0,
+        legRDmg: 0,
+        lostLeftArm: false,
+        lostRightArm: false,
+        lostLeftLeg: false,
+        lostRightLeg: false,
+        crawling: false,
+        crawlFallTimer: 0,
+        crawlPhase: 0,
+        crawlBloodDist: 0,
+        crippledLeg: 1,
+        woundMask: 0,
         legDmg: 0,
         legCrippled: false,
         hitZone: 'torso',
@@ -2027,25 +2173,35 @@
     }
   }
 
+  function resetRigAttachments(rig) {
+    if (!rig || !rig.root) return;
+    rig.root.visible = false;
+    if (rig.neckStumpNode) rig.neckStumpNode.visible = false;
+    if (rig.armStumpL) rig.armStumpL.visible = false;
+    if (rig.armStumpR) rig.armStumpR.visible = false;
+    if (rig.legStumpL) rig.legStumpL.visible = false;
+    if (rig.legStumpR) rig.legStumpR.visible = false;
+    if (rig.woundNodes) {
+      for (let k = 0; k < rig.woundNodes.length; k++) {
+        if (rig.woundNodes[k]) rig.woundNodes[k].visible = false;
+      }
+    }
+    if (rig.bones) {
+      if (rig.bones.head) rig.bones.head.scale.set(1, 1, 1);
+      if (rig.bones.leftForeArm) rig.bones.leftForeArm.scale.set(1, 1, 1);
+      if (rig.bones.rightForeArm) rig.bones.rightForeArm.scale.set(1, 1, 1);
+      if (rig.bones.leftLeg) rig.bones.leftLeg.scale.set(1, 1, 1);
+      if (rig.bones.rightLeg) rig.bones.rightLeg.scale.set(1, 1, 1);
+    }
+  }
+
   function zeroZombieMatrices(idx) {
     if (_useSkinnedRigs) {
       const slot = _rigPool[idx];
       if (slot) {
-        if (slot.infected && slot.infected.root) {
-          slot.infected.root.visible = false;
-          if (slot.infected.neckStumpNode) slot.infected.neckStumpNode.visible = false;
-          if (slot.infected.bones && slot.infected.bones.head) slot.infected.bones.head.scale.set(1, 1, 1);
-        }
-        if (slot.commuter && slot.commuter.root) {
-          slot.commuter.root.visible = false;
-          if (slot.commuter.neckStumpNode) slot.commuter.neckStumpNode.visible = false;
-          if (slot.commuter.bones && slot.commuter.bones.head) slot.commuter.bones.head.scale.set(1, 1, 1);
-        }
-        if (slot.soldier && slot.soldier.root) {
-          slot.soldier.root.visible = false;
-          if (slot.soldier.neckStumpNode) slot.soldier.neckStumpNode.visible = false;
-          if (slot.soldier.bones && slot.soldier.bones.head) slot.soldier.bones.head.scale.set(1, 1, 1);
-        }
+        resetRigAttachments(slot.infected);
+        resetRigAttachments(slot.commuter);
+        resetRigAttachments(slot.soldier);
       }
       return;
     }
@@ -2124,6 +2280,20 @@
       E.zombies[i].bloodPoolSpawned = false;
       E.zombies[i].neckSpurtCount = 0;
       E.zombies[i].headDmg = 0;
+      E.zombies[i].armLDmg = 0;
+      E.zombies[i].armRDmg = 0;
+      E.zombies[i].legLDmg = 0;
+      E.zombies[i].legRDmg = 0;
+      E.zombies[i].lostLeftArm = false;
+      E.zombies[i].lostRightArm = false;
+      E.zombies[i].lostLeftLeg = false;
+      E.zombies[i].lostRightLeg = false;
+      E.zombies[i].crawling = false;
+      E.zombies[i].crawlFallTimer = 0;
+      E.zombies[i].crawlPhase = 0;
+      E.zombies[i].crawlBloodDist = 0;
+      E.zombies[i].crippledLeg = 1;
+      E.zombies[i].woundMask = 0;
       E.zombies[i].isRoamer = false;
       E.zombies[i].aggroState = 'CHASE';
       E.zombies[i].coarseDt = 0;
@@ -2748,23 +2918,36 @@
     let sinkY = 0;
     let buckleT = 0;
     let layFlatT = 0;
-    const deadDir = z.fallPitchSign || z.fallSign || 1;
+    const isCrawling = (!z.dead && !!z.crawling);
+    const crawlFallT = isCrawling ? Math.min(1.0, (z.crawlFallTimer || 0) / 0.42) : 0;
+    const deadDir = z.crawling ? 1 : (z.fallPitchSign || z.fallSign || 1);
+    let deadLiftY = 0;
     if (z.dead) {
-      buckleT = Math.min(1.0, z.deathTimer / 0.22);
-      const raw2 = Math.max(0.0, Math.min(1.0, (z.deathTimer - 0.14) / 0.34));
-      layFlatT = 1.0 - (1.0 - raw2) * (1.0 - raw2);
-      z.fallAngle = layFlatT * (Math.PI * 0.49) * deadDir + buckleT * (1.0 - layFlatT) * 0.32 * deadDir;
+      if (z.crawling) {
+        const slumpT = Math.min(1.0, z.deathTimer / 0.25);
+        layFlatT = 1.0;
+        z.fallAngle = 1.44 + (Math.PI * 0.49 - 1.44) * slumpT;
+        deadLiftY = (0.115 * (1.0 - slumpT) + 0.095 * slumpT) * sc;
+      } else {
+        buckleT = Math.min(1.0, z.deathTimer / 0.22);
+        const raw2 = Math.max(0.0, Math.min(1.0, (z.deathTimer - 0.14) / 0.34));
+        layFlatT = 1.0 - (1.0 - raw2) * (1.0 - raw2);
+        z.fallAngle = layFlatT * (Math.PI * 0.49) * deadDir + buckleT * (1.0 - layFlatT) * 0.32 * deadDir;
+        deadLiftY = 0.095 * sc * layFlatT;
+      }
       if (z.deathTimer > 10.8) {
         const fadeT = Math.min(1.0, (z.deathTimer - 10.8) / 1.2);
         sinkY = -0.35 * sc * fadeT;
       }
     }
 
-    const deadLiftY = z.dead ? (0.095 * sc * layFlatT) : 0;
-    rig.root.position.set(z.x, z.y + deadLiftY + sinkY, z.z);
+    const rootY = z.dead
+      ? (z.y + deadLiftY + sinkY)
+      : (isCrawling ? (z.y + 0.115 * sc * crawlFallT) : z.y);
+    rig.root.position.set(z.x, rootY, z.z);
     rig.root.rotation.order = 'YXZ';
     rig.root.rotation.set(
-      z.dead ? z.fallAngle : 0,
+      z.dead ? z.fallAngle : (isCrawling ? 1.44 * crawlFallT : 0),
       z.yaw || 0,
       z.dead ? (deadDir * 0.08 * layFlatT * (z.fallSign || 1)) : 0
     );
@@ -2799,9 +2982,17 @@
     const spdSmooth = z.dead ? 0 : (typeof z.actualSpeedSmooth === 'number' ? z.actualSpeedSmooth : (z.speed * mb));
     const walkTimeScale = Math.max(0.05, spdSmooth / (1.24 * sc));
     const runTimeScale = Math.max(0.10, spdSmooth / (3.15 * sc));
+    const isCrippledLimp = (!z.dead && !isCrawling && !!z.legCrippled);
+    const injLeg = z.crippledLeg || 1;
+    const limpStumble = isCrippledLimp
+      ? Math.max(0, Math.sin(timeSec * Math.max(2.6, walkTimeScale * 5.6) + z.seed))
+      : 0;
+    if (isCrippledLimp) {
+      rig.root.position.y += -0.11 * sc - limpStumble * 0.07 * sc;
+    }
 
-    if (z.dead) {
-      // Blend immediately out of Walk/Run stride into Idle before laying corpse flat
+    if (z.dead || isCrawling) {
+      // Blend immediately out of Walk/Run stride into Idle for floor crawl or death collapse
       if (acts.idle) {
         acts.idle.paused = false;
         acts.idle.setEffectiveWeight(1.0);
@@ -2820,7 +3011,7 @@
         acts.zombieWalk.setEffectiveWeight(0);
       }
       if (rig.mixer) {
-        rig.mixer.update(z.deathTimer < 0.35 ? animDt : 0);
+        rig.mixer.update((z.dead && z.deathTimer >= 0.35) ? 0 : animDt);
       }
     } else {
       if (acts.idle) {
@@ -2834,7 +3025,7 @@
       }
 
       if (isBrute) {
-        const isCharging = z.chargeTimer > 0;
+        const isCharging = z.chargeTimer > 0 && !isCrippledLimp;
         if (acts.walk) {
           acts.walk.paused = false;
           acts.walk.setEffectiveWeight(isCharging ? 0 : mb);
@@ -2845,7 +3036,7 @@
           acts.run.setEffectiveWeight(isCharging ? mb : 0);
           acts.run.timeScale = runTimeScale;
         }
-      } else if (z.variant === 'runner' || z.variant === 'screamer') {
+      } else if ((z.variant === 'runner' || z.variant === 'screamer') && !isCrippledLimp) {
         if (acts.run) {
           acts.run.paused = false;
           acts.run.setEffectiveWeight(mb);
@@ -2856,7 +3047,7 @@
           acts.walk.setEffectiveWeight(0);
         }
       } else {
-        // Walker & Spitter: lock full-stride 1.042s Walk clip to actual ground velocity (eliminates foot sliding!)
+        // Walker, Spitter, or crippled zombie: lock Walk clip to actual ground velocity
         if (acts.walk) {
           acts.walk.paused = false;
           acts.walk.setEffectiveWeight(mb);
@@ -2873,7 +3064,7 @@
       }
     }
 
-    // Character-space bone posing (head decapitation stump, articulated death collapse, or alive combat poses)
+    // Character-space bone posing (decapitation, arm stumps, wound patches, death collapse, limp & alive poses)
     rig.root.updateMatrixWorld(true);
     rig.root.getWorldQuaternion(_qRootInv);
     _qRootInv.invert();
@@ -2889,9 +3080,36 @@
         if (rig.neckStumpNode) rig.neckStumpNode.visible = false;
       }
     }
+    const lostL = !!z.lostLeftArm;
+    const lostR = !!z.lostRightArm;
+    const lostLegL = !!z.lostLeftLeg;
+    const lostLegR = !!z.lostRightLeg;
+    if (b.leftForeArm) {
+      b.leftForeArm.scale.setScalar(lostL ? 0.0001 : 1.0);
+      if (rig.armStumpL) rig.armStumpL.visible = lostL;
+    }
+    if (b.rightForeArm) {
+      b.rightForeArm.scale.setScalar(lostR ? 0.0001 : 1.0);
+      if (rig.armStumpR) rig.armStumpR.visible = lostR;
+    }
+    if (b.leftLeg) {
+      b.leftLeg.scale.setScalar(lostLegL ? 0.0001 : 1.0);
+      if (rig.legStumpL) rig.legStumpL.visible = lostLegL;
+    }
+    if (b.rightLeg) {
+      b.rightLeg.scale.setScalar(lostLegR ? 0.0001 : 1.0);
+      if (rig.legStumpR) rig.legStumpR.visible = lostLegR;
+    }
+    if (rig.woundNodes) {
+      const wm = z.woundMask || 0;
+      for (let k = 0; k < rig.woundNodes.length; k++) {
+        const wn = rig.woundNodes[k];
+        if (wn) wn.visible = ((wm & (1 << k)) !== 0);
+      }
+    }
 
     if (z.dead) {
-      const buckleBlend = buckleT * (1.0 - layFlatT);
+      const buckleBlend = z.crawling ? 0 : (buckleT * (1.0 - layFlatT));
       if (buckleBlend > 0.01) {
         applyCharSpaceDelta(b.spine2, _qRootInv, _axisX, 0.24 * deadDir * buckleBlend);
         applyCharSpaceDelta(b.leftUpLeg, _qRootInv, _axisX, -0.35 * deadDir * buckleBlend);
@@ -2902,14 +3120,39 @@
       const flatAlpha = layFlatT * 0.96;
       if (flatAlpha > 0.005) {
         aimBoneInCharSpace(b.leftUpLeg, _qRootInv, 0.20 + limp * 0.05, -0.97, 0.04 * deadDir, flatAlpha);
-        aimBoneInCharSpace(b.leftLeg, _qRootInv, 0.06, -0.99, 0.05 * deadDir, flatAlpha);
+        if (!lostLegL) aimBoneInCharSpace(b.leftLeg, _qRootInv, 0.06, -0.99, 0.05 * deadDir, flatAlpha);
         aimBoneInCharSpace(b.rightUpLeg, _qRootInv, -0.22 + limp * 0.05, -0.97, 0.04 * deadDir, flatAlpha);
-        aimBoneInCharSpace(b.rightLeg, _qRootInv, -0.10, -0.99, 0.05 * deadDir, flatAlpha);
+        if (!lostLegR) aimBoneInCharSpace(b.rightLeg, _qRootInv, -0.10, -0.99, 0.05 * deadDir, flatAlpha);
         aimBoneInCharSpace(b.leftArm, _qRootInv, 0.84, -0.46 + limp * 0.16, 0.05 * deadDir, flatAlpha);
-        aimBoneInCharSpace(b.leftForeArm, _qRootInv, 0.65, 0.72, 0.05 * deadDir, flatAlpha);
+        if (!lostL) aimBoneInCharSpace(b.leftForeArm, _qRootInv, 0.65, 0.72, 0.05 * deadDir, flatAlpha);
         aimBoneInCharSpace(b.rightArm, _qRootInv, -0.84, -0.42 - limp * 0.16, 0.05 * deadDir, flatAlpha);
-        aimBoneInCharSpace(b.rightForeArm, _qRootInv, -0.70, 0.68, 0.05 * deadDir, flatAlpha);
+        if (!lostR) aimBoneInCharSpace(b.rightForeArm, _qRootInv, -0.70, 0.68, 0.05 * deadDir, flatAlpha);
       }
+    } else if (isCrawling) {
+      // Grounded prone crawler kinematics (never floats!): trailing thighs/shins flat, head arched forward, alternating floor-pull arms
+      const trailBlend = 0.50 + 0.42 * crawlFallT;
+      aimBoneInCharSpace(b.leftUpLeg, _qRootInv, 0.14, -0.98, 0.06, trailBlend);
+      if (!lostLegL) aimBoneInCharSpace(b.leftLeg, _qRootInv, 0.06, -0.99, 0.05, trailBlend);
+      aimBoneInCharSpace(b.rightUpLeg, _qRootInv, -0.14, -0.98, 0.06, trailBlend);
+      if (!lostLegR) aimBoneInCharSpace(b.rightLeg, _qRootInv, -0.06, -0.99, 0.05, trailBlend);
+
+      applyCharSpaceDelta(b.spine1, _qRootInv, _axisX, -0.22 * crawlFallT);
+      applyCharSpaceDelta(b.spine2, _qRootInv, _axisX, -0.26 * crawlFallT);
+      applyCharSpaceDelta(b.neck, _qRootInv, _axisX, -0.24 * crawlFallT);
+      applyCharSpaceDelta(b.head, _qRootInv, _axisX, -0.32 * crawlFallT);
+
+      const cp = z.crawlPhase || 0;
+      const pullL = mb > 0.04 ? Math.sin(cp) : 0.45;
+      const pullR = mb > 0.04 ? Math.sin(cp + Math.PI) : -0.35;
+      const lyL = 0.25 + pullL * 0.62;
+      const lzL = 0.24 + Math.max(0, pullL) * 0.12;
+      aimBoneInCharSpace(b.leftArm, _qRootInv, 0.34, lyL, lzL, 0.90);
+      if (!lostL) aimBoneInCharSpace(b.leftForeArm, _qRootInv, 0.16, 0.42 + pullL * 0.50, 0.26, 0.92);
+
+      const lyR = 0.25 + pullR * 0.62;
+      const lzR = 0.24 + Math.max(0, pullR) * 0.12;
+      aimBoneInCharSpace(b.rightArm, _qRootInv, -0.34, lyR, lzR, 0.90);
+      if (!lostR) aimBoneInCharSpace(b.rightForeArm, _qRootInv, -0.16, 0.42 + pullR * 0.50, 0.26, 0.92);
     } else {
       const lungeWave = (z.attackTimer > z.attackCooldown - 0.30)
         ? Math.sin(((z.attackCooldown - z.attackTimer) / 0.30) * Math.PI)
@@ -2941,11 +3184,11 @@
           applyCharSpaceDelta(b.head, _qRootInv, _axisX, -0.26);
           applyCharSpaceDelta(b.head, _qRootInv, _axisZ, limp * 0.10 - thrash * 0.7);
 
-          // Override upright waist-jogging Run arms completely: extend BOTH arms FORWARD toward player (+Z)!
-          aimBoneInCharSpace(b.leftArm, _qRootInv, 0.12, -0.02 + swayL, 0.99, 0.92);
-          aimBoneInCharSpace(b.leftForeArm, _qRootInv, -0.10, 0.12 + swayL, 0.98, 0.95);
-          aimBoneInCharSpace(b.rightArm, _qRootInv, -0.12, -0.02 + swayR, 0.99, 0.92);
-          aimBoneInCharSpace(b.rightForeArm, _qRootInv, 0.10, 0.12 + swayR, 0.98, 0.95);
+          // Override upright waist-jogging Run arms completely: extend intact arm(s) FORWARD toward player (+Z)!
+          aimBoneInCharSpace(b.leftArm, _qRootInv, 0.12, (lostL ? -0.45 : -0.02) + swayL, lostL ? 0.65 : 0.99, lostL ? 0.65 : 0.92);
+          if (!lostL) aimBoneInCharSpace(b.leftForeArm, _qRootInv, -0.10, 0.12 + swayL, 0.98, 0.95);
+          aimBoneInCharSpace(b.rightArm, _qRootInv, -0.12, (lostR ? -0.45 : -0.02) + swayR, lostR ? 0.65 : 0.99, lostR ? 0.65 : 0.92);
+          if (!lostR) aimBoneInCharSpace(b.rightForeArm, _qRootInv, 0.10, 0.12 + swayR, 0.98, 0.95);
         }
       } else if (isBrute) {
         const chgPitch = z.chargeTimer > 0 ? 0.22 : (z.chargeWindup > 0 ? 0.14 : 0.06);
@@ -2954,7 +3197,7 @@
         applyCharSpaceDelta(b.head, _qRootInv, _axisX, -0.12);
         if (z.chargeTimer > 0 || lungeWave > 0.05) {
           aimBoneInCharSpace(b.rightArm, _qRootInv, -0.18, -0.22, 0.96, 0.75);
-          aimBoneInCharSpace(b.rightForeArm, _qRootInv, 0.20, 0.28, 0.94, 0.75);
+          if (!lostR) aimBoneInCharSpace(b.rightForeArm, _qRootInv, 0.20, 0.28, 0.94, 0.75);
         }
       } else {
         // Walker & Spitter: ~24 deg hunched shamble, asymmetric limp roll, head cocked & leering up, reaching claw arm(s)
@@ -2977,19 +3220,31 @@
         applyCharSpaceDelta(b.head, _qRootInv, _axisZ, headCock);
 
         const reachWave = Math.sin(timeSec * 2.8 + z.seed) * 0.08 + lungeWave * 0.22;
-        if (limp < 0) {
-          // Strong Left arm reaching forward (+Z) clawing; Right arm hanging/dragging lower
+        // Reach forward with intact strong arm (switch to other intact arm if primary arm was severed)
+        const reachLeft = (!lostL && (limp < 0 || lostR));
+        if (reachLeft) {
           aimBoneInCharSpace(b.leftArm, _qRootInv, 0.12, -0.16 + reachWave, 0.98, 0.88);
           aimBoneInCharSpace(b.leftForeArm, _qRootInv, -0.12, -0.02 + reachWave, 0.99, 0.90);
           aimBoneInCharSpace(b.rightArm, _qRootInv, -0.16, -0.78, 0.60, 0.62);
-          aimBoneInCharSpace(b.rightForeArm, _qRootInv, -0.08, -0.50, 0.86, 0.62);
+          if (!lostR) aimBoneInCharSpace(b.rightForeArm, _qRootInv, -0.08, -0.50, 0.86, 0.62);
         } else {
-          // Strong Right arm reaching forward (+Z) clawing; Left arm hanging/dragging lower
-          aimBoneInCharSpace(b.rightArm, _qRootInv, -0.12, -0.16 + reachWave, 0.98, 0.88);
-          aimBoneInCharSpace(b.rightForeArm, _qRootInv, 0.12, -0.02 + reachWave, 0.99, 0.90);
+          aimBoneInCharSpace(b.rightArm, _qRootInv, -0.12, (lostR ? -0.52 : -0.16) + reachWave, lostR ? 0.72 : 0.98, lostR ? 0.65 : 0.88);
+          if (!lostR) aimBoneInCharSpace(b.rightForeArm, _qRootInv, 0.12, -0.02 + reachWave, 0.99, 0.90);
           aimBoneInCharSpace(b.leftArm, _qRootInv, 0.16, -0.78, 0.60, 0.62);
-          aimBoneInCharSpace(b.leftForeArm, _qRootInv, 0.08, -0.50, 0.86, 0.62);
+          if (!lostL) aimBoneInCharSpace(b.leftForeArm, _qRootInv, 0.08, -0.50, 0.86, 0.62);
         }
+      }
+
+      // True asymmetrical leg-shot limp pose (weight shifted onto healthy leg, injured leg stiff & dragging)
+      if (isCrippledLimp) {
+        const tilt = -injLeg * (0.16 + 0.14 * limpStumble);
+        applyCharSpaceDelta(b.spine, _qRootInv, _axisZ, tilt);
+        applyCharSpaceDelta(b.spine2, _qRootInv, _axisZ, tilt * 0.75);
+        applyCharSpaceDelta(b.spine2, _qRootInv, _axisX, 0.16 + 0.16 * limpStumble);
+        const injUp = injLeg >= 0 ? b.leftUpLeg : b.rightUpLeg;
+        const injLow = injLeg >= 0 ? b.leftLeg : b.rightLeg;
+        aimBoneInCharSpace(injUp, _qRootInv, injLeg * 0.16, -0.92, -0.32 + limpStumble * 0.16, 0.72);
+        aimBoneInCharSpace(injLow, _qRootInv, injLeg * 0.10, -0.94, -0.28, 0.75);
       }
     }
   }
@@ -3076,9 +3331,10 @@
               ? (0.24 + 0.16 * mb + Math.sin(timeSec * 6.0 + z.seed) * 0.03)
               : (0.22 + 0.08 * mb + idleBreath * 0.025));
 
+    const isLegHitZone = z.hitZone === 'legs' || z.hitZone === 'leftLeg' || z.hitZone === 'rightLeg';
     if (z.staggerTimer > 0 && !z.dead) {
       const stagT = Math.min(1.0, z.staggerTimer / 0.35);
-      torsoPitch -= (z.hitZone === 'legs' ? -0.18 : 0.12) * stagT;
+      torsoPitch -= (isLegHitZone ? -0.18 : 0.12) * stagT;
     }
     if (z.chargeWindup > 0 && !z.dead) torsoPitch += 0.24;
     if (z.shriekTimer > 0 && !z.dead) torsoPitch = -0.26;
@@ -3103,7 +3359,7 @@
     const walkBob = z.dead ? 0 : (Math.abs(Math.sin(phase)) * (z.variant === 'runner' ? 0.048 : (z.variant === 'brute' ? 0.036 : 0.026)) - 0.012) * mb * s;
     const variantHipBase = z.variant === 'runner' ? (0.768 - 0.048 * mb) : (z.variant === 'screamer' ? 0.752 : 0.778);
     const crippleDrop = (!z.dead && z.legCrippled) ? 0.14 * s : 0;
-    const stagLegDrop = (!z.dead && z.staggerTimer > 0 && z.hitZone === 'legs') ? 0.12 * s * Math.min(1.0, z.staggerTimer / 0.42) : 0;
+    const stagLegDrop = (!z.dead && z.staggerTimer > 0 && isLegHitZone) ? 0.12 * s * Math.min(1.0, z.staggerTimer / 0.42) : 0;
     const hipHeight = z.dead
       ? (0.778 * s * (1.0 - 0.46 * deadStage1) * (1.0 - deadStage2) + 0.15 * s * deadStage2)
       : (variantHipBase * s - crippleDrop - stagLegDrop + walkBob);
@@ -3299,13 +3555,17 @@
       _m4.compose(_v1, _qUpper, _scale);
       uaMesh.setMatrixAt(idx, _m4);
 
-      // Compose forearm orientation cleanly on top of upper-arm quaternion
-      _vJointLocal.set(0, -0.255 * s, 0).applyQuaternion(_qUpper).add(_v1);
-      _e1.set(-elbowFlex, 0, side * 0.08, 'YXZ');
-      _qLocal.setFromEuler(_e1);
-      _q1.copy(_qUpper).multiply(_qLocal);
-      _m4.compose(_vJointLocal, _q1, _scale);
-      faMesh.setMatrixAt(idx, _m4);
+      // Compose forearm orientation cleanly on top of upper-arm quaternion (hide if dismembered)
+      if ((side < 0 && z.lostLeftArm) || (side > 0 && z.lostRightArm)) {
+        faMesh.setMatrixAt(idx, _zeroMat);
+      } else {
+        _vJointLocal.set(0, -0.255 * s, 0).applyQuaternion(_qUpper).add(_v1);
+        _e1.set(-elbowFlex, 0, side * 0.08, 'YXZ');
+        _qLocal.setFromEuler(_e1);
+        _q1.copy(_qUpper).multiply(_qLocal);
+        _m4.compose(_vJointLocal, _q1, _scale);
+        faMesh.setMatrixAt(idx, _m4);
+      }
     }
 
     // 5. Articulated Two-Segment Legs (Pelvis -> Hip -> Knee -> Heel-Strike/Stance/Toe-Off Calf & Boot)
@@ -3344,10 +3604,14 @@
       thighMesh.setMatrixAt(idx, _m4);
 
       _vKnee.set(0, -0.375 * s, 0).applyQuaternion(_q1).add(_v1);
-      _e1.set(thighPitch + kneeFlex, z.yaw + hipYaw, side * -0.02, 'YXZ');
-      _q1.setFromEuler(_e1);
-      _m4.compose(_vKnee, _q1, _scale);
-      calfMesh.setMatrixAt(idx, _m4);
+      if ((side < 0 && z.lostLeftLeg) || (side > 0 && z.lostRightLeg)) {
+        calfMesh.setMatrixAt(idx, _zeroMat);
+      } else {
+        _e1.set(thighPitch + kneeFlex, z.yaw + hipYaw, side * -0.02, 'YXZ');
+        _q1.setFromEuler(_e1);
+        _m4.compose(_vKnee, _q1, _scale);
+        calfMesh.setMatrixAt(idx, _m4);
+      }
     }
   }
 

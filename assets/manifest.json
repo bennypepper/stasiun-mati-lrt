@@ -453,8 +453,8 @@
       "id": "zombie_commuter",
       "category": "enemy",
       "gltf": "assets/models/zombie_commuter/zombie_commuter.glb",
-      "binBytes": 357072,
-      "totalBytes": 357072,
+      "binBytes": 773204,
+      "totalBytes": 773204,
       "files": 1
     },
     "zombie_infected": {

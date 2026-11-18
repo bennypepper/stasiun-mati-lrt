@@ -1124,25 +1124,58 @@
     }
 
     // TILE 6 (512..1024, 360..512): PANGGIL KERETA Console + Loket Header
-    // Call Train Console (512..768)
-    ctx.fillStyle = '#1B2430';
+    // Call Train Emergency Stanchion Faceplate (512..768, 360..512)
+    ctx.fillStyle = '#1E2530';
     ctx.fillRect(512, 360, 256, 152);
-    ctx.fillStyle = '#E5D429';
-    ctx.fillRect(528, 376, 224, 42);
-    ctx.fillStyle = '#181A1C';
-    ctx.font = 'bold 17px sans-serif';
-    ctx.fillText('PANGGIL KERETA LRT', 542, 403);
-    ctx.fillStyle = '#16A34A';
-    ctx.beginPath();
-    ctx.arc(640, 458, 30, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.strokeStyle = '#94A3B8';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(518, 366, 244, 140);
+    ctx.fillStyle = '#0F2A4A';
+    ctx.fillRect(524, 372, 232, 40);
+    ctx.fillStyle = '#38BDF8';
+    ctx.fillRect(524, 410, 232, 4);
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 15px sans-serif';
-    ctx.fillText('TEKAN [E]', 602, 464);
-    etx.fillStyle = '#22C55E';
+    ctx.font = 'bold 17px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('PANGGIL KERETA LRT', 640, 392);
+    // Stainless speaker grill dots on left + illuminated push button on right
+    for (let gr = 0; gr < 4; gr++) {
+      for (let gc = 0; gc < 4; gc++) {
+        ctx.fillStyle = '#0B1017';
+        ctx.beginPath();
+        ctx.arc(548 + gc * 12, 438 + gr * 12, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.fillStyle = '#064E3B';
+    ctx.beginPath();
+    ctx.arc(680, 456, 30, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#34D399';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.fillStyle = '#ECFDF5';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillText('TEKAN [E]', 680, 457);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+
+    etx.fillStyle = '#0B1424';
+    etx.fillRect(524, 372, 232, 40);
+    etx.fillStyle = '#10B981';
+    etx.fillRect(524, 410, 232, 4);
+    etx.fillStyle = '#E2E8F0';
+    etx.font = 'bold 17px sans-serif';
+    etx.textAlign = 'center';
+    etx.textBaseline = 'middle';
+    etx.fillText('PANGGIL KERETA LRT', 640, 392);
+    etx.fillStyle = '#10B981';
     etx.beginPath();
-    etx.arc(640, 458, 28, 0, Math.PI * 2);
+    etx.arc(680, 456, 26, 0, Math.PI * 2);
     etx.fill();
+    etx.textAlign = 'left';
+    etx.textBaseline = 'alphabetic';
 
     // Loket Ticket Counter Header (768..1024)
     ctx.fillStyle = '#142C52';

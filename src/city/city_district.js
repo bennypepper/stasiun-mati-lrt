@@ -12,8 +12,6 @@
       const paperGeo = new THREE.BoxGeometry(0.22, 0.010, 0.29);
       const lineGeo = new THREE.BoxGeometry(0.145, 0.004, 0.012);
       const stampGeo = new THREE.BoxGeometry(0.044, 0.004, 0.026);
-      const glintGeo = new THREE.PlaneGeometry(0.46, 0.46);
-      glintGeo.rotateX(-Math.PI * 0.5);
 
       const folderMat = new THREE.MeshStandardMaterial({ color: 0xd4ab6a, roughness: 0.72, metalness: 0.04 });
       const paperMat = new THREE.MeshStandardMaterial({
@@ -32,16 +30,17 @@
         metalness: 0.0
       });
 
-      city.disposableGeometries.push(folderGeo, tabGeo, paperGeo, lineGeo, stampGeo, glintGeo);
+      city.disposableGeometries.push(folderGeo, tabGeo, paperGeo, lineGeo, stampGeo);
       city.disposableMaterials.push(folderMat, paperMat, inkMat, stampMat);
       city._fieldLogPropAssets = {
-        folderGeo, tabGeo, paperGeo, lineGeo, stampGeo, glintGeo,
+        folderGeo, tabGeo, paperGeo, lineGeo, stampGeo,
         folderMat, paperMat, inkMat, stampMat
       };
     }
 
     const a = city._fieldLogPropAssets;
     city._fieldLogGlints = city._fieldLogGlints || [];
+    city._perimeterHalos = city._perimeterHalos || [];
 
     const grp = new THREE.Group();
     grp.name = 'CityFieldLogProp_' + id;
@@ -75,26 +74,16 @@
     stamp.rotation.y = 0.24;
     grp.add(stamp);
 
-    const glintMat = new THREE.MeshBasicMaterial({
-      color: 0xffd27d,
-      transparent: true,
-      opacity: 0.30,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide
-    });
-    city.disposableMaterials.push(glintMat);
-    const glint = new THREE.Mesh(a.glintGeo, glintMat);
-    glint.position.set(0, 0.004, 0);
-    glint.visible = !used;
-    grp.add(glint);
-
-    city._fieldLogGlints.push({
-      id: id,
-      mesh: glint,
-      mat: glintMat,
-      used: !!used
-    });
+    // Universal perimeter silhouette halo around the folder prop (zero flat glint quads!)
+    if (typeof LRT !== 'undefined' && LRT.Render && typeof LRT.Render.attachPerimeterHalo === 'function') {
+      const halo = LRT.Render.attachPerimeterHalo(grp, {
+        color: 0xfacc15,
+        hoverColor: 0xfacc15,
+        thicknessScale: 0.90,
+        initialMode: used ? 'off' : 'subtle'
+      });
+      city._perimeterHalos.push({ id: id, halo: halo, used: !!used, x: x, y: y, z: z });
+    }
   }
 
   function createDistrictBuilder(city, arch, rng, root, o) {
@@ -1226,13 +1215,10 @@
     for (let fr = 0; fr < fenceRuns.length; fr++) {
       const run = fenceRuns[fr];
       if (run.z1 <= run.z0 + 1.0) continue;
-      // Leave 4m pedestrian crossing opening centered at track aprons if close to platform end
+      // Continuous welded BRC V-mesh security fence panels along rail right-of-way
       for (let fz = run.z0 + 1.0; fz <= run.z1 - 1.0; fz += 2.0) {
-        fencePlacements.push({ x: run.x, y: SIDEWALK_Y, z: fz, ry: run.ry, sy: 0.72 });
-        addCylinder(bSteelDark, 0.045, 0.05, 1.80, 6, run.x, SIDEWALK_Y + 0.90, fz - 1.0);
+        fencePlacements.push({ x: run.x, y: SIDEWALK_Y, z: fz, ry: run.ry, sx: 0.85, sy: 1.0 });
       }
-      addCylinder(bSteelDark, 0.045, 0.05, 1.80, 6, run.x, SIDEWALK_Y + 0.90, run.z1);
-      addBox(bSteelDark, 0.06, 0.05, run.z1 - run.z0, run.x, SIDEWALK_Y + 1.76, (run.z0 + run.z1) * 0.5);
       city._addCollider(run.x - 0.14, SIDEWALK_Y, run.z0, run.x + 0.14, SIDEWALK_Y + 1.8, run.z1, 'metal', { blocksBullets: false });
       addBox(bCollHull, 0.12, 1.8, run.z1 - run.z0, run.x, SIDEWALK_Y + 0.9, (run.z0 + run.z1) * 0.5);
     }
@@ -1786,13 +1772,7 @@
         { cx: cMinX - 0.30, x0: cMinX - 0.68, x1: cMinX + 0.08, postX: cMinX - 0.62, barrierX: cMinX - 0.35 },
         { cx: cMaxX + 0.30, x0: cMaxX - 0.08, x1: cMaxX + 0.68, postX: cMaxX + 0.62, barrierX: cMaxX + 0.35 }
       ]) {
-        addBox(bSteelDark, 0.14, 2.35, 0.14, side.postX, SIDEWALK_Y + 1.175, gz);
-        addBox(bSteelDark, 0.72, 0.08, 0.08, side.cx, SIDEWALK_Y + 2.25, gz);
-        addBox(bSteelDark, 0.72, 0.08, 0.08, side.cx, SIDEWALK_Y + 1.20, gz);
-        addBox(bSteelDark, 0.72, 0.08, 0.08, side.cx, SIDEWALK_Y + 0.22, gz);
-        for (const pxOff of [-0.22, 0.0, 0.22]) {
-          addBox(bSteelDark, 0.05, 2.15, 0.05, side.cx + pxOff, SIDEWALK_Y + 1.15, gz);
-        }
+        fencePlacements.push({ x: side.cx, y: SIDEWALK_Y, z: gz, ry: 0, sx: 0.32, sy: 1.15 });
         city._addCollider(side.x0, RAIL_TOP_Y, gz - 0.35, side.x1, RAIL_TOP_Y + 3.5, gz + 0.35, 'metal', {
           blocksWalk: true, blocksBullets: false
         });
@@ -1909,13 +1889,10 @@
         addBox(bCornerRed, 0.90, 0.26, 0.08, cx, SIDEWALK_Y + 3.25, tentZ - 2.56);
         addBox(bCornerRed, 0.26, 0.90, 0.08, cx, SIDEWALK_Y + 3.25, tentZ - 2.56);
         addBox(bCornerWarmBulb, 1.6, 0.08, 0.14, cx, SIDEWALK_Y + 2.86, tentZ);
-        // Main medical examination table & interactive Kotak Medis Darurat PMI
+        // Main medical examination table (interactive Kotak Medis PMI mesh added with perimeter halo in Stage 14)
         const medX = cx + 0.25, medZ = 101.3;
         addBox(bSteelDark, 2.1, 0.76, 0.90, medX, SIDEWALK_Y + 0.38, medZ);
         addBox(bCornerWhite, 2.2, 0.08, 0.96, medX, SIDEWALK_Y + 0.80, medZ);
-        addBox(bCornerWhite, 0.56, 0.24, 0.38, medX, SIDEWALK_Y + 0.96, medZ);
-        addBox(bCornerRed, 0.24, 0.06, 0.06, medX, SIDEWALK_Y + 1.09, medZ);
-        addBox(bCornerRed, 0.06, 0.06, 0.24, medX, SIDEWALK_Y + 1.09, medZ);
         // IV drip stand beside triage table
         addCylinder(bSteelDark, 0.025, 0.03, 2.05, 6, medX + 1.35, SIDEWALK_Y + 1.025, medZ + 0.15);
         addBox(bCornerWhite, 0.14, 0.22, 0.08, medX + 1.25, SIDEWALK_Y + 1.88, medZ + 0.15);
@@ -2150,9 +2127,7 @@
         addBox(bSteelDark, 0.96, 0.06, 0.48, warX + 0.85, SIDEWALK_Y + 0.93, warZ + 1.05);
         addBox(bCornerGlass, 0.92, 0.54, 0.44, warX + 0.85, SIDEWALK_Y + 1.23, warZ + 1.05);
         addBox(bCornerWarmBulb, 0.78, 0.06, 0.10, warX + 0.85, SIDEWALK_Y + 1.46, warZ + 1.05);
-        // Interactive Red/Silver Kopi Thermos & snack jar on front counter (city_se_warung)
-        addCylinder(bCornerRed, 0.11, 0.11, 0.36, 8, warX - 0.65, SIDEWALK_Y + 1.10, warZ + 1.08);
-        addCylinder(bSteelDark, 0.08, 0.10, 0.08, 8, warX - 0.65, SIDEWALK_Y + 1.32, warZ + 1.08);
+        // Snack jar on front counter (interactive Red/Silver Kopi Thermos added with perimeter halo in Stage 14)
         addCylinder(bCornerGlass, 0.09, 0.09, 0.24, 8, warX - 0.30, SIDEWALK_Y + 1.04, warZ + 1.08);
         // Festive warm string bulbs draped across Poskamling & Warung facade
         const strX0 = posX - 1.5, strX1 = warX + 1.6, strZ = -99.85;
@@ -2379,10 +2354,7 @@
     const protoLamp = P.getStreetLampProto();
     const protosCar = city._extractModelLodProtos('covered_car', 1.65);
     const protoBarrier = P.getRoadBarrierProto();
-    const protosFence = city._extractModelLodProtos('modular_chainlink_fence', 2.35,
-      (n) => n.name === 'modular_chainlink_fence_double',
-      { x: -1.0, y: 0, z: 0.02 }
-    );
+    const protoFence = P.getWeldedWireFenceProto();
     const protoPole1 = P.getPowerPoleProto(0);
     const protoPole2 = P.getPowerPoleProto(1);
     const protoHydrant = P.getFireHydrantProto();
@@ -2407,7 +2379,7 @@
     city._emitInstancedProto(protoLamp, lampPlacements, false, false, 'StreetLamp');
     emitSpatialLodBatches(protosCar, carPlacements, 'CoveredCar', true, 0, 0, null);
     city._emitInstancedProto(protoBarrier, barrierPlacements, false, true, 'RoadBarrier');
-    emitSpatialLodBatches(protosFence, fencePlacements, 'ChainlinkFence', true, 0, 0, null);
+    city._emitInstancedProto(protoFence, fencePlacements, false, true, 'WeldedWireFence');
     city._emitInstancedProto(protoPole1, pole1Placements, false, false, 'PowerPoleA');
     city._emitInstancedProto(protoPole2, pole2Placements, false, false, 'PowerPoleB');
     city._emitInstancedProto(protoHydrant, hydrantPlacements, false, true, 'FireHydrant');
@@ -2792,6 +2764,16 @@
     plnGroup.add(doorLatch, leverArm, leverGrip, plnBeaconM);
     root.add(plnGroup);
     city._addCollider(plnX - 0.50, SIDEWALK_Y, plnZ - 0.74, plnX + 0.50, SIDEWALK_Y + 1.98, plnZ + 0.74, 'metal');
+    if (typeof LRT !== 'undefined' && LRT.Render && typeof LRT.Render.attachPerimeterHalo === 'function') {
+      city._perimeterHalos = city._perimeterHalos || [];
+      const plnHalo = LRT.Render.attachPerimeterHalo(plnGroup, {
+        color: 0xfacc15,
+        hoverColor: 0xfacc15,
+        objectiveColor: 0xfde047,
+        initialMode: plnUsed ? 'off' : 'objective'
+      });
+      city._perimeterHalos.push({ id: 'city_pln_box', halo: plnHalo, used: !!plnUsed, isObjective: true, x: plnX - 0.35, y: SIDEWALK_Y + 1.25, z: plnZ });
+    }
 
     city.interactables.push({
       id: 'city_pln_box',
@@ -2861,84 +2843,141 @@
       });
     }
 
-    // 4 Far-Corner Exploration Hub Rewards & Field Notes (NW, NE, SW, SE)
+    // 4 Far-Corner Exploration Hub Rewards & Field Notes (NW, NE, SW, SE) — Universal Perimeter Halo (zero RingGeometry!)
     city._streetBeacons = city._streetBeacons || {};
-    const addCornerBeacon = (id, bx, by, bz, hexColor) => {
-      const ringGeo = new THREE.RingGeometry(0.42, 0.56, 20);
-      ringGeo.rotateX(-Math.PI * 0.5);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: hexColor,
-        transparent: true,
-        opacity: usedSet.has(id) ? 0.08 : 0.62,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.DoubleSide
-      });
-      city.disposableGeometries.push(ringGeo);
-      city.disposableMaterials.push(ringMat);
-      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-      ringMesh.position.set(bx, by, bz);
-      ringMesh.visible = !usedSet.has(id);
-      root.add(ringMesh);
-      city._streetBeacons[id] = { mesh: ringMesh, mat: ringMat, used: usedSet.has(id) };
+    city._perimeterHalos = city._perimeterHalos || [];
+    const attachCornerHalo = (id, targetMesh, hx, hy, hz) => {
+      const used = usedSet.has(id);
+      if (typeof LRT !== 'undefined' && LRT.Render && typeof LRT.Render.attachPerimeterHalo === 'function' && targetMesh) {
+        const halo = LRT.Render.attachPerimeterHalo(targetMesh, {
+          color: 0xfacc15,
+          hoverColor: 0xfacc15,
+          thicknessScale: 0.95,
+          initialMode: used ? 'off' : 'subtle'
+        });
+        city._perimeterHalos.push({ id: id, halo: halo, used: used, x: hx, y: hy, z: hz });
+        city._streetBeacons[id] = { halo: halo, used: used };
+      }
     };
 
+    // NW Corner Interactive PMI Trauma Kit Mesh
     const nwMedUsed = usedSet.has('city_nw_medpost');
+    const nwMedX = cornerHubCoords.NW.cx + 0.25, nwMedY = SIDEWALK_Y + 0.84, nwMedZ = 101.3;
+    const nwMedGrp = new THREE.Group();
+    nwMedGrp.name = 'CornerNW_Medpost';
+    nwMedGrp.position.set(nwMedX, nwMedY, nwMedZ);
+    const nwMatW = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.48, metalness: 0.12 });
+    const nwMatR = new THREE.MeshStandardMaterial({ color: 0xd92626, roughness: 0.40, metalness: 0.15 });
+    const nwBoxGeo = new THREE.BoxGeometry(0.56, 0.24, 0.38);
+    const nwCrossAGeo = new THREE.BoxGeometry(0.24, 0.04, 0.06);
+    const nwCrossBGeo = new THREE.BoxGeometry(0.06, 0.04, 0.24);
+    city.disposableGeometries.push(nwBoxGeo, nwCrossAGeo, nwCrossBGeo);
+    city.disposableMaterials.push(nwMatW, nwMatR);
+    const nwBoxM = new THREE.Mesh(nwBoxGeo, nwMatW); nwBoxM.position.y = 0.12;
+    const nwCA = new THREE.Mesh(nwCrossAGeo, nwMatR); nwCA.position.y = 0.25;
+    const nwCB = new THREE.Mesh(nwCrossBGeo, nwMatR); nwCB.position.y = 0.25;
+    nwMedGrp.add(nwBoxM, nwCA, nwCB);
+    root.add(nwMedGrp);
+    attachCornerHalo('city_nw_medpost', nwMedGrp, nwMedX, nwMedY + 0.12, nwMedZ);
     city.interactables.push({
       id: 'city_nw_medpost',
       type: 'corner_medpost',
       corner: 'NW',
-      x: cornerHubCoords.NW.cx + 0.25,
+      x: nwMedX,
       y: SIDEWALK_Y + 0.96,
-      z: 101.3,
+      z: nwMedZ,
       label: nwMedUsed ? '[E] Kotak Medis Darurat PMI (Sudah Diambil)' : '[E] Ambil Kotak Medis Darurat PMI (+35 Armor & +25 HP)',
       prompt: nwMedUsed ? '[E] Kotak Medis Darurat PMI (Sudah Diambil)' : '[E] Ambil Kotak Medis Darurat PMI (+35 Armor & +25 HP)',
       used: nwMedUsed
     });
-    addCornerBeacon('city_nw_medpost', cornerHubCoords.NW.cx + 0.25, SIDEWALK_Y + 0.86, 101.3, 0x38bdf8);
 
+    // NE Corner Interactive Expedition Supply Pack atop Dock Chest
     const neDockY = SIDEWALK_Y + 0.62;
     const neDepotUsed = usedSet.has('city_ne_depot');
+    const neDepX = cornerHubCoords.NE.cx + 0.5, neDepY = neDockY + 0.73, neDepZ = 102.3;
+    const nePackGrp = new THREE.Group();
+    nePackGrp.name = 'CornerNE_DepotPack';
+    nePackGrp.position.set(neDepX + 0.22, neDepY, neDepZ);
+    const nePackMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.42, metalness: 0.68 });
+    const neBandMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.35, metalness: 0.35 });
+    const nePackGeo = new THREE.BoxGeometry(0.32, 0.18, 0.24);
+    const neBandGeo = new THREE.BoxGeometry(0.34, 0.04, 0.06);
+    city.disposableGeometries.push(nePackGeo, neBandGeo);
+    city.disposableMaterials.push(nePackMat, neBandMat);
+    const nePackM = new THREE.Mesh(nePackGeo, nePackMat); nePackM.position.y = 0.09;
+    const neBandM = new THREE.Mesh(neBandGeo, neBandMat); neBandM.position.y = 0.16;
+    nePackGrp.add(nePackM, neBandM);
+    root.add(nePackGrp);
+    attachCornerHalo('city_ne_depot', nePackGrp, neDepX, neDockY + 0.55, neDepZ);
     city.interactables.push({
       id: 'city_ne_depot',
       type: 'corner_depot',
       corner: 'NE',
-      x: cornerHubCoords.NE.cx + 0.5,
+      x: neDepX,
       y: neDockY + 0.55,
-      z: 102.3,
+      z: neDepZ,
       label: neDepotUsed ? '[E] Peti Logistik Gudang Utara (Sudah Diambil)' : '[E] Bongkar Peti Logistik Gudang Utara (Amunisi Penuh & Heavy Ammo)',
       prompt: neDepotUsed ? '[E] Peti Logistik Gudang Utara (Sudah Diambil)' : '[E] Bongkar Peti Logistik Gudang Utara (Amunisi Penuh & Heavy Ammo)',
       used: neDepotUsed
     });
-    addCornerBeacon('city_ne_depot', cornerHubCoords.NE.cx + 0.5, neDockY + 0.72, 102.3, 0xfbbf24);
 
+    // SW Corner Interactive Tactical Ordnance Pouch atop Convoy Chest
     const swConvoyUsed = usedSet.has('city_sw_convoy');
+    const swX = cornerHubCoords.SW.cx + 1.8, swY = SIDEWALK_Y + 0.65, swZ = -101.2;
+    const swPackGrp = new THREE.Group();
+    swPackGrp.name = 'CornerSW_OrdnancePack';
+    swPackGrp.position.set(swX + 0.24, swY, swZ);
+    const swPackMat = new THREE.MeshStandardMaterial({ color: 0x3b4836, roughness: 0.58, metalness: 0.35 });
+    const swStrapMat = new THREE.MeshStandardMaterial({ color: 0xd9a738, roughness: 0.32, metalness: 0.78 });
+    const swPackGeo = new THREE.BoxGeometry(0.34, 0.16, 0.26);
+    const swStrapGeo = new THREE.BoxGeometry(0.10, 0.18, 0.28);
+    city.disposableGeometries.push(swPackGeo, swStrapGeo);
+    city.disposableMaterials.push(swPackMat, swStrapMat);
+    const swPackM = new THREE.Mesh(swPackGeo, swPackMat); swPackM.position.y = 0.08;
+    const swStrapM = new THREE.Mesh(swStrapGeo, swStrapMat); swStrapM.position.y = 0.09;
+    swPackGrp.add(swPackM, swStrapM);
+    root.add(swPackGrp);
+    attachCornerHalo('city_sw_convoy', swPackGrp, swX, swY, swZ);
     city.interactables.push({
       id: 'city_sw_convoy',
       type: 'corner_convoy',
       corner: 'SW',
-      x: cornerHubCoords.SW.cx + 1.8,
+      x: swX,
       y: SIDEWALK_Y + 0.65,
-      z: -101.2,
+      z: swZ,
       label: swConvoyUsed ? '[E] Peti Amunisi Konvoi Militer (Sudah Diambil)' : '[E] Ambil Peti Amunisi Konvoi Militer (+25 Armor & +2 Mag)',
       prompt: swConvoyUsed ? '[E] Peti Amunisi Konvoi Militer (Sudah Diambil)' : '[E] Ambil Peti Amunisi Konvoi Militer (+25 Armor & +2 Mag)',
       used: swConvoyUsed
     });
-    addCornerBeacon('city_sw_convoy', cornerHubCoords.SW.cx + 1.8, SIDEWALK_Y + 0.66, -101.2, 0x4ade80);
 
+    // SE Corner Interactive Red/Silver Kopi Thermos on Warung Counter
     const seWarungUsed = usedSet.has('city_se_warung');
+    const seX = cornerHubCoords.SE.cx + 2.35, seY = SIDEWALK_Y + 0.90, seZ = -100.12;
+    const seThermosGrp = new THREE.Group();
+    seThermosGrp.name = 'CornerSE_KopiThermos';
+    seThermosGrp.position.set(seX, seY, seZ);
+    const seRedMat = new THREE.MeshStandardMaterial({ color: 0xd92626, roughness: 0.35, metalness: 0.25 });
+    const seCapMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.26, metalness: 0.84 });
+    const seBodyGeo = new THREE.CylinderGeometry(0.11, 0.11, 0.36, 10);
+    const seCapGeo = new THREE.CylinderGeometry(0.08, 0.10, 0.08, 10);
+    city.disposableGeometries.push(seBodyGeo, seCapGeo);
+    city.disposableMaterials.push(seRedMat, seCapMat);
+    const seBodyM = new THREE.Mesh(seBodyGeo, seRedMat); seBodyM.position.y = 0.18;
+    const seCapM = new THREE.Mesh(seCapGeo, seCapMat); seCapM.position.y = 0.40;
+    seThermosGrp.add(seBodyM, seCapM);
+    root.add(seThermosGrp);
+    attachCornerHalo('city_se_warung', seThermosGrp, seX, seY + 0.15, seZ);
     city.interactables.push({
       id: 'city_se_warung',
       type: 'corner_warung',
       corner: 'SE',
-      x: cornerHubCoords.SE.cx + 2.35,
+      x: seX,
       y: SIDEWALK_Y + 1.05,
-      z: -100.12,
+      z: seZ,
       label: seWarungUsed ? '[E] Termos Kopi & Bekal Pos Ronda (Sudah Diminum)' : '[E] Minum Termos Kopi & Bekal Pos Ronda (+25 HP & Fast Sprint 45s)',
       prompt: seWarungUsed ? '[E] Termos Kopi & Bekal Pos Ronda (Sudah Diminum)' : '[E] Minum Termos Kopi & Bekal Pos Ronda (+25 HP & Fast Sprint 45s)',
       used: seWarungUsed
     });
-    addCornerBeacon('city_se_warung', cornerHubCoords.SE.cx + 2.35, SIDEWALK_Y + 0.94, -100.12, 0xf59e0b);
 
     const cornerNotes = [
       {
@@ -2993,7 +3032,7 @@
       city._syncStreetBeacons();
     }
 
-    // Tactical Street Lootboxes (detailed hinged crate + difficulty-scaled yellow halo!)
+    // Tactical Street Lootboxes (openable 3D Pelican cases with 3 individual 3D item slots & universal perimeter halo!)
     city._lootboxVisuals = city._lootboxVisuals || [];
     const lootboxSpecs = [
       {
@@ -3003,8 +3042,13 @@
         z: -30.2,
         ry: 0.25,
         riskLuck: 0.85,
-        labelOpen: '[E / Klik] Buka Peti Suplai Gang Samping (High-Risk • RPG & Medkit)',
-        labelUsed: '[E] Peti Suplai Gang Samping (Sudah Diambil)'
+        labelOpen: '[E / Klik] Buka Peti Suplai Gang Samping (High-Risk)',
+        labelUsed: '[E] Peti Suplai Gang Samping (Kosong)',
+        slotSpecs: [
+          { itemType: 'ammo', ammoType: 'rifle', ammoAmount: 45, localX: -0.26, localZ: -0.14, label: '[E] Ambil Magasin 5.56mm (+45 Peluru)' },
+          { itemType: 'weapon_variant', weaponId: 'rifle', variantId: 'ak47', variantLabel: 'AK-47', localX: 0.0, localZ: 0.08, label: '[E] Ambil Senapan AK-47 (Varian Langka)' },
+          { itemType: 'medkit', healAmount: 35, localX: 0.26, localZ: -0.14, label: '[E] Ambil Medkit Taktis (+35 HP)' }
+        ]
       },
       {
         id: 'city_plaza_lootbox',
@@ -3013,8 +3057,13 @@
         z: -15.5,
         ry: -0.35,
         riskLuck: 0.55,
-        labelOpen: '[E / Klik] Buka Peti Taktis Taman & Busway (+Amunisi & Medkit)',
-        labelUsed: '[E] Peti Taktis Taman & Busway (Sudah Diambil)'
+        labelOpen: '[E / Klik] Buka Peti Taktis Taman & Busway',
+        labelUsed: '[E] Peti Taktis Taman & Busway (Kosong)',
+        slotSpecs: [
+          { itemType: 'ammo', ammoType: 'shotgun', ammoAmount: 12, localX: -0.26, localZ: -0.14, label: '[E] Ambil Selongsong 12G (+12 Peluru)' },
+          { itemType: 'weapon_variant', weaponId: 'pistol', variantId: 'revolver', variantLabel: 'Revolver .357', localX: 0.0, localZ: 0.08, label: '[E] Ambil Revolver .357 Magnum (Varian Langka)' },
+          { itemType: 'armor', armorAmount: 25, localX: 0.26, localZ: -0.14, label: '[E] Ambil Pelat Rompi (+25 Armor)' }
+        ]
       }
     ];
     if (rng() < 0.5) {
@@ -3025,14 +3074,37 @@
         z: 18.0,
         ry: Math.PI * 0.5,
         riskLuck: 0.45,
-        labelOpen: '[E / Klik] Buka Peti Suplai Trotoar Barat (+Amunisi & Medkit)',
-        labelUsed: '[E] Peti Suplai Trotoar Barat (Sudah Diambil)'
+        labelOpen: '[E / Klik] Buka Peti Suplai Trotoar Barat',
+        labelUsed: '[E] Peti Suplai Trotoar Barat (Kosong)',
+        slotSpecs: [
+          { itemType: 'ammo', ammoType: 'pistol', ammoAmount: 30, localX: -0.26, localZ: -0.14, label: '[E] Ambil Magasin 9mm (+30 Peluru)' },
+          { itemType: 'weapon_variant', weaponId: 'shotgun', variantId: 'doublebarrel', variantLabel: 'Double-Barrel 12G', localX: 0.0, localZ: 0.08, label: '[E] Ambil Double-Barrel Coach Gun (Varian Langka)' },
+          { itemType: 'medkit', healAmount: 30, localX: 0.26, localZ: -0.14, label: '[E] Ambil Kotak P3K (+30 HP)' }
+        ]
       });
     }
     const bLootColl = [];
     for (let li = 0; li < lootboxSpecs.length; li++) {
       const lb = lootboxSpecs[li];
-      const lbUsed = usedSet.has(lb.id);
+      const takenSlots = new Set();
+      let takenCount = 0;
+      for (let si = 0; si < lb.slotSpecs.length; si++) {
+        if (usedSet.has(`${lb.id}__slot_${si}`)) {
+          takenSlots.add(si);
+          takenCount++;
+        }
+      }
+      const lbOpened = usedSet.has(`${lb.id}__opened`) || takenCount > 0 || usedSet.has(lb.id);
+      const lbUsed = usedSet.has(lb.id) || takenCount >= lb.slotSpecs.length;
+
+      const vis = P.createLootboxVisual(
+        root, city.disposableGeometries, city.disposableMaterials,
+        lb.id, lb.x, lb.y, lb.z, lb.ry, lbUsed,
+        { slotSpecs: lb.slotSpecs, opened: lbOpened, takenSlots: takenSlots }
+      );
+      city._lootboxVisuals.push(vis);
+      if (city._lootboxGlows) city._lootboxGlows[lb.id] = vis.haloGroup;
+
       city.interactables.push({
         id: lb.id,
         type: 'lootbox',
@@ -3042,15 +3114,31 @@
         z: lb.z,
         label: lbUsed ? lb.labelUsed : lb.labelOpen,
         prompt: lbUsed ? lb.labelUsed : lb.labelOpen,
+        _openLabel: lb.labelOpen,
+        _usedLabel: lb.labelUsed,
+        opened: lbOpened,
         used: lbUsed
       });
 
-      const vis = P.createLootboxVisual(
-        root, city.disposableGeometries, city.disposableMaterials,
-        lb.id, lb.x, lb.y, lb.z, lb.ry, lbUsed
-      );
-      city._lootboxVisuals.push(vis);
-      if (city._lootboxGlows) city._lootboxGlows[lb.id] = vis.haloGroup;
+      if (vis.slots && vis.slots.length > 0) {
+        for (let si = 0; si < vis.slots.length; si++) {
+          const sl = vis.slots[si];
+          city.interactables.push({
+            id: sl.id,
+            type: 'lootbox',
+            isLootSlot: true,
+            crateId: lb.id,
+            slotIdx: sl.slotIdx,
+            x: sl.x,
+            y: sl.y,
+            z: sl.z,
+            label: sl.label,
+            prompt: sl.label,
+            taken: !!sl.taken,
+            used: !!sl.taken
+          });
+        }
+      }
 
       city._addCollider(lb.x - 0.52, lb.y, lb.z - 0.52, lb.x + 0.52, lb.y + 0.66, lb.z + 0.52, 'metal', {
         blocksWalk: true, blocksBullets: false

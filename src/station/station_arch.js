@@ -236,16 +236,18 @@
 
     // Trackside Emergency Maintenance Climb Steps (y = -0.55m, 0.42m wide)
     // Aligned with every breakable PSD doorway (dims.psdCentersZ) + open non-PSD bay ends so players
-    // who breach any PSD door onto the -1.10m trackbed can jump onto the step and climb back onto any platform!
+    // and 0.38m-radius zombies traversing breached PSD openings can step cleanly between -1.10m trackbed and 0.00m platform!
     const psdStepZs = Array.isArray(dims.psdCentersZ) && dims.psdCentersZ.length > 0
       ? dims.psdCentersZ
       : [-23.25, -17.55, -11.85, -5.70, 0.0, 5.70, 11.85, 17.55, 23.25];
-    const psdStepLen = Math.min(1.80, dims.psdDoorClearWidth || 1.50);
+    const psdStepLen = Math.min(1.80, Math.max(1.66, dims.psdDoorClearWidth || 1.50));
     const buildTracksideClimbSteps = (wallX, sideSign, zList, stepLen, skipSpans) => {
       const stepX = wallX + sideSign * 0.21;
-      const lenZ = stepLen || 1.50;
+      const lenZ = stepLen || 1.66;
       const halfZ = lenZ * 0.5;
       const brkOff = Math.max(0.35, halfZ - 0.18);
+      const colMinX = Math.min(wallX, wallX + sideSign * 0.46);
+      const colMaxX = Math.max(wallX, wallX + sideSign * 0.46);
       for (let ci = 0; ci < zList.length; ci++) {
         const sz = zList[ci];
         if (sz < platMinZ + 2.0 || sz > platMaxZ - 2.0) continue;
@@ -253,8 +255,8 @@
         addBox(bTactile, 0.42, 0.06, lenZ, stepX, -0.55, sz, 0, 0, 0, 0.8, 1.5);
         addBox(bSteelDark, 0.38, 0.12, 0.08, wallX + sideSign * 0.19, -0.64, sz - brkOff);
         addBox(bSteelDark, 0.38, 0.12, 0.08, wallX + sideSign * 0.19, -0.64, sz + brkOff);
-        station._addCollider(stepX - 0.21, -0.65, sz - halfZ, stepX + 0.21, -0.52, sz + halfZ, 'metal', {
-          blocksWalk: true, blocksBullets: false
+        station._addCollider(colMinX, -0.60, sz - halfZ, colMaxX, -0.52, sz + halfZ, 'stair', {
+          isFloor: true, blocksWalk: true, blocksBullets: false
         });
       }
     };
@@ -1622,7 +1624,7 @@
     // 5. PLATFORM SCREEN DOORS (HHPSD) ALONG TRACK 1 (x=+1.46) & TRACK 2 (x=track2X-1.46)
     // =========================================================
     const doorCenters = dims.psdCentersZ;
-    const doorW = dims.psdDoorClearWidth;
+    const doorW = Math.max(1.66, dims.psdDoorClearWidth || 1.50);
     const halfDoor = doorW * 0.5;
     const psd2X = track2X - 1.46;
 
@@ -1724,7 +1726,185 @@
 
     station.psdDoors = [];
     station.psdDoors2 = [];
-    station.navGraph = null;
+    const injectPsdCrossingNavLinks = (graph) => {
+      if (!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.adj) || graph._psdLinksInjected) return;
+      graph._psdLinksInjected = true;
+      const nodes = graph.nodes;
+      const adj = graph.adj;
+      const MAX_GRAPH_NODES = 384;
+      const trkY = TRACK_BED_Y + 0.08;
+
+      const isSegClearSameLevel = (a, b) => {
+        if (!station.spatialGrid || typeof station.spatialGrid.queryPoint !== 'function') {
+          return Math.hypot(b.x - a.x, b.z - a.z) <= 10.0;
+        }
+        const horiz = Math.hypot(b.x - a.x, b.z - a.z);
+        if (horiz < 0.25 || horiz > 22.0) return false;
+        const steps = Math.max(3, Math.ceil(horiz / 0.85));
+        const rad = 0.36;
+        for (let s = 1; s < steps; s++) {
+          const t = s / steps;
+          const px = a.x + (b.x - a.x) * t;
+          const py = a.y + (b.y - a.y) * t;
+          const pz = a.z + (b.z - a.z) * t;
+          const near = station.spatialGrid.queryPoint(px, pz, 0.65);
+          let hasFloor = false;
+          for (let k = 0; k < near.length; k++) {
+            const c = near[k];
+            if (!c || c.broken || c.disabled || c.blocksWalk === false || c.isTrigger) continue;
+            const tag = c.tag || '';
+            const floorLike = c.isFloor || c.isRamp || tag === 'floor' || tag === 'ramp' || tag === 'stair' || tag === 'stairs';
+            if (floorLike) {
+              if (px >= c.minX - 0.15 && px <= c.maxX + 0.15 && pz >= c.minZ - 0.15 && pz <= c.maxZ + 0.15) {
+                if (c.maxY >= py - 0.60 && c.minY <= py + 0.50) hasFloor = true;
+              }
+              continue;
+            }
+            if (tag === 'interact') continue;
+            if (c.maxY <= py + 0.42 || c.minY >= py + 1.55) continue;
+            const cx = Math.max(c.minX, Math.min(px, c.maxX));
+            const cz = Math.max(c.minZ, Math.min(pz, c.maxZ));
+            const dx = px - cx, dz = pz - cz;
+            if (dx * dx + dz * dz < rad * rad) return false;
+          }
+          if (!hasFloor) return false;
+        }
+        return true;
+      };
+
+      const findOrAddNode = (x, y, z, tag, mergeTol, filterFn) => {
+        if (mergeTol > 0) {
+          for (let i = 0; i < nodes.length; i++) {
+            const n = nodes[i];
+            if (Math.abs(n.y - y) > 0.35) continue;
+            if (n.tag !== tag && (n.tag === 'psd_step1' || n.tag === 'psd_step2' || tag === 'psd_step1' || tag === 'psd_step2')) continue;
+            if (filterFn && !filterFn(n)) continue;
+            if (Math.hypot(n.x - x, n.z - z) <= mergeTol) return i;
+          }
+        }
+        if (nodes.length >= MAX_GRAPH_NODES) return -1;
+        const id = nodes.length;
+        nodes.push({ id, x, y, z, tag });
+        while (adj.length <= id) adj.push([]);
+        return id;
+      };
+
+      const addBidirPortalEdge = (idA, idB, gatedPsdZ, gatedTrack) => {
+        if (idA < 0 || idB < 0 || idA === idB) return;
+        const a = nodes[idA], b = nodes[idB];
+        const cost = Math.hypot(b.x - a.x, (b.y - a.y) * 1.35, b.z - a.z);
+        const pushOrReplace = (fromId, toId) => {
+          const list = adj[fromId];
+          const existing = list.find((e) => e.to === toId);
+          const edgeObj = gatedTrack
+            ? { to: toId, cost, gatedPsdZ, gatedTrack }
+            : { to: toId, cost };
+          if (existing) {
+            existing.cost = cost;
+            if (gatedTrack) {
+              existing.gatedPsdZ = gatedPsdZ;
+              existing.gatedTrack = gatedTrack;
+            }
+          } else {
+            list.push(edgeObj);
+          }
+        };
+        pushOrReplace(idA, idB);
+        pushOrReplace(idB, idA);
+      };
+
+      const connectPlatformNeighbors = (nodeId, xMin, xMax) => {
+        if (nodeId < 0) return;
+        const na = nodes[nodeId];
+        for (let i = 0; i < nodes.length; i++) {
+          if (i === nodeId) continue;
+          const nb = nodes[i];
+          if (Math.abs(nb.y - na.y) > 0.45) continue;
+          if (nb.x < xMin || nb.x > xMax) continue;
+          const dist = Math.hypot(nb.x - na.x, nb.z - na.z);
+          if (dist < 0.35 || dist > 16.0) continue;
+          if (isSegClearSameLevel(na, nb)) {
+            addBidirPortalEdge(nodeId, i);
+          }
+        }
+      };
+
+      const trk1Nodes = [];
+      const trk2Nodes = [];
+      for (let di = 0; di < psdStepZs.length; di++) {
+        const pz = psdStepZs[di];
+        if (pz < platMinZ + 2.0 || pz > platMaxZ - 2.0) continue;
+
+        const nStep1 = findOrAddNode(p1MinX - 0.21, -0.55, pz, 'psd_step1', 0.25);
+        const nTrk1 = findOrAddNode(0.0, trkY, pz, 'track_bed', 1.15, (n) => Math.abs(n.x - 0.0) <= 0.80);
+        const nTrk2 = findOrAddNode(track2X, trkY, pz, 'track_bed', 1.15, (n) => Math.abs(n.x - track2X) <= 0.80);
+        if (nTrk1 >= 0) trk1Nodes.push(nTrk1);
+        if (nTrk2 >= 0) trk2Nodes.push(nTrk2);
+
+        if (!isIsland) {
+          const nP1 = findOrAddNode(p1MinX + 0.72, 0.0, pz, 'psd_p1', 0.85, (n) => n.x >= p1MinX + 0.25);
+          const nStep2 = findOrAddNode(p2MaxX + 0.21, -0.55, pz, 'psd_step2', 0.25);
+          const nP2 = findOrAddNode(p2MaxX - 0.72, 0.0, pz, 'psd_p2', 0.85, (n) => n.x <= p2MaxX - 0.25);
+
+          addBidirPortalEdge(nP1, nStep1, pz, 1);
+          addBidirPortalEdge(nStep1, nTrk1);
+          addBidirPortalEdge(nTrk1, nTrk2);
+          addBidirPortalEdge(nTrk2, nStep2);
+          addBidirPortalEdge(nStep2, nP2, pz, 2);
+
+          connectPlatformNeighbors(nP1, p1MinX + 0.25, p1MaxX - 0.15);
+          connectPlatformNeighbors(nP2, p2MinX + 0.15, p2MaxX - 0.25);
+        } else {
+          const nP1W = findOrAddNode(p1MinX + 0.72, 0.0, pz, 'psd_p1', 0.85, (n) => n.x >= p1MinX + 0.25 && n.x <= p1MaxX - 0.25);
+          const nP1E = findOrAddNode(p1MaxX - 0.72, 0.0, pz, 'psd_p2', 0.85, (n) => n.x >= p1MinX + 0.25 && n.x <= p1MaxX - 0.25);
+          const nStep2 = findOrAddNode(p1MaxX + 0.21, -0.55, pz, 'psd_step2', 0.25);
+
+          addBidirPortalEdge(nP1W, nStep1, pz, 1);
+          addBidirPortalEdge(nStep1, nTrk1);
+          addBidirPortalEdge(nP1E, nStep2, pz, 2);
+          addBidirPortalEdge(nStep2, nTrk2);
+
+          connectPlatformNeighbors(nP1W, p1MinX + 0.25, p1MaxX - 0.25);
+          connectPlatformNeighbors(nP1E, p1MinX + 0.25, p1MaxX - 0.25);
+        }
+      }
+
+      const linkTrackChain = (chain, tx) => {
+        for (let i = 0; i < chain.length - 1; i++) {
+          addBidirPortalEdge(chain[i], chain[i + 1]);
+        }
+        for (let i = 0; i < chain.length; i++) {
+          const na = nodes[chain[i]];
+          for (let j = 0; j < nodes.length; j++) {
+            if (j === chain[i]) continue;
+            const nb = nodes[j];
+            if (Math.abs(nb.x - tx) > 0.85 || Math.abs(nb.y - na.y) > 0.45) continue;
+            const d = Math.hypot(nb.x - na.x, nb.z - na.z);
+            if (d >= 0.35 && d <= 22.0) addBidirPortalEdge(chain[i], j);
+          }
+        }
+      };
+      linkTrackChain(trk1Nodes, 0.0);
+      linkTrackChain(trk2Nodes, track2X);
+    };
+
+    let _navGraphRef = null;
+    try {
+      Object.defineProperty(station, 'navGraph', {
+        configurable: true,
+        enumerable: true,
+        get: function () { return _navGraphRef; },
+        set: function (g) {
+          _navGraphRef = g;
+          if (g && Array.isArray(g.nodes) && Array.isArray(g.adj) && !g._psdLinksInjected) {
+            injectPsdCrossingNavLinks(g);
+          }
+        }
+      });
+    } catch (_) {
+      station.navGraph = null;
+    }
+    station._injectPsdCrossingNavLinks = injectPsdCrossingNavLinks;
     station._psdFrameInst = buildPsdRow(psdX, 1, station.psdDoors, SIGN_UV.psdHeader);
     station._psdFrameInst2 = buildPsdRow(psd2X, -1, station.psdDoors2, SIGN_UV.psdHeaderP2 || SIGN_UV.psdHeader);
 

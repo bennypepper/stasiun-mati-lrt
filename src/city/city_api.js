@@ -54,6 +54,8 @@
     _lootboxGlows: null,
     _lootboxVisuals: null,
     _streetBeacons: null,
+    _perimeterHalos: null,
+    _hoveredInteractableId: null,
     cornerHubs: null,
     layoutBounds: null,
     _fieldLogGlints: null,
@@ -266,9 +268,31 @@
       this.cullChunks = [];
       this.litLampPositions = [];
       this.trafficSignalPositions = [];
+      if (this._perimeterHalos) {
+        for (let i = 0; i < this._perimeterHalos.length; i++) {
+          const ph = this._perimeterHalos[i];
+          if (ph && ph.halo && typeof ph.halo.dispose === 'function') ph.halo.dispose();
+        }
+      }
+      if (this._lootboxVisuals) {
+        for (let i = 0; i < this._lootboxVisuals.length; i++) {
+          const lv = this._lootboxVisuals[i];
+          if (!lv) continue;
+          if (lv.halo && typeof lv.halo.dispose === 'function') lv.halo.dispose();
+          if (lv.slots) {
+            for (let si = 0; si < lv.slots.length; si++) {
+              if (lv.slots[si] && lv.slots[si].halo && typeof lv.slots[si].halo.dispose === 'function') {
+                lv.slots[si].halo.dispose();
+              }
+            }
+          }
+        }
+      }
       this._lootboxGlows = null;
       this._lootboxVisuals = null;
       this._streetBeacons = null;
+      this._perimeterHalos = null;
+      this._hoveredInteractableId = null;
       this.cornerHubs = null;
       this.layoutBounds = null;
       this._fieldLogGlints = null;
@@ -342,6 +366,8 @@
       this._lootboxGlows = {};
       this._lootboxVisuals = [];
       this._streetBeacons = {};
+      this._perimeterHalos = [];
+      this._hoveredInteractableId = null;
       this._fieldLogGlints = [];
       this._fieldLogPropAssets = null;
       this.destructibleProps = [];
@@ -564,25 +590,35 @@
       if (typeof P.updateTrafficSignalTime === 'function') {
         P.updateTrafficSignalTime(this._timeAccum);
       }
+      const oz = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
+      this._hoveredInteractableId = (camPos && camForward) ? this._findCrosshairHoveredId(camPos, camForward, 8.0) : null;
       if (this._lootboxVisuals && this._lootboxVisuals.length > 0 && typeof P.updateLootboxVisuals === 'function') {
-        const oz = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
-        P.updateLootboxVisuals(this._lootboxVisuals, dt, this._timeAccum, camPos, camForward, difficultyKey, oz);
+        P.updateLootboxVisuals(this._lootboxVisuals, dt, this._timeAccum, camPos, camForward, difficultyKey, oz, this._hoveredInteractableId);
       }
-      if (this._fieldLogGlints && this._fieldLogGlints.length > 0) {
-        for (let i = 0; i < this._fieldLogGlints.length; i++) {
-          const fg = this._fieldLogGlints[i];
-          if (fg.used || !fg.mesh || !fg.mesh.visible) continue;
-          if (fg.mat) fg.mat.opacity = 0.22 + 0.14 * Math.sin(this._timeAccum * 2.8 + i * 1.1);
-        }
-      }
-      if (this._streetBeacons) {
-        let bi = 0;
-        for (const bk in this._streetBeacons) {
-          const sb = this._streetBeacons[bk];
-          if (sb && !sb.used && sb.mesh && sb.mesh.visible && sb.mat) {
-            sb.mat.opacity = 0.44 + 0.22 * Math.sin(this._timeAccum * 3.0 + bi * 1.3);
+      if (this._perimeterHalos && this._perimeterHalos.length > 0) {
+        const diff = String(difficultyKey || 'medium').toLowerCase();
+        for (let i = 0; i < this._perimeterHalos.length; i++) {
+          const ph = this._perimeterHalos[i];
+          if (!ph || !ph.halo) continue;
+          if (ph.used) {
+            ph.halo.setMode('off');
+            continue;
           }
-          bi++;
+          let inRange = true;
+          if (camPos && diff !== 'easy' && ph.x !== undefined) {
+            const dist = Math.hypot(ph.x - camPos.x, (ph.y || 0) - camPos.y, (ph.z + oz) - camPos.z);
+            inRange = diff === 'medium' ? dist <= 16.0 : (diff === 'hard' ? dist <= 7.0 : dist <= 3.5);
+          }
+          if (!inRange && !ph.isObjective) {
+            ph.halo.setMode('off');
+          } else if (this._hoveredInteractableId && this._hoveredInteractableId === ph.id) {
+            ph.halo.setMode('hover');
+          } else if (ph.isObjective) {
+            ph.halo.setMode('objective');
+          } else {
+            ph.halo.setMode('subtle');
+          }
+          ph.halo.update(this._timeAccum);
         }
       }
       if (_warungSprintTimer > 0) {
@@ -771,20 +807,73 @@
       return this.interactables || [];
     },
 
+    _findCrosshairHoveredId: function (pos, lookDir, maxDist) {
+      if (this._isBuilding || !this.interactables || !pos || !lookDir) return null;
+      const limit = maxDist !== undefined ? maxDist : 8.0;
+      const oz = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
+      const pz = pos.z - oz;
+      let bestId = null;
+      let bestPerp = 999;
+
+      for (let i = 0; i < this.interactables.length; i++) {
+        const it = this.interactables[i];
+        if (!it || it.type === 'bench' || it.used) continue;
+        if (it.isLootSlot) {
+          const parentCrate = this.interactables.find((c) => c.id === it.crateId);
+          if (!parentCrate || !parentCrate.opened || parentCrate.used || it.taken) continue;
+        } else if (it.type === 'lootbox' && it.opened) {
+          continue;
+        }
+        const dx = it.x - pos.x;
+        const dy = it.y - pos.y;
+        const dz = it.z - pz;
+        const proj = dx * lookDir.x + dy * lookDir.y + dz * lookDir.z;
+        if (proj < 0.1 || proj > limit) continue;
+        const px = dx - proj * lookDir.x;
+        const py = dy - proj * lookDir.y;
+        const pzErr = dz - proj * lookDir.z;
+        const perp = Math.hypot(px, py, pzErr);
+        const rad = it.isLootSlot ? 0.24 : 0.56;
+        if (perp <= rad && perp < bestPerp) {
+          bestPerp = perp;
+          bestId = it.id;
+        }
+      }
+      return bestId;
+    },
+
     getInteractableNear: function (pos, lookDir) {
       if (this._isBuilding || !this.interactables || !pos) return null;
+      const oz = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
+      const pz = pos.z - oz;
       let best = null;
       let bestScore = -999;
       for (let i = 0; i < this.interactables.length; i++) {
         const it = this.interactables[i];
+        if (!it) continue;
+        if (it.isLootSlot) {
+          const parentCrate = this.interactables.find((c) => c.id === it.crateId);
+          if (!parentCrate || !parentCrate.opened || parentCrate.used || it.taken) continue;
+        } else if (it.type === 'lootbox' && it.opened && !it.used) {
+          continue;
+        }
         const dx = it.x - pos.x;
         const dy = it.y - pos.y;
-        const dz = it.z - pos.z;
+        const dz = it.z - pz;
         const dist = Math.hypot(dx, dy, dz);
         if (dist > 3.0) continue;
         let dot = 1.0;
         if (lookDir && dist > 0.05) {
           dot = (dx * lookDir.x + dy * lookDir.y + dz * lookDir.z) / dist;
+        }
+        if (it.isLootSlot) {
+          if (dot < 0.65) continue;
+          const slotScore = dot * 4.5 - dist * 0.35;
+          if (slotScore > bestScore) {
+            bestScore = slotScore;
+            best = it;
+          }
+          continue;
         }
         if (dot < 0.25 && dist > 1.2) continue;
         const score = dot * 2.0 - dist * 0.55;
@@ -797,26 +886,41 @@
     },
 
     _markFieldLogGlintUsed: function (id) {
-      if (!this._fieldLogGlints || !this._fieldLogGlints.length) return;
-      for (let i = 0; i < this._fieldLogGlints.length; i++) {
-        const fg = this._fieldLogGlints[i];
-        if (fg.id === id) {
-          fg.used = true;
-          if (fg.mesh) fg.mesh.visible = false;
+      if (this._fieldLogGlints && this._fieldLogGlints.length) {
+        for (let i = 0; i < this._fieldLogGlints.length; i++) {
+          const fg = this._fieldLogGlints[i];
+          if (fg.id === id) {
+            fg.used = true;
+            if (fg.mesh) fg.mesh.visible = false;
+          }
+        }
+      }
+      if (this._perimeterHalos && this._perimeterHalos.length) {
+        for (let i = 0; i < this._perimeterHalos.length; i++) {
+          const ph = this._perimeterHalos[i];
+          if (ph && ph.id === id) {
+            ph.used = true;
+            if (ph.halo && typeof ph.halo.setMode === 'function') ph.halo.setMode('off');
+          }
         }
       }
     },
 
     _syncStreetBeacons: function () {
-      if (!this._streetBeacons) return;
-      for (const id in this._streetBeacons) {
-        const sb = this._streetBeacons[id];
-        if (!sb) continue;
-        const it = this.interactables ? this.interactables.find((x) => x.id === id) : null;
-        const used = !!((it && it.used) || (this._usedIds && this._usedIds.has(id)));
-        sb.used = used;
-        if (sb.mesh) sb.mesh.visible = !used;
-        if (sb.mat) sb.mat.opacity = used ? 0.0 : 0.62;
+      if (this._streetBeacons) {
+        for (const id in this._streetBeacons) {
+          const sb = this._streetBeacons[id];
+          if (!sb) continue;
+          const it = this.interactables ? this.interactables.find((x) => x.id === id) : null;
+          const used = !!((it && it.used) || (this._usedIds && this._usedIds.has(id)));
+          sb.used = used;
+          if (sb.halo && typeof sb.halo.setMode === 'function') {
+            sb.halo.setMode(used ? 'off' : 'subtle');
+          }
+          if (sb.mesh) sb.mesh.visible = !used;
+          if (sb.mat) sb.mat.opacity = used ? 0.0 : 0.62;
+          if (used) this._markFieldLogGlintUsed(id);
+        }
       }
     },
 
@@ -866,9 +970,6 @@
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(it.id);
         this._syncStreetBeacons();
-        if (fresh && LRT.PlayerUI && typeof LRT.PlayerUI.addArmor === 'function') {
-          LRT.PlayerUI.addArmor(35, 100);
-        }
         return {
           ok: true,
           type: 'corner_medpost',
@@ -876,6 +977,7 @@
           heal: fresh ? 25 : 0,
           healAmount: fresh ? 25 : 0,
           armor: fresh ? 35 : 0,
+          armorBonus: fresh ? 35 : 0,
           message: fresh ? 'Kotak Medis Darurat PMI: +35 Armor & +25 HP!' : 'Kotak Medis Darurat PMI sudah diambil.'
         };
       }
@@ -922,14 +1024,12 @@
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(it.id);
         this._syncStreetBeacons();
-        if (fresh && LRT.PlayerUI && typeof LRT.PlayerUI.addArmor === 'function') {
-          LRT.PlayerUI.addArmor(25, 100);
-        }
         return {
           ok: true,
           type: 'corner_convoy',
           action: 'street_stash',
           armor: fresh ? 25 : 0,
+          armorBonus: fresh ? 25 : 0,
           ammo: fresh ? { type: 'all', amount: 34 } : null,
           message: fresh ? 'Peti Amunisi Konvoi Militer: +25 Armor & +2 Mag!' : 'Peti Amunisi Konvoi Militer sudah diambil.'
         };
@@ -977,6 +1077,7 @@
         it.label = '[E] Kotak Relai PLN Jalanan (Daya Aktif)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(it.id);
+        this._markFieldLogGlintUsed(it.id);
         if (LRT.Enemies && typeof LRT.Enemies.alertAllTo === 'function') {
           LRT.Enemies.alertAllTo({ x: it.x, y: it.y, z: it.z }, 45.0);
         }
@@ -1074,30 +1175,138 @@
         };
       }
 
-      if (it.type === 'lootbox') {
-        if (LRT.Audio && typeof LRT.Audio.play === 'function') {
-          LRT.Audio.play('crate_open', { gain: 0.85 });
-          if (!it.used) LRT.Audio.play('loot_chime', { gain: 0.65 });
+      if (it.type === 'lootbox' && it.isLootSlot) {
+        const vis = this._lootboxVisuals ? this._lootboxVisuals.find((v) => v && v.id === it.crateId) : null;
+        const slot = (vis && vis.slots) ? vis.slots[it.slotIdx] : null;
+        if (!vis || !vis.opened || !slot || slot.taken || it.taken) {
+          return { ok: false };
         }
-        const fresh = !it.used;
+        slot.taken = true;
+        it.taken = true;
+        it.used = true;
+        if (slot.mesh) slot.mesh.visible = false;
+        if (slot.halo && typeof slot.halo.setMode === 'function') slot.halo.setMode('off');
+        if (this._usedIds) this._usedIds.add(it.id);
+
+        if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+          if (slot.itemType === 'weapon_variant' || slot.itemType === 'armor') {
+            LRT.Audio.play('loot_chime', { gain: 0.72 });
+          } else {
+            LRT.Audio.play('ammo_pickup', { gain: 0.72 });
+          }
+        }
+
+        const allTaken = vis.slots.every((s) => !s || s.taken);
+        if (allTaken) {
+          vis.used = true;
+          const parentIt = this.interactables.find((c) => c && c.id === it.crateId);
+          if (parentIt) {
+            parentIt.used = true;
+            parentIt.label = parentIt._usedLabel || parentIt.label;
+            parentIt.prompt = parentIt.label;
+          }
+          if (this._usedIds) this._usedIds.add(it.crateId);
+        }
+
+        if (slot.itemType === 'weapon_variant') {
+          return {
+            ok: true,
+            type: 'lootbox',
+            action: 'lootbox_item',
+            individualSlot: true,
+            skipRandomRoll: true,
+            weaponId: slot.weaponId,
+            variantId: slot.variantId,
+            variantLabel: slot.variantLabel,
+            message: 'Senjata Diperoleh: ' + (slot.variantLabel || slot.variantId)
+          };
+        }
+        if (slot.itemType === 'ammo') {
+          return {
+            ok: true,
+            type: 'lootbox',
+            action: 'lootbox_item',
+            individualSlot: true,
+            skipRandomRoll: true,
+            ammo: { type: slot.ammoType || 'all', amount: slot.ammoAmount || 30 },
+            message: 'Amunisi Diperoleh: +' + (slot.ammoAmount || 30) + ' ' + String(slot.ammoType || 'all').toUpperCase()
+          };
+        }
+        if (slot.itemType === 'armor') {
+          return {
+            ok: true,
+            type: 'lootbox',
+            action: 'lootbox_item',
+            individualSlot: true,
+            skipRandomRoll: true,
+            armor: slot.armorAmount || 25,
+            armorBonus: slot.armorAmount || 25,
+            message: 'Pelat Rompi Diperoleh: +' + (slot.armorAmount || 25) + ' Armor'
+          };
+        }
+        return {
+          ok: true,
+          type: 'lootbox',
+          action: 'lootbox_item',
+          individualSlot: true,
+          skipRandomRoll: true,
+          heal: slot.healAmount || 30,
+          healAmount: slot.healAmount || 30,
+          message: 'Medkit Diperoleh: +' + (slot.healAmount || 30) + ' HP'
+        };
+      }
+
+      if (it.type === 'lootbox') {
+        const vis = this._lootboxVisuals ? this._lootboxVisuals.find((v) => v && v.id === it.id) : null;
+        if (it.used) {
+          return {
+            ok: true,
+            type: 'lootbox',
+            action: 'lootbox',
+            fresh: false,
+            used: true,
+            skipRandomRoll: true,
+            message: 'Peti taktis jalanan sudah kosong.'
+          };
+        }
         const riskLuck = it.riskLuck !== undefined ? it.riskLuck : 0.55;
         const isAlley = it.id === 'city_alley_lootbox' || riskLuck >= 0.75;
+        if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+          LRT.Audio.play('crate_open', { gain: 0.85 });
+          if (!it.opened) LRT.Audio.play('loot_chime', { gain: 0.55 });
+        }
+        if (vis && vis.slots && vis.slots.length > 0) {
+          it.opened = true;
+          vis.opened = true;
+          if (vis.halo && typeof vis.halo.setMode === 'function') vis.halo.setMode('off');
+          if (this._usedIds) this._usedIds.add(`${it.id}__opened`);
+          if (isAlley && LRT.Enemies && typeof LRT.Enemies.alertAllTo === 'function') {
+            LRT.Enemies.alertAllTo({ x: it.x, y: it.y, z: it.z }, 32.0);
+          }
+          return {
+            ok: true,
+            type: 'lootbox',
+            action: 'crate_open',
+            openedOnly: true,
+            skipRandomRoll: true,
+            fresh: true,
+            lurePos: isAlley ? { x: it.x, y: it.y, z: it.z } : null,
+            message: 'Peti terbuka — arahkan kursor & tekan [E] untuk mengambil isi!'
+          };
+        }
+
+        // Fallback if called on legacy non-slot lootbox
+        const fresh = !it.used;
         const isWest = it.id === 'city_west_plaza_lootbox';
         it.used = true;
-        it.label = isAlley
-          ? '[E] Peti Suplai Gang Samping (Sudah Diambil)'
-          : (isWest ? '[E] Peti Suplai Trotoar Barat (Sudah Diambil)' : '[E] Peti Taktis Taman & Busway (Sudah Diambil)');
+        it.label = it._usedLabel || (isAlley
+          ? '[E] Peti Suplai Gang Samping (Kosong)'
+          : (isWest ? '[E] Peti Suplai Trotoar Barat (Kosong)' : '[E] Peti Taktis Taman & Busway (Kosong)'));
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(it.id);
-        if (this._lootboxGlows && this._lootboxGlows[it.id]) {
-          this._lootboxGlows[it.id].visible = false;
-        }
-        if (this._lootboxVisuals) {
-          for (let i = 0; i < this._lootboxVisuals.length; i++) {
-            if (this._lootboxVisuals[i].id === it.id) {
-              this._lootboxVisuals[i].used = true;
-            }
-          }
+        if (vis) {
+          vis.used = true;
+          if (vis.halo && typeof vis.halo.setMode === 'function') vis.halo.setMode('off');
         }
         if (fresh && isAlley && LRT.Enemies && typeof LRT.Enemies.alertAllTo === 'function') {
           LRT.Enemies.alertAllTo({ x: it.x, y: it.y, z: it.z }, 32.0);

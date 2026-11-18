@@ -950,7 +950,19 @@
     syncFastTravelAtmosphereUi();
   }
 
+  function syncFastTravelAvailability() {
+    const unlocked = !!(PL.isFastTravelUnlocked && PL.isFastTravelUnlocked());
+    if (dom['btn-pause-fast-travel']) {
+      dom['btn-pause-fast-travel'].classList.toggle('hidden', !unlocked);
+    }
+    if (dom['pill-fast-travel']) {
+      dom['pill-fast-travel'].classList.toggle('hidden', !unlocked);
+    }
+    return unlocked;
+  }
+
   function openFastTravelModal(opts) {
+    if (!syncFastTravelAvailability()) return false;
     const o = opts || {};
     const modal = dom['fast-travel-modal'];
     if (!modal) return false;
@@ -1441,6 +1453,7 @@
         openFastTravelModal({ fromPause: true });
       });
     }
+    syncFastTravelAvailability();
     if (dom['btn-fast-travel-close']) {
       dom['btn-fast-travel-close'].addEventListener('click', () => {
         closeFastTravelModal(true);
@@ -1867,7 +1880,10 @@
         const hmTime = wh.hitmarkerTimer ?? wh.hitmarkerTime ?? 0;
         const hmCrit = !!(wh.headshotHit ?? wh.hitmarkerCrit);
 
-        const weaponName = reloading ? `${wh.name} [RELOADING]` : wh.name;
+        const rawVariantLabel = wh.variantLabel ? String(wh.variantLabel).trim() : '';
+        const useVariantName = !!(rawVariantLabel && !/^(default|standard|base)$/i.test(rawVariantLabel));
+        const displayWeaponName = useVariantName ? rawVariantLabel : wh.name;
+        const weaponName = reloading ? `${displayWeaponName} [RELOADING]` : displayWeaponName;
         if (_hudCache.weaponName !== weaponName) {
           _hudCache.weaponName = weaponName;
           if (dom['weapon-name']) dom['weapon-name'].textContent = weaponName;
@@ -1978,6 +1994,7 @@
     if (dom['gameover-overlay']) dom['gameover-overlay'].classList.toggle('hidden', screenName !== 'gameover');
     if (dom['tutorial-complete-overlay']) dom['tutorial-complete-overlay'].classList.add('hidden');
     if (dom.hud) dom.hud.classList.toggle('hidden', screenName !== 'play');
+    syncFastTravelAvailability();
     if (screenName !== 'play' && PL.closeCheatConsole) {
       PL.closeCheatConsole(false);
     }
@@ -2082,6 +2099,7 @@
     closeFastTravelModal(false, true);
     closeTutorialCompleteModal();
     PL.resetPhysics(spawnPos, invulnerable, mode);
+    syncFastTravelAvailability();
     _hudCache.armorVal = null;
     _hudCache.armorPct = null;
     _hudCache.armorVisible = null;
@@ -2115,6 +2133,7 @@
   PL.closeDocViewer = closeDocViewer;
   PL.openFastTravelModal = openFastTravelModal;
   PL.closeFastTravelModal = closeFastTravelModal;
+  PL.syncFastTravelAvailability = syncFastTravelAvailability;
   PL.openTutorialCompleteModal = openTutorialCompleteModal;
   PL.closeTutorialCompleteModal = closeTutorialCompleteModal;
   PL.toggleHud = toggleHud;
@@ -2159,6 +2178,8 @@
     closeDocViewer,
     openFastTravelModal,
     closeFastTravelModal,
+    syncFastTravelAvailability,
+    isFastTravelUnlocked: () => !!(PL.isFastTravelUnlocked && PL.isFastTravelUnlocked()),
     openTutorialCompleteModal,
     closeTutorialCompleteModal,
     setOnInteractResult: (fn) => { PL.callbacks.onInteractResult = fn; },

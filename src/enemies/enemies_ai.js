@@ -397,6 +397,20 @@
     slot.bloodPoolSpawned = false;
     slot.neckSpurtCount = 0;
     slot.headDmg = 0;
+    slot.armLDmg = 0;
+    slot.armRDmg = 0;
+    slot.legLDmg = 0;
+    slot.legRDmg = 0;
+    slot.lostLeftArm = false;
+    slot.lostRightArm = false;
+    slot.lostLeftLeg = false;
+    slot.lostRightLeg = false;
+    slot.crawling = false;
+    slot.crawlFallTimer = 0;
+    slot.crawlPhase = 0;
+    slot.crawlBloodDist = 0;
+    slot.crippledLeg = 1;
+    slot.woundMask = 0;
     slot.animPhase = Math.random() * Math.PI * 2;
     slot.moveBlend = 0;
     slot.actualSpeed = 0;
@@ -955,7 +969,8 @@
       const fwdX = Math.sin(z.yaw);
       const fwdZ = Math.cos(z.yaw);
       const fwdDot = hitDir.x * fwdX + hitDir.z * fwdZ;
-      z.fallPitchSign = (z.hitZone === 'legs' || fwdDot > 0.15) ? 1 : -1;
+      const isLegFall = z.hitZone === 'legs' || z.hitZone === 'leftLeg' || z.hitZone === 'rightLeg';
+      z.fallPitchSign = (isLegFall || fwdDot > 0.15) ? 1 : -1;
       z.vx += hitDir.x * 2.8;
       z.vz += hitDir.z * 2.8;
     } else {
@@ -1000,18 +1015,24 @@
     }
   }
 
-  function applyDamageToZombie(z, dmg, hitPoint, hitDir, knockbackForce, isHeadshot, onDropPickup, hitZone) {
+  function applyDamageToZombie(z, dmg, hitPoint, hitDir, knockbackForce, isHeadshot, onDropPickup, hitZone, dismemberOpt) {
     if (!z || !z.active || z.dead) return { hit: false, killed: false, armored: false, hitZone: 'torso', legCrippledNow: false };
 
     const zone = hitZone || (isHeadshot ? 'head' : 'torso');
     const isHead = zone === 'head' || !!isHeadshot;
+    const isLegZone = zone === 'legs' || zone === 'leftLeg' || zone === 'rightLeg';
+    const isArmZone = zone === 'leftArm' || zone === 'rightArm';
+    const rawDism = (dismemberOpt && typeof dismemberOpt === 'object') ? dismemberOpt.dismemberMult : dismemberOpt;
+    const dMult = (typeof rawDism === 'number' && rawDism > 0) ? rawDism : ((knockbackForce || 0) >= 5.0 ? 1.8 : 1.0);
     let finalDmg = dmg;
     let armoredHit = false;
     let legCrippledNow = false;
 
     if (zone === 'torso') {
       finalDmg = Math.max(1, Math.round(dmg * 0.90));
-    } else if (zone === 'legs') {
+    } else if (isArmZone) {
+      finalDmg = Math.max(1, Math.round(dmg * 0.78));
+    } else if (isLegZone) {
       finalDmg = Math.max(1, Math.round(dmg * 0.60));
     }
 
@@ -1044,6 +1065,12 @@
     }
 
     z.hitZone = zone;
+    let hitLat = 0;
+    if (hitPoint) {
+      const lxVec = Math.cos(z.yaw);
+      const lzVec = -Math.sin(z.yaw);
+      hitLat = (hitPoint.x - z.x) * lxVec + (hitPoint.z - z.z) * lzVec;
+    }
     if (hitDir) {
       const rightX = Math.cos(z.yaw);
       const rightZ = -Math.sin(z.yaw);
@@ -1055,14 +1082,77 @@
     if (isHead && !armoredHit) {
       z.headDmg = (z.headDmg || 0) + finalDmg;
     }
-    if (zone === 'legs' && !armoredHit) {
-      z.legDmg = (z.legDmg || 0) + finalDmg;
-      if (!z.legCrippled && (z.legDmg >= 22 || finalDmg >= 24)) {
-        z.legCrippled = true;
-        legCrippledNow = true;
-        const baseSpd = z.baseSpeed || z.speed;
-        z.speed = baseSpd * 0.48;
+
+    let armSeveredNow = false;
+    let legSeveredNow = false;
+    if (!armoredHit) {
+      if (zone === 'torso') {
+        z.woundMask = (z.woundMask || 0) | (((z.woundMask || 0) & 1) ? 2 : 1);
+      } else if (zone === 'leftArm') {
+        z.woundMask = (z.woundMask || 0) | 4;
+        z.armLDmg = (z.armLDmg || 0) + finalDmg * dMult;
+        if (!z.lostLeftArm && (z.armLDmg >= 44 || (finalDmg * dMult >= 46) || ((knockbackForce || 0) >= 5.0 && dMult >= 1.5))) {
+          z.lostLeftArm = true;
+          armSeveredNow = true;
+        }
+      } else if (zone === 'rightArm') {
+        z.woundMask = (z.woundMask || 0) | 8;
+        z.armRDmg = (z.armRDmg || 0) + finalDmg * dMult;
+        if (!z.lostRightArm && (z.armRDmg >= 44 || (finalDmg * dMult >= 46) || ((knockbackForce || 0) >= 5.0 && dMult >= 1.5))) {
+          z.lostRightArm = true;
+          armSeveredNow = true;
+        }
+      } else if (isLegZone) {
+        const legSide = zone === 'leftLeg' ? 1 : (zone === 'rightLeg' ? -1 : (hitLat !== 0 ? (hitLat >= 0 ? 1 : -1) : (z.limbBias || 1)));
+        z.woundMask = (z.woundMask || 0) | (legSide >= 0 ? 16 : 32);
+        const legBurst = finalDmg * dMult;
+        if (legSide >= 0) z.legLDmg = (z.legLDmg || 0) + legBurst;
+        else z.legRDmg = (z.legRDmg || 0) + legBurst;
+        z.legDmg = (z.legDmg || 0) + finalDmg;
+        if (!z.legCrippled && (z.legDmg >= 22 || finalDmg >= 24)) {
+          z.legCrippled = true;
+          z.crippledLeg = legSide;
+          legCrippledNow = true;
+          const baseSpd = z.baseSpeed || z.speed;
+          if (!z.crawling) z.speed = baseSpd * 0.48;
+        }
+        const sideCumDmg = legSide >= 0 ? z.legLDmg : z.legRDmg;
+        const canSeverLeg = (sideCumDmg >= 48) || (legBurst >= 46) || ((knockbackForce || 0) >= 5.0 && dMult >= 1.5);
+        if (canSeverLeg) {
+          if (legSide >= 0 && !z.lostLeftLeg) {
+            z.lostLeftLeg = true;
+            legSeveredNow = true;
+          } else if (legSide < 0 && !z.lostRightLeg) {
+            z.lostRightLeg = true;
+            legSeveredNow = true;
+          }
+          if (legSeveredNow && !z.crawling) {
+            z.crawling = true;
+            z.crawlFallTimer = 0;
+            z.crawlPhase = 0;
+            z.crawlBloodDist = 0;
+            const baseSpd = z.baseSpeed || z.speed;
+            z.speed = baseSpd * (z.variant === 'runner' ? 0.36 : 0.46);
+            z.chargeWindup = 0;
+            z.chargeTimer = 0;
+          }
+        }
       }
+    }
+
+    if (armSeveredNow || legSeveredNow) {
+      const sPt = hitPoint || _v1.set(z.x, z.y + (legSeveredNow ? 0.48 : 1.15) * z.scale, z.z);
+      if (LRT.Weapons && typeof LRT.Weapons.spawnGoreBurst === 'function') {
+        LRT.Weapons.spawnGoreBurst(sPt, hitDir, legSeveredNow ? 22 : 18);
+      } else if (LRT.Weapons && typeof LRT.Weapons.spawnBlood === 'function') {
+        LRT.Weapons.spawnBlood(sPt, hitDir, 18);
+      }
+      if (legSeveredNow && LRT.Weapons && typeof LRT.Weapons.spawnBloodDecal === 'function') {
+        _v2.set(z.x, z.y + 0.022, z.z);
+        _v3.set(0, 1, 0);
+        LRT.Weapons.spawnBloodDecal(_v2, _v3, 0.72, false);
+      }
+      E.play3D('debris_crumble', sPt, 0.12, 0.75);
     }
 
     z.hp -= finalDmg;
@@ -1089,24 +1179,25 @@
     }
     let minStagger = Math.min(0.45, 0.12 + kb * 0.05);
     if (isHead) minStagger = Math.max(minStagger, 0.32);
-    if (legCrippledNow) minStagger = Math.max(minStagger, 0.45);
+    if (legCrippledNow || armSeveredNow || legSeveredNow) minStagger = Math.max(minStagger, 0.45);
     z.staggerTimer = Math.max(z.staggerTimer, minStagger);
 
     E.applyZombieColors(z);
     E.markColorsDirty();
 
     if (z.hp <= 0) {
-      z.decapitated = !!(isHead || ((knockbackForce || 0) >= 5.0 && (z.headDmg || 0) >= 28))
+      const headSever = isHead && (dMult >= 1.35 || (knockbackForce || 0) >= 4.2 || finalDmg >= 65 || (z.headDmg || 0) >= 55);
+      z.decapitated = !!(headSever || ((knockbackForce || 0) >= 5.0 && (z.headDmg || 0) >= 28))
         && !(z.variant === 'brute' && z.hasArmor);
       handleZombieDeath(z, hitDir, onDropPickup);
-      return { hit: true, killed: true, armored: armoredHit, hitZone: zone, legCrippledNow };
+      return { hit: true, killed: true, armored: armoredHit, hitZone: zone, legCrippledNow, armSeveredNow, legSeveredNow };
     }
-    return { hit: true, killed: false, armored: armoredHit, hitZone: zone, legCrippledNow };
+    return { hit: true, killed: false, armored: armoredHit, hitZone: zone, legCrippledNow, armSeveredNow, legSeveredNow };
   }
 
-  function hitZombie(zombieId, dmg, hitPoint, hitDir, knockbackForce, isHeadshot, hitZone) {
+  function hitZombie(zombieId, dmg, hitPoint, hitDir, knockbackForce, isHeadshot, hitZone, dismemberOpt) {
     const z = E.zombies[zombieId];
-    return applyDamageToZombie(z, dmg, hitPoint, hitDir, knockbackForce, isHeadshot, _cachedOnDropPickup, hitZone);
+    return applyDamageToZombie(z, dmg, hitPoint, hitDir, knockbackForce, isHeadshot, _cachedOnDropPickup, hitZone, dismemberOpt);
   }
 
   function applyBlast(origin, radius, maxDmg, force) {
@@ -1156,12 +1247,14 @@
       if (!z.active || z.dead) continue;
       const sc = z.scale;
       const hipDrop = z.legCrippled ? 0.14 * sc : 0;
+      const fwdX = Math.sin(z.yaw || 0);
+      const fwdZ = Math.cos(z.yaw || 0);
 
-      // 1. Head sphere test (matched to hunched anatomy & leg-crippled crouch)
-      const leanFwd = (z.variant === 'runner' || z.variant === 'screamer') ? 0.26 * sc : 0.12 * sc;
-      const hx = z.x + Math.sin(z.yaw) * leanFwd;
-      const hy = z.y + (z.variant === 'runner' ? 1.42 : (z.variant === 'screamer' ? 1.46 : 1.56)) * sc - hipDrop;
-      const hz = z.z + Math.cos(z.yaw) * leanFwd;
+      // 1. Head sphere test (ground-level forward sphere when crawling, otherwise hunched standing)
+      const leanFwd = z.crawling ? (0.56 * sc) : ((z.variant === 'runner' || z.variant === 'screamer') ? 0.26 * sc : 0.12 * sc);
+      const hx = z.x + fwdX * leanFwd;
+      const hy = z.y + (z.crawling ? (0.34 * sc) : ((z.variant === 'runner' ? 1.42 : (z.variant === 'screamer' ? 1.46 : 1.56)) * sc - hipDrop));
+      const hz = z.z + fwdZ * leanFwd;
       const hr = 0.24 * sc;
 
       const ocx = _rayOrig.x - hx;
@@ -1187,38 +1280,45 @@
             hitZone: 'head',
             isArmor: false
           };
-          continue;
         }
       }
 
-      // 2. Torso/Legs vertical segment capsule test
-      const ax = z.x, ay = z.y + 0.18 * sc, az = z.z;
-      const bx = z.x, by = z.y + 1.38 * sc - hipDrop, bz = z.z;
-      const segLen = by - ay;
-      const tr = (z.variant === 'brute' ? 0.44 : 0.36) * sc;
+      // 2. Torso/Legs segment capsule test (prone horizontal capsule when crawling, vertical otherwise)
+      const ax = z.crawling ? (z.x - fwdX * 0.48 * sc) : z.x;
+      const ay = z.crawling ? (z.y + 0.20 * sc) : (z.y + 0.18 * sc);
+      const az = z.crawling ? (z.z - fwdZ * 0.48 * sc) : z.z;
+      const bx = z.crawling ? (z.x + fwdX * 0.38 * sc) : z.x;
+      const by = z.crawling ? (z.y + 0.26 * sc) : (z.y + 1.38 * sc - hipDrop);
+      const bz = z.crawling ? (z.z + fwdZ * 0.38 * sc) : z.z;
+      const ux = bx - ax, uy = by - ay, uz = bz - az;
+      const cCoef = ux * ux + uy * uy + uz * uz;
+      const tr = (z.variant === 'brute' ? (z.crawling ? 0.42 : 0.44) : (z.crawling ? 0.34 : 0.36)) * sc;
 
       const w0x = _rayOrig.x - ax;
       const w0y = _rayOrig.y - ay;
       const w0z = _rayOrig.z - az;
-      const bCoef = _rayDir.y;
+      const bCoef = _rayDir.x * ux + _rayDir.y * uy + _rayDir.z * uz;
       const dCoef = _rayDir.x * w0x + _rayDir.y * w0y + _rayDir.z * w0z;
-      const eCoef = w0y;
-      const denom = 1 - bCoef * bCoef;
+      const eCoef = ux * w0x + uy * w0y + uz * w0z;
+      const denom = cCoef - bCoef * bCoef;
 
-      let tNear, sNear;
+      let tNear, uNorm;
       if (denom < 1e-5) {
-        sNear = Math.max(0, Math.min(segLen, eCoef));
-        tNear = Math.max(0, -dCoef + bCoef * sNear);
+        uNorm = Math.max(0, Math.min(1, eCoef / Math.max(1e-5, cCoef)));
+        tNear = Math.max(0, -dCoef + bCoef * uNorm);
       } else {
-        tNear = Math.max(0, (bCoef * eCoef - dCoef) / denom);
-        sNear = bCoef * tNear + eCoef;
-        if (sNear < 0) { sNear = 0; tNear = Math.max(0, -dCoef); }
-        else if (sNear > segLen) { sNear = segLen; tNear = Math.max(0, -dCoef + bCoef * segLen); }
+        tNear = Math.max(0, (bCoef * eCoef - cCoef * dCoef) / denom);
+        uNorm = (bCoef * tNear + eCoef) / Math.max(1e-5, cCoef);
+        if (uNorm < 0) { uNorm = 0; tNear = Math.max(0, -dCoef); }
+        else if (uNorm > 1) { uNorm = 1; tNear = Math.max(0, bCoef - dCoef); }
       }
 
-      const rx = _rayOrig.x + _rayDir.x * tNear - ax;
-      const ry = _rayOrig.y + _rayDir.y * tNear - (ay + sNear);
-      const rz = _rayOrig.z + _rayDir.z * tNear - az;
+      const qx = ax + ux * uNorm;
+      const qy = ay + uy * uNorm;
+      const qz = az + uz * uNorm;
+      const rx = _rayOrig.x + _rayDir.x * tNear - qx;
+      const ry = _rayOrig.y + _rayDir.y * tNear - qy;
+      const rz = _rayOrig.z + _rayDir.z * tNear - qz;
       const distSq = rx * rx + ry * ry + rz * rz;
       if (distSq <= tr * tr) {
         const entryOffset = Math.sqrt(Math.max(0, tr * tr - distSq));
@@ -1228,9 +1328,21 @@
           const px = _rayOrig.x + _rayDir.x * tHit;
           const py = _rayOrig.y + _rayDir.y * tHit;
           const pz = _rayOrig.z + _rayDir.z * tHit;
-          const hipSplit = Math.max(0.25 * sc, 0.60 * sc - hipDrop * 0.5);
-          const hitZone = sNear < hipSplit ? 'legs' : 'torso';
-          _v1.set(px - ax, py - (ay + sNear), pz - az).normalize();
+          const sNear = uNorm * Math.sqrt(Math.max(1e-6, cCoef));
+          const hipSplit = z.crawling ? 0.30 * sc : Math.max(0.25 * sc, 0.60 * sc - hipDrop * 0.5);
+          const lat = (px - z.x) * Math.cos(z.yaw) + (pz - z.z) * (-Math.sin(z.yaw));
+          let hitZone = 'torso';
+          let subZone = 'torso';
+          if (sNear < hipSplit) {
+            subZone = lat >= 0 ? 'leftLeg' : 'rightLeg';
+            hitZone = Math.abs(lat) < 0.055 * sc ? 'legs' : subZone;
+          } else {
+            const armLat = (z.variant === 'brute' ? 0.21 : 0.16) * sc;
+            if (sNear >= hipSplit + 0.10 * sc && lat >= armLat) hitZone = 'leftArm';
+            else if (sNear >= hipSplit + 0.10 * sc && lat <= -armLat) hitZone = 'rightArm';
+            subZone = hitZone;
+          }
+          _v1.set(px - qx, py - qy, pz - qz).normalize();
           best = {
             dist: tHit,
             point: new THREE.Vector3(px, py, pz),
@@ -1239,7 +1351,8 @@
             variant: z.variant,
             isHeadshot: false,
             hitZone: hitZone,
-            isArmor: z.variant === 'brute' && z.hasArmor && hitZone === 'torso'
+            subZone: subZone,
+            isArmor: z.variant === 'brute' && z.hasArmor && (hitZone === 'torso' || hitZone === 'leftArm' || hitZone === 'rightArm')
           };
         }
       }
@@ -2053,7 +2166,7 @@
             const reachedWp = z.hasNavWp && Math.hypot(z.wpX - z.x, z.wpZ - z.z) < 1.25 && Math.abs(z.wpY - z.y) < 0.85;
             const activelyClimbing = z.hasNavWp && (z.wpY - z.y) > 0.25 && Math.hypot(z.wpX - z.x, z.wpZ - z.z) < 6.5;
             if (reachedWp || (z.navTimer <= 0 && !activelyClimbing && isTickFrame)) {
-              z.navTimer = 0.36 + (i % 5) * 0.04;
+              z.navTimer = 0.26 + (i % 4) * 0.03;
               E.solveNavWaypoint(z, targetX, targetY, targetZ, spatialGrid, tc);
             }
           }
@@ -2104,7 +2217,7 @@
           }
 
           // 2. Brute telegraphed charge windup
-          if (z.variant === 'brute' && !z.dead && z.staggerTimer <= 0 && z.chargeWindup <= 0 && z.chargeTimer <= 0 && z.chargeCooldown <= 0 && !z.hasNavWp && !isDoorCrossing && playerPos) {
+          if (z.variant === 'brute' && !z.dead && !z.crawling && z.staggerTimer <= 0 && z.chargeWindup <= 0 && z.chargeTimer <= 0 && z.chargeCooldown <= 0 && !z.hasNavWp && !isDoorCrossing && playerPos) {
             if (distHoriz >= 5.0 && distHoriz <= 14.0 && Math.abs(pdy) <= 0.85) {
               _v1.set(z.x, z.y + 1.35 * z.scale, z.z);
               _v2.set(playerPos.x - _v1.x, ((playerPos.y || 0) + 1.2) - _v1.y, playerPos.z - _v1.z).normalize();
@@ -2180,7 +2293,10 @@
           const isEnteringDoor = doorAssign >= 0;
           const moveCheckDist = isEnteringDoor ? Math.hypot(goalX - z.x, goalZ - z.z) : dist3D;
           const effStopDist = isEnteringDoor ? 0.22 : stopDist;
-          const shouldMove = (moveCheckDist > effStopDist || isBackpedaling || z.chargeTimer > 0) && z.alertDelay <= 0 && z.shriekTimer <= 0 && z.chargeWindup <= 0;
+          if (z.crawling) z.crawlFallTimer = (z.crawlFallTimer || 0) + moveStep;
+          const crawlFalling = z.crawling && z.crawlFallTimer < 0.30;
+          const shouldMove = (moveCheckDist > effStopDist || isBackpedaling || z.chargeTimer > 0)
+            && !crawlFalling && z.alertDelay <= 0 && z.shriekTimer <= 0 && z.chargeWindup <= 0;
 
           if (shouldMove) {
             steerAndMove(z, i, goalX, goalZ, moveSpd, moveStep, isBackpedaling, dist3D, distHoriz, pdx, pdz, isDoorCrossing || isInsideCabin);
@@ -2208,6 +2324,18 @@
               z.actualSpeedSmooth += (z.actualSpeed - (z.actualSpeedSmooth || 0)) * Math.min(1.0, moveStep * 12.0);
               z.moveBlend = Math.min(1.0, z.actualSpeedSmooth / Math.max(0.25, z.speed));
               z.animPhase += moveStep * (1.2 + z.actualSpeedSmooth * 2.35);
+              if (z.crawling && z.crawlFallTimer >= 0.30) {
+                z.crawlPhase = (z.crawlPhase || 0) + frameDist * 4.2 + moveStep * 0.8 * z.moveBlend;
+                z.crawlBloodDist = (z.crawlBloodDist || 0) + frameDist;
+                if (z.crawlBloodDist >= 0.95) {
+                  z.crawlBloodDist = 0;
+                  if (LRT.Weapons && typeof LRT.Weapons.spawnBloodDecal === 'function') {
+                    _v2.set(z.x, z.y + 0.022, z.z);
+                    _v3.set(0, 1, 0);
+                    LRT.Weapons.spawnBloodDecal(_v2, _v3, 0.48, false);
+                  }
+                }
+              }
             }
             E.updateStuckRecovery(z, moveStep, moveCheckDist, effStopDist);
           } else if (!z.groundedOnce) {
@@ -2217,14 +2345,15 @@
           }
 
           const canMelee = !playerInTrain || isInsideCabin || (isDoorCrossing && trainBounds && Math.abs((z.x - trainBounds.trackX) * trainBounds.travelDir) <= 1.40);
-          if (canMelee && dist3D <= meleeRange && Math.abs(pdy) <= 1.8 && z.attackTimer <= 0 && z.staggerTimer <= 0 && z.shriekTimer <= 0 && z.chargeWindup <= 0 && z.alertDelay <= 0) {
+          if (canMelee && !crawlFalling && dist3D <= meleeRange && Math.abs(pdy) <= 1.8 && z.attackTimer <= 0 && z.staggerTimer <= 0 && z.shriekTimer <= 0 && z.chargeWindup <= 0 && z.alertDelay <= 0) {
             z.attackTimer = z.attackCooldown * (isDaylightOutbreak() ? (getDaylightMods().windupMult || 0.85) : 1.0);
             const isChargingHit = z.chargeTimer > 0;
             if (isChargingHit) z.chargeTimer = 0;
-            _v1.set(z.x, z.y + 1.3, z.z);
+            _v1.set(z.x, z.y + (z.crawling ? 0.42 : 1.3), z.z);
             E.play3D('zombie_attack', _v1, 0.14, 0.95);
             if (typeof onPlayerHit === 'function') {
-              const hitDmg = isChargingHit ? Math.round(z.damage * 1.5) : z.damage;
+              const armMult = (z.lostLeftArm && z.lostRightArm) ? 0.55 : ((z.lostLeftArm || z.lostRightArm) ? 0.80 : 1.0);
+              const hitDmg = Math.max(1, Math.round((isChargingHit ? z.damage * 1.5 : z.damage) * armMult));
               onPlayerHit(hitDmg, _v1);
             }
           }

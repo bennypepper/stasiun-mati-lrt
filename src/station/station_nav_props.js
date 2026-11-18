@@ -298,8 +298,12 @@
         station.interactables.push({
           id: tid, type: 'turnstile', x: lx, y: 0.9, z: lz,
           label: '[E] Tap Kartu Elektronik (Access by KAI)',
-          prompt: '[E] Tap Kartu Elektronik (Access by KAI)', used: false
+          prompt: '[E] Tap Kartu Elektronik (Access by KAI)', used: false,
+          targetObj: cab
         });
+        if (typeof station._registerHaloTarget === 'function') {
+          station._registerHaloTarget(tid, cab, { category: 'interactable', x: lx, y: 0.9, z: lz, hitRadius: 0.55 });
+        }
       }
     }
 
@@ -352,8 +356,6 @@
     const paperGeo = new THREE.BoxGeometry(0.22, 0.010, 0.29);
     const lineGeo = new THREE.BoxGeometry(0.145, 0.004, 0.012);
     const stampGeo = new THREE.BoxGeometry(0.044, 0.004, 0.026);
-    const glintGeo = new THREE.PlaneGeometry(0.46, 0.46);
-    glintGeo.rotateX(-Math.PI * 0.5);
 
     const folderMat = new THREE.MeshStandardMaterial({ color: 0xd4ab6a, roughness: 0.72, metalness: 0.04 });
     const paperMat = new THREE.MeshStandardMaterial({
@@ -372,20 +374,19 @@
       metalness: 0.0
     });
 
-    station.disposableGeometries.push(folderGeo, tabGeo, paperGeo, lineGeo, stampGeo, glintGeo);
+    station.disposableGeometries.push(folderGeo, tabGeo, paperGeo, lineGeo, stampGeo);
     station.disposableMaterials.push(folderMat, paperMat, inkMat, stampMat);
 
     station._fieldLogPropAssets = {
-      folderGeo, tabGeo, paperGeo, lineGeo, stampGeo, glintGeo,
+      folderGeo, tabGeo, paperGeo, lineGeo, stampGeo,
       folderMat, paperMat, inkMat, stampMat
     };
     return station._fieldLogPropAssets;
   }
 
-  function placeFieldLogProp(station, root, id, x, y, z, ry, used) {
-    if (!root) return;
+  function placeFieldLogProp(station, root, id, x, y, z, ry, used, skipHalo) {
+    if (!root) return null;
     const a = getFieldLogPropAssets(station);
-    station._fieldLogGlints = station._fieldLogGlints || [];
 
     const grp = new THREE.Group();
     grp.name = 'FieldLogProp_' + id;
@@ -419,26 +420,10 @@
     stamp.rotation.y = 0.24;
     grp.add(stamp);
 
-    const glintMat = new THREE.MeshBasicMaterial({
-      color: 0xffd27d,
-      transparent: true,
-      opacity: 0.30,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide
-    });
-    station.disposableMaterials.push(glintMat);
-    const glint = new THREE.Mesh(a.glintGeo, glintMat);
-    glint.position.set(0, 0.004, 0);
-    glint.visible = !used;
-    grp.add(glint);
-
-    station._fieldLogGlints.push({
-      id: id,
-      mesh: glint,
-      mat: glintMat,
-      used: !!used
-    });
+    if (!skipHalo && typeof station._registerHaloTarget === 'function') {
+      station._registerHaloTarget(id, grp, { category: 'interactable', x, y: y + 0.03, z, hitRadius: 0.48 });
+    }
+    return grp;
   }
 
   function makeCanvasTex(station, w, h, drawFn, repeat) {
@@ -483,8 +468,9 @@
     const hw = (cos * bw + sin * bd) * 0.5;
     const hd = (sin * bw + cos * bd) * 0.5;
 
+    let bGrp = null;
     if (benchProto && benchProto.parts && benchProto.parts.length) {
-      const bGrp = new THREE.Group();
+      bGrp = new THREE.Group();
       bGrp.position.set(x, y, z);
       bGrp.rotation.y = rotY;
       if (sx !== 1.0) bGrp.scale.set(sx, 1, 1);
@@ -496,7 +482,7 @@
       }
       root.add(bGrp);
     } else {
-      const bGrp = new THREE.Group();
+      bGrp = new THREE.Group();
       bGrp.position.set(x, y, z);
       bGrp.rotation.y = rotY;
       const ironMat = new THREE.MeshStandardMaterial({ color: 0x242a32, roughness: 0.45, metalness: 0.72 });
@@ -522,8 +508,12 @@
       standPos: { x: x + standOffX, y: y + 0.02, z: z + standOffZ },
       yaw: playerYaw,
       label: '[E] Duduk di Bangku Stasiun',
-      prompt: '[E] Duduk di Bangku Stasiun'
+      prompt: '[E] Duduk di Bangku Stasiun',
+      targetObj: bGrp
     });
+    if (bGrp && typeof station._registerHaloTarget === 'function') {
+      station._registerHaloTarget(id, bGrp, { category: 'interactable', x, y: y + 0.45, z, hitRadius: 0.95 });
+    }
   }
 
   function addTrashBinProp(station, root, x, y, z) {
@@ -802,10 +792,14 @@
     addPbrPart(station, grp, new THREE.BoxGeometry(5.76, 0.04, 3.76), steelMat, 0, 2.93, 0);
 
     // 4) Interior Left Bay: Illuminated 2-door glass Beverage Chiller
-    addPbrPart(station, grp, new THREE.BoxGeometry(1.90, 2.16, 0.58), steelMat, -1.55, 1.12, -1.32);
-    addPbrPart(station, grp, new THREE.BoxGeometry(1.80, 2.04, 0.04), chillerMat, -1.55, 1.12, -1.02);
-    for (const hX of [-1.62, -1.48]) {
-      addPbrPart(station, grp, new THREE.BoxGeometry(0.03, 0.42, 0.04), brushedMat, hX, 1.08, -0.99);
+    const chillerGrp = new THREE.Group();
+    chillerGrp.name = 'IndomaretBeverageChiller';
+    chillerGrp.position.set(-1.55, 0, -1.32);
+    grp.add(chillerGrp);
+    addPbrPart(station, chillerGrp, new THREE.BoxGeometry(1.90, 2.16, 0.58), steelMat, 0, 1.12, 0);
+    addPbrPart(station, chillerGrp, new THREE.BoxGeometry(1.80, 2.04, 0.04), chillerMat, 0, 1.12, 0.30);
+    for (const hX of [-0.07, 0.07]) {
+      addPbrPart(station, chillerGrp, new THREE.BoxGeometry(0.03, 0.42, 0.04), brushedMat, hX, 1.08, 0.33);
     }
     addIndoCollider(-1.55, -1.32, 1.92, 0.60, 0, 2.20, 'metal', { blocksWalk: true });
 
@@ -868,8 +862,14 @@
       radius: 2.3,
       label: chillUsed ? '[E] Chiller Indomaret & Point Coffee (Sudah Diambil)' : '[E] Ambil Minuman Dingin & Point Coffee (+20 HP & +15s Fast Sprint)',
       prompt: chillUsed ? '[E] Chiller Indomaret & Point Coffee (Sudah Diambil)' : '[E] Ambil Minuman Dingin & Point Coffee (+20 HP & +15s Fast Sprint)',
-      used: chillUsed
+      used: chillUsed,
+      targetObj: chillerGrp
     });
+    if (typeof station._registerHaloTarget === 'function') {
+      station._registerHaloTarget('indomaret_chiller', chillerGrp, {
+        category: 'interactable', x: chillIntP[0], y: 1.15, z: chillIntP[1], hitRadius: 1.15
+      });
+    }
 
     const walkIn = inW(-0.35, 0.55);
     const frontDoor = inW(0, 2.55);
@@ -956,6 +956,7 @@
     addPbrPart(station, grp, new THREE.BoxGeometry(0.52, 0.22, 0.06), darkMat, 0, 0.52, 0.26);
 
     station._addCollider(x - 0.48, 0, z - 0.44, x + 0.48, 2.10, z + 0.44, 'metal');
+    return grp;
   }
 
   function buildDetailedCowayStation(station, root, x, z, yaw) {
@@ -1017,24 +1018,133 @@
     addPbrPart(station, grp, new THREE.BoxGeometry(0.14, 0.03, 0.03), steelMat, 0, 0.62, 0.28);
 
     station._addCollider(x - 0.60, 0, z - 0.36, x + 0.60, 1.98, z + 0.36, 'metal');
+    return grp;
   }
 
-  function buildCallTrainPidsSign(station, ctx, x, z, isPrev, destName) {
-    const { root, getCanopyArchY, isCawang, jpoZ, jpoNearZ, jpoFarZ } = ctx;
+  function buildCallTrainPedestal(station, ctx, x, z, isPrev, destName) {
+    const { root } = ctx;
     const grp = new THREE.Group();
-    grp.name = isPrev ? 'CallTrainConsoleP2' : 'CallTrainConsoleP1';
+    grp.name = isPrev ? 'CallTrainPedestalP2' : 'CallTrainPedestalP1';
+    grp.position.set(x, 0, z);
+    grp.rotation.y = isPrev ? -Math.PI * 0.5 : Math.PI * 0.5;
     root.add(grp);
 
     const accentHex = isPrev ? 0xf59e0b : 0x10b981;
-    const ledMat = new THREE.MeshStandardMaterial({
-      color: accentHex, emissive: new THREE.Color(accentHex), emissiveIntensity: 1.75, roughness: 0.22, metalness: 0.15
-    });
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x1e2530, roughness: 0.42, metalness: 0.72 });
-    station.disposableMaterials.push(ledMat, frameMat);
+    const darkHex = isPrev ? '#241406' : '#08241d';
+    const badgeHex = isPrev ? '#d97706' : '#059669';
+    const subHex = isPrev ? '#fde68a' : '#6ee7b7';
 
-    // Console color-coded base & hood LED strips
-    addPbrPart(station, grp, new THREE.BoxGeometry(0.48, 0.06, 0.48), ledMat, x, 0.05, z);
-    addPbrPart(station, grp, new THREE.BoxGeometry(0.48, 0.04, 0.48), ledMat, x, 1.44, z);
+    const powderMat = new THREE.MeshStandardMaterial({ color: 0x1c222b, roughness: 0.48, metalness: 0.66 });
+    const steelMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.24, metalness: 0.88 });
+    const darkTrimMat = new THREE.MeshStandardMaterial({ color: 0x11161d, roughness: 0.56, metalness: 0.52 });
+    const ledMat = new THREE.MeshStandardMaterial({
+      color: accentHex, emissive: new THREE.Color(accentHex), emissiveIntensity: 1.65, roughness: 0.20, metalness: 0.12
+    });
+
+    const faceMap = makeCanvasTex(station, 384, 384, (c, w, h) => {
+      c.fillStyle = '#141b24';
+      c.fillRect(0, 0, w, h);
+      // Brushed stainless border
+      c.strokeStyle = '#94a3b8';
+      c.lineWidth = 8;
+      c.strokeRect(10, 10, w - 20, h - 20);
+      // KAI LRT header plate
+      c.fillStyle = darkHex;
+      c.fillRect(22, 22, w - 44, 152);
+      c.fillStyle = badgeHex;
+      c.fillRect(22, 22, w - 44, 42);
+      c.fillStyle = '#ffffff';
+      c.font = 'bold 21px sans-serif';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText('PANGGIL KERETA LRT', w * 0.5, 43);
+
+      c.fillStyle = subHex;
+      c.font = 'bold 17px sans-serif';
+      c.fillText(isPrev ? 'PERON 2  •  ← KEMBALI' : 'PERON 1  •  → MAJU', w * 0.5, 92);
+      c.fillStyle = '#ffffff';
+      c.font = 'bold 22px sans-serif';
+      c.fillText(String(destName || '').toUpperCase().slice(0, 18), w * 0.5, 132);
+      c.fillStyle = '#94a3b8';
+      c.font = 'bold 13px sans-serif';
+      c.fillText('KAI LRT JABODEBEK  •  INTERKOM DARURAT', w * 0.5, 162);
+
+      // Lower panel background behind physical button & speaker grille
+      c.fillStyle = '#1e2733';
+      c.fillRect(22, 188, w - 44, 174);
+      c.fillStyle = '#cbd5e1';
+      c.font = 'bold 15px sans-serif';
+      c.fillText('TEKAN TOMBOL [E]', w * 0.5, 212);
+    }, false);
+    const faceEm = makeCanvasTex(station, 384, 384, (c, w, h) => {
+      c.fillStyle = '#000000';
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = darkHex;
+      c.fillRect(22, 22, w - 44, 152);
+      c.fillStyle = badgeHex;
+      c.fillRect(22, 22, w - 44, 42);
+      c.fillStyle = '#ffffff';
+      c.font = 'bold 21px sans-serif';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText('PANGGIL KERETA LRT', w * 0.5, 43);
+      c.fillStyle = subHex;
+      c.font = 'bold 17px sans-serif';
+      c.fillText(isPrev ? 'PERON 2  •  ← KEMBALI' : 'PERON 1  •  → MAJU', w * 0.5, 92);
+      c.fillStyle = '#f8fafc';
+      c.font = 'bold 22px sans-serif';
+      c.fillText(String(destName || '').toUpperCase().slice(0, 18), w * 0.5, 132);
+    }, false);
+    const faceMat = new THREE.MeshStandardMaterial({
+      map: faceMap, emissive: new THREE.Color(0xffffff), emissiveMap: faceEm, emissiveIntensity: 0.72, roughness: 0.28, metalness: 0.25
+    });
+    station.disposableMaterials.push(powderMat, steelMat, darkTrimMat, ledMat, faceMat);
+
+    // 1) Heavy bolted steel floor flange + 4 corner hex anchor bolts
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.54, 0.045, 0.50), steelMat, 0, 0.0225, 0);
+    for (const bx of [-0.21, 0.21]) {
+      for (const bz of [-0.19, 0.19]) {
+        addPbrPart(station, grp, new THREE.CylinderGeometry(0.018, 0.018, 0.03, 6), darkTrimMat, bx, 0.055, bz);
+      }
+    }
+    // 2) Tapered beveled powder-coated pedestal shaft + brushed stainless side trim pillars
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.38, 0.22, 0.34), powderMat, 0, 0.155, 0);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.32, 0.84, 0.28), powderMat, 0, 0.68, -0.01);
+    for (const sx of [-0.175, 0.175]) {
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.035, 1.38, 0.30), steelMat, sx, 0.74, 0);
+    }
+    // Side illuminated direction status bars
+    for (const sx of [-0.196, 0.196]) {
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.012, 0.36, 0.05), ledMat, sx, 1.24, 0.04);
+    }
+    // 3) Upper hooded kiosk head & brushed faceplate (y = 1.06..1.52)
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.40, 0.44, 0.34), powderMat, 0, 1.28, 0.01);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.42, 0.04, 0.42), steelMat, 0, 1.50, 0.04);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.42, 0.10, 0.03), steelMat, 0, 1.46, 0.23, 0.18);
+    // Front angled LCD faceplate + rear brushed access cover
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.36, 0.38, 0.03), steelMat, 0, 1.27, 0.175, -0.10);
+    addPbrPart(station, grp, new THREE.PlaneGeometry(0.32, 0.34), faceMat, 0, 1.27, 0.194, -0.10);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.28, 0.66, 0.02), steelMat, 0, 0.72, -0.16);
+    // 4) Tactile glowing push-button ring + stainless plunger + intercom speaker grille
+    addPbrPart(station, grp, new THREE.CylinderGeometry(0.058, 0.062, 0.03, 18), ledMat, 0, 1.01, 0.16, Math.PI * 0.5 - 0.10);
+    addPbrPart(station, grp, new THREE.CylinderGeometry(0.038, 0.038, 0.045, 16), steelMat, 0, 1.01, 0.168, Math.PI * 0.5 - 0.10);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.22, 0.12, 0.03), darkTrimMat, 0, 0.84, 0.14);
+    for (let gy = -1; gy <= 1; gy++) {
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.16, 0.014, 0.015), steelMat, 0, 0.84 + gy * 0.032, 0.156);
+    }
+
+    station._addCollider(x - 0.28, 0, z - 0.28, x + 0.28, 1.56, z + 0.28, 'metal');
+    return grp;
+  }
+
+  function buildCallTrainPidsSign(station, ctx, x, z, isPrev, destName) {
+    const { root, getCanopyArchY, isCawang, jpoNearZ, jpoFarZ } = ctx;
+    const grp = new THREE.Group();
+    grp.name = isPrev ? 'CallTrainPidsBoardP2' : 'CallTrainPidsBoardP1';
+    root.add(grp);
+
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x1e2530, roughness: 0.42, metalness: 0.72 });
+    station.disposableMaterials.push(frameMat);
 
     // Overhead Platform PIDS Signboard (y = 3.10m, suspended clear of Cawang JPO soffit & canopies)
     const signY = 3.10;
@@ -1274,11 +1384,16 @@
       addPbrPart(station, grp, new THREE.BoxGeometry(0.06, 0.42, 0.42), frameMat, loungeCX + lx, UPPER_FLOOR_Y + 0.21, nearZ);
     }
     // 3D Tactical Logistics Bag sitting on Tactical Bench
-    addPbrPart(station, grp, new THREE.BoxGeometry(0.54, 0.24, 0.32), bagMat, loungeCX, UPPER_FLOOR_Y + 0.60, nearZ, 0, 0.12, 0);
-    addPbrPart(station, grp, new THREE.BoxGeometry(0.10, 0.26, 0.34), strapMat, loungeCX - 0.14, UPPER_FLOOR_Y + 0.60, nearZ, 0, 0.12, 0);
-    addPbrPart(station, grp, new THREE.BoxGeometry(0.10, 0.26, 0.34), strapMat, loungeCX + 0.14, UPPER_FLOOR_Y + 0.60, nearZ, 0, 0.12, 0);
-    addPbrPart(station, grp, new THREE.BoxGeometry(0.12, 0.03, 0.04), crossMat, loungeCX, UPPER_FLOOR_Y + 0.73, nearZ);
-    addPbrPart(station, grp, new THREE.BoxGeometry(0.04, 0.03, 0.12), crossMat, loungeCX, UPPER_FLOOR_Y + 0.73, nearZ);
+    const bagGrp = new THREE.Group();
+    bagGrp.name = 'Jpo2SupplyBag';
+    bagGrp.position.set(loungeCX, UPPER_FLOOR_Y + 0.60, nearZ);
+    bagGrp.rotation.y = 0.12;
+    grp.add(bagGrp);
+    addPbrPart(station, bagGrp, new THREE.BoxGeometry(0.54, 0.24, 0.32), bagMat, 0, 0, 0);
+    addPbrPart(station, bagGrp, new THREE.BoxGeometry(0.10, 0.26, 0.34), strapMat, -0.14, 0, 0);
+    addPbrPart(station, bagGrp, new THREE.BoxGeometry(0.10, 0.26, 0.34), strapMat, 0.14, 0, 0);
+    addPbrPart(station, bagGrp, new THREE.BoxGeometry(0.12, 0.03, 0.04), crossMat, 0, 0.13, 0);
+    addPbrPart(station, bagGrp, new THREE.BoxGeometry(0.04, 0.03, 0.12), crossMat, 0, 0.13, 0);
     station._addCollider(loungeCX - 0.44, UPPER_FLOOR_Y, nearZ - 0.26, loungeCX + 0.44, UPPER_FLOOR_Y + 0.80, nearZ + 0.26, 'metal');
 
     const jpo2Used = station._usedIds.has('jpo2_supply');
@@ -1290,9 +1405,15 @@
       z: nearZ,
       label: jpo2Used ? '[E] Tas Logistik JPO Sekunder (Sudah Diambil)' : '[E] Ambil Tas Logistik JPO Sekunder (+20 Amunisi & +15 HP)',
       prompt: jpo2Used ? '[E] Tas Logistik JPO Sekunder (Sudah Diambil)' : '[E] Ambil Tas Logistik JPO Sekunder (+20 Amunisi & +15 HP)',
-      used: jpo2Used
+      used: jpo2Used,
+      targetObj: bagGrp
     });
-    placeFieldLogProp(station, grp, 'jpo2_supply', loungeCX + 0.26, UPPER_FLOOR_Y + 0.485, nearZ + farDir * 0.08, 0.2, jpo2Used);
+    if (typeof station._registerHaloTarget === 'function') {
+      station._registerHaloTarget('jpo2_supply', bagGrp, {
+        category: 'interactable', x: loungeCX, y: UPPER_FLOOR_Y + 0.62, z: nearZ, hitRadius: 0.55
+      });
+    }
+    placeFieldLogProp(station, grp, 'jpo2_supply', loungeCX + 0.26, UPPER_FLOOR_Y + 0.485, nearZ + farDir * 0.08, 0.2, jpo2Used, true);
 
     // 5) Ceiling CCTV Domes under JPO 2 Pergola Soffit
     const cctvY = (jpoPergolaY || 6.95) - 0.14;
@@ -1524,38 +1645,45 @@
         used: loketUsed
       });
       placeFieldLogProp(station, ctx.root, 'loket_counter', notePos[0], 1.055, notePos[1], lkYaw + 0.14, loketUsed);
-
-      shX = concMinX + 7.8;
-      shZ = concMaxZ - 1.45;
-      addAtlasBox(bStall, 2.4, 2.55, 2.1, shX, 1.28, shZ, 0, null, STALL_UV.shutter260);
-      station._addCollider(shX - 1.2, 0, shZ - 1.1, shX + 1.2, 2.6, shZ + 1.1, 'metal');
     }
 
     const jakX = isIsland ? p1MaxX - 2.0 : concMinX + 3.8;
     const jakZ = isIsland ? -16.0 : concMaxZ - 1.8;
     const jakYaw = isIsland ? 0 : Math.PI;
     const jakTrayZ = isIsland ? (jakZ + 0.44) : (jakZ - 0.44);
-    buildDetailedJaklingkoKiosk(station, ctx.root, jakX, jakZ, jakYaw);
+    const jakGrp = buildDetailedJaklingkoKiosk(station, ctx.root, jakX, jakZ, jakYaw);
     const jakUsed = station._usedIds.has('jaklingko_kiosk');
     station.interactables.push({
       id: 'jaklingko_kiosk', type: 'jaklingko', x: jakX, y: 1.2, z: jakZ,
       label: jakUsed ? '[E] Terminal JakLingko (Sudah Diambil)' : '[E] Top-Up KUE / JakLingko Terminal (+Amunisi)',
       prompt: jakUsed ? '[E] Terminal JakLingko (Sudah Diambil)' : '[E] Top-Up KUE / JakLingko Terminal (+1 Magazin)',
-      used: jakUsed
+      used: jakUsed,
+      targetObj: jakGrp
     });
-    placeFieldLogProp(station, ctx.root, 'jaklingko_kiosk', jakX, 1.045, jakTrayZ, isIsland ? 0.12 : Math.PI + 0.12, jakUsed);
+    if (jakGrp && typeof station._registerHaloTarget === 'function') {
+      station._registerHaloTarget('jaklingko_kiosk', jakGrp, {
+        category: 'interactable', x: jakX, y: 1.05, z: jakZ, hitRadius: 0.85
+      });
+    }
+    placeFieldLogProp(station, ctx.root, 'jaklingko_kiosk', jakX, 1.045, jakTrayZ, isIsland ? 0.12 : Math.PI + 0.12, jakUsed, true);
 
     const cowX = isIsland ? p1MaxX - 2.0 : concMinX + 5.4;
     const cowZ = isIsland ? -13.5 : concMaxZ - 1.8;
     const cowYaw = isIsland ? 0 : Math.PI;
-    buildDetailedCowayStation(station, ctx.root, cowX, cowZ, cowYaw);
+    const cowGrp = buildDetailedCowayStation(station, ctx.root, cowX, cowZ, cowYaw);
     const cowUsed = station._usedIds.has('coway_water');
     station.interactables.push({
       id: 'coway_water', type: 'coway', x: cowX, y: 1.1, z: cowZ,
       label: cowUsed ? '[E] Dispenser Coway (Sudah Minum)' : '[E] Minum Air Steril Coway (+15 HP)',
       prompt: cowUsed ? '[E] Dispenser Coway (Sudah Minum)' : '[E] Minum Air Steril Coway (+15 HP)',
-      used: cowUsed
+      used: cowUsed,
+      targetObj: cowGrp
     });
+    if (cowGrp && typeof station._registerHaloTarget === 'function') {
+      station._registerHaloTarget('coway_water', cowGrp, {
+        category: 'interactable', x: cowX, y: 1.0, z: cowZ, hitRadius: 0.78
+      });
+    }
 
     const stationsList = (LRT.Config && (LRT.Config.stations || LRT.Config.ARCHETYPES))
       || (LRT.CONFIG && LRT.CONFIG.stations)
@@ -1569,27 +1697,35 @@
 
     const callX = p1MinX + 1.45;
     const callZ = -2.85;
-    addBox(bSteelDark, 0.42, 1.35, 0.42, callX, 0.68, callZ);
-    addAtlasBox(bSign, 0.46, 0.44, 0.46, callX, 1.22, callZ, Math.PI * 0.5, null, SIGN_UV.callTrain);
-    station._addCollider(callX - 0.25, 0, callZ - 0.25, callX + 0.25, 1.45, callZ + 0.25, 'metal');
+    const call1Ped = buildCallTrainPedestal(station, ctx, callX, callZ, false, nextName);
     buildCallTrainPidsSign(station, ctx, callX, callZ, false, nextName);
     station.interactables.push({
       id: 'call_train', type: 'call_train', x: callX, y: 1.2, z: callZ,
       label: '[E] Panggil Kereta LRT Peron 1 → MAJU (Tujuan: ' + nextName + ')',
-      prompt: '[E] Panggil Kereta LRT Peron 1 → MAJU (Tujuan: ' + nextName + ')', used: false
+      prompt: '[E] Panggil Kereta LRT Peron 1 → MAJU (Tujuan: ' + nextName + ')', used: false,
+      targetObj: call1Ped
     });
+    if (call1Ped && typeof station._registerHaloTarget === 'function') {
+      station._registerHaloTarget('call_train', call1Ped, {
+        category: 'train', x: callX, y: 0.9, z: callZ, hitRadius: 0.65
+      });
+    }
 
     const call2X = (isIsland ? p1MaxX : p2MaxX) - 1.45;
     const call2Z = -2.85;
-    addBox(bSteelDark, 0.42, 1.35, 0.42, call2X, 0.68, call2Z);
-    addAtlasBox(bSign, 0.46, 0.44, 0.46, call2X, 1.22, call2Z, -Math.PI * 0.5, null, SIGN_UV.callTrain);
-    station._addCollider(call2X - 0.25, 0, call2Z - 0.25, call2X + 0.25, 1.45, call2Z + 0.25, 'metal');
+    const call2Ped = buildCallTrainPedestal(station, ctx, call2X, call2Z, true, prevName);
     buildCallTrainPidsSign(station, ctx, call2X, call2Z, true, prevName);
     station.interactables.push({
       id: 'call_train_prev', type: 'call_train_prev', x: call2X, y: 1.2, z: call2Z,
       label: '[E] Panggil Kereta LRT Peron 2 ← KEMBALI (Tujuan: ' + prevName + ')',
-      prompt: '[E] Panggil Kereta LRT Peron 2 ← KEMBALI (Tujuan: ' + prevName + ')', used: false
+      prompt: '[E] Panggil Kereta LRT Peron 2 ← KEMBALI (Tujuan: ' + prevName + ')', used: false,
+      targetObj: call2Ped
     });
+    if (call2Ped && typeof station._registerHaloTarget === 'function') {
+      station._registerHaloTarget('call_train_prev', call2Ped, {
+        category: 'train', x: call2X, y: 0.9, z: call2Z, hitRadius: 0.65
+      });
+    }
 
     const exX = p1MaxX - 1.1;
     const exBy = 3.25, exBh = 0.64;
@@ -1625,20 +1761,68 @@
 
     const totemX = p1MinX + 3.0;
     const totemZ = 8.6;
-    addBox(bSteelDark, 1.66, 0.08, 0.30, totemX, 0.04, totemZ);
-    addBox(bSteelDark, 0.08, 1.88, 0.14, totemX - 0.76, 0.94, totemZ);
-    addBox(bSteelDark, 0.08, 1.88, 0.14, totemX + 0.76, 0.94, totemZ);
-    addBox(bSteelDark, 1.62, 0.58, 0.14, totemX, 1.54, totemZ);
-    addAtlasQuad(bSign, 1.52, 0.48, totemX, 1.54, totemZ + 0.075, 0, 0, 0, SIGN_UV.routeMap);
-    addAtlasQuad(bSign, 1.52, 0.48, totemX, 1.54, totemZ - 0.075, 0, Math.PI, 0, SIGN_UV.routeMap);
-    addBox(bSteelDark, 0.56, 0.05, 0.32, totemX, 1.04, totemZ - 0.16);
-    station._addCollider(totemX - 0.86, 0, totemZ - 0.16, totemX + 0.86, 1.92, totemZ + 0.16, 'metal');
+    const totemGrp = new THREE.Group();
+    totemGrp.name = 'RouteMapTotem';
+    totemGrp.position.set(totemX, 0, totemZ);
+    ctx.root.add(totemGrp);
+    const totemSteelMat = new THREE.MeshStandardMaterial({ color: 0x222933, roughness: 0.42, metalness: 0.74 });
+    const totemBrushedMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.26, metalness: 0.86 });
+    const totemTex = makeCanvasTex(station, 512, 256, (c, w, h) => {
+      c.fillStyle = '#f2f3f5';
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = '#16325c';
+      c.fillRect(0, 0, w, 46);
+      c.fillStyle = '#e5b82e';
+      c.fillRect(0, 46, w, 5);
+      c.fillStyle = '#ffffff';
+      c.font = 'bold 20px sans-serif';
+      c.fillText('PETA RUTE LRT JABODEBEK  •  INFO STASIUN', 16, 30);
+      c.strokeStyle = '#1d4ed8';
+      c.lineWidth = 7;
+      c.beginPath(); c.moveTo(32, 128); c.lineTo(295, 128); c.lineTo(476, 94); c.stroke();
+      c.strokeStyle = '#15803d';
+      c.beginPath(); c.moveTo(295, 128); c.lineTo(476, 174); c.stroke();
+      const tStops = ['Dukuh Atas', 'Setiabudi', 'Kuningan', 'Cikoko', 'Cawang'];
+      for (let ts = 0; ts < tStops.length; ts++) {
+        const sx = 40 + ts * 64;
+        c.fillStyle = '#ffffff';
+        c.beginPath(); c.arc(sx, 128, 7, 0, Math.PI * 2); c.fill();
+        c.strokeStyle = '#16325c'; c.lineWidth = 2.5; c.stroke();
+        c.fillStyle = '#0f172a';
+        c.font = 'bold 12px sans-serif';
+        c.textAlign = 'center';
+        c.fillText(tStops[ts], sx, 154);
+      }
+      c.textAlign = 'left';
+      c.fillStyle = '#9d6e32';
+      c.fillRect(0, 224, w, 32);
+      c.fillStyle = '#e5d429';
+      for (let bx = 10; bx < w; bx += 26) c.fillRect(bx, 232, 12, 12);
+    }, false);
+    const totemMapMat = new THREE.MeshStandardMaterial({
+      map: totemTex, emissive: new THREE.Color(0xffffff), emissiveMap: totemTex, emissiveIntensity: 0.34, roughness: 0.34
+    });
+    station.disposableMaterials.push(totemSteelMat, totemBrushedMat, totemMapMat);
+    addPbrPart(station, totemGrp, new THREE.BoxGeometry(1.68, 0.08, 0.34), totemSteelMat, 0, 0.04, 0);
+    addPbrPart(station, totemGrp, new THREE.BoxGeometry(0.08, 1.88, 0.14), totemBrushedMat, -0.76, 0.94, 0);
+    addPbrPart(station, totemGrp, new THREE.BoxGeometry(0.08, 1.88, 0.14), totemBrushedMat, 0.76, 0.94, 0);
+    addPbrPart(station, totemGrp, new THREE.BoxGeometry(1.62, 0.72, 0.14), totemSteelMat, 0, 1.54, 0);
+    addPbrPart(station, totemGrp, new THREE.PlaneGeometry(1.52, 0.64), totemMapMat, 0, 1.54, 0.075);
+    addPbrPart(station, totemGrp, new THREE.PlaneGeometry(1.52, 0.64), totemMapMat, 0, 1.54, -0.075, 0, Math.PI, 0);
+    addPbrPart(station, totemGrp, new THREE.BoxGeometry(0.56, 0.05, 0.32), totemSteelMat, 0, 1.04, -0.16);
+    station._addCollider(totemX - 0.86, 0, totemZ - 0.18, totemX + 0.86, 1.92, totemZ + 0.18, 'metal');
     station.interactables.push({
       id: 'route_totem', type: 'info', x: totemX, y: 1.2, z: totemZ,
       label: '[E] Periksa Peta Rute LRT Jabodebek',
-      prompt: '[E] Periksa Peta Rute LRT Jabodebek', used: false
+      prompt: '[E] Periksa Peta Rute LRT Jabodebek', used: false,
+      targetObj: totemGrp
     });
-    placeFieldLogProp(station, ctx.root, 'route_totem', totemX, 1.07, totemZ - 0.16, Math.PI + 0.10, station._usedIds.has('route_totem'));
+    if (typeof station._registerHaloTarget === 'function') {
+      station._registerHaloTarget('route_totem', totemGrp, {
+        category: 'interactable', x: totemX, y: 1.05, z: totemZ, hitRadius: 0.95
+      });
+    }
+    placeFieldLogProp(station, ctx.root, 'route_totem', totemX, 1.07, totemZ - 0.16, Math.PI + 0.10, station._usedIds.has('route_totem'), true);
 
     for (let hz = -38; hz <= 38; hz += 38) {
       if (!isIsland && hz > concMinZ && hz < concMaxZ) continue;
@@ -1954,8 +2138,14 @@
             standPos: { x: tx + 0.92, y: 0.02, z: bz },
             yaw: -Math.PI * 0.5,
             label: '[E] Duduk di Bangku Peron',
-            prompt: '[E] Duduk di Bangku Peron'
+            prompt: '[E] Duduk di Bangku Peron',
+            targetObj: bGrp
           });
+          if (typeof station._registerHaloTarget === 'function') {
+            station._registerHaloTarget('bench_plat_' + bi, bGrp, {
+              category: 'interactable', x: tx, y: 0.45, z: bz, hitRadius: 0.95
+            });
+          }
         } else {
           metalPropSpecs.push({ x: tx, y: 0.26, z: bz, sx: 0.56, sy: 0.52, sz: 2.1, rx: 0, ry: 0, rz: 0, color: 0x383e44, halfH: 0.26, dynamic: true });
         }
@@ -2063,49 +2253,10 @@
     vinesInst.instanceMatrix.needsUpdate = true;
     root.add(vinesInst);
 
-    // Roti'O Warm Plinth Glow + Cawang Derelict Cab Hazard Beacon
+    // Roti'O Warm Plinth Glow
     const amberPositions = [
       [rotioX, 0.04, rotioZ + 1.15, 3.3, 0.08, 0.14]
     ];
-    station._cawangHazardRing = null;
-    if (isCawang && ctx.cawangWreckX !== undefined) {
-      const hx = ctx.cawangWreckX;
-      const hazTaken = !!(station._usedIds && station._usedIds.has('cawang_derelict_cab'));
-      const hazGroup = new THREE.Group();
-      hazGroup.position.set(hx, 2.8, -10.5);
-      hazGroup.visible = !hazTaken;
-      const coreGeo = new THREE.BoxGeometry(0.24, 0.24, 0.24);
-      const ringGeo = new THREE.RingGeometry(0.32, 0.72, 24);
-      ringGeo.rotateX(-Math.PI * 0.5);
-      const flareGeo = new THREE.PlaneGeometry(1.15, 1.15);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: 0xff9d2e,
-        transparent: true,
-        opacity: 0.72,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.DoubleSide
-      });
-      const flareMat = new THREE.MeshBasicMaterial({
-        color: 0xffb33a,
-        transparent: true,
-        opacity: 0.48,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.DoubleSide
-      });
-      station.disposableGeometries.push(coreGeo, ringGeo, flareGeo);
-      station.disposableMaterials.push(ringMat, flareMat);
-      const coreMesh = new THREE.Mesh(coreGeo, mats.amberBeacon);
-      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-      const flareMesh = new THREE.Mesh(flareGeo, flareMat);
-      flareMesh.rotation.y = Math.PI * 0.25;
-      hazGroup.add(coreMesh);
-      hazGroup.add(ringMesh);
-      hazGroup.add(flareMesh);
-      root.add(hazGroup);
-      station._cawangHazardRing = { group: hazGroup, ring: ringMesh, flare: flareMesh, ringMat, flareMat };
-    }
     const amberGeo = new THREE.BoxGeometry(1, 1, 1);
     station.disposableGeometries.push(amberGeo);
     const amberInst = new THREE.InstancedMesh(amberGeo, mats.amberBeacon, amberPositions.length);
@@ -2167,15 +2318,27 @@
 
     // 3D Physical Field Log Paper / Manila Folder Props at Station Note Counters
     if (isCawang && ctx.cawangWreckX !== undefined) {
-      const cabBoxGeo = new THREE.BoxGeometry(0.38, 0.42, 0.34);
-      const cabBoxMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.55, metalness: 0.6 });
-      station.disposableGeometries.push(cabBoxGeo);
-      station.disposableMaterials.push(cabBoxMat);
-      const cabBox = new THREE.Mesh(cabBoxGeo, cabBoxMat);
-      cabBox.position.set(ctx.cawangWreckX - 1.58, 0.21, -10.5);
-      cabBox.receiveShadow = true;
-      root.add(cabBox);
-      placeFieldLogProp(station, root, 'cawang_derelict_cab', ctx.cawangWreckX - 1.58, 0.425, -10.5, 0.22, station._usedIds.has('cawang_derelict_cab'));
+      const cabGrp = new THREE.Group();
+      cabGrp.name = 'CawangFuseJunctionBox';
+      cabGrp.position.set(ctx.cawangWreckX - 1.58, 0, -10.5);
+      root.add(cabGrp);
+      const cabSteel = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.46, metalness: 0.68 });
+      const cabTrim = new THREE.MeshStandardMaterial({ color: 0x1e252e, roughness: 0.36, metalness: 0.78 });
+      const cabWarn = new THREE.MeshStandardMaterial({ color: 0xeab308, emissive: 0x422006, emissiveIntensity: 0.45, roughness: 0.42 });
+      const cabLed = new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xf97316, emissiveIntensity: 1.5 });
+      station.disposableMaterials.push(cabSteel, cabTrim, cabWarn, cabLed);
+      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.46, 0.06, 0.40), cabTrim, 0, 0.03, 0);
+      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.40, 0.36, 0.34), cabSteel, 0, 0.24, 0);
+      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.44, 0.04, 0.38), cabTrim, 0, 0.43, 0);
+      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.24, 0.14, 0.02), cabWarn, 0, 0.25, 0.18);
+      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.05, 0.05, 0.03), cabLed, 0.14, 0.36, 0.18);
+      addPbrPart(station, cabGrp, new THREE.CylinderGeometry(0.022, 0.022, 0.38, 8), cabTrim, -0.18, 0.22, -0.18);
+      if (typeof station._registerHaloTarget === 'function') {
+        station._registerHaloTarget('cawang_derelict_cab', cabGrp, {
+          category: 'interactable', x: ctx.cawangWreckX - 1.58, y: 0.42, z: -10.5, hitRadius: 0.72
+        });
+      }
+      placeFieldLogProp(station, root, 'cawang_derelict_cab', ctx.cawangWreckX - 1.58, 0.45, -10.5, 0.22, station._usedIds.has('cawang_derelict_cab'), true);
     }
     if (arch.hasGardenTerrace) {
       const gCX = (track2X + 1.85 + gardenMaxX) * 0.5;
@@ -2185,16 +2348,34 @@
       placeFieldLogProp(station, root, 'depot_supply', depotMaxX - 1.2, 1.16, 54.0, -Math.PI * 0.5 + 0.14, station._usedIds.has('depot_supply'));
     }
     if (arch.id === 'setiabudi') {
-      const relBoxGeo = new THREE.BoxGeometry(0.46, 0.82, 0.40);
-      const relBoxMat = new THREE.MeshStandardMaterial({ color: 0x2a3340, roughness: 0.48, metalness: 0.65 });
-      station.disposableGeometries.push(relBoxGeo);
-      station.disposableMaterials.push(relBoxMat);
-      const relBox = new THREE.Mesh(relBoxGeo, relBoxMat);
-      relBox.position.set(supX + 1.8, UPPER_FLOOR_Y + 0.41, supZ);
-      relBox.receiveShadow = true;
-      root.add(relBox);
+      const relGrp = new THREE.Group();
+      relGrp.name = 'SetiabudiRelayCabinet';
+      relGrp.position.set(supX + 1.8, UPPER_FLOOR_Y, supZ);
+      root.add(relGrp);
+      const relBodyMat = new THREE.MeshStandardMaterial({ color: 0x2a3340, roughness: 0.44, metalness: 0.68 });
+      const relTrimMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.28, metalness: 0.85 });
+      const relDarkMat = new THREE.MeshStandardMaterial({ color: 0x151a22, roughness: 0.55, metalness: 0.6 });
+      const relLedRed = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 1.6 });
+      const relLedAmb = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 1.6 });
+      station.disposableMaterials.push(relBodyMat, relTrimMat, relDarkMat, relLedRed, relLedAmb);
+      addPbrPart(station, relGrp, new THREE.BoxGeometry(0.54, 0.06, 0.46), relDarkMat, 0, 0.03, 0);
+      addPbrPart(station, relGrp, new THREE.BoxGeometry(0.48, 0.74, 0.40), relBodyMat, 0, 0.43, 0);
+      addPbrPart(station, relGrp, new THREE.BoxGeometry(0.52, 0.05, 0.44), relTrimMat, 0, 0.82, 0);
+      addPbrPart(station, relGrp, new THREE.BoxGeometry(0.38, 0.56, 0.02), relDarkMat, 0, 0.43, 0.205);
+      for (let lv = 0; lv < 4; lv++) {
+        addPbrPart(station, relGrp, new THREE.BoxGeometry(0.28, 0.025, 0.015), relTrimMat, 0, 0.22 + lv * 0.06, 0.22);
+      }
+      addPbrPart(station, relGrp, new THREE.BoxGeometry(0.04, 0.14, 0.04), relTrimMat, 0.14, 0.52, 0.22);
+      addPbrPart(station, relGrp, new THREE.BoxGeometry(0.04, 0.04, 0.02), relLedRed, -0.10, 0.64, 0.22);
+      addPbrPart(station, relGrp, new THREE.BoxGeometry(0.04, 0.04, 0.02), relLedAmb, -0.02, 0.64, 0.22);
+      addPbrPart(station, relGrp, new THREE.CylinderGeometry(0.010, 0.016, 0.42, 6), relTrimMat, -0.18, 1.05, -0.12);
       station._addCollider(supX + 1.55, UPPER_FLOOR_Y, supZ - 0.22, supX + 2.05, UPPER_FLOOR_Y + 0.85, supZ + 0.22, 'metal');
-      placeFieldLogProp(station, root, 'setiabudi_jpo_switch', supX + 1.8, UPPER_FLOOR_Y + 0.825, supZ, 0.15, station._usedIds.has('setiabudi_jpo_switch'));
+      if (typeof station._registerHaloTarget === 'function') {
+        station._registerHaloTarget('setiabudi_jpo_switch', relGrp, {
+          category: 'interactable', x: supX + 1.8, y: UPPER_FLOOR_Y + 0.52, z: supZ, hitRadius: 0.72
+        });
+      }
+      placeFieldLogProp(station, root, 'setiabudi_jpo_switch', supX + 1.8, UPPER_FLOOR_Y + 0.845, supZ, 0.15, station._usedIds.has('setiabudi_jpo_switch'), true);
     }
 
     // =========================================================
@@ -2202,36 +2383,295 @@
     // =========================================================
     station._lootboxGlows = new Map();
     station._lootboxVisuals = [];
-    const placeLootbox = (id, lx, ly, lz, ry, riskLuck, title) => {
-      const used = station._usedIds.has(id);
-      const cityInt = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.city;
-      if (cityInt && typeof cityInt.createLootboxVisual === 'function') {
-        const vis = cityInt.createLootboxVisual(
-          root, station.disposableGeometries, station.disposableMaterials,
-          id, lx, ly, lz, ry, used
-        );
-        station._lootboxVisuals.push(vis);
-        station._lootboxGlows.set(id, vis.haloGroup);
+    const RARE_WEAPON_DROPS = [
+      { weaponId: 'pistol', variantId: 'revolver', label: '[E] Ambil Revolver .357 Magnum', ammoAmount: 18 },
+      { weaponId: 'rifle', variantId: 'm4', label: '[E] Ambil M4A1 Tactical', ammoAmount: 45 },
+      { weaponId: 'rifle', variantId: 'ak47', label: '[E] Ambil AK-47 Kalashnikov', ammoAmount: 45 },
+      { weaponId: 'shotgun', variantId: 'doublebarrel', label: '[E] Ambil Double-Barrel Coach Gun', ammoAmount: 16 }
+    ];
+
+    const buildFallbackWeaponMesh = (weaponId, variantId) => {
+      const wg = new THREE.Group();
+      const steel = new THREE.MeshStandardMaterial({ color: 0x2a313b, roughness: 0.34, metalness: 0.84 });
+      const wood = new THREE.MeshStandardMaterial({ color: 0x6b3e22, roughness: 0.64, metalness: 0.08 });
+      const brass = new THREE.MeshStandardMaterial({ color: 0xd4a338, roughness: 0.28, metalness: 0.88 });
+      station.disposableMaterials.push(steel, wood, brass);
+      if (variantId === 'revolver' || weaponId === 'pistol') {
+        addPbrPart(station, wg, new THREE.BoxGeometry(0.18, 0.032, 0.026), steel, 0.03, 0.04, 0);
+        addPbrPart(station, wg, new THREE.CylinderGeometry(0.022, 0.022, 0.044, 10), steel, -0.02, 0.036, 0, 0, 0, Math.PI * 0.5);
+        addPbrPart(station, wg, new THREE.BoxGeometry(0.042, 0.08, 0.024), wood, -0.08, 0.015, 0, 0, 0, 0.28);
+      } else if (variantId === 'doublebarrel' || weaponId === 'shotgun') {
+        addPbrPart(station, wg, new THREE.CylinderGeometry(0.011, 0.011, 0.24, 8), steel, 0.05, 0.035, -0.013, 0, 0, Math.PI * 0.5);
+        addPbrPart(station, wg, new THREE.CylinderGeometry(0.011, 0.011, 0.24, 8), steel, 0.05, 0.035, 0.013, 0, 0, Math.PI * 0.5);
+        addPbrPart(station, wg, new THREE.BoxGeometry(0.11, 0.042, 0.044), steel, -0.04, 0.03, 0);
+        addPbrPart(station, wg, new THREE.BoxGeometry(0.14, 0.045, 0.036), wood, -0.14, 0.022, 0, 0, 0, 0.14);
       } else {
-        station._placeNormalizedModel('ammo_box', lx, ly, lz, ry, 0.38);
+        const isAk = variantId === 'ak47';
+        addPbrPart(station, wg, new THREE.BoxGeometry(0.18, 0.048, 0.038), steel, -0.01, 0.038, 0);
+        addPbrPart(station, wg, new THREE.CylinderGeometry(0.009, 0.009, 0.17, 8), steel, 0.13, 0.044, 0, 0, 0, Math.PI * 0.5);
+        addPbrPart(station, wg, new THREE.BoxGeometry(0.12, 0.044, 0.034), isAk ? wood : steel, -0.13, 0.032, 0);
+        addPbrPart(station, wg, new THREE.BoxGeometry(0.028, 0.08, 0.022), isAk ? brass : steel, 0.02, 0.015, 0.035, 0.4, 0, -0.18);
       }
-      station._addCollider(lx - 0.50, ly, lz - 0.50, lx + 0.50, ly + 0.64, lz + 0.50, 'metal', {
+      return wg;
+    };
+
+    let crateSerial = 0;
+    const placeLootbox = (id, lx, ly, lz, ry, riskLuck, title) => {
+      const myIdx = crateSerial++;
+      const used = station._usedIds.has(id);
+      const grp = new THREE.Group();
+      grp.name = id + '_PelicanCrate';
+      grp.position.set(lx, ly, lz);
+      if (ry) grp.rotation.y = ry;
+      root.add(grp);
+
+      const caseMat = new THREE.MeshStandardMaterial({ color: 0x3b4432, roughness: 0.56, metalness: 0.22 });
+      const rubberMat = new THREE.MeshStandardMaterial({ color: 0x181c22, roughness: 0.78, metalness: 0.18 });
+      const foamMat = new THREE.MeshStandardMaterial({ color: 0x16191e, roughness: 0.92, metalness: 0.04 });
+      const latchMat = new THREE.MeshStandardMaterial({ color: 0xd4a338, roughness: 0.30, metalness: 0.85 });
+      const steelMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.28, metalness: 0.86 });
+      const redMat = new THREE.MeshStandardMaterial({ color: 0xc81e1e, roughness: 0.40, metalness: 0.14 });
+      const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.44, metalness: 0.10 });
+      const medGreenMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.46, metalness: 0.20 });
+      const gunMetalMat = new THREE.MeshStandardMaterial({ color: 0x27303b, roughness: 0.36, metalness: 0.78 });
+      station.disposableMaterials.push(caseMat, rubberMat, foamMat, latchMat, steelMat, redMat, whiteMat, medGreenMat, gunMetalMat);
+
+      // 1) Pelican / military polymer-steel lower tub, rubber corner bumpers, reinforced ribs & steel carry handles
+      addPbrPart(station, grp, new THREE.BoxGeometry(1.12, 0.38, 0.66), caseMat, 0, 0.20, 0);
+      for (const bx of [-0.54, 0.54]) {
+        for (const bz of [-0.31, 0.31]) {
+          addPbrPart(station, grp, new THREE.BoxGeometry(0.08, 0.42, 0.08), rubberMat, bx, 0.21, bz);
+        }
+      }
+      for (const cx of [-0.57, 0.57]) {
+        addPbrPart(station, grp, new THREE.BoxGeometry(0.05, 0.36, 0.56), rubberMat, cx, 0.21, 0);
+        addPbrPart(station, grp, new THREE.CylinderGeometry(0.015, 0.015, 0.24, 8), steelMat, cx * 1.07, 0.23, 0, Math.PI * 0.5, 0, 0);
+      }
+      for (const rxPos of [-0.36, -0.18, 0.18, 0.36]) {
+        addPbrPart(station, grp, new THREE.BoxGeometry(0.036, 0.35, 0.69), rubberMat, rxPos, 0.20, 0);
+      }
+      // Upper perimeter lip & rubber gasket seal + dual brass draw-latches + stencil plate
+      addPbrPart(station, grp, new THREE.BoxGeometry(1.16, 0.045, 0.70), rubberMat, 0, 0.415, 0);
+      for (const lxPos of [-0.32, 0.32]) {
+        addPbrPart(station, grp, new THREE.BoxGeometry(0.08, 0.14, 0.045), latchMat, lxPos, 0.34, 0.345);
+        addPbrPart(station, grp, new THREE.BoxGeometry(0.045, 0.06, 0.055), rubberMat, lxPos, 0.28, 0.35);
+      }
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.32, 0.055, 0.02), latchMat, 0, 0.23, 0.335);
+
+      // Recessed charcoal foam interior tray + 3 divider ribs
+      addPbrPart(station, grp, new THREE.BoxGeometry(1.02, 0.045, 0.58), foamMat, 0, 0.405, 0);
+      for (const divX of [-0.17, 0.17]) {
+        addPbrPart(station, grp, new THREE.BoxGeometry(0.028, 0.035, 0.54), rubberMat, divX, 0.432, 0);
+      }
+
+      // 2) Hinged Pelican lid anchored at back edge (y = 0.44, z = -0.34)
+      const lidPivot = new THREE.Group();
+      lidPivot.name = id + '_LidPivot';
+      lidPivot.position.set(0, 0.44, -0.34);
+      lidPivot.rotation.x = used ? -1.72 : 0.0;
+      grp.add(lidPivot);
+      addPbrPart(station, lidPivot, new THREE.BoxGeometry(1.16, 0.09, 0.70), rubberMat, 0, 0.045, 0.34);
+      addPbrPart(station, lidPivot, new THREE.BoxGeometry(1.04, 0.05, 0.58), caseMat, 0, 0.105, 0.34);
+      addPbrPart(station, lidPivot, new THREE.BoxGeometry(0.98, 0.02, 0.52), foamMat, 0, 0.005, 0.34);
+      for (const lxPos of [-0.34, 0, 0.34]) {
+        addPbrPart(station, lidPivot, new THREE.BoxGeometry(0.055, 0.03, 0.56), rubberMat, lxPos, 0.135, 0.34);
+      }
+      addPbrPart(station, lidPivot, new THREE.BoxGeometry(0.74, 0.024, 0.06), latchMat, 0, 0.138, 0.58);
+      addPbrPart(station, lidPivot, new THREE.BoxGeometry(0.24, 0.03, 0.036), steelMat, 0, 0.145, 0.34);
+
+      // Attach outer Pelican case perimeter halo BEFORE adding interior item slots
+      const crateHalo = (LRT.Render && typeof LRT.Render.attachPerimeterHalo === 'function')
+        ? LRT.Render.attachPerimeterHalo(grp, { initialMode: used ? 'off' : 'subtle' })
+        : null;
+
+      // 3) Build 3 discrete interactive 3D item meshes inside interior tray (Slot 0: Rare Weapon, Slot 1: Ammo, Slot 2: Medkit)
+      const cos = Math.cos(ry || 0);
+      const sin = Math.sin(ry || 0);
+      const slotWorldPos = (slx, slz) => [lx + slx * cos + slz * sin, ly + 0.46, lz - slx * sin + slz * cos];
+
+      const stSeed = (typeof station._stationIndex === 'number' ? station._stationIndex : 0);
+      const wPick = RARE_WEAPON_DROPS[(stSeed * 3 + myIdx) % RARE_WEAPON_DROPS.length];
+      const useShotgunAmmo = (myIdx % 2 === 1) || wPick.weaponId === 'shotgun';
+
+      const slotSpecs = [
+        {
+          slotIdx: 0,
+          lx: -0.34,
+          itemType: 'weapon_variant',
+          weaponId: wPick.weaponId,
+          variantId: wPick.variantId,
+          ammoType: wPick.weaponId,
+          amount: wPick.ammoAmount,
+          label: wPick.label
+        },
+        {
+          slotIdx: 1,
+          lx: 0.0,
+          itemType: 'ammo',
+          weaponId: null,
+          variantId: null,
+          ammoType: useShotgunAmmo ? 'shotgun' : 'rifle',
+          amount: useShotgunAmmo ? 12 : 30,
+          label: useShotgunAmmo ? '[E] Ambil Peluru 12G (+12)' : '[E] Ambil Amunisi 5.56mm (+30)'
+        },
+        {
+          slotIdx: 2,
+          lx: 0.34,
+          itemType: 'medkit',
+          weaponId: null,
+          variantId: null,
+          ammoType: null,
+          amount: 35,
+          label: '[E] Ambil Medkit (+35 HP)'
+        }
+      ];
+
+      const items = [];
+      for (let si = 0; si < slotSpecs.length; si++) {
+        const spec = slotSpecs[si];
+        const slotGrp = new THREE.Group();
+        slotGrp.name = id + '_Slot_' + spec.slotIdx;
+        slotGrp.position.set(spec.lx, 0.435, 0);
+        slotGrp.visible = !used;
+        grp.add(slotGrp);
+
+        if (spec.itemType === 'weapon_variant') {
+          let wMesh = (LRT.Weapons && typeof LRT.Weapons.buildWorldWeaponMesh === 'function')
+            ? LRT.Weapons.buildWorldWeaponMesh(spec.weaponId, spec.variantId)
+            : null;
+          if (!wMesh) wMesh = buildFallbackWeaponMesh(spec.weaponId, spec.variantId);
+          wMesh.rotation.y = Math.PI * 0.5;
+          wMesh.updateMatrixWorld(true);
+          const box = new THREE.Box3().setFromObject(wMesh);
+          const sz = new THREE.Vector3();
+          const ctr = new THREE.Vector3();
+          box.getSize(sz);
+          box.getCenter(ctr);
+          const maxDim = Math.max(sz.x, sz.y, sz.z, 0.01);
+          const fit = 0.42;
+          const sc = maxDim > fit ? (fit / maxDim) : Math.min(1.0, 0.32 / maxDim);
+          wMesh.scale.multiplyScalar(sc);
+          wMesh.position.set(-ctr.x * sc, -box.min.y * sc + 0.006, -ctr.z * sc);
+          slotGrp.add(wMesh);
+        } else if (spec.itemType === 'ammo') {
+          if (spec.ammoType === 'shotgun') {
+            for (let sh = 0; sh < 4; sh++) {
+              const szPos = -0.105 + sh * 0.07;
+              addPbrPart(station, slotGrp, new THREE.CylinderGeometry(0.020, 0.020, 0.14, 8), redMat, -0.015, 0.022, szPos, 0, 0, Math.PI * 0.5);
+              addPbrPart(station, slotGrp, new THREE.CylinderGeometry(0.021, 0.021, 0.032, 8), latchMat, 0.068, 0.022, szPos, 0, 0, Math.PI * 0.5);
+            }
+          } else {
+            for (const [mx, mz, mry] of [[-0.055, -0.02, 0.16], [0.055, 0.02, 0.16]]) {
+              addPbrPart(station, slotGrp, new THREE.BoxGeometry(0.075, 0.048, 0.24), gunMetalMat, mx, 0.026, mz, 0, mry, 0);
+              addPbrPart(station, slotGrp, new THREE.CylinderGeometry(0.008, 0.011, 0.05, 6), latchMat, mx + 0.015, 0.052, mz + 0.08, Math.PI * 0.5, 0, 0);
+            }
+          }
+        } else {
+          addPbrPart(station, slotGrp, new THREE.BoxGeometry(0.24, 0.068, 0.28), whiteMat, 0, 0.036, 0);
+          addPbrPart(station, slotGrp, new THREE.BoxGeometry(0.25, 0.018, 0.29), medGreenMat, 0, 0.062, 0);
+          addPbrPart(station, slotGrp, new THREE.BoxGeometry(0.11, 0.014, 0.032), redMat, 0, 0.076, 0);
+          addPbrPart(station, slotGrp, new THREE.BoxGeometry(0.032, 0.014, 0.11), redMat, 0, 0.076, 0);
+        }
+
+        const slotHalo = (LRT.Render && typeof LRT.Render.attachPerimeterHalo === 'function')
+          ? LRT.Render.attachPerimeterHalo(slotGrp, { initialMode: 'off', thicknessScale: 0.78 })
+          : null;
+        const [sx, sy, sz] = slotWorldPos(spec.lx, 0);
+        const slotRec = {
+          slotIdx: spec.slotIdx,
+          itemType: spec.itemType,
+          weaponId: spec.weaponId,
+          variantId: spec.variantId,
+          ammoType: spec.ammoType,
+          amount: spec.amount,
+          label: spec.label,
+          mesh: slotGrp,
+          halo: slotHalo,
+          taken: !!used,
+          x: sx,
+          y: sy,
+          z: sz
+        };
+        items.push(slotRec);
+
+        const slotInterId = id + '__slot_' + spec.slotIdx;
+        station.interactables.push({
+          id: slotInterId,
+          type: 'lootbox_item',
+          crateId: id,
+          slotIdx: spec.slotIdx,
+          x: sx,
+          y: sy,
+          z: sz,
+          radius: 2.65,
+          used: !!used,
+          label: spec.label,
+          prompt: spec.label,
+          targetObj: slotGrp,
+          _crateItemRef: slotRec
+        });
+      }
+
+      const vis = {
+        id: id,
+        group: grp,
+        lidPivot: lidPivot,
+        halo: crateHalo,
+        opened: !!used,
+        used: !!used,
+        x: lx,
+        y: ly,
+        z: lz,
+        items: items
+      };
+      station._lootboxVisuals.push(vis);
+      if (crateHalo) station._lootboxGlows.set(id, crateHalo.group);
+
+      station._addCollider(lx - 0.58, ly, lz - 0.38, lx + 0.58, ly + 0.64, lz + 0.38, 'metal', {
         blocksWalk: true, blocksBullets: false
       });
 
-      const tierTag = riskLuck >= 0.5 ? '(Risiko Tinggi — Amunisi Berat & Medis)' : '(Amunisi Taktis & Medis)';
-      const lbl = used ? `[E] ${title} (Sudah Dibuka)` : `[E / Klik] Buka ${title} ${tierTag}`;
+      const tierTag = riskLuck >= 0.5 ? '(Risiko Tinggi — Senjata & Medis)' : '(Taktis — Senjata & Medis)';
+      const lbl = used ? `[E] ${title} (Kosong)` : `[E / Klik] Buka ${title} ${tierTag}`;
       station.interactables.push({
         id: id,
         type: 'lootbox',
         riskLuck: riskLuck,
         x: lx,
-        y: ly + 0.55,
+        y: ly + 0.32,
         z: lz,
+        radius: 2.85,
         label: lbl,
         prompt: lbl,
-        used: used
+        opened: !!used,
+        used: !!used,
+        targetObj: grp,
+        _crateVisual: vis
       });
+
+      if (typeof station._registerHaloTarget === 'function') {
+        station._registerHaloTarget(id, grp, {
+          category: 'lootbox',
+          x: lx,
+          y: ly + 0.32,
+          z: lz,
+          hitRadius: 0.72,
+          halo: crateHalo,
+          isUsedFn: () => vis.opened || vis.used
+        });
+        for (let si = 0; si < items.length; si++) {
+          const sr = items[si];
+          station._registerHaloTarget(id + '__slot_' + sr.slotIdx, sr.mesh, {
+            category: 'lootbox_item',
+            x: sr.x,
+            y: sr.y,
+            z: sr.z,
+            hitRadius: 0.24,
+            halo: sr.halo,
+            isUsedFn: () => !vis.opened || sr.taken
+          });
+        }
+      }
     };
 
     const isLootboxSocketValid = (lx, ly, lz) => {
@@ -2358,43 +2798,20 @@
     station.explosiveBarrels = [];
     station._barrelCueVisual = null;
     if (arch.hasDepotShed) {
-      const barrelHaloRingGeo = new THREE.RingGeometry(0.46, 0.72, 24);
-      barrelHaloRingGeo.rotateX(-Math.PI * 0.5);
-      const barrelHaloShellGeo = new THREE.CylinderGeometry(0.48, 0.56, 1.08, 16, 1, true);
-      const barrelHaloRingMat = new THREE.MeshBasicMaterial({
-        color: 0xff5a1f,
-        transparent: true,
-        opacity: 0.78,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        side: THREE.DoubleSide
-      });
-      const barrelHaloShellMat = new THREE.MeshBasicMaterial({
-        color: 0xff4500,
-        transparent: true,
-        opacity: 0.22,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        side: THREE.DoubleSide
-      });
-      station.disposableGeometries.push(barrelHaloRingGeo, barrelHaloShellGeo);
-      station.disposableMaterials.push(barrelHaloRingMat, barrelHaloShellMat);
-
       const addExplosiveBarrel = (id, bx, bz, rotY) => {
         const mesh = station._placeNormalizedModel('Barrel_01', bx, 0.0, bz, rotY, 0.90, null, 'barrel');
         const cIdx = station.colliders.length - 1;
         const col = station.colliders[cIdx];
         if (col) col.barrelId = id;
 
-        const haloGroup = new THREE.Group();
-        haloGroup.position.set(bx, 0.0, bz);
-        const haloRing = new THREE.Mesh(barrelHaloRingGeo, barrelHaloRingMat);
-        haloRing.position.y = 0.035;
-        const haloShell = new THREE.Mesh(barrelHaloShellGeo, barrelHaloShellMat);
-        haloShell.position.y = 0.54;
-        haloGroup.add(haloRing);
-        haloGroup.add(haloShell);
-        root.add(haloGroup);
+        const halo = (mesh && LRT.Render && typeof LRT.Render.attachPerimeterHalo === 'function')
+          ? LRT.Render.attachPerimeterHalo(mesh, {
+              color: 0xf97316,
+              hoverColor: 0xfacc15,
+              objectiveColor: 0xfde047,
+              initialMode: 'subtle'
+            })
+          : null;
 
         station.explosiveBarrels.push({
           id: id,
@@ -2405,65 +2822,12 @@
           exploded: false,
           mesh: mesh,
           colliderIdx: cIdx,
-          haloGroup: haloGroup,
-          haloRing: haloRing,
-          haloShell: haloShell
+          halo: halo
         });
       };
 
       addExplosiveBarrel(0, depotMaxX - 1.3, 41.0, 0.0);
       addExplosiveBarrel(1, depotMaxX - 1.3, 50.0, 1.2);
-
-      const cueOrbGeo = new THREE.SphereGeometry(0.18, 12, 10);
-      const cueShellGeo = new THREE.OctahedronGeometry(0.28, 0);
-      const cueBeamGeo = new THREE.CylinderGeometry(0.05, 0.30, 1.55, 12, 1, true);
-      const cueOrbMat = new THREE.MeshBasicMaterial({
-        color: 0xff8c38,
-        transparent: true,
-        opacity: 0.92,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending
-      });
-      const cueShellMat = new THREE.MeshBasicMaterial({
-        color: 0xffb347,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.72,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending
-      });
-      const cueBeamMat = new THREE.MeshBasicMaterial({
-        color: 0xff5a1f,
-        transparent: true,
-        opacity: 0.24,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        side: THREE.DoubleSide
-      });
-      station.disposableGeometries.push(cueOrbGeo, cueShellGeo, cueBeamGeo);
-      station.disposableMaterials.push(cueOrbMat, cueShellMat, cueBeamMat);
-
-      const cueGroup = new THREE.Group();
-      cueGroup.visible = false;
-      const cueOrb = new THREE.Mesh(cueOrbGeo, cueOrbMat);
-      cueOrb.position.y = 1.65;
-      const cueShell = new THREE.Mesh(cueShellGeo, cueShellMat);
-      cueShell.position.y = 1.65;
-      const cueBeam = new THREE.Mesh(cueBeamGeo, cueBeamMat);
-      cueBeam.position.y = 0.80;
-      cueGroup.add(cueBeam);
-      cueGroup.add(cueOrb);
-      cueGroup.add(cueShell);
-      root.add(cueGroup);
-
-      station._barrelCueVisual = {
-        group: cueGroup,
-        orb: cueOrb,
-        shell: cueShell,
-        beam: cueBeam,
-        ringMat: barrelHaloRingMat,
-        shellMat: barrelHaloShellMat
-      };
     }
 
     station._groundPickups = [];
@@ -2626,9 +2990,15 @@
         z: bcZ + 1.45,
         used: cleared,
         label: cleared ? '[E] Barikade Jalan Tol Ditembus' : '[E / Tembak] Ledakkan Barikade Tol Cikoko',
-        prompt: cleared ? '[E] Barikade Jalan Tol Ditembus' : '[E / Tembak] Ledakkan Barikade Tol Cikoko'
+        prompt: cleared ? '[E] Barikade Jalan Tol Ditembus' : '[E / Tembak] Ledakkan Barikade Tol Cikoko',
+        targetObj: bcGroup
       };
       station.interactables.push(bcItem);
+      if (typeof station._registerHaloTarget === 'function') {
+        station._registerHaloTarget('cikoko_barricade', bcGroup, {
+          category: 'interactable', x: bcX, y: bcY + 1.05, z: bcZ + 0.65, hitRadius: 2.2
+        });
+      }
       station._cikokoBarricade = {
         id: 'cikoko_barricade',
         x: bcX,
@@ -2920,7 +3290,7 @@
         { x: rotioX + 3.0, y: 0.0, z: rotioZ + 1.2, zone: 'concourse' },
         { x: concMinX + 1.8, y: 0.0, z: rotioZ + 2.6, zone: 'concealed_station' },
         { x: indoX - 2.6, y: 0.0, z: indoZ - 2.2, zone: 'concourse' },
-        { x: shX - 2.4, y: 0.0, z: shZ - 1.8, zone: 'concealed_station' },
+        { x: concMinX + 5.4, y: 0.0, z: concMaxZ - 3.25, zone: 'concealed_station' },
         { x: concMinX + 1.6, y: 0.0, z: concMaxZ - 2.2, zone: 'concealed_station' },
         { x: concMaxX - 2.6, y: 0.0, z: concMinZ + 1.4, zone: 'concourse' },
         { x: concMaxX - 4.8, y: 0.0, z: cStairFootZ, zone: 'stairwell_pocket' },

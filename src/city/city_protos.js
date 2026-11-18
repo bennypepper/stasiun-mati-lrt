@@ -1277,6 +1277,124 @@
     return proto;
   }
 
+  let _weldedWireMeshMat = null;
+  let _galvanizedFenceMat = null;
+  function getGalvanizedFenceFrameMaterial() {
+    if (!_galvanizedFenceMat) {
+      _galvanizedFenceMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        vertexColors: true,
+        roughness: 0.44,
+        metalness: 0.78
+      });
+    }
+    return _galvanizedFenceMat;
+  }
+
+  function getWeldedWireMeshMaterial() {
+    if (_weldedWireMeshMat) return _weldedWireMeshMat;
+    let tex = null;
+    if (typeof document !== 'undefined') {
+      const cvs = document.createElement('canvas');
+      cvs.width = 512;
+      cvs.height = 512;
+      const ctx = cvs.getContext('2d');
+      ctx.clearRect(0, 0, 512, 512);
+      // Welded rectangular BRC wire grid (16 vertical x 8 horizontal cells per repeat)
+      const cols = 16;
+      const rows = 8;
+      const stepX = 512 / cols;
+      const stepY = 512 / rows;
+      // Outer dark galvanized steel wire pass
+      ctx.fillStyle = '#333b44';
+      for (let c = 0; c <= cols; c++) {
+        const x = Math.round(c * stepX) - 3;
+        ctx.fillRect(x, 0, 6, 512);
+      }
+      for (let r = 0; r <= rows; r++) {
+        const y = Math.round(r * stepY) - 4;
+        ctx.fillRect(0, y, 512, 7);
+      }
+      // Crisp metallic specular highlight core along wires + weld nodes
+      ctx.fillStyle = '#7c8796';
+      for (let c = 0; c <= cols; c++) {
+        const x = Math.round(c * stepX) - 1;
+        ctx.fillRect(x, 0, 2, 512);
+      }
+      for (let r = 0; r <= rows; r++) {
+        const y = Math.round(r * stepY) - 1;
+        ctx.fillRect(0, y, 512, 2);
+      }
+      ctx.fillStyle = '#535d6a';
+      for (let c = 0; c <= cols; c++) {
+        for (let r = 0; r <= rows; r++) {
+          ctx.fillRect(Math.round(c * stepX) - 3, Math.round(r * stepY) - 3, 6, 6);
+        }
+      }
+      tex = new THREE.CanvasTexture(cvs);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(2, 2);
+      tex.anisotropy = 8;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.needsUpdate = true;
+    }
+    _weldedWireMeshMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: tex,
+      alphaTest: 0.35,
+      transparent: false,
+      side: THREE.DoubleSide,
+      roughness: 0.38,
+      metalness: 0.80
+    });
+    return _weldedWireMeshMat;
+  }
+
+  // Welded BRC / V-Mesh Security Fence (2.40m x 1.84m panel with concrete curb, steel posts & 3 V-crimp ribs)
+  function getWeldedWireFenceProto() {
+    const cacheKey = 'proc_prop_welded_wire_fence_v1';
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+    const bConcrete = [];
+    const bFrame = [];
+    const bMesh = [];
+
+    // Grounded concrete footing curb
+    addColoredBox(bConcrete, 2.40, 0.16, 0.18, 0, 0.08, 0, 0, 0, 0, 0x7e8389, 0.88);
+    // Left & right galvanized steel square posts + post caps + mounting clamps
+    for (const px of [-1.17, 1.17]) {
+      addColoredBox(bFrame, 0.075, 1.84, 0.075, px, 0.92, 0, 0, 0, 0, 0x3b424c, 0.86);
+      addColoredBox(bFrame, 0.098, 0.04, 0.098, px, 1.855, 0, 0, 0, 0, 0x2a3038, 0.82);
+      for (const cy of [0.34, 0.78, 1.24, 1.68]) {
+        addColoredBox(bFrame, 0.105, 0.045, 0.095, px, cy, 0, 0, 0, 0, 0x626b78, 0.90);
+      }
+    }
+    // Top & bottom galvanized structural channel rails
+    addColoredBox(bFrame, 2.34, 0.045, 0.045, 0, 1.76, 0, 0, 0, 0, 0x454d58, 0.88);
+    addColoredBox(bFrame, 2.34, 0.045, 0.045, 0, 0.20, 0, 0, 0, 0, 0x454d58, 0.88);
+    // 3 Horizontal V-fold / crimp stiffener ribs protruding cleanly across panel width
+    for (const vy of [0.56, 1.00, 1.44]) {
+      addColoredBox(bFrame, 2.32, 0.024, 0.070, 0, vy + 0.022, 0.022, 0.56, 0, 0, 0x525b68, 0.90);
+      addColoredBox(bFrame, 2.32, 0.024, 0.070, 0, vy - 0.022, 0.022, -0.56, 0, 0, 0x424a55, 0.85);
+    }
+
+    // Dual-sided plane for alpha-tested welded wire mesh grid (explicit 0..1 UVs so CanvasTexture tiles crisply)
+    const meshGeo = new THREE.PlaneGeometry(2.30, 1.54);
+    meshGeo.translate(0, 0.98, 0);
+    bMesh.push(meshGeo);
+
+    const proto = {
+      parts: mergePartBuckets([
+        { bucket: bConcrete, mat: getConcretePbrMaterial() },
+        { bucket: bFrame, mat: getGalvanizedFenceFrameMaterial() },
+        { bucket: bMesh, mat: getWeldedWireMeshMaterial() }
+      ]),
+      size: { x: 2.40, y: 1.86, z: 0.18 }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
   // Jakarta PJU Street Lamp (Arm extends +X cleanly over roadway)
   function getStreetLampProto() {
     const cacheKey = 'proc_prop_street_lamp_v3';
@@ -1490,14 +1608,18 @@
     return { body: _lootCrateBodyMat, rim: _lootCrateRimMat, gold: _lootCrateGoldMat };
   }
 
-  function createLootboxVisual(parentGroup, disposableGeos, disposableMats, id, x, y, z, ry, used) {
+  function createLootboxVisual(parentGroup, disposableGeos, disposableMats, id, x, y, z, ry, used, opts) {
     const mats = getLootboxMats();
     const grp = new THREE.Group();
     grp.name = `${id}_Crate`;
     grp.position.set(x, y, z);
     if (ry) grp.rotation.y = ry;
 
-    const addPart = (geo, mat, px, py, pz, rx, ryLoc, rz) => {
+    const crateHullGrp = new THREE.Group();
+    crateHullGrp.name = `${id}_Hull`;
+    grp.add(crateHullGrp);
+
+    const addPart = (target, geo, mat, px, py, pz, rx, ryLoc, rz) => {
       disposableGeos.push(geo);
       const m = new THREE.Mesh(geo, mat);
       m.position.set(px, py, pz);
@@ -1506,57 +1628,56 @@
       if (rz) m.rotation.z = rz;
       m.castShadow = false;
       m.receiveShadow = true;
-      grp.add(m);
+      target.add(m);
       return m;
     };
 
     // Armored lower tub with structural ribs, corner bumpers, and side handles
-    addPart(new THREE.BoxGeometry(0.92, 0.38, 0.60), mats.body, 0, 0.21, 0);
-    // Corner protective bumpers (4 corners)
+    addPart(crateHullGrp, new THREE.BoxGeometry(0.92, 0.38, 0.60), mats.body, 0, 0.21, 0);
     for (const bx of [-0.45, 0.45]) {
       for (const bz of [-0.29, 0.29]) {
-        addPart(new THREE.BoxGeometry(0.07, 0.42, 0.07), mats.rim, bx, 0.22, bz);
+        addPart(crateHullGrp, new THREE.BoxGeometry(0.07, 0.42, 0.07), mats.rim, bx, 0.22, bz);
       }
     }
-    // Side reinforced ribs + recessed steel carry handles
     for (const cx of [-0.46, 0.46]) {
-      addPart(new THREE.BoxGeometry(0.05, 0.40, 0.56), mats.rim, cx, 0.22, 0);
-      addPart(new THREE.CylinderGeometry(0.014, 0.014, 0.22, 8), mats.gold, cx * 1.09, 0.24, 0, Math.PI * 0.5, 0, 0);
+      addPart(crateHullGrp, new THREE.BoxGeometry(0.05, 0.40, 0.56), mats.rim, cx, 0.22, 0);
+      addPart(crateHullGrp, new THREE.CylinderGeometry(0.014, 0.014, 0.22, 8), mats.gold, cx * 1.09, 0.24, 0, Math.PI * 0.5, 0, 0);
     }
-    // Front & rear vertical stiffening ribs + upper lip collar
     for (const rxPos of [-0.26, 0, 0.26]) {
-      addPart(new THREE.BoxGeometry(0.035, 0.34, 0.63), mats.rim, rxPos, 0.21, 0);
+      addPart(crateHullGrp, new THREE.BoxGeometry(0.035, 0.34, 0.63), mats.rim, rxPos, 0.21, 0);
     }
-    addPart(new THREE.BoxGeometry(0.96, 0.05, 0.64), mats.rim, 0, 0.415, 0);
-    // Heavy dual tactical draw-latches + yellow hazard plate on front face
+    addPart(crateHullGrp, new THREE.BoxGeometry(0.96, 0.05, 0.64), mats.rim, 0, 0.415, 0);
     for (const lx of [-0.26, 0.26]) {
-      addPart(new THREE.BoxGeometry(0.075, 0.14, 0.045), mats.gold, lx, 0.35, 0.315);
-      addPart(new THREE.BoxGeometry(0.04, 0.06, 0.055), mats.rim, lx, 0.29, 0.32);
+      addPart(crateHullGrp, new THREE.BoxGeometry(0.075, 0.14, 0.045), mats.gold, lx, 0.35, 0.315);
+      addPart(crateHullGrp, new THREE.BoxGeometry(0.04, 0.06, 0.055), mats.rim, lx, 0.29, 0.32);
     }
-    addPart(new THREE.BoxGeometry(0.28, 0.05, 0.02), mats.gold, 0, 0.24, 0.308);
+    addPart(crateHullGrp, new THREE.BoxGeometry(0.28, 0.05, 0.02), mats.gold, 0, 0.24, 0.308);
 
-    // Recessed foam supply tray + detailed 3D interior items (revealed when lid opens!)
-    addPart(new THREE.BoxGeometry(0.84, 0.04, 0.52), mats.rim, 0, 0.41, 0);
+    // Recessed foam supply tray
+    addPart(crateHullGrp, new THREE.BoxGeometry(0.84, 0.04, 0.52), mats.rim, 0, 0.41, 0);
     if (!mats._interiorRed) {
       mats._interiorRed = new THREE.MeshStandardMaterial({ color: 0xc81e1e, roughness: 0.42, metalness: 0.15 });
       mats._interiorWhite = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.45, metalness: 0.1 });
       mats._interiorBrass = new THREE.MeshStandardMaterial({ color: 0xd9a738, roughness: 0.28, metalness: 0.85 });
       mats._interiorGun = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.38, metalness: 0.72 });
-      disposableMats.push(mats._interiorRed, mats._interiorWhite, mats._interiorBrass, mats._interiorGun);
+      mats._interiorArmor = new THREE.MeshStandardMaterial({ color: 0x273444, roughness: 0.68, metalness: 0.22 });
+      disposableMats.push(mats._interiorRed, mats._interiorWhite, mats._interiorBrass, mats._interiorGun, mats._interiorArmor);
     }
-    // Two angled 5.56 STANAG magazines inside left bay
-    addPart(new THREE.BoxGeometry(0.07, 0.045, 0.20), mats._interiorGun, -0.28, 0.445, -0.04, 0, 0.18, 0);
-    addPart(new THREE.BoxGeometry(0.07, 0.045, 0.20), mats._interiorGun, -0.17, 0.445, 0.02, 0, 0.18, 0);
-    // Row of four 12G red shells with brass heads in center bay
-    for (let si = 0; si < 4; si++) {
-      const sz = -0.11 + si * 0.07;
-      addPart(new THREE.CylinderGeometry(0.018, 0.018, 0.11, 8), mats._interiorRed, 0.02, 0.445, sz, 0, 0, Math.PI * 0.5);
-      addPart(new THREE.CylinderGeometry(0.019, 0.019, 0.025, 8), mats._interiorBrass, 0.075, 0.445, sz, 0, 0, Math.PI * 0.5);
+
+    const slotSpecs = opts && Array.isArray(opts.slotSpecs) && opts.slotSpecs.length > 0 ? opts.slotSpecs : null;
+    if (!slotSpecs) {
+      // Static interior showcase (for callers not opting into 3-slot individual pickups)
+      addPart(crateHullGrp, new THREE.BoxGeometry(0.07, 0.045, 0.20), mats._interiorGun, -0.28, 0.445, -0.04, 0, 0.18, 0);
+      addPart(crateHullGrp, new THREE.BoxGeometry(0.07, 0.045, 0.20), mats._interiorGun, -0.17, 0.445, 0.02, 0, 0.18, 0);
+      for (let si = 0; si < 4; si++) {
+        const sz = -0.11 + si * 0.07;
+        addPart(crateHullGrp, new THREE.CylinderGeometry(0.018, 0.018, 0.11, 8), mats._interiorRed, 0.02, 0.445, sz, 0, 0, Math.PI * 0.5);
+        addPart(crateHullGrp, new THREE.CylinderGeometry(0.019, 0.019, 0.025, 8), mats._interiorBrass, 0.075, 0.445, sz, 0, 0, Math.PI * 0.5);
+      }
+      addPart(crateHullGrp, new THREE.BoxGeometry(0.20, 0.055, 0.26), mats._interiorWhite, 0.26, 0.445, 0.0);
+      addPart(crateHullGrp, new THREE.BoxGeometry(0.09, 0.012, 0.028), mats._interiorRed, 0.26, 0.476, 0.0);
+      addPart(crateHullGrp, new THREE.BoxGeometry(0.028, 0.012, 0.09), mats._interiorRed, 0.26, 0.476, 0.0);
     }
-    // White & red-cross emergency trauma pouch in right bay
-    addPart(new THREE.BoxGeometry(0.20, 0.055, 0.26), mats._interiorWhite, 0.26, 0.445, 0.0);
-    addPart(new THREE.BoxGeometry(0.09, 0.012, 0.028), mats._interiorRed, 0.26, 0.476, 0.0);
-    addPart(new THREE.BoxGeometry(0.028, 0.012, 0.09), mats._interiorRed, 0.26, 0.476, 0.0);
 
     // Hinged Lid Pivot anchored along back top edge (z = -0.31, y = 0.44)
     const lidPivot = new THREE.Group();
@@ -1575,101 +1696,179 @@
     };
     addLidPart(new THREE.BoxGeometry(0.96, 0.10, 0.64), mats.rim, 0, 0.05, 0.31);
     addLidPart(new THREE.BoxGeometry(0.84, 0.05, 0.52), mats.body, 0, 0.115, 0.31);
-    // Molded lid ribs + front hazard trim + top carry handle
     for (const lx of [-0.28, 0, 0.28]) {
       addLidPart(new THREE.BoxGeometry(0.05, 0.03, 0.50), mats.rim, lx, 0.145, 0.31);
     }
     addLidPart(new THREE.BoxGeometry(0.68, 0.025, 0.065), mats.gold, 0, 0.145, 0.52);
     addLidPart(new THREE.BoxGeometry(0.22, 0.028, 0.035), mats.gold, 0, 0.155, 0.31);
-    grp.add(lidPivot);
+    crateHullGrp.add(lidPivot);
 
-    // Yellow-only perimeter halo around the crate model (ZERO floating orb/cone!)
-    const haloGroup = new THREE.Group();
-    haloGroup.name = `${id}_YellowHalo`;
-    haloGroup.visible = !used;
+    const attachHalo = (typeof LRT !== 'undefined' && LRT.Render && typeof LRT.Render.attachPerimeterHalo === 'function')
+      ? LRT.Render.attachPerimeterHalo
+      : null;
 
-    const ringGeo = new THREE.RingGeometry(0.56, 0.72, 24);
-    ringGeo.rotateX(-Math.PI * 0.5);
-    const haloShellGeo = new THREE.BoxGeometry(1.06, 0.66, 0.74);
-    disposableGeos.push(ringGeo, haloShellGeo);
+    // Universal perimeter silhouette halo around crate body+lid (ZERO floating orb/ring/cube!)
+    const crateHalo = attachHalo
+      ? attachHalo(crateHullGrp, { color: 0xfacc15, hoverColor: 0xfacc15, initialMode: used ? 'off' : 'subtle' })
+      : null;
 
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: 0xfacc15,
-      transparent: true,
-      opacity: 0.68,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide
-    });
-    const shellMat = new THREE.MeshBasicMaterial({
-      color: 0xeab308,
-      transparent: true,
-      opacity: 0.22,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      side: THREE.BackSide
-    });
-    disposableMats.push(ringMat, shellMat);
+    // Discrete 3D item slots inside the openable foam tray
+    const slots = slotSpecs ? [] : null;
+    if (slotSpecs) {
+      const cosR = Math.cos(ry || 0);
+      const sinR = Math.sin(ry || 0);
+      for (let si = 0; si < slotSpecs.length; si++) {
+        const sp = slotSpecs[si];
+        const slotGrp = new THREE.Group();
+        slotGrp.name = `${id}_Slot_${si}`;
+        const lx = sp.localX !== undefined ? sp.localX : (si === 0 ? -0.26 : (si === 1 ? 0.0 : 0.26));
+        const lz = sp.localZ !== undefined ? sp.localZ : (si === 1 ? 0.08 : -0.14);
+        const ly = sp.localY !== undefined ? sp.localY : 0.435;
+        slotGrp.position.set(lx, ly, lz);
 
-    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-    ringMesh.position.y = 0.03;
-    const shellMesh = new THREE.Mesh(haloShellGeo, shellMat);
-    shellMesh.position.y = 0.30;
-    haloGroup.add(ringMesh);
-    haloGroup.add(shellMesh);
-    grp.add(haloGroup);
+        if (sp.itemType === 'weapon_variant') {
+          let wMesh = null;
+          if (typeof LRT !== 'undefined' && LRT.Weapons && typeof LRT.Weapons.buildWorldWeaponMesh === 'function') {
+            wMesh = LRT.Weapons.buildWorldWeaponMesh(sp.weaponId, sp.variantId);
+          }
+          if (wMesh) {
+            wMesh.rotation.y = Math.PI * 0.5;
+            const sc = sp.weaponId === 'pistol' ? 0.92 : 0.78;
+            wMesh.scale.setScalar(sc);
+            wMesh.traverse((c) => {
+              if (c && c.isMesh) {
+                if (c.geometry) disposableGeos.push(c.geometry);
+              }
+            });
+            slotGrp.add(wMesh);
+          } else {
+            addPart(slotGrp, new THREE.BoxGeometry(0.46, 0.06, 0.12), mats._interiorGun, 0, 0.03, 0);
+          }
+        } else if (sp.itemType === 'ammo') {
+          if (sp.ammoType === 'shotgun') {
+            for (let sh = 0; sh < 4; sh++) {
+              const sz = -0.09 + sh * 0.06;
+              addPart(slotGrp, new THREE.CylinderGeometry(0.017, 0.017, 0.11, 8), mats._interiorRed, -0.01, 0.022, sz, 0, 0, Math.PI * 0.5);
+              addPart(slotGrp, new THREE.CylinderGeometry(0.018, 0.018, 0.025, 8), mats._interiorBrass, 0.045, 0.022, sz, 0, 0, Math.PI * 0.5);
+            }
+          } else {
+            addPart(slotGrp, new THREE.BoxGeometry(0.07, 0.045, 0.19), mats._interiorGun, -0.055, 0.024, 0, 0, 0.16, 0);
+            addPart(slotGrp, new THREE.BoxGeometry(0.07, 0.045, 0.19), mats._interiorGun, 0.055, 0.024, 0.02, 0, -0.12, 0);
+            addPart(slotGrp, new THREE.BoxGeometry(0.06, 0.015, 0.04), mats._interiorBrass, -0.055, 0.050, -0.06, 0, 0.16, 0);
+          }
+        } else if (sp.itemType === 'armor') {
+          addPart(slotGrp, new THREE.BoxGeometry(0.21, 0.055, 0.22), mats._interiorArmor, 0, 0.028, 0);
+          addPart(slotGrp, new THREE.BoxGeometry(0.15, 0.014, 0.05), mats.gold, 0, 0.060, 0.02);
+        } else {
+          // Medkit trauma pouch
+          addPart(slotGrp, new THREE.BoxGeometry(0.20, 0.055, 0.24), mats._interiorWhite, 0, 0.028, 0);
+          addPart(slotGrp, new THREE.BoxGeometry(0.09, 0.014, 0.028), mats._interiorRed, 0, 0.060, 0);
+          addPart(slotGrp, new THREE.BoxGeometry(0.028, 0.014, 0.09), mats._interiorRed, 0, 0.060, 0);
+        }
+
+        const slotTaken = !!used || !!(opts.takenSlots && opts.takenSlots.has(si));
+        slotGrp.visible = !slotTaken;
+        grp.add(slotGrp);
+        const sHalo = attachHalo
+          ? attachHalo(slotGrp, { color: 0xfacc15, hoverColor: 0xfacc15, thicknessScale: 0.85, initialMode: 'off' })
+          : null;
+
+        const wx = x + lx * cosR + lz * sinR;
+        const wz = z - lx * sinR + lz * cosR;
+        const wy = y + ly + 0.04;
+        slots.push(Object.assign({}, sp, {
+          slotIdx: si,
+          id: `${id}__slot_${si}`,
+          crateId: id,
+          mesh: slotGrp,
+          halo: sHalo,
+          taken: slotTaken,
+          x: wx,
+          y: wy,
+          z: wz
+        }));
+      }
+    }
 
     if (parentGroup) parentGroup.add(grp);
-    return { id, group: grp, lidPivot, haloGroup, ringMat, shellMat, ringMesh, x, y, z, used: !!used };
+    return {
+      id,
+      group: grp,
+      crateHullGrp,
+      lidPivot,
+      halo: crateHalo,
+      haloGroup: crateHalo ? crateHalo.group : null,
+      slots,
+      x,
+      y,
+      z,
+      opened: !!used || !!(opts && opts.opened),
+      used: !!used
+    };
   }
 
-  function updateLootboxVisuals(visuals, dt, timeAccum, camPos, camForward, difficultyKey, worldOffsetZ) {
+  function updateLootboxVisuals(visuals, dt, timeAccum, camPos, camForward, difficultyKey, worldOffsetZ, hoveredId) {
     if (!visuals || visuals.length === 0) return;
     const diff = String(difficultyKey || 'medium').toLowerCase();
     const offZ = worldOffsetZ || 0;
-    const pulse = 0.76 + 0.24 * Math.sin((timeAccum || 0) * 3.8);
 
     for (let i = 0; i < visuals.length; i++) {
       const v = visuals[i];
       if (!v) continue;
       // Smoothly animate hinged lid opening
-      const targetRot = v.used ? -1.72 : 0.0;
+      const isOpen = !!(v.opened || v.used);
+      const targetRot = isOpen ? -1.72 : 0.0;
       if (v.lidPivot && Math.abs(v.lidPivot.rotation.x - targetRot) > 0.005) {
         const step = Math.min(1, (dt || 0.016) * 9.5);
         v.lidPivot.rotation.x += (targetRot - v.lidPivot.rotation.x) * step;
       }
-      if (!v.haloGroup) continue;
-      if (v.used) {
-        v.haloGroup.visible = false;
-        continue;
-      }
 
-      let showHalo = true;
+      let inRange = true;
       if (camPos && diff !== 'easy') {
         const dx = v.x - camPos.x;
         const dy = (v.y + 0.35) - camPos.y;
         const dz = (v.z + offZ) - camPos.z;
         const dist = Math.hypot(dx, dy, dz);
         if (diff === 'medium') {
-          showHalo = dist <= 12.0;
+          inRange = dist <= 12.0;
         } else if (diff === 'hard') {
-          showHalo = dist <= 3.6;
+          inRange = dist <= 4.2;
         } else if (diff === 'nightmare') {
-          if (dist > 1.75) {
-            showHalo = false;
+          if (dist > 2.2) {
+            inRange = false;
           } else if (camForward && dist > 0.05) {
             const dot = (dx * camForward.x + dy * camForward.y + dz * camForward.z) / dist;
-            showHalo = dot >= 0.62;
+            inRange = dot >= 0.55;
           }
         }
       }
-      v.haloGroup.visible = showHalo;
-      if (showHalo) {
-        if (v.ringMat) v.ringMat.opacity = 0.62 * pulse;
-        if (v.shellMat) v.shellMat.opacity = 0.22 * pulse;
-        if (v.ringMesh) {
-          const s = 0.97 + 0.05 * pulse;
-          v.ringMesh.scale.set(s, 1, s);
+
+      if (v.halo) {
+        if (v.used || v.opened || !inRange) {
+          v.halo.setMode('off');
+        } else if (hoveredId && hoveredId === v.id) {
+          v.halo.setMode('hover');
+        } else {
+          v.halo.setMode('subtle');
+        }
+        v.halo.update(timeAccum);
+      }
+
+      if (v.slots && v.slots.length > 0) {
+        for (let si = 0; si < v.slots.length; si++) {
+          const sl = v.slots[si];
+          if (!sl) continue;
+          if (sl.mesh) sl.mesh.visible = !sl.taken;
+          if (sl.halo) {
+            if (!v.opened || v.used || sl.taken || !inRange) {
+              sl.halo.setMode('off');
+            } else if (hoveredId && hoveredId === sl.id) {
+              sl.halo.setMode('hover');
+            } else {
+              sl.halo.setMode('subtle');
+            }
+            sl.halo.update(timeAccum);
+          }
         }
       }
     }
@@ -2194,6 +2393,9 @@
     getPalletProto,
     getParkBenchProto,
     getRoadBarrierProto,
+    getWeldedWireFenceProto,
+    getWeldedWireMeshMaterial,
+    getGalvanizedFenceFrameMaterial,
     getStreetLampProto,
     getFireHydrantProto,
     getPowerPoleProto,

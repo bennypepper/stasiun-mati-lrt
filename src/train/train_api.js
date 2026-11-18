@@ -73,6 +73,27 @@
       : '🔓 [E] BUKA KUNCI PINTU KERETA (TURUN KE PERON)';
   }
 
+  function updateCabHalos(hoveredId) {
+    const halos = T._cabHalos;
+    if (!halos) return;
+    const activeBoarded = (T.state === 'BOARDED_WAIT' && T.trainGroup && T.trainGroup.visible);
+    const doorsOpen = areDoorsOpen();
+    const map = [
+      ['train_depart_front', halos.departFront, activeBoarded ? (doorsOpen ? 'subtle' : 'objective') : 'off'],
+      ['train_depart_rear', halos.departRear, activeBoarded ? (doorsOpen ? 'subtle' : 'objective') : 'off'],
+      ['train_door_lock_front', halos.lockFront, activeBoarded ? (doorsOpen ? 'objective' : 'subtle') : 'off'],
+      ['train_door_lock_rear', halos.lockRear, activeBoarded ? (doorsOpen ? 'objective' : 'subtle') : 'off']
+    ];
+    for (let i = 0; i < map.length; i++) {
+      const [id, halo, baseMode] = map[i];
+      if (!halo) continue;
+      const mode = (activeBoarded && hoveredId === id) ? 'hover' : baseMode;
+      halo.setMode(mode);
+      if (mode !== 'off') halo.update(T.animTime || 0);
+    }
+  }
+  T._hoveredCabId = null;
+
   function syncDepartPrompts() {
     const txt = formatDepartPrompt();
     const lockTxt = formatDoorLockPrompt();
@@ -526,6 +547,8 @@
     T.updateDoorTransforms();
     if (typeof T.syncDoorLockPanels === 'function') T.syncDoorLockPanels(false);
     syncDepartPrompts();
+    T._hoveredCabId = null;
+    updateCabHalos(null);
   }
 
   function setHeadlights(on, intensity) {
@@ -906,6 +929,7 @@
     }
     T.updateStrapsAndSway(clampedDt);
     T.syncTrainLights();
+    updateCabHalos(T._hoveredCabId);
   }
 
   function setWarmupMode(active) {
@@ -978,8 +1002,14 @@
   }
 
   function getInteractableNear(pos, lookDir) {
-    if (!T.initialized || !T.trainGroup || !T.trainGroup.visible || !pos) return null;
-    if (!isPlayerInside(pos)) return null;
+    if (!T.initialized || !T.trainGroup || !T.trainGroup.visible || !pos) {
+      T._hoveredCabId = null;
+      return null;
+    }
+    if (!isPlayerInside(pos)) {
+      T._hoveredCabId = null;
+      return null;
+    }
 
     let best = null;
     let bestScore = Infinity;
@@ -1025,6 +1055,7 @@
         }
       }
     }
+    T._hoveredCabId = best ? best.id : null;
     return best;
   }
 
