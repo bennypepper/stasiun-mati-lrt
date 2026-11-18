@@ -2944,11 +2944,19 @@
     const rootY = z.dead
       ? (z.y + deadLiftY + sinkY)
       : (isCrawling ? (z.y + 0.115 * sc * crawlFallT) : z.y);
-    rig.root.position.set(z.x, rootY, z.z);
+    const crawlBackOffset = isCrawling
+      ? (-0.52 * sc * crawlFallT)
+      : ((z.dead && z.crawling) ? (-0.52 * sc) : 0);
+    const yawRad = z.yaw || 0;
+    rig.root.position.set(
+      z.x + Math.sin(yawRad) * crawlBackOffset,
+      rootY,
+      z.z + Math.cos(yawRad) * crawlBackOffset
+    );
     rig.root.rotation.order = 'YXZ';
     rig.root.rotation.set(
       z.dead ? z.fallAngle : (isCrawling ? 1.44 * crawlFallT : 0),
-      z.yaw || 0,
+      yawRad,
       z.dead ? (deadDir * 0.08 * layFlatT * (z.fallSign || 1)) : 0
     );
     rig.root.scale.setScalar(sc);
@@ -3247,6 +3255,74 @@
         aimBoneInCharSpace(injLow, _qRootInv, injLeg * 0.10, -0.94, -0.28, 0.75);
       }
     }
+  }
+
+  function getZombieCrawlerAnchors(z, outHead, outChest, outHips, outFeet) {
+    if (!z) return false;
+    const sc = z.scale || 1.0;
+    const yaw = z.yaw || 0;
+    const fwdX = Math.sin(yaw);
+    const fwdZ = Math.cos(yaw);
+    const fallT = z.crawling ? Math.min(1.0, (z.crawlFallTimer || 0) / 0.42) : 0;
+    const backOff = -0.52 * sc * fallT;
+
+    if (_useSkinnedRigs) {
+      const slot = _rigPool[z.id];
+      const rig = getSlotRigForVariant(z, slot);
+      if (rig && rig.root && rig.bones && rig.bones.head && rig.bones.spine2 && rig.bones.hips) {
+        const prevRootVis = rig.root.visible;
+        rig.root.visible = true;
+        rig.root.updateMatrixWorld(true);
+        const offX = E.enemyRoot ? E.enemyRoot.position.x : 0;
+        const offY = E.enemyRoot ? E.enemyRoot.position.y : 0;
+        const offZ = E.enemyRoot ? E.enemyRoot.position.z : 0;
+
+        rig.bones.head.getWorldPosition(outHead);
+        rig.bones.spine2.getWorldPosition(outChest);
+        rig.bones.hips.getWorldPosition(outHips);
+        outHead.set(outHead.x - offX, outHead.y - offY, outHead.z - offZ);
+        outChest.set(outChest.x - offX, outChest.y - offY, outChest.z - offZ);
+        outHips.set(outHips.x - offX, outHips.y - offY, outHips.z - offZ);
+
+        // Nudge head anchor slightly toward skull center along chest->head vector
+        _v1.subVectors(outHead, outChest);
+        const hcLen = _v1.length();
+        if (hcLen > 0.02) {
+          outHead.addScaledVector(_v1, (0.065 * sc) / hcLen);
+        } else {
+          outHead.y += 0.065 * sc;
+        }
+
+        if (outFeet) {
+          const legAnchorFrac = (z.lostLeftLeg && z.lostRightLeg) ? 0.48 : 0.12;
+          const baseRootX = z.x + fwdX * backOff;
+          const baseRootZ = z.z + fwdZ * backOff;
+          outFeet.set(
+            baseRootX + (outHips.x - baseRootX) * legAnchorFrac,
+            z.y + 0.14 * sc,
+            baseRootZ + (outHips.z - baseRootZ) * legAnchorFrac
+          );
+        }
+        rig.root.visible = prevRootVis;
+        return true;
+      }
+    }
+
+    // Analytical fallback matching root pitch 1.44 * fallT and backOff = -0.52 * fallT
+    const pitch = 1.44 * fallT;
+    const sinP = Math.sin(pitch);
+    const cosP = Math.cos(pitch);
+    const baseY = z.y + 0.115 * sc * fallT;
+    const baseX = z.x + fwdX * backOff;
+    const baseZ = z.z + fwdZ * backOff;
+    outHips.set(baseX + fwdX * (0.90 * sc * sinP), baseY + 0.90 * sc * cosP, baseZ + fwdZ * (0.90 * sc * sinP));
+    outChest.set(baseX + fwdX * (1.30 * sc * sinP), baseY + 1.30 * sc * cosP + 0.10 * sc * fallT, baseZ + fwdZ * (1.30 * sc * sinP));
+    outHead.set(baseX + fwdX * (1.52 * sc * sinP), baseY + 1.52 * sc * cosP + 0.24 * sc * fallT, baseZ + fwdZ * (1.52 * sc * sinP));
+    if (outFeet) {
+      const legReach = (z.lostLeftLeg && z.lostRightLeg) ? 0.45 : 0.12;
+      outFeet.set(baseX + fwdX * (0.90 * sc * sinP * legReach), z.y + 0.14 * sc, baseZ + fwdZ * (0.90 * sc * sinP * legReach));
+    }
+    return true;
   }
 
   function getZombieCorpsePoolPos(z, outVec) {
@@ -3664,6 +3740,7 @@
   E.updateBileProjectiles = updateBileProjectiles;
   E.updateOverlayVisibilityAndCounts = updateOverlayVisibilityAndCounts;
   E.updateZombieMatrices = updateZombieMatrices;
+  E.getZombieCrawlerAnchors = getZombieCrawlerAnchors;
   E.getZombieCorpsePoolPos = getZombieCorpsePoolPos;
   E.initMeshRoot = initMeshRoot;
 })(window.LRT = window.LRT || {});

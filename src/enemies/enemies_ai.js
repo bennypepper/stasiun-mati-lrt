@@ -151,6 +151,10 @@
   const _v4 = new THREE.Vector3();
   const _rayOrig = new THREE.Vector3();
   const _rayDir = new THREE.Vector3();
+  const _crawlHead = new THREE.Vector3();
+  const _crawlChest = new THREE.Vector3();
+  const _crawlHips = new THREE.Vector3();
+  const _crawlFeet = new THREE.Vector3();
   const _losOrig = new THREE.Vector3();
   const _losDir = new THREE.Vector3();
   const _sepVel = { x: 0, z: 0 };
@@ -1242,58 +1246,9 @@
     let best = null;
     let bestDist = maxDist !== undefined ? maxDist : 200;
 
-    for (let i = 0; i < MAX_ENEMIES; i++) {
-      const z = E.zombies[i];
-      if (!z.active || z.dead) continue;
-      const sc = z.scale;
-      const hipDrop = z.legCrippled ? 0.14 * sc : 0;
-      const fwdX = Math.sin(z.yaw || 0);
-      const fwdZ = Math.cos(z.yaw || 0);
-
-      // 1. Head sphere test (ground-level forward sphere when crawling, otherwise hunched standing)
-      const leanFwd = z.crawling ? (0.56 * sc) : ((z.variant === 'runner' || z.variant === 'screamer') ? 0.26 * sc : 0.12 * sc);
-      const hx = z.x + fwdX * leanFwd;
-      const hy = z.y + (z.crawling ? (0.34 * sc) : ((z.variant === 'runner' ? 1.42 : (z.variant === 'screamer' ? 1.46 : 1.56)) * sc - hipDrop));
-      const hz = z.z + fwdZ * leanFwd;
-      const hr = 0.24 * sc;
-
-      const ocx = _rayOrig.x - hx;
-      const ocy = _rayOrig.y - hy;
-      const ocz = _rayOrig.z - hz;
-      const hb = ocx * _rayDir.x + ocy * _rayDir.y + ocz * _rayDir.z;
-      const hc = ocx * ocx + ocy * ocy + ocz * ocz - hr * hr;
-      const hDisc = hb * hb - hc;
-      if (hDisc >= 0) {
-        const t = -hb - Math.sqrt(hDisc);
-        if (t >= 0 && t < bestDist) {
-          bestDist = t;
-          const px = _rayOrig.x + _rayDir.x * t;
-          const py = _rayOrig.y + _rayDir.y * t;
-          const pz = _rayOrig.z + _rayDir.z * t;
-          best = {
-            dist: t,
-            point: new THREE.Vector3(px, py, pz),
-            normal: new THREE.Vector3((px - hx) / hr, (py - hy) / hr, (pz - hz) / hr),
-            zombieId: z.id,
-            variant: z.variant,
-            isHeadshot: true,
-            hitZone: 'head',
-            isArmor: false
-          };
-        }
-      }
-
-      // 2. Torso/Legs segment capsule test (prone horizontal capsule when crawling, vertical otherwise)
-      const ax = z.crawling ? (z.x - fwdX * 0.48 * sc) : z.x;
-      const ay = z.crawling ? (z.y + 0.20 * sc) : (z.y + 0.18 * sc);
-      const az = z.crawling ? (z.z - fwdZ * 0.48 * sc) : z.z;
-      const bx = z.crawling ? (z.x + fwdX * 0.38 * sc) : z.x;
-      const by = z.crawling ? (z.y + 0.26 * sc) : (z.y + 1.38 * sc - hipDrop);
-      const bz = z.crawling ? (z.z + fwdZ * 0.38 * sc) : z.z;
+    function testCapsule(z, sc, hipDrop, ax, ay, az, bx, by, bz, radius, zoneMode) {
       const ux = bx - ax, uy = by - ay, uz = bz - az;
       const cCoef = ux * ux + uy * uy + uz * uz;
-      const tr = (z.variant === 'brute' ? (z.crawling ? 0.42 : 0.44) : (z.crawling ? 0.34 : 0.36)) * sc;
-
       const w0x = _rayOrig.x - ax;
       const w0y = _rayOrig.y - ay;
       const w0z = _rayOrig.z - az;
@@ -1320,41 +1275,156 @@
       const ry = _rayOrig.y + _rayDir.y * tNear - qy;
       const rz = _rayOrig.z + _rayDir.z * tNear - qz;
       const distSq = rx * rx + ry * ry + rz * rz;
-      if (distSq <= tr * tr) {
-        const entryOffset = Math.sqrt(Math.max(0, tr * tr - distSq));
-        const tHit = Math.max(0, tNear - entryOffset);
-        if (tHit < bestDist) {
-          bestDist = tHit;
-          const px = _rayOrig.x + _rayDir.x * tHit;
-          const py = _rayOrig.y + _rayDir.y * tHit;
-          const pz = _rayOrig.z + _rayDir.z * tHit;
-          const sNear = uNorm * Math.sqrt(Math.max(1e-6, cCoef));
-          const hipSplit = z.crawling ? 0.30 * sc : Math.max(0.25 * sc, 0.60 * sc - hipDrop * 0.5);
-          const lat = (px - z.x) * Math.cos(z.yaw) + (pz - z.z) * (-Math.sin(z.yaw));
-          let hitZone = 'torso';
-          let subZone = 'torso';
-          if (sNear < hipSplit) {
-            subZone = lat >= 0 ? 'leftLeg' : 'rightLeg';
-            hitZone = Math.abs(lat) < 0.055 * sc ? 'legs' : subZone;
-          } else {
-            const armLat = (z.variant === 'brute' ? 0.21 : 0.16) * sc;
-            if (sNear >= hipSplit + 0.10 * sc && lat >= armLat) hitZone = 'leftArm';
-            else if (sNear >= hipSplit + 0.10 * sc && lat <= -armLat) hitZone = 'rightArm';
-            subZone = hitZone;
-          }
-          _v1.set(px - qx, py - qy, pz - qz).normalize();
-          best = {
-            dist: tHit,
-            point: new THREE.Vector3(px, py, pz),
-            normal: _v1.clone(),
-            zombieId: z.id,
-            variant: z.variant,
-            isHeadshot: false,
-            hitZone: hitZone,
-            subZone: subZone,
-            isArmor: z.variant === 'brute' && z.hasArmor && (hitZone === 'torso' || hitZone === 'leftArm' || hitZone === 'rightArm')
-          };
+      if (distSq > radius * radius) return;
+
+      const entryOffset = Math.sqrt(Math.max(0, radius * radius - distSq));
+      if (tNear + entryOffset < 0) return;
+      const tHit = Math.max(0, tNear - entryOffset);
+      if (tHit >= bestDist) return;
+
+      bestDist = tHit;
+      const px = _rayOrig.x + _rayDir.x * tHit;
+      const py = _rayOrig.y + _rayDir.y * tHit;
+      const pz = _rayOrig.z + _rayDir.z * tHit;
+      const lat = (px - qx) * Math.cos(z.yaw) + (pz - qz) * (-Math.sin(z.yaw));
+      const armLat = (z.variant === 'brute' ? 0.21 : 0.16) * sc;
+
+      let hitZone = 'torso';
+      let subZone = 'torso';
+      if (zoneMode === 'lower') {
+        subZone = lat >= 0 ? 'leftLeg' : 'rightLeg';
+        hitZone = Math.abs(lat) < 0.055 * sc ? 'legs' : subZone;
+      } else if (zoneMode === 'upper') {
+        if (uNorm >= 0.35 && lat >= armLat) hitZone = 'leftArm';
+        else if (uNorm >= 0.35 && lat <= -armLat) hitZone = 'rightArm';
+        subZone = hitZone;
+      } else {
+        const sNear = uNorm * Math.sqrt(Math.max(1e-6, cCoef));
+        const hipSplit = Math.max(0.25 * sc, 0.60 * sc - hipDrop * 0.5);
+        if (sNear < hipSplit) {
+          subZone = lat >= 0 ? 'leftLeg' : 'rightLeg';
+          hitZone = Math.abs(lat) < 0.055 * sc ? 'legs' : subZone;
+        } else {
+          if (sNear >= hipSplit + 0.10 * sc && lat >= armLat) hitZone = 'leftArm';
+          else if (sNear >= hipSplit + 0.10 * sc && lat <= -armLat) hitZone = 'rightArm';
+          subZone = hitZone;
         }
+      }
+
+      _v1.set(px - qx, py - qy, pz - qz);
+      if (_v1.lengthSq() > 1e-6) _v1.normalize();
+      else _v1.set(0, 1, 0);
+
+      best = {
+        dist: tHit,
+        point: new THREE.Vector3(px, py, pz),
+        normal: _v1.clone(),
+        zombieId: z.id,
+        variant: z.variant,
+        isHeadshot: false,
+        hitZone: hitZone,
+        subZone: subZone,
+        isArmor: z.variant === 'brute' && z.hasArmor && (hitZone === 'torso' || hitZone === 'leftArm' || hitZone === 'rightArm')
+      };
+    }
+
+    for (let i = 0; i < MAX_ENEMIES; i++) {
+      const z = E.zombies[i];
+      if (!z.active || z.dead) continue;
+      const sc = z.scale;
+      const hipDrop = z.legCrippled ? 0.14 * sc : 0;
+      const fwdX = Math.sin(z.yaw || 0);
+      const fwdZ = Math.cos(z.yaw || 0);
+
+      let hx, hy, hz, hr;
+      let hasCrawlerAnchors = false;
+      if (z.crawling && typeof E.getZombieCrawlerAnchors === 'function') {
+        // Coarse sphere check before querying live bone world transforms
+        const cx = z.x + fwdX * 0.35 * sc;
+        const cy = z.y + 0.45 * sc;
+        const cz = z.z + fwdZ * 0.35 * sc;
+        const dxC = cx - _rayOrig.x;
+        const dyC = cy - _rayOrig.y;
+        const dzC = cz - _rayOrig.z;
+        const proj = Math.max(0, dxC * _rayDir.x + dyC * _rayDir.y + dzC * _rayDir.z);
+        const ex = dxC - _rayDir.x * proj;
+        const ey = dyC - _rayDir.y * proj;
+        const ez = dzC - _rayDir.z * proj;
+        const maxCoarseR = 2.1 * sc;
+        if (proj - maxCoarseR > bestDist || (ex * ex + ey * ey + ez * ez) > maxCoarseR * maxCoarseR) {
+          continue;
+        }
+        hasCrawlerAnchors = E.getZombieCrawlerAnchors(z, _crawlHead, _crawlChest, _crawlHips, _crawlFeet);
+      }
+
+      if (hasCrawlerAnchors) {
+        hx = _crawlHead.x;
+        hy = _crawlHead.y;
+        hz = _crawlHead.z;
+        hr = 0.29 * sc;
+      } else {
+        const leanFwd = z.crawling ? (0.95 * sc) : ((z.variant === 'runner' || z.variant === 'screamer') ? 0.26 * sc : 0.12 * sc);
+        hx = z.x + fwdX * leanFwd;
+        hy = z.y + (z.crawling ? (0.38 * sc) : ((z.variant === 'runner' ? 1.42 : (z.variant === 'screamer' ? 1.46 : 1.56)) * sc - hipDrop));
+        hz = z.z + fwdZ * leanFwd;
+        hr = (z.crawling ? 0.29 : 0.24) * sc;
+      }
+
+      // 1. Head sphere test (supports point-blank / steep downward ray origins inside sphere)
+      const ocx = _rayOrig.x - hx;
+      const ocy = _rayOrig.y - hy;
+      const ocz = _rayOrig.z - hz;
+      const hb = ocx * _rayDir.x + ocy * _rayDir.y + ocz * _rayDir.z;
+      const hc = ocx * ocx + ocy * ocy + ocz * ocz - hr * hr;
+      const hDisc = hb * hb - hc;
+      if (hDisc >= 0) {
+        const sqrtD = Math.sqrt(hDisc);
+        const tExit = -hb + sqrtD;
+        if (tExit >= 0) {
+          const t = Math.max(0, -hb - sqrtD);
+          if (t < bestDist) {
+            bestDist = t;
+            const px = _rayOrig.x + _rayDir.x * t;
+            const py = _rayOrig.y + _rayDir.y * t;
+            const pz = _rayOrig.z + _rayDir.z * t;
+            best = {
+              dist: t,
+              point: new THREE.Vector3(px, py, pz),
+              normal: new THREE.Vector3((px - hx) / hr, (py - hy) / hr, (pz - hz) / hr),
+              zombieId: z.id,
+              variant: z.variant,
+              isHeadshot: true,
+              hitZone: 'head',
+              isArmor: false
+            };
+          }
+        }
+      }
+
+      // 2. Body/Limb capsule test(s)
+      if (z.crawling) {
+        const trUpper = (z.variant === 'brute' ? 0.45 : 0.39) * sc;
+        const trLower = ((z.lostLeftLeg && z.lostRightLeg) ? 0.29 : 0.33) * sc;
+        if (hasCrawlerAnchors) {
+          testCapsule(z, sc, hipDrop, _crawlHips.x, _crawlHips.y, _crawlHips.z, _crawlChest.x, _crawlChest.y, _crawlChest.z, trUpper, 'upper');
+          testCapsule(z, sc, hipDrop, _crawlFeet.x, _crawlFeet.y, _crawlFeet.z, _crawlHips.x, _crawlHips.y, _crawlHips.z, trLower, 'lower');
+        } else {
+          testCapsule(
+            z, sc, hipDrop,
+            z.x + fwdX * 0.25 * sc, z.y + 0.24 * sc, z.z + fwdZ * 0.25 * sc,
+            z.x + fwdX * 0.85 * sc, z.y + 0.30 * sc, z.z + fwdZ * 0.85 * sc,
+            trUpper, 'upper'
+          );
+          testCapsule(
+            z, sc, hipDrop,
+            z.x - fwdX * 0.40 * sc, z.y + 0.16 * sc, z.z - fwdZ * 0.40 * sc,
+            z.x + fwdX * 0.25 * sc, z.y + 0.24 * sc, z.z + fwdZ * 0.25 * sc,
+            trLower, 'lower'
+          );
+        }
+      } else {
+        const tr = (z.variant === 'brute' ? 0.44 : 0.36) * sc;
+        testCapsule(z, sc, hipDrop, z.x, z.y + 0.18 * sc, z.z, z.x, z.y + 1.38 * sc - hipDrop, z.z, tr, 'standing');
       }
     }
 
@@ -1362,7 +1432,7 @@
   }
 
   function hasLineOfSightToPlayer(z, playerPos) {
-    const eyeY = z.y + 1.48 * z.scale;
+    const eyeY = z.y + (z.crawling ? 0.45 : 1.48) * z.scale;
     const pEyeY = (playerPos.y || 0) + 1.50;
     _losOrig.set(z.x, eyeY, z.z);
     _losDir.set(playerPos.x - z.x, pEyeY - eyeY, playerPos.z - z.z);
