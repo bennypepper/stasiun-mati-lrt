@@ -170,6 +170,16 @@
     const bLampBulbs = [];
     const bGantryFrame = [];
     const bGantrySign = [];
+    const bInfraConcrete = [];
+    const bTunnelDark = [];
+    const bTunnelSignalRed = [];
+    const bCornerWood = [];
+    const bCornerRoof = [];
+    const bCornerWhite = [];
+    const bCornerRed = [];
+    const bCornerSandbag = [];
+    const bCornerWarmBulb = [];
+    const bCornerGlass = [];
 
     const SECTOR_KEYS = ['Sector_N', 'Sector_S', 'Sector_E_Near', 'Sector_E_Far', 'Sector_W_Near', 'Sector_W_Far'];
     const sectorBuckets = {};
@@ -272,6 +282,56 @@
       outerEastBlocks.push({ x0: eastColRoadMaxX, z0: bz0, x1: DIST_X_MAX, z1: bz1, zi });
     }
 
+    const cornerHubCoords = {
+      NW: {
+        id: 'city_nw_medpost',
+        noteId: 'note_nw_corner',
+        name: 'Pojok NW — Posko Medis PMI',
+        cx: westColRoadMaxX + 8.5,
+        cz: 98.0,
+        teleport: { x: westColRoadMaxX + 9.0, y: SIDEWALK_Y + 0.05, z: 94.5, yaw: Math.PI }
+      },
+      NE: {
+        id: 'city_ne_depot',
+        noteId: 'note_ne_corner',
+        name: 'Pojok NE — Gudang Logistik',
+        cx: eastColRoadMinX - 8.5,
+        cz: 98.0,
+        teleport: { x: eastColRoadMinX - 9.0, y: SIDEWALK_Y + 0.05, z: 94.5, yaw: Math.PI }
+      },
+      SW: {
+        id: 'city_sw_convoy',
+        noteId: 'note_sw_corner',
+        name: 'Pojok SW — Konvoi Militer',
+        cx: westColRoadMaxX + 8.5,
+        cz: -98.0,
+        teleport: { x: westColRoadMaxX + 8.7, y: SIDEWALK_Y + 0.05, z: -97.0, yaw: 0 }
+      },
+      SE: {
+        id: 'city_se_warung',
+        noteId: 'note_se_corner',
+        name: 'Pojok SE — Pos Ronda & Warung',
+        cx: eastColRoadMinX - 8.5,
+        cz: -98.0,
+        teleport: { x: eastColRoadMinX - 9.0, y: SIDEWALK_Y + 0.05, z: -94.5, yaw: 0 }
+      }
+    };
+    city.layoutBounds = {
+      cMinX, cMaxX, platMinZ, platMaxZ,
+      DIST_X_MIN, DIST_X_MAX, DIST_Z_MIN, DIST_Z_MAX,
+      westInnerSwMinX, westInnerSwMaxX, westRoadMinX, westRoadMaxX,
+      westOuterSwMinX, westOuterSwMaxX, westColRoadMinX, westColRoadMaxX,
+      eastInnerSwMinX, eastInnerSwMaxX, eastRoadMinX, eastRoadMaxX,
+      eastOuterSwMinX, eastOuterSwMaxX, eastColRoadMinX, eastColRoadMaxX,
+      SIDEWALK_Y, STREET_GROUND_Y, RAIL_TOP_Y
+    };
+    city.cornerHubs = {
+      NW: Object.assign({ id: cornerHubCoords.NW.id, noteId: cornerHubCoords.NW.noteId, name: cornerHubCoords.NW.name }, cornerHubCoords.NW.teleport),
+      NE: Object.assign({ id: cornerHubCoords.NE.id, noteId: cornerHubCoords.NE.noteId, name: cornerHubCoords.NE.name }, cornerHubCoords.NE.teleport),
+      SW: Object.assign({ id: cornerHubCoords.SW.id, noteId: cornerHubCoords.SW.noteId, name: cornerHubCoords.SW.name }, cornerHubCoords.SW.teleport),
+      SE: Object.assign({ id: cornerHubCoords.SE.id, noteId: cornerHubCoords.SE.noteId, name: cornerHubCoords.SE.name }, cornerHubCoords.SE.teleport)
+    };
+
     const self = city;
     const fireEscapePlacements = [];
     const airconPlacements = [];
@@ -314,6 +374,10 @@
     const cardboardBoxPlacements = [];
     const bermudaGrassPlacements = [];
     const handTruckPlacements = [];
+    const palletPlacements = [];
+    const ammoBoxPlacements = [];
+    const ambulancePlacements = [];
+    const militaryTruckPlacements = [];
 
     const sectorPartDefs = [
       { key: 'facadeModern', mat: matFacadeModern, canShadow: true, receiveShadow: true, prefix: 'BuildingsModern' },
@@ -333,13 +397,14 @@
     // =========================================================
     // 1. ASPHALT ROADS & LEVEL RAIL CROSSINGS (y = -1.00)
     // =========================================================
-    const addAsphaltSlab = (x0, z0, x1, z1, walkable) => {
+    const addAsphaltSlab = (x0, z0, x1, z1, walkable, topY) => {
       const w = x1 - x0;
       const d = z1 - z0;
       if (w <= 0.05 || d <= 0.05) return;
-      addBox(bAsphalt, w, 0.24, d, (x0 + x1) * 0.5, STREET_GROUND_Y - 0.12, (z0 + z1) * 0.5, 0, 0, 0, 6.0);
+      const yTop = topY !== undefined ? topY : STREET_GROUND_Y;
+      addBox(bAsphalt, w, 0.24, d, (x0 + x1) * 0.5, yTop - 0.12, (z0 + z1) * 0.5, 0, 0, 0, 6.0);
       if (walkable !== false) {
-        city._addCollider(x0, STREET_GROUND_Y - 0.24, z0, x1, STREET_GROUND_Y, z1, 'floor', {
+        city._addCollider(x0, yTop - 0.24, z0, x1, yTop, z1, 'floor', {
           isFloor: true, blocksWalk: true, blocksBullets: false
         });
       }
@@ -349,14 +414,20 @@
     addAsphaltSlab(DIST_X_MIN, DIST_Z_MIN, westInnerSwMinX, DIST_Z_MAX, true);
     addAsphaltSlab(eastInnerSwMaxX, DIST_Z_MIN, DIST_X_MAX, DIST_Z_MAX, true);
 
-    // Extended outer urban terrain skirt & perimeter bounds (cleanly abutting outer edges, zero overlap!)
+    // Extended outer urban terrain skirt & perimeter bounds spanning continuous full X width (zero sky-void holes!)
     const OUTER_SKIRT = 90.0;
+    const RAIL_EXT_Z = 145.0;
     addAsphaltSlab(DIST_X_MIN - OUTER_SKIRT, DIST_Z_MIN - OUTER_SKIRT, DIST_X_MIN, DIST_Z_MAX + OUTER_SKIRT, true);
     addAsphaltSlab(DIST_X_MAX, DIST_Z_MIN - OUTER_SKIRT, DIST_X_MAX + OUTER_SKIRT, DIST_Z_MAX + OUTER_SKIRT, true);
     addAsphaltSlab(DIST_X_MIN, DIST_Z_MIN - OUTER_SKIRT, cMinX - 0.02, DIST_Z_MIN, true);
     addAsphaltSlab(cMaxX + 0.02, DIST_Z_MIN - OUTER_SKIRT, DIST_X_MAX, DIST_Z_MIN, true);
     addAsphaltSlab(DIST_X_MIN, DIST_Z_MAX, cMinX - 0.02, DIST_Z_MAX + OUTER_SKIRT, true);
     addAsphaltSlab(cMaxX + 0.02, DIST_Z_MAX, DIST_X_MAX, DIST_Z_MAX + OUTER_SKIRT, true);
+    // Seal rail corridor sub-base continuously across [cMinX - 0.02 .. cMaxX + 0.02] (sits cleanly beneath -1.20..-1.12 ballast)
+    addAsphaltSlab(cMinX - 0.02, DIST_Z_MIN - OUTER_SKIRT, cMaxX + 0.02, -RAIL_EXT_Z, false);
+    addAsphaltSlab(cMinX - 0.02, -RAIL_EXT_Z, cMaxX + 0.02, southCrossZ0, false, STREET_GROUND_Y - 0.20);
+    addAsphaltSlab(cMinX - 0.02, northCrossZ1, cMaxX + 0.02, RAIL_EXT_Z, false, STREET_GROUND_Y - 0.20);
+    addAsphaltSlab(cMinX - 0.02, RAIL_EXT_Z, cMaxX + 0.02, DIST_Z_MAX + OUTER_SKIRT, false);
     // Physical Quarantine Roadblocks along outer edges (z = ±116.5 & outer collector/cross exits)
     // (Replaces invisible walls with concrete road barriers, covered car blockades, chainlink fences & amber warning beacons)
     city._addCollider(DIST_X_MIN, STREET_GROUND_Y, -117.2, cMinX - 0.2, STREET_GROUND_Y + 3.0, -115.8, 'concrete', { blocksBullets: false });
@@ -433,8 +504,8 @@
       }
     }
 
-    // Outer corridor ballasted tracks beyond z = ±80 (ground level -1.18 .. -1.00)
-    for (const [tz0, tz1] of [[DIST_Z_MIN, southCrossZ0], [northCrossZ1, DIST_Z_MAX]]) {
+    // Outer corridor ballasted tracks & rails extended continuously out to z = ±145m inside tunnel chambers
+    for (const [tz0, tz1] of [[-RAIL_EXT_Z, southCrossZ0], [northCrossZ1, RAIL_EXT_Z]]) {
       const tLen = tz1 - tz0;
       const tMidZ = (tz0 + tz1) * 0.5;
       addBox(bCurb, cMaxX - cMinX, 0.08, tLen, (cMinX + cMaxX) * 0.5, -1.16, tMidZ, 0, 0, 0, 4.0);
@@ -647,6 +718,11 @@
       addAdaCurbRamp(westOuterSwMaxX - 2.5, bz + 5.55, 2.2, 1.15, 'z', 1);
       addAdaCurbRamp(eastOuterSwMinX + 2.5, bz - 5.55, 2.2, 1.15, 'z', -1);
       addAdaCurbRamp(eastOuterSwMinX + 2.5, bz + 5.55, 2.2, 1.15, 'z', 1);
+    }
+    // Collector-road ADA curb ramps leading directly into the 4 Far-Corner Exploration Hubs (NW, NE, SW, SE)
+    for (const cz of [-98.0, 98.0]) {
+      addAdaCurbRamp(westColRoadMaxX - 0.55, cz, 3.2, 1.15, 'x', 1);
+      addAdaCurbRamp(eastColRoadMinX + 0.55, cz, 3.2, 1.15, 'x', -1);
     }
     city._mergeAndRegisterBVH(bSidewalk, matSidewalk, false, true, 'CitySidewalks', true);
     city._mergeAndRegisterBVH(bCurb, matCurb, false, true, 'CityCurbsAndCrossings', true);
@@ -1062,7 +1138,8 @@
       const bz1 = blk.z1 - 2.2;
       const midX = (bx0 + bx1) * 0.5;
       if (blk.zi === 0) {
-        buildUCourtyardComplex(sb, bx0, bz0, bx1, bz1, 'east', 14.5);
+        // Leave outer SW corner half open for SW Military Checkpoint & Convoy Hub
+        buildUCourtyardComplex(sb, midX + 1.0, bz0, bx1, bz1, 'east', 14.5);
       } else if (blk.zi === 1) {
         buildRukoRow(sb, midX + 1.5, bz0, bx1, bz1, 'east', 5, false);
         buildChamferedTower(sb, bx0, bz0 + 1.5, midX - 0.5, bz1 - 1.5, 28.0);
@@ -1072,7 +1149,8 @@
         buildRukoRow(sb, midX + 1.5, bz0, bx1, bz1, 'east', 5, true);
         buildDiagonalCivic(sb, bx0, bz0 + 1.0, midX - 0.5, bz1 - 1.0, 14.0);
       } else {
-        buildChamferedTower(sb, bx0 + 1.5, bz0 + 1.5, bx1 - 1.5, bz1 - 1.5, 24.0);
+        // Leave outer NW corner half open for NW PMI Emergency Medical Hub & Ambulance
+        buildChamferedTower(sb, midX + 1.0, bz0 + 1.5, bx1 - 1.0, bz1 - 1.5, 24.0);
       }
     }
 
@@ -1086,7 +1164,8 @@
       const bz1 = blk.z1 - 2.2;
       const midX = (bx0 + bx1) * 0.5;
       if (blk.zi === 0) {
-        buildLShapedTower(sb, bx0 + 1.0, bz0 + 1.0, bx1 - 1.0, bz1 - 1.0, 0, 29.0);
+        // Leave outer SE corner half open for SE Pos Ronda & Warung Kopi Hub
+        buildLShapedTower(sb, bx0 + 1.0, bz0 + 1.0, midX - 1.0, bz1 - 1.0, 0, 26.0);
       } else if (blk.zi === 1) {
         buildRukoRow(sb, bx0, bz0, midX - 1.5, bz1, 'west', 5, true);
         buildLShapedTower(sb, midX + 0.5, bz0 + 1.0, bx1, bz1 - 1.0, 1, 26.0);
@@ -1098,7 +1177,8 @@
       } else if (blk.zi === 3) {
         buildUCourtyardComplex(sb, bx0, bz0, bx1, bz1, 'west', 15.5);
       } else {
-        buildDiagonalCivic(sb, bx0 + 1.0, bz0 + 1.0, bx1 - 1.0, bz1 - 1.0, 18.0);
+        // Leave outer NE corner half open for NE Expedition Logistics Yard & Security Booth
+        buildDiagonalCivic(sb, bx0 + 1.0, bz0 + 1.0, midX - 1.0, bz1 - 1.0, 18.0);
       }
     }
     }
@@ -1138,10 +1218,10 @@
       { x: cMinX + 0.15, z0: platMaxZ + 2.5, z1: northCrossZ0 - 1.5, ry: Math.PI * 0.5 },
       { x: cMaxX - 0.15, z0: southCrossZ1 + 1.5, z1: platMinZ - 2.5, ry: Math.PI * 0.5 },
       { x: cMaxX - 0.15, z0: platMaxZ + 2.5, z1: northCrossZ0 - 1.5, ry: Math.PI * 0.5 },
-      { x: cMinX + 0.15, z0: -110, z1: southCrossZ0 - 1.5, ry: Math.PI * 0.5 },
-      { x: cMaxX - 0.15, z0: -110, z1: southCrossZ0 - 1.5, ry: Math.PI * 0.5 },
-      { x: cMinX + 0.15, z0: northCrossZ1 + 1.5, z1: 110, ry: Math.PI * 0.5 },
-      { x: cMaxX - 0.15, z0: northCrossZ1 + 1.5, z1: 110, ry: Math.PI * 0.5 }
+      { x: cMinX + 0.15, z0: -118.0, z1: southCrossZ0 - 1.5, ry: Math.PI * 0.5 },
+      { x: cMaxX - 0.15, z0: -118.0, z1: southCrossZ0 - 1.5, ry: Math.PI * 0.5 },
+      { x: cMinX + 0.15, z0: northCrossZ1 + 1.5, z1: 118.0, ry: Math.PI * 0.5 },
+      { x: cMaxX - 0.15, z0: northCrossZ1 + 1.5, z1: 118.0, ry: Math.PI * 0.5 }
     ];
     for (let fr = 0; fr < fenceRuns.length; fr++) {
       const run = fenceRuns[fr];
@@ -1251,6 +1331,13 @@
         });
       }
     }
+    // Register the 4 Far-Corner Hub focal lighting anchors into the pooled streetlamp system (zero extra PointLights!)
+    city.litLampPositions.push(
+      { x: cornerHubCoords.NW.cx + 3.2, y: SIDEWALK_Y + 3.3, z: cornerHubCoords.NW.cz + 2.0, flicker: false },
+      { x: cornerHubCoords.NE.cx + 2.8, y: SIDEWALK_Y + 3.0, z: cornerHubCoords.NE.cz + 1.0, flicker: false },
+      { x: cornerHubCoords.SW.cx + 3.4, y: SIDEWALK_Y + 3.2, z: cornerHubCoords.SW.cz + 1.6, flicker: true },
+      { x: cornerHubCoords.SE.cx - 0.5, y: SIDEWALK_Y + 2.55, z: cornerHubCoords.SE.cz - 2.4, flicker: false }
+    );
     // Emit 3 persistent pooled streetlamp PointLights (attached to main scene so NUM_POINT_LIGHTS never shifts!)
     const poolTargetScene = o.scene || (window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core && window.__LRT_INTERNAL__.core.scene) || root;
     const poolCount = Math.min(3, city.litLampPositions.length);
@@ -1551,26 +1638,125 @@
         addBox(bJpo, hw, 0.28, 0.30, hcx, STREET_GROUND_Y + 2.35, hz);
         // Checkpoint guardhouse container / booth near main avenue shoulders
         const boothX = hx0 < 0 ? westRoadMaxX - 1.6 : eastRoadMinX + 1.6;
-        addBox(bCurb, 3.2, 2.85, 4.2, boothX, STREET_GROUND_Y + 1.425, hz + dir * 2.6, 0, 0, 0, 2.5);
+        addBox(bInfraConcrete, 3.2, 2.85, 4.2, boothX, STREET_GROUND_Y + 1.425, hz + dir * 2.6, 0, 0, 0, 2.5);
+        addBox(bCornerGlass, 2.6, 0.95, 0.10, boothX, STREET_GROUND_Y + 1.85, hz + dir * 0.48);
         addBox(bSteelDark, 3.5, 0.24, 4.5, boothX, STREET_GROUND_Y + 2.95, hz + dir * 2.6);
         addBox(bAmber, 0.30, 0.22, 0.30, boothX, STREET_GROUND_Y + 3.16, hz + dir * 2.6);
       }
-      // Elevated Jakarta Inner-Ring Toll Viaduct Bridge closing deep street sightlines cleanly
+      // Elevated Jakarta Inner-Ring Toll Viaduct Bridge spanning continuously across entire X width & rail corridor (y = 7.4m deck)
       const bridgeZ = hz + dir * 13.0;
-      const westBridgeX0 = DIST_X_MIN - 32.0;
-      const westBridgeX1 = cMinX - 1.5;
-      const eastBridgeX0 = cMaxX + 1.5;
-      const eastBridgeX1 = DIST_X_MAX + 32.0;
-      for (const [bx0, bx1] of [[westBridgeX0, westBridgeX1], [eastBridgeX0, eastBridgeX1]]) {
+      const bX0 = DIST_X_MIN - 32.0;
+      const bX1 = DIST_X_MAX + 32.0;
+      const bW = bX1 - bX0;
+      const bCX = (bX0 + bX1) * 0.5;
+      addBox(bInfraConcrete, bW, 0.85, 11.6, bCX, 7.425, bridgeZ, 0, 0, 0, 6.0);
+      addBox(bInfraConcrete, bW, 1.05, 0.45, bCX, 8.375, bridgeZ - 5.55, 0, 0, 0, 4.0);
+      addBox(bInfraConcrete, bW, 1.05, 0.45, bCX, 8.375, bridgeZ + 5.55, 0, 0, 0, 4.0);
+      addBox(bInfraConcrete, bW, 0.72, 0.36, bCX, 8.21, bridgeZ, 0, 0, 0, 4.0);
+      for (const [bx0, bx1] of [[bX0, cMinX - 2.1], [cMaxX + 2.1, bX1]]) {
         const bw = bx1 - bx0;
-        const bcx = (bx0 + bx1) * 0.5;
-        // Box girder deck + jersey parapets + support piers
-        addBox(bCurb, bw, 1.85, 11.5, bcx, STREET_GROUND_Y + 7.2, bridgeZ, 0, 0, 0, 6.0);
-        addBox(bCurb, bw, 1.05, 0.45, bcx, STREET_GROUND_Y + 8.65, bridgeZ - 5.4, 0, 0, 0, 4.0);
-        addBox(bCurb, bw, 1.05, 0.45, bcx, STREET_GROUND_Y + 8.65, bridgeZ + 5.4, 0, 0, 0, 4.0);
-        for (let px = bx0 + 8.0; px <= bx1 - 6.0; px += 20.0) {
-          addBox(bCurb, 2.6, 6.8, 3.2, px, STREET_GROUND_Y + 3.4, bridgeZ, 0, 0, 0, 4.0);
-          addBox(bSteelDark, 2.9, 0.5, 5.2, px, STREET_GROUND_Y + 6.4, bridgeZ);
+        if (bw > 0.5) {
+          addBox(bInfraConcrete, bw, 1.00, 7.2, (bx0 + bx1) * 0.5, 6.50, bridgeZ, 0, 0, 0, 4.0);
+        }
+      }
+      for (let px = bX0 + 8.0; px <= bX1 - 6.0; px += 20.0) {
+        if (px >= cMinX - 4.2 && px <= cMaxX + 4.2) continue;
+        addBox(bInfraConcrete, 2.6, 7.0, 3.2, px, 2.50, bridgeZ, 0, 0, 0, 4.0);
+        addBox(bSteelDark, 3.0, 0.48, 5.4, px, 5.76, bridgeZ);
+      }
+
+      // Twin-Bore Concrete Rail Tunnel Portal & Wing Retaining Walls directly beneath viaduct (z = ±133.5m)
+      const sortedTracks = trackXs.slice().sort((a, b) => a - b);
+      const pMinX = cMinX - 2.0;
+      const pMaxX = cMaxX + 2.0;
+      const pSpanX = pMaxX - pMinX;
+      const pMidX = (pMinX + pMaxX) * 0.5;
+      const portalZ = dir * 133.5;
+      const boreHalfW = 1.92;
+      const boreBotY = -1.35;
+      const boreTopY = 4.65;
+      const boreH = boreTopY - boreBotY;
+      const boreMidY = (boreBotY + boreTopY) * 0.5;
+      const collarZ = portalZ - dir * 1.54;
+
+      let curX = pMinX;
+      for (let ti = 0; ti < sortedTracks.length; ti++) {
+        const tx = sortedTracks[ti];
+        const bL = tx - boreHalfW;
+        const bR = tx + boreHalfW;
+        const pierW = bL - curX;
+        if (pierW > 0.04) {
+          addBox(bInfraConcrete, pierW, boreH, 3.2, (curX + bL) * 0.5, boreMidY, portalZ, 0, 0, 0, 2.5);
+        }
+        // Corner haunches & dark steel bore collar frame (clears train halfWidth 1.37m & HVAC 3.80m)
+        addBox(bInfraConcrete, 0.36, 0.42, 0.36, bL + 0.18, boreTopY - 0.21, collarZ);
+        addBox(bInfraConcrete, 0.36, 0.42, 0.36, bR - 0.18, boreTopY - 0.21, collarZ);
+        addBox(bSteelDark, 0.22, boreH, 0.24, bL + 0.09, boreMidY, collarZ - dir * 0.06);
+        addBox(bSteelDark, 0.22, boreH, 0.24, bR - 0.09, boreMidY, collarZ - dir * 0.06);
+        addBox(bSteelDark, boreHalfW * 2.0 + 0.20, 0.26, 0.28, tx, boreTopY + 0.13, collarZ - dir * 0.06);
+
+        // Red tunnel block signal head mounted on concrete headwall above each bore opening
+        const sigZ = portalZ - dir * 1.72;
+        addBox(bSteelDark, 0.42, 0.68, 0.24, tx - 1.25, 5.20, sigZ);
+        addBox(bSteelDark, 0.32, 0.08, 0.28, tx - 1.25, 5.42, sigZ - dir * 0.12);
+        addBox(bTunnelSignalRed, 0.22, 0.22, 0.08, tx - 1.25, 5.28, sigZ - dir * 0.12);
+        addBox(bTunnelSignalRed, 0.16, 0.16, 0.08, tx - 1.25, 5.02, sigZ - dir * 0.12);
+
+        // Pitch-black interior tunnel bore liner walls (visual-only, zero colliders/BVH)
+        addBox(bTunnelDark, 0.16, boreH + 0.10, 10.8, bL - 0.08, boreMidY, dir * 140.2);
+        addBox(bTunnelDark, 0.16, boreH + 0.10, 10.8, bR + 0.08, boreMidY, dir * 140.2);
+        // Interior concrete tunnel ribs at 3m spacing
+        for (const ribAbsZ of [137.0, 140.0, 143.0]) {
+          const ribZ = dir * ribAbsZ;
+          addBox(bInfraConcrete, 0.20, boreH - 0.10, 0.42, bL + 0.10, boreMidY - 0.05, ribZ);
+          addBox(bInfraConcrete, 0.20, boreH - 0.10, 0.42, bR - 0.10, boreMidY - 0.05, ribZ);
+          addBox(bInfraConcrete, boreHalfW * 2.0, 0.20, 0.42, tx, boreTopY - 0.10, ribZ);
+        }
+        // Overhead longitudinal catenary contact & messenger wires
+        addBox(bCables, 0.035, 0.035, 22.0, tx, 4.35, dir * 125.0);
+        addBox(bCables, 0.030, 0.030, 22.0, tx, 4.95, dir * 125.0);
+        curX = bR;
+      }
+      if (pMaxX - curX > 0.04) {
+        addBox(bInfraConcrete, pMaxX - curX, boreH, 3.2, (curX + pMaxX) * 0.5, boreMidY, portalZ, 0, 0, 0, 2.5);
+      }
+      // Solid concrete headwall + coping cap flush against viaduct soffit (y = 7.00m)
+      addBox(bInfraConcrete, pSpanX, 2.10, 3.2, pMidX, 5.70, portalZ, 0, 0, 0, 3.0);
+      addBox(bInfraConcrete, pSpanX + 0.4, 0.25, 3.5, pMidX, 6.875, portalZ - dir * 0.15, 0, 0, 0, 3.0);
+
+      // Wing retaining walls flanking approach (z = dir * 124 .. dir * 132)
+      for (const wx of [cMinX - 1.25, cMaxX + 1.25]) {
+        addBox(bInfraConcrete, 1.5, 4.4, 4.1, wx, 0.85, dir * 126.0, 0, 0, 0, 2.5);
+        addBox(bInfraConcrete, 1.75, 0.22, 4.2, wx, 3.16, dir * 126.0, 0, 0, 0, 2.5);
+        addBox(bInfraConcrete, 1.7, 6.5, 4.1, wx, 1.90, dir * 130.0, 0, 0, 0, 2.5);
+        addBox(bInfraConcrete, 1.95, 0.24, 4.2, wx, 5.27, dir * 130.0, 0, 0, 0, 2.5);
+      }
+      // Trackside auxiliary tunnel block signal heads on portal flanks
+      for (const sx of [cMinX - 0.90, cMaxX + 0.90]) {
+        const msZ = portalZ - dir * 1.72;
+        addBox(bSteelDark, 0.34, 0.72, 0.24, sx, 2.95, msZ);
+        addBox(bTunnelSignalRed, 0.18, 0.18, 0.08, sx, 3.08, msZ - dir * 0.12);
+        addBox(bTunnelSignalRed, 0.18, 0.18, 0.08, sx, 2.78, msZ - dir * 0.12);
+      }
+      // Pitch-black interior chamber ceiling, outer walls & far blackout plate (visual-only, NO collider/BVH)
+      addBox(bTunnelDark, pSpanX, 0.26, 11.2, pMidX, boreTopY + 0.13, dir * 140.4);
+      addBox(bTunnelDark, 0.30, boreH + 0.30, 11.2, pMinX + 0.15, boreMidY + 0.05, dir * 140.4);
+      addBox(bTunnelDark, 0.30, boreH + 0.30, 11.2, pMaxX - 0.15, boreMidY + 0.05, dir * 140.4);
+      addBox(bTunnelDark, pSpanX, boreH + 0.40, 0.40, pMidX, boreMidY + 0.10, dir * 145.6);
+
+      // Overhead steel catenary gantries along outer track approach (z = ±120.5m & ±127.0m)
+      const gantrySpan = cMaxX - cMinX;
+      for (const gAbsZ of [120.5, 127.0]) {
+        const gz = dir * gAbsZ;
+        addBox(bSteelDark, 0.30, 7.0, 0.30, cMinX + 0.22, 2.15, gz);
+        addBox(bSteelDark, 0.30, 7.0, 0.30, cMaxX - 0.22, 2.15, gz);
+        if (gantrySpan > 12.0 && sortedTracks.every((tx) => Math.abs(tx - pMidX) > 2.3)) {
+          addBox(bSteelDark, 0.28, 7.0, 0.28, pMidX, 2.15, gz);
+        }
+        addBox(bSteelDark, gantrySpan, 0.28, 0.30, (cMinX + cMaxX) * 0.5, 5.45, gz);
+        addBox(bSteelDark, gantrySpan, 0.18, 0.22, (cMinX + cMaxX) * 0.5, 4.65, gz);
+        for (let ti = 0; ti < sortedTracks.length; ti++) {
+          addBox(bSteelDark, 0.08, 0.90, 0.08, sortedTracks[ti], 4.82, gz);
         }
       }
     }
@@ -1585,15 +1771,40 @@
       addBox(bJpo, 0.34, 0.28, cw + 1.0, DIST_X_MAX + 0.5, STREET_GROUND_Y + 2.45, cmz);
     }
 
-    // Rail Corridor Security Gates at z = ±108.0 (x in [cMinX .. cMaxX])
+    // Rail Corridor Security Gates at z = ±108.0 (x in [cMinX - 0.6 .. cMaxX + 0.6])
     const railGateZs = [-108.0, 108.0];
     for (let gi = 0; gi < railGateZs.length; gi++) {
       const gz = railGateZs[gi];
       addBox(bSteelDark, 0.6, 5.8, 0.6, cMinX + 0.3, RAIL_TOP_Y + 2.9, gz);
       addBox(bSteelDark, 0.6, 5.8, 0.6, cMaxX - 0.3, RAIL_TOP_Y + 2.9, gz);
-      addBox(bSteelDark, (cMaxX - cMinX), 0.5, 0.6, (cMinX + cMaxX) * 0.5, RAIL_TOP_Y + 5.5, gz);
+      addBox(bSteelDark, (cMaxX - cMinX) + 1.30, 0.5, 0.6, (cMinX + cMaxX) * 0.5, RAIL_TOP_Y + 5.5, gz);
       addBox(bAmber, 0.26, 0.26, 0.26, cMinX + 0.3, RAIL_TOP_Y + 5.95, gz);
       addBox(bAmber, 0.26, 0.26, 0.26, cMaxX - 0.3, RAIL_TOP_Y + 5.95, gz);
+
+      // Extended security fence wings & static colliders closing sidewalk gap around gate posts
+      for (const side of [
+        { cx: cMinX - 0.30, x0: cMinX - 0.68, x1: cMinX + 0.08, postX: cMinX - 0.62, barrierX: cMinX - 0.35 },
+        { cx: cMaxX + 0.30, x0: cMaxX - 0.08, x1: cMaxX + 0.68, postX: cMaxX + 0.62, barrierX: cMaxX + 0.35 }
+      ]) {
+        addBox(bSteelDark, 0.14, 2.35, 0.14, side.postX, SIDEWALK_Y + 1.175, gz);
+        addBox(bSteelDark, 0.72, 0.08, 0.08, side.cx, SIDEWALK_Y + 2.25, gz);
+        addBox(bSteelDark, 0.72, 0.08, 0.08, side.cx, SIDEWALK_Y + 1.20, gz);
+        addBox(bSteelDark, 0.72, 0.08, 0.08, side.cx, SIDEWALK_Y + 0.22, gz);
+        for (const pxOff of [-0.22, 0.0, 0.22]) {
+          addBox(bSteelDark, 0.05, 2.15, 0.05, side.cx + pxOff, SIDEWALK_Y + 1.15, gz);
+        }
+        city._addCollider(side.x0, RAIL_TOP_Y, gz - 0.35, side.x1, RAIL_TOP_Y + 3.5, gz + 0.35, 'metal', {
+          blocksWalk: true, blocksBullets: false
+        });
+        addBox(bCollHull, side.x1 - side.x0, 3.5, 0.70, (side.x0 + side.x1) * 0.5, RAIL_TOP_Y + 1.75, gz);
+
+        // Concrete Jersey barrier flanking each gate post
+        barrierPlacements.push({ x: side.barrierX, y: SIDEWALK_Y, z: gz, ry: 0 });
+        city._addCollider(side.barrierX - 0.78, SIDEWALK_Y, gz - 0.34, side.barrierX + 0.78, SIDEWALK_Y + 0.85, gz + 0.34, 'concrete', {
+          blocksWalk: true, blocksBullets: false
+        });
+        addBox(bCollHull, 1.56, 0.85, 0.66, side.barrierX, SIDEWALK_Y + 0.425, gz, 0, 0, 0);
+      }
 
       const gateGroup = new THREE.Group();
       gateGroup.position.set(0, 0, gz);
@@ -1669,12 +1880,331 @@
     for (const pz of [-8.0, -2.0, 2.0, 8.0]) {
       shrub1Placements.push({ x: eastOuterSwMinX + 0.9, y: SIDEWALK_Y, z: pz, ry: Math.PI * 0.5 });
     }
+
+    // 4 Far-Corner City Exploration Hubs (NW PMI Medpost, NE Logistics Depot, SW Military Convoy, SE Poskamling & Warung)
+    (function buildCornerHubsStaticStage() {
+      const NW = cornerHubCoords.NW;
+      const NE = cornerHubCoords.NE;
+      const SW = cornerHubCoords.SW;
+      const SE = cornerHubCoords.SE;
+
+      // --- 1) NW CORNER: Posko Medis Darurat PMI & Ambulans ---
+      {
+        const cx = NW.cx;
+        const tentZ = 100.8;
+        // Weatherproof rubberized triage pad floor
+        addBox(bSteelDark, 7.6, 0.05, 5.4, cx, SIDEWALK_Y + 0.025, tentZ);
+        // Tent corner steel stanchions (colliders on posts only, open walk-in canopy)
+        for (const [px, pz] of [
+          [cx - 3.45, tentZ - 2.35], [cx + 3.45, tentZ - 2.35],
+          [cx - 3.45, tentZ + 2.35], [cx + 3.45, tentZ + 2.35]
+        ]) {
+          addBox(bSteelDark, 0.12, 2.95, 0.12, px, SIDEWALK_Y + 1.475, pz);
+          city._addCollider(px - 0.12, SIDEWALK_Y, pz - 0.12, px + 0.12, SIDEWALK_Y + 2.95, pz + 0.12, 'metal', { blocksBullets: false });
+        }
+        // White PMI canopy roof + red perimeter valance & Red Cross emblem
+        addHippedRoof(bCornerWhite, cx - 3.6, tentZ - 2.5, cx + 3.6, tentZ + 2.5, SIDEWALK_Y + 2.90, 1.05, 0.35, 2.0);
+        addBox(bCornerRed, 7.4, 0.24, 0.08, cx, SIDEWALK_Y + 2.82, tentZ - 2.52);
+        addBox(bCornerRed, 7.4, 0.24, 0.08, cx, SIDEWALK_Y + 2.82, tentZ + 2.52);
+        addBox(bCornerRed, 0.90, 0.26, 0.08, cx, SIDEWALK_Y + 3.25, tentZ - 2.56);
+        addBox(bCornerRed, 0.26, 0.90, 0.08, cx, SIDEWALK_Y + 3.25, tentZ - 2.56);
+        addBox(bCornerWarmBulb, 1.6, 0.08, 0.14, cx, SIDEWALK_Y + 2.86, tentZ);
+        // Main medical examination table & interactive Kotak Medis Darurat PMI
+        const medX = cx + 0.25, medZ = 101.3;
+        addBox(bSteelDark, 2.1, 0.76, 0.90, medX, SIDEWALK_Y + 0.38, medZ);
+        addBox(bCornerWhite, 2.2, 0.08, 0.96, medX, SIDEWALK_Y + 0.80, medZ);
+        addBox(bCornerWhite, 0.56, 0.24, 0.38, medX, SIDEWALK_Y + 0.96, medZ);
+        addBox(bCornerRed, 0.24, 0.06, 0.06, medX, SIDEWALK_Y + 1.09, medZ);
+        addBox(bCornerRed, 0.06, 0.06, 0.24, medX, SIDEWALK_Y + 1.09, medZ);
+        // IV drip stand beside triage table
+        addCylinder(bSteelDark, 0.025, 0.03, 2.05, 6, medX + 1.35, SIDEWALK_Y + 1.025, medZ + 0.15);
+        addBox(bCornerWhite, 0.14, 0.22, 0.08, medX + 1.25, SIDEWALK_Y + 1.88, medZ + 0.15);
+        city._addCollider(medX - 1.12, SIDEWALK_Y, medZ - 0.50, medX + 1.12, SIDEWALK_Y + 1.05, medZ + 0.50, 'metal', { blocksBullets: false });
+        addBox(bCollHull, 2.24, 1.05, 1.00, medX, SIDEWALK_Y + 0.525, medZ);
+        // Folding desk holding note_nw_corner
+        const deskX = cx - 2.1, deskZ = 100.9;
+        addBox(bSteelDark, 0.96, 0.76, 0.64, deskX, SIDEWALK_Y + 0.38, deskZ);
+        addBox(bCornerWood, 1.04, 0.06, 0.70, deskX, SIDEWALK_Y + 0.79, deskZ);
+        city._addCollider(deskX - 0.54, SIDEWALK_Y, deskZ - 0.36, deskX + 0.54, SIDEWALK_Y + 0.84, deskZ + 0.36, 'wood', { blocksBullets: false });
+        // Floodlight tripod mast + warm flood head
+        const mastX = cx + 4.8, mastZ = 99.8;
+        addCylinder(bSteelDark, 0.04, 0.06, 3.8, 6, mastX, SIDEWALK_Y + 1.9, mastZ);
+        addBox(bSteelDark, 0.72, 0.28, 0.24, mastX, SIDEWALK_Y + 3.85, mastZ, 0, -0.45, 0);
+        addBox(bCornerWarmBulb, 0.58, 0.18, 0.08, mastX - 0.05, SIDEWALK_Y + 3.85, mastZ - 0.10, 0, -0.45, 0);
+        city._addCollider(mastX - 0.45, SIDEWALK_Y, mastZ - 0.45, mastX + 0.45, SIDEWALK_Y + 3.9, mastZ + 0.45, 'metal', { blocksBullets: false });
+        // Ambulance parked on west side of NW lot facing south/collector entrance
+        const ambX = cx - 5.2, ambZ = 96.5, ambRy = -0.18;
+        ambulancePlacements.push({ x: ambX, y: SIDEWALK_Y, z: ambZ, ry: ambRy });
+        city._addCollider(ambX - 1.32, SIDEWALK_Y, ambZ - 2.85, ambX + 1.32, SIDEWALK_Y + 2.45, ambZ + 2.85, 'metal', { blocksBullets: true });
+        addBox(bCollHull, 2.35, 2.45, 5.65, ambX, SIDEWALK_Y + 1.225, ambZ, 0, ambRy, 0);
+        // Surrounding PMI supply crates & seating
+        plasticCratePlacements.push({ x: cx + 2.7, y: SIDEWALK_Y, z: 102.0, ry: 0.25 });
+        plasticCratePlacements.push({ x: cx + 2.7, y: SIDEWALK_Y + 0.26, z: 102.0, ry: 0.42 });
+        cardboardBoxPlacements.push({ x: cx - 2.9, y: SIDEWALK_Y, z: 99.2, ry: 0.15 });
+        monoblocChairPlacements.push({ x: cx + 1.9, y: SIDEWALK_Y, z: 98.4, ry: -0.6 });
+        barrierPlacements.push({ x: cx - 6.6, y: SIDEWALK_Y, z: 92.2, ry: 0.25 });
+        city._addCollider(cx - 7.38, SIDEWALK_Y, 91.65, cx - 5.82, SIDEWALK_Y + 0.85, 92.75, 'concrete', { blocksBullets: false });
+        addBox(bCollHull, 1.56, 0.85, 0.66, cx - 6.6, SIDEWALK_Y + 0.425, 92.2, 0, 0.25, 0);
+      }
+
+      // --- 2) NE CORNER: Gudang Logistik Ekspedisi & Pos Sekuriti ---
+      {
+        const cx = NE.cx;
+        const dockY = SIDEWALK_Y + 0.62;
+        const dockX0 = cx - 6.0, dockX1 = cx + 4.0, dockZ0 = 100.2, dockZ1 = 108.2;
+        const dockW = dockX1 - dockX0, dockD = dockZ1 - dockZ0;
+        const dockCX = (dockX0 + dockX1) * 0.5, dockCZ = (dockZ0 + dockZ1) * 0.5;
+        // Raised concrete loading bay dock + BVH-walkable front ramp
+        addBox(bInfraConcrete, dockW, 0.62, dockD, dockCX, SIDEWALK_Y + 0.31, dockCZ, 0, 0, 0, 3.0);
+        addWedgeRamp(bInfraConcrete, cx - 5.8, 97.4, cx - 2.6, 100.2, SIDEWALK_Y, dockY, 'z', 2.0);
+        addBox(bAmber, dockW - 3.6, 0.08, 0.14, cx + 0.9, dockY - 0.04, dockZ0 - 0.03);
+        // Front vertical drop collider ONLY east of ramp so ramp walk-on stays smooth!
+        city._addCollider(cx - 2.55, SIDEWALK_Y, dockZ0 - 0.18, dockX1, dockY - 0.06, dockZ0 + 0.18, 'concrete', { blocksBullets: false });
+        // Corrugated steel warehouse canopy sheltering rear loading bay
+        for (const [px, pz] of [
+          [dockX0 + 0.35, dockZ0 + 0.45], [dockX1 - 0.35, dockZ0 + 0.45],
+          [dockX0 + 0.35, dockZ1 - 0.45], [dockX1 - 0.35, dockZ1 - 0.45]
+        ]) {
+          addBox(bSteelDark, 0.18, 3.6, 0.18, px, dockY + 1.8, pz);
+          city._addCollider(px - 0.16, dockY, pz - 0.16, px + 0.16, dockY + 3.6, pz + 0.16, 'metal', { blocksBullets: false });
+        }
+        addBox(bCornerRoof, dockW + 0.8, 0.14, dockD + 0.6, dockCX, dockY + 3.68, dockCZ, -0.06, 0, 0);
+        addBox(bCornerWarmBulb, 2.2, 0.08, 0.16, dockCX, dockY + 3.55, dockCZ - 0.5);
+        // Warehouse parapet walls & railing along north & east edges of dock
+        addBox(bSteelDark, dockW, 0.95, 0.14, dockCX, dockY + 0.475, dockZ1 - 0.12);
+        city._addCollider(dockX0, dockY, dockZ1 - 0.25, dockX1, dockY + 1.0, dockZ1 + 0.15, 'metal', { blocksBullets: false });
+
+        // Interactive Peti Logistik Gudang Utara on dock apron + cargo pallet stacks
+        const depotX = cx + 0.5, depotZ = 102.3;
+        palletPlacements.push({ x: depotX, y: dockY, z: depotZ, ry: 0.08 });
+        // Multi-part heavy armored Expedition Supply Chest on timber pallet
+        addBox(bSteelDark, 0.96, 0.08, 0.68, depotX, dockY + 0.19, depotZ);
+        addBox(bCornerRed, 0.88, 0.42, 0.60, depotX, dockY + 0.44, depotZ);
+        addBox(bCornerRed, 0.92, 0.10, 0.64, depotX, dockY + 0.68, depotZ);
+        // Dark-steel corner angle guards & protective lid rim bands
+        for (const [cxOff, czOff] of [[-0.43, -0.29], [0.43, -0.29], [-0.43, 0.29], [0.43, 0.29]]) {
+          addBox(bSteelDark, 0.09, 0.54, 0.09, depotX + cxOff, dockY + 0.46, depotZ + czOff);
+        }
+        addBox(bSteelDark, 0.95, 0.06, 0.67, depotX, dockY + 0.62, depotZ);
+        // Side carry handles + twin front padlock clasps & amber stencil band
+        addBox(bTruss, 0.05, 0.08, 0.28, depotX - 0.47, dockY + 0.45, depotZ);
+        addBox(bTruss, 0.05, 0.08, 0.28, depotX + 0.47, dockY + 0.45, depotZ);
+        addBox(bTruss, 0.10, 0.16, 0.05, depotX - 0.24, dockY + 0.56, depotZ - 0.32);
+        addBox(bTruss, 0.10, 0.16, 0.05, depotX + 0.24, dockY + 0.56, depotZ - 0.32);
+        addBox(bAmber, 0.66, 0.06, 0.04, depotX, dockY + 0.42, depotZ - 0.30);
+        addBox(bAmber, 0.66, 0.05, 0.14, depotX, dockY + 0.74, depotZ);
+        ammoBoxPlacements.push({ x: depotX - 0.18, y: dockY + 0.73, z: depotZ, ry: 0.14 });
+        city._addCollider(depotX - 0.58, dockY, depotZ - 0.48, depotX + 0.58, dockY + 0.76, depotZ + 0.48, 'wood', { blocksBullets: false });
+        addBox(bCollHull, 1.16, 0.76, 0.96, depotX, dockY + 0.38, depotZ);
+
+        // Background palletized warehouse freight clusters (off main walkway)
+        for (const [px, pz, pry] of [
+          [cx - 4.4, 105.6, 0.05], [cx - 2.2, 106.0, -0.06], [cx + 2.4, 105.6, 0.12], [cx + 2.6, 102.4, -0.15]
+        ]) {
+          palletPlacements.push({ x: px, y: dockY, z: pz, ry: pry });
+          plasticCratePlacements.push({ x: px - 0.2, y: dockY + 0.15, z: pz, ry: pry });
+          cardboardBoxPlacements.push({ x: px + 0.25, y: dockY + 0.15, z: pz + 0.05, ry: pry + 0.4 });
+          city._addCollider(px - 0.68, dockY, pz - 0.58, px + 0.68, dockY + 0.95, pz + 0.58, 'wood', { blocksBullets: false });
+        }
+        militaryCratePlacements.push({ x: cx - 4.5, y: dockY + 0.15, z: 103.5, ry: 0.1 });
+        fuelBarrelPlacements.push({ x: cx - 5.4, y: SIDEWALK_Y, z: 95.8, ry: 0.5 });
+        handTruckPlacements.push({ x: cx - 2.2, y: dockY, z: 102.0, ry: -0.7 });
+
+        // Security Gatehouse Booth on east collector edge + manifest counter for note_ne_corner
+        const secX = cx + 5.3, secZ = 98.4;
+        addBox(bInfraConcrete, 2.4, 2.65, 2.5, secX, SIDEWALK_Y + 1.325, secZ, 0, 0, 0, 2.0);
+        addBox(bCornerGlass, 2.48, 0.85, 2.0, secX, SIDEWALK_Y + 1.65, secZ);
+        addBox(bCornerRoof, 2.9, 0.18, 3.0, secX, SIDEWALK_Y + 2.74, secZ);
+        addBox(bCornerWarmBulb, 0.45, 0.08, 0.45, secX, SIDEWALK_Y + 2.52, secZ);
+        city._addCollider(secX - 1.25, SIDEWALK_Y, secZ - 1.30, secX + 1.25, SIDEWALK_Y + 2.8, secZ + 1.30, 'concrete', { blocksBullets: true });
+        addBox(bCollHull, 2.5, 2.8, 2.6, secX, SIDEWALK_Y + 1.4, secZ);
+        // Manifest desk counter protruding on west booth wall holding note_ne_corner
+        addBox(bCornerWood, 0.72, 0.84, 1.45, secX - 1.56, SIDEWALK_Y + 0.42, secZ);
+        city._addCollider(secX - 1.94, SIDEWALK_Y, secZ - 0.74, secX - 1.20, SIDEWALK_Y + 0.86, secZ + 0.74, 'wood', { blocksBullets: false });
+      }
+
+      // --- 3) SW CORNER: Pos Sekat Militer & Konvoi Taktis ---
+      {
+        const cx = SW.cx;
+        // Multi-course stacked sandbag defensive perimeter facing intersection (+Z shoulder)
+        const sbCourses = [
+          { x: cx - 0.8, z: -92.4, w: 3.4, ry: -0.10 },
+          { x: cx + 2.6, z: -92.8, w: 3.4, ry: 0.12 },
+          { x: cx + 4.8, z: -94.6, w: 2.6, ry: 1.22 }
+        ];
+        for (let si = 0; si < sbCourses.length; si++) {
+          const s = sbCourses[si];
+          for (let row = 0; row < 3; row++) {
+            addBox(bCornerSandbag, s.w - row * 0.12, 0.27, 0.78 - row * 0.06, s.x, SIDEWALK_Y + 0.135 + row * 0.27, s.z, 0, s.ry, 0);
+          }
+          const cos = Math.abs(Math.cos(s.ry)), sin = Math.abs(Math.sin(s.ry));
+          const hx = cos * (s.w * 0.5) + sin * 0.42;
+          const hz = sin * (s.w * 0.5) + cos * 0.42;
+          city._addCollider(s.x - hx, SIDEWALK_Y, s.z - hz, s.x + hx, SIDEWALK_Y + 0.86, s.z + hz, 'concrete', { blocksBullets: true });
+          addBox(bCollHull, s.w, 0.86, 0.82, s.x, SIDEWALK_Y + 0.43, s.z, 0, s.ry, 0);
+        }
+        // Tactical olive/steel shelter canopy over SW ammo staging area
+        const tentX = cx + 1.6, tentZ = -101.6;
+        for (const [px, pz] of [
+          [tentX - 2.4, tentZ - 1.6], [tentX + 2.4, tentZ - 1.6],
+          [tentX - 2.4, tentZ + 1.6], [tentX + 2.4, tentZ + 1.6]
+        ]) {
+          addBox(bSteelDark, 0.10, 2.85, 0.10, px, SIDEWALK_Y + 1.425, pz);
+          city._addCollider(px - 0.12, SIDEWALK_Y, pz - 0.12, px + 0.12, SIDEWALK_Y + 2.85, pz + 0.12, 'metal', { blocksBullets: false });
+        }
+        addBox(bSteelDark, 5.3, 0.10, 3.7, tentX, SIDEWALK_Y + 2.88, tentZ, 0.05, 0, 0);
+        addBox(bCornerWarmBulb, 1.3, 0.08, 0.14, tentX, SIDEWALK_Y + 2.78, tentZ);
+        // Interactive Peti Amunisi Konvoi Militer (reinforced military ordnance chest + GLTF ammo box) + operations crate
+        const crateX = cx + 1.8, crateZ = -101.2;
+        addBox(bCornerWood, 1.12, 0.10, 0.78, crateX, SIDEWALK_Y + 0.05, crateZ);
+        addBox(bSteelDark, 1.00, 0.44, 0.68, crateX, SIDEWALK_Y + 0.32, crateZ);
+        addBox(bSteelDark, 1.04, 0.11, 0.72, crateX, SIDEWALK_Y + 0.595, crateZ);
+        for (const [cxOff, czOff] of [[-0.49, -0.33], [0.49, -0.33], [-0.49, 0.33], [0.49, 0.33]]) {
+          addBox(bTruss, 0.08, 0.55, 0.08, crateX + cxOff, SIDEWALK_Y + 0.375, crateZ + czOff);
+        }
+        addBox(bTruss, 0.06, 0.08, 0.30, crateX - 0.52, SIDEWALK_Y + 0.35, crateZ);
+        addBox(bTruss, 0.06, 0.08, 0.30, crateX + 0.52, SIDEWALK_Y + 0.35, crateZ);
+        addBox(bTruss, 0.10, 0.16, 0.05, crateX - 0.26, SIDEWALK_Y + 0.48, crateZ + 0.36);
+        addBox(bTruss, 0.10, 0.16, 0.05, crateX + 0.26, SIDEWALK_Y + 0.48, crateZ + 0.36);
+        addBox(bAmber, 0.72, 0.06, 0.04, crateX, SIDEWALK_Y + 0.33, crateZ + 0.35);
+        addBox(bAmber, 0.72, 0.05, 0.14, crateX, SIDEWALK_Y + 0.66, crateZ);
+        ammoBoxPlacements.push({ x: crateX - 0.22, y: SIDEWALK_Y + 0.65, z: crateZ, ry: -0.22 });
+        city._addCollider(crateX - 0.58, SIDEWALK_Y, crateZ - 0.42, crateX + 0.58, SIDEWALK_Y + 0.68, crateZ + 0.42, 'metal', { blocksBullets: false });
+        addBox(bCollHull, 1.16, 0.68, 0.84, crateX, SIDEWALK_Y + 0.34, crateZ);
+
+        const opX = cx - 0.4, opZ = -101.4;
+        addBox(bCornerWood, 0.88, 0.70, 0.66, opX, SIDEWALK_Y + 0.35, opZ);
+        ammoBoxPlacements.push({ x: opX + 0.22, y: SIDEWALK_Y + 0.70, z: opZ - 0.10, ry: 0.38 });
+        city._addCollider(opX - 0.48, SIDEWALK_Y, opZ - 0.36, opX + 0.48, SIDEWALK_Y + 0.72, opZ + 0.36, 'wood', { blocksBullets: false });
+
+        // Tactical warning amber beacon tripod near sandbag corner
+        addCylinder(bSteelDark, 0.04, 0.07, 2.2, 6, cx + 4.8, SIDEWALK_Y + 1.1, -93.6);
+        addBox(bAmber, 0.28, 0.30, 0.28, cx + 4.8, SIDEWALK_Y + 2.30, -93.6);
+
+        // Tactical Military Utility Truck parked on west apron facing NE
+        const trkX = cx - 4.8, trkZ = -101.0, trkRy = 0.38;
+        militaryTruckPlacements.push({ x: trkX, y: SIDEWALK_Y, z: trkZ, ry: trkRy });
+        city._addCollider(trkX - 1.65, SIDEWALK_Y, trkZ - 3.05, trkX + 1.65, SIDEWALK_Y + 2.65, trkZ + 3.05, 'metal', { blocksBullets: true });
+        addBox(bCollHull, 2.38, 2.65, 6.10, trkX, SIDEWALK_Y + 1.325, trkZ, 0, trkRy, 0);
+
+        // Military cargo & barrier dressing
+        militaryCratePlacements.push({ x: cx + 3.4, y: SIDEWALK_Y, z: -102.2, ry: -0.25 });
+        fuelBarrelPlacements.push({ x: cx - 2.3, y: SIDEWALK_Y, z: -103.5, ry: 0.6 });
+        jerrycanPlacements.push({ x: cx - 1.8, y: SIDEWALK_Y, z: -102.8, ry: 1.1 });
+        oldTyrePlacements.push({ x: cx + 4.9, y: SIDEWALK_Y, z: -96.5, ry: 0.4 });
+        oldTyrePlacements.push({ x: cx + 4.9, y: SIDEWALK_Y + 0.165, z: -96.5, ry: 1.1 });
+        barrierPlacements.push({ x: cx - 6.6, y: SIDEWALK_Y, z: -92.0, ry: -0.20 });
+        city._addCollider(cx - 7.38, SIDEWALK_Y, -92.55, cx - 5.82, SIDEWALK_Y + 0.85, -91.45, 'concrete', { blocksBullets: false });
+        addBox(bCollHull, 1.56, 0.85, 0.66, cx - 6.6, SIDEWALK_Y + 0.425, -92.0, 0, -0.20, 0);
+      }
+
+      // --- 4) SE CORNER: Poskamling RT/RW & Warung Kopi Malam ---
+      {
+        const cx = SE.cx;
+        const posX = cx - 1.6, posZ = -101.8;
+        const plinthY = SIDEWALK_Y + 0.30;
+        // Concrete Pos Ronda raised foundation plinth & front entrance step
+        addBox(bInfraConcrete, 3.8, 0.30, 3.6, posX, SIDEWALK_Y + 0.15, posZ, 0, 0, 0, 2.0);
+        addBox(bInfraConcrete, 3.2, 0.15, 0.72, posX, SIDEWALK_Y + 0.075, posZ + 2.15, 0, 0, 0, 1.5);
+        // 4 corner timber posts
+        for (const [px, pz] of [
+          [posX - 1.70, posZ - 1.60], [posX + 1.70, posZ - 1.60],
+          [posX - 1.70, posZ + 1.60], [posX + 1.70, posZ + 1.60]
+        ]) {
+          addBox(bCornerWood, 0.15, 2.70, 0.15, px, plinthY + 1.35, pz);
+          city._addCollider(px - 0.12, SIDEWALK_Y, pz - 0.12, px + 0.12, plinthY + 2.75, pz + 0.12, 'wood', { blocksBullets: false });
+        }
+        // Wooden half-height waist walls (back, left, right) & built-in bale-bale guard bench
+        addBox(bCornerWood, 3.35, 0.90, 0.10, posX, plinthY + 0.45, posZ - 1.60);
+        addBox(bCornerWood, 0.10, 0.90, 3.15, posX - 1.70, plinthY + 0.45, posZ);
+        addBox(bCornerWood, 0.10, 0.90, 3.15, posX + 1.70, plinthY + 0.45, posZ);
+        addBox(bCornerWood, 2.95, 0.42, 0.95, posX, plinthY + 0.21, posZ - 0.95);
+        city._addCollider(posX - 1.82, SIDEWALK_Y, posZ - 1.72, posX + 1.82, plinthY + 1.0, posZ - 1.45, 'wood', { blocksBullets: false });
+        city._addCollider(posX - 1.82, SIDEWALK_Y, posZ - 1.72, posX - 1.55, plinthY + 1.0, posZ + 1.68, 'wood', { blocksBullets: false });
+        city._addCollider(posX + 1.55, SIDEWALK_Y, posZ - 1.72, posX + 1.82, plinthY + 1.0, posZ + 1.68, 'wood', { blocksBullets: false });
+        // Pitched terracotta Genteng hipped roof
+        addHippedRoof(bCornerRoof, posX - 1.9, posZ - 1.8, posX + 1.9, posZ + 1.8, plinthY + 2.70, 1.35, 0.48, 2.0);
+        // Iconic Indonesian Kentongan hanging on front-right timber post
+        addCylinder(bCornerWood, 0.095, 0.095, 0.68, 8, posX + 1.94, plinthY + 1.72, posZ + 1.58);
+        addCylinder(bSteelDark, 0.020, 0.020, 0.34, 6, posX + 1.94, plinthY + 2.16, posZ + 1.58);
+        addCylinder(bCornerWood, 0.025, 0.025, 0.38, 6, posX + 2.08, plinthY + 1.68, posZ + 1.58, 0.0, 0.0, 0.22);
+        // Front Poskamling guard ledger sill holding note_se_corner
+        addBox(bCornerWood, 1.15, 0.92, 0.48, posX + 0.95, SIDEWALK_Y + 0.46, posZ + 1.82);
+        city._addCollider(posX + 0.34, SIDEWALK_Y, posZ + 1.54, posX + 1.56, SIDEWALK_Y + 0.95, posZ + 2.10, 'wood', { blocksBullets: false });
+
+        // Warung Kopi Malam stall right beside Poskamling
+        const warX = cx + 3.0, warZ = -101.2;
+        for (const [px, pz] of [
+          [warX - 1.65, warZ - 1.15], [warX + 1.65, warZ - 1.15],
+          [warX - 1.65, warZ + 1.15], [warX + 1.65, warZ + 1.15]
+        ]) {
+          addBox(bCornerWood, 0.11, 2.55, 0.11, px, SIDEWALK_Y + 1.275, pz);
+        }
+        addBox(bCornerRoof, 3.9, 0.12, 2.9, warX, SIDEWALK_Y + 2.62, warZ, -0.10, 0, 0);
+        // Serving counter & rear shelf
+        addBox(bCornerWood, 3.4, 0.90, 0.72, warX, SIDEWALK_Y + 0.45, warZ + 1.05);
+        addBox(bCornerWood, 3.2, 0.85, 0.50, warX, SIDEWALK_Y + 0.425, warZ - 0.85);
+        city._addCollider(warX - 1.76, SIDEWALK_Y, warZ - 1.22, warX + 1.76, SIDEWALK_Y + 2.6, warZ + 1.42, 'wood', { blocksBullets: false });
+        addBox(bCollHull, 3.5, 2.5, 2.6, warX, SIDEWALK_Y + 1.25, warZ);
+        // Illuminated glass etalase display cabinet on east counter end
+        addBox(bSteelDark, 0.96, 0.06, 0.48, warX + 0.85, SIDEWALK_Y + 0.93, warZ + 1.05);
+        addBox(bCornerGlass, 0.92, 0.54, 0.44, warX + 0.85, SIDEWALK_Y + 1.23, warZ + 1.05);
+        addBox(bCornerWarmBulb, 0.78, 0.06, 0.10, warX + 0.85, SIDEWALK_Y + 1.46, warZ + 1.05);
+        // Interactive Red/Silver Kopi Thermos & snack jar on front counter (city_se_warung)
+        addCylinder(bCornerRed, 0.11, 0.11, 0.36, 8, warX - 0.65, SIDEWALK_Y + 1.10, warZ + 1.08);
+        addCylinder(bSteelDark, 0.08, 0.10, 0.08, 8, warX - 0.65, SIDEWALK_Y + 1.32, warZ + 1.08);
+        addCylinder(bCornerGlass, 0.09, 0.09, 0.24, 8, warX - 0.30, SIDEWALK_Y + 1.04, warZ + 1.08);
+        // Festive warm string bulbs draped across Poskamling & Warung facade
+        const strX0 = posX - 1.5, strX1 = warX + 1.6, strZ = -99.85;
+        addBox(bCables, strX1 - strX0, 0.025, 0.025, (strX0 + strX1) * 0.5, SIDEWALK_Y + 2.82, strZ);
+        for (let bx = strX0 + 0.35; bx <= strX1 - 0.25; bx += 0.78) {
+          const tNorm = (bx - strX0) / (strX1 - strX0);
+          const sagY = Math.sin(tNorm * Math.PI) * 0.22;
+          addBox(bCornerWarmBulb, 0.10, 0.12, 0.10, bx, SIDEWALK_Y + 2.74 - sagY, strZ);
+        }
+        // Outdoor Warung Kopi bench + table + plastic crates
+        seatingPlacements.push({ x: cx + 3.4, y: SIDEWALK_Y, z: -96.6, ry: Math.PI });
+        city._addCollider(cx + 2.45, SIDEWALK_Y, -97.05, cx + 4.35, SIDEWALK_Y + 0.85, -96.15, 'wood', { blocksBullets: false });
+        outdoorTablePlacements.push({ x: cx + 3.4, y: SIDEWALK_Y, z: -97.8, ry: 0.2 });
+        monoblocChairPlacements.push({ x: cx + 4.4, y: SIDEWALK_Y, z: -98.0, ry: -1.1 });
+        plasticCratePlacements.push({ x: warX + 2.1, y: SIDEWALK_Y, z: warZ + 0.4, ry: 0.3 });
+      }
+    })();
+
     city._mergeAndRegisterBVH(bSteelDark, matSteelDark, false, true, 'CitySteelDark', true);
     city._mergeAndRegisterBVH(bTruss, matTruss, false, true, 'CityTrimMetal', true);
     city._mergeAndRegisterBVH(bGantryFrame, matSteelDark, true, true, 'CityGantryFrame', false);
     city._mergeAndRegisterBVH(bGantrySign, P.getHighwaySignMaterial(), false, false, 'CityGantrySigns', false);
     city._mergeAndRegisterBVH(bLampBulbs, P.getLampBulbMaterial(), false, false, 'CityLampBulbs', false);
     city._mergeAndRegisterBVH(bAmber, matAmber, false, false, 'CityBeacons', false);
+
+    // Merge rail tunnel, viaduct concrete & corner exploration hub buckets
+    const matInfraConcrete = city._getMat('infraConcrete', 'concrete_station', { color: 0x767a80, roughness: 0.88, metalness: 0.06 });
+    const matTunnelDark = city._getMat('tunnelDark', null, { color: 0x050608, roughness: 0.96, metalness: 0.02 });
+    const matTunnelSignalRed = new THREE.MeshStandardMaterial({
+      color: 0x330404, emissive: 0xff2222, emissiveIntensity: 3.2, roughness: 0.18, metalness: 0.1
+    });
+    const matCornerWood = city._getMat('cornerWood', 'dark_wood', { color: 0x8b5d3b, roughness: 0.72, metalness: 0.05 });
+    const matCornerWhite = city._getMat('cornerWhite', null, {
+      color: 0xf1f5f9, roughness: 0.62, metalness: 0.06, side: THREE.DoubleSide
+    });
+    const matCornerRed = city._getMat('cornerRed', null, { color: 0xd92626, roughness: 0.42, metalness: 0.14 });
+    const matCornerSandbag = city._getMat('cornerSandbag', null, { color: 0xa69473, roughness: 0.92, metalness: 0.02 });
+    const matCornerWarmBulb = new THREE.MeshStandardMaterial({
+      color: 0xfff0c8, emissive: 0xffb347, emissiveIntensity: 2.8, roughness: 0.22, metalness: 0.05
+    });
+    city.disposableMaterials.push(matTunnelSignalRed, matCornerWarmBulb);
+
+    city._mergeAndRegisterBVH(bInfraConcrete, matInfraConcrete, true, true, 'CityInfraConcrete', true);
+    city._mergeAndRegisterBVH(bTunnelDark, matTunnelDark, false, false, 'CityTunnelDark', false);
+    city._mergeAndRegisterBVH(bTunnelSignalRed, matTunnelSignalRed, false, false, 'CityTunnelSignals', false);
+    city._mergeAndRegisterBVH(bCornerWood, matCornerWood, true, true, 'CityCornerWood', true);
+    city._mergeAndRegisterBVH(bCornerRoof, matRoofTerra, true, true, 'CityCornerRoof', true);
+    city._mergeAndRegisterBVH(bCornerWhite, matCornerWhite, true, true, 'CityCornerWhite', true);
+    city._mergeAndRegisterBVH(bCornerRed, matCornerRed, false, true, 'CityCornerRed', false);
+    city._mergeAndRegisterBVH(bCornerSandbag, matCornerSandbag, true, true, 'CityCornerSandbags', true);
+    city._mergeAndRegisterBVH(bCornerWarmBulb, matCornerWarmBulb, false, false, 'CityCornerWarmBulbs', false);
+    city._mergeAndRegisterBVH(bCornerGlass, matGlassBldg, false, true, 'CityCornerGlass', false);
     }
 
     // =========================================================
@@ -1904,6 +2434,9 @@
     city._emitInstancedProto(P.getOjolProto(), ojolPlacements, false, true, 'OjolMotorbike');
     city._emitInstancedProto(P.getGerobakProto(), gerobakPlacements, false, true, 'GerobakKakiLima');
     city._emitInstancedProto(P.getTrafficSignalProto(), trafficSignalPlacements, false, true, 'TrafficSignal');
+    city._emitInstancedProto(P.getAmbulanceProto(), ambulancePlacements, true, true, 'CornerAmbulance');
+    city._emitInstancedProto(P.getMilitaryTruckProto(), militaryTruckPlacements, true, true, 'CornerMilitaryTruck');
+    city._emitInstancedProto(P.getPalletProto(), palletPlacements, false, true, 'CornerCargoPallet');
 
     // Register destructible/reactive environment prop anchors for ballistic & RPG impacts
     city.destructibleProps = [];
@@ -1917,6 +2450,8 @@
       }
     };
     regDestruct(sedanPlacements, 'vehicle', 2.4);
+    regDestruct(ambulancePlacements, 'vehicle', 2.8);
+    regDestruct(militaryTruckPlacements, 'bus', 3.4);
     regDestruct(mpvAjarPlacements, 'vehicle', 2.4);
     regDestruct(angkotPlacements, 'vehicle', 2.4);
     regDestruct(carPlacements, 'vehicle', 2.4);
@@ -1990,7 +2525,7 @@
 
     // 3) U-Shaped Courtyards & L-Tower Plazas + Collector Roads (evacuation supply stacks, barrels & tires)
     const courtyardHubs = [
-      { x: eastOuterSwMinX + 6.5, z: -98.0, ry: -Math.PI * 0.5 },
+      { x: eastColRoadMinX - 1.8, z: -108.5, ry: -Math.PI * 0.5 },
       { x: westOuterSwMaxX - 6.5, z: 48.0, ry: Math.PI * 0.5 },
       { x: eastOuterSwMinX + 5.5, z: 2.0, ry: 0.0 },
       { x: westOuterSwMaxX - 5.5, z: -98.0, ry: Math.PI * 0.25 },
@@ -2058,6 +2593,9 @@
     const pCardBox  = city._extractModelLodProtos('cardboard_box_01', 0.44);
     const pGrass    = city._extractModelLodProtos('grass_bermuda_01', 0.24);
     const pHandTrk  = city._extractModelLodProtos('hand_truck', 1.36);
+    const pGen      = city._extractModelLodProtos('portable_generator', 0.72);
+    const pMedBox   = city._extractModelLodProtos('medical_box', 0.36);
+    const pAmmoBox  = city._extractModelLodProtos('ammo_box', 0.36);
 
     emitSpatialLodBatches(pMonobloc, monoblocChairPlacements, 'MonoblocChair', false, 0.28, 0.85, 'wood');
     emitSpatialLodBatches(pTableSet, outdoorTablePlacements, 'OutdoorTableSet', false, 0.55, 0.82, 'wood');
@@ -2070,6 +2608,16 @@
     emitSpatialLodBatches(pCardBox, cardboardBoxPlacements, 'CardboardBox', false, 0.22, 0.44, 'wood');
     emitSpatialLodBatches(pGrass, bermudaGrassPlacements, 'BermudaGrass', false, 0, 0, null);
     emitSpatialLodBatches(pHandTrk, handTruckPlacements, 'HandTruck', false, 0.28, 1.30, 'metal');
+    emitSpatialLodBatches(pGen, [
+      { x: cornerHubCoords.NW.cx + 4.7, y: SIDEWALK_Y, z: 100.6, ry: -0.4 },
+      { x: cornerHubCoords.SW.cx + 3.8, y: SIDEWALK_Y, z: -99.6, ry: 0.8 }
+    ], 'CornerGenerator', false, 0.42, 0.72, 'metal');
+    emitSpatialLodBatches(pMedBox, [
+      { x: cornerHubCoords.NW.cx + 2.35, y: SIDEWALK_Y, z: 101.2, ry: 0.15 },
+      { x: cornerHubCoords.NW.cx + 2.35, y: SIDEWALK_Y + 0.36, z: 101.2, ry: -0.20 },
+      { x: cornerHubCoords.NW.cx - 1.4, y: SIDEWALK_Y, z: 101.6, ry: 0.45 }
+    ], 'CornerMedicalBox', false, 0.28, 0.42, 'metal');
+    emitSpatialLodBatches(pAmmoBox, ammoBoxPlacements, 'CornerAmmoBox', false, 0, 0, null);
 
     // =========================================================
     // 8. CITY STREET & PLAZA SPAWN NODES (FOR ROAMING ZOMBIES)
@@ -2291,21 +2839,158 @@
     });
     placeCityFieldLogProp(city, root, 'city_pocket_park', parkX, SIDEWALK_Y + 0.425, 0.0, -Math.PI * 0.5 + 0.14, parkUsed);
 
-    // Sittable East Pocket Park Benches
+    // Sittable East Pocket Park & Warung Kopi Benches
     for (let si = 0; si < seatingPlacements.length; si++) {
       const sp = seatingPlacements[si];
+      const isWarung = Math.abs(sp.ry - Math.PI) < 0.25 && sp.z < -80;
       city.interactables.push({
         id: 'bench_park_' + si,
         type: 'bench',
         x: sp.x,
         y: sp.y + 0.55,
         z: sp.z,
-        seatPos: { x: sp.x - 0.12, y: sp.y + 0.02, z: sp.z },
-        standPos: { x: sp.x - 0.95, y: sp.y + 0.02, z: sp.z },
-        yaw: Math.PI * 0.5,
-        label: '[E] Duduk di Bangku Taman',
-        prompt: '[E] Duduk di Bangku Taman'
+        seatPos: isWarung
+          ? { x: sp.x, y: sp.y + 0.02, z: sp.z + 0.12 }
+          : { x: sp.x - 0.12, y: sp.y + 0.02, z: sp.z },
+        standPos: isWarung
+          ? { x: sp.x, y: sp.y + 0.02, z: sp.z + 0.95 }
+          : { x: sp.x - 0.95, y: sp.y + 0.02, z: sp.z },
+        yaw: isWarung ? 0 : Math.PI * 0.5,
+        label: isWarung ? '[E] Duduk di Bangku Warung Kopi' : '[E] Duduk di Bangku Taman',
+        prompt: isWarung ? '[E] Duduk di Bangku Warung Kopi' : '[E] Duduk di Bangku Taman'
       });
+    }
+
+    // 4 Far-Corner Exploration Hub Rewards & Field Notes (NW, NE, SW, SE)
+    city._streetBeacons = city._streetBeacons || {};
+    const addCornerBeacon = (id, bx, by, bz, hexColor) => {
+      const ringGeo = new THREE.RingGeometry(0.42, 0.56, 20);
+      ringGeo.rotateX(-Math.PI * 0.5);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: hexColor,
+        transparent: true,
+        opacity: usedSet.has(id) ? 0.08 : 0.62,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+      city.disposableGeometries.push(ringGeo);
+      city.disposableMaterials.push(ringMat);
+      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      ringMesh.position.set(bx, by, bz);
+      ringMesh.visible = !usedSet.has(id);
+      root.add(ringMesh);
+      city._streetBeacons[id] = { mesh: ringMesh, mat: ringMat, used: usedSet.has(id) };
+    };
+
+    const nwMedUsed = usedSet.has('city_nw_medpost');
+    city.interactables.push({
+      id: 'city_nw_medpost',
+      type: 'corner_medpost',
+      corner: 'NW',
+      x: cornerHubCoords.NW.cx + 0.25,
+      y: SIDEWALK_Y + 0.96,
+      z: 101.3,
+      label: nwMedUsed ? '[E] Kotak Medis Darurat PMI (Sudah Diambil)' : '[E] Ambil Kotak Medis Darurat PMI (+35 Armor & +25 HP)',
+      prompt: nwMedUsed ? '[E] Kotak Medis Darurat PMI (Sudah Diambil)' : '[E] Ambil Kotak Medis Darurat PMI (+35 Armor & +25 HP)',
+      used: nwMedUsed
+    });
+    addCornerBeacon('city_nw_medpost', cornerHubCoords.NW.cx + 0.25, SIDEWALK_Y + 0.86, 101.3, 0x38bdf8);
+
+    const neDockY = SIDEWALK_Y + 0.62;
+    const neDepotUsed = usedSet.has('city_ne_depot');
+    city.interactables.push({
+      id: 'city_ne_depot',
+      type: 'corner_depot',
+      corner: 'NE',
+      x: cornerHubCoords.NE.cx + 0.5,
+      y: neDockY + 0.55,
+      z: 102.3,
+      label: neDepotUsed ? '[E] Peti Logistik Gudang Utara (Sudah Diambil)' : '[E] Bongkar Peti Logistik Gudang Utara (Amunisi Penuh & Heavy Ammo)',
+      prompt: neDepotUsed ? '[E] Peti Logistik Gudang Utara (Sudah Diambil)' : '[E] Bongkar Peti Logistik Gudang Utara (Amunisi Penuh & Heavy Ammo)',
+      used: neDepotUsed
+    });
+    addCornerBeacon('city_ne_depot', cornerHubCoords.NE.cx + 0.5, neDockY + 0.72, 102.3, 0xfbbf24);
+
+    const swConvoyUsed = usedSet.has('city_sw_convoy');
+    city.interactables.push({
+      id: 'city_sw_convoy',
+      type: 'corner_convoy',
+      corner: 'SW',
+      x: cornerHubCoords.SW.cx + 1.8,
+      y: SIDEWALK_Y + 0.65,
+      z: -101.2,
+      label: swConvoyUsed ? '[E] Peti Amunisi Konvoi Militer (Sudah Diambil)' : '[E] Ambil Peti Amunisi Konvoi Militer (+25 Armor & +2 Mag)',
+      prompt: swConvoyUsed ? '[E] Peti Amunisi Konvoi Militer (Sudah Diambil)' : '[E] Ambil Peti Amunisi Konvoi Militer (+25 Armor & +2 Mag)',
+      used: swConvoyUsed
+    });
+    addCornerBeacon('city_sw_convoy', cornerHubCoords.SW.cx + 1.8, SIDEWALK_Y + 0.66, -101.2, 0x4ade80);
+
+    const seWarungUsed = usedSet.has('city_se_warung');
+    city.interactables.push({
+      id: 'city_se_warung',
+      type: 'corner_warung',
+      corner: 'SE',
+      x: cornerHubCoords.SE.cx + 2.35,
+      y: SIDEWALK_Y + 1.05,
+      z: -100.12,
+      label: seWarungUsed ? '[E] Termos Kopi & Bekal Pos Ronda (Sudah Diminum)' : '[E] Minum Termos Kopi & Bekal Pos Ronda (+25 HP & Fast Sprint 45s)',
+      prompt: seWarungUsed ? '[E] Termos Kopi & Bekal Pos Ronda (Sudah Diminum)' : '[E] Minum Termos Kopi & Bekal Pos Ronda (+25 HP & Fast Sprint 45s)',
+      used: seWarungUsed
+    });
+    addCornerBeacon('city_se_warung', cornerHubCoords.SE.cx + 2.35, SIDEWALK_Y + 0.94, -100.12, 0xf59e0b);
+
+    const cornerNotes = [
+      {
+        id: 'note_nw_corner',
+        x: cornerHubCoords.NW.cx - 2.1,
+        y: SIDEWALK_Y + 0.83,
+        z: 100.9,
+        ry: 0.22,
+        label: '[E] Baca Log Medis Posko PMI NW'
+      },
+      {
+        id: 'note_ne_corner',
+        x: cornerHubCoords.NE.cx + 3.74,
+        y: SIDEWALK_Y + 0.85,
+        z: 98.4,
+        ry: -Math.PI * 0.5 + 0.15,
+        label: '[E] Baca Manifes Kargo Pos Sekuriti NE'
+      },
+      {
+        id: 'note_sw_corner',
+        x: cornerHubCoords.SW.cx - 0.4,
+        y: SIDEWALK_Y + 0.71,
+        z: -101.4,
+        ry: -0.30,
+        label: '[E] Baca Perintah Sekat Konvoi SW'
+      },
+      {
+        id: 'note_se_corner',
+        x: cornerHubCoords.SE.cx - 0.65,
+        y: SIDEWALK_Y + 0.93,
+        z: -99.98,
+        ry: 0.12,
+        label: '[E] Baca Buku Jaga Poskamling SE'
+      }
+    ];
+    for (let ni = 0; ni < cornerNotes.length; ni++) {
+      const cn = cornerNotes[ni];
+      const nUsed = usedSet.has(cn.id);
+      city.interactables.push({
+        id: cn.id,
+        type: 'field_log',
+        x: cn.x,
+        y: cn.y + 0.04,
+        z: cn.z,
+        label: nUsed ? cn.label + ' (Sudah Dibaca)' : cn.label,
+        prompt: nUsed ? cn.label + ' (Sudah Dibaca)' : cn.label,
+        used: nUsed
+      });
+      placeCityFieldLogProp(city, root, cn.id, cn.x, cn.y, cn.z, cn.ry, nUsed);
+    }
+    if (typeof city._syncStreetBeacons === 'function') {
+      city._syncStreetBeacons();
     }
 
     // Tactical Street Lootboxes (detailed hinged crate + difficulty-scaled yellow halo!)

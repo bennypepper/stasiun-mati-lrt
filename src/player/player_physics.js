@@ -59,6 +59,7 @@
     fastSprint: false,
     cheatOpen: false,
     docViewerOpen: false,
+    fastTravelOpen: false,
     kills: 0,
     lastSafePos: new THREE.Vector3(4.0, 0.05, 6.0),
     bobPhase: 0,
@@ -150,7 +151,7 @@
   }
 
   function requestLock() {
-    if (flags.paused || !flags.allowActionInput || state.cheatOpen || state.docViewerOpen) return;
+    if (flags.paused || !flags.allowActionInput || state.cheatOpen || state.docViewerOpen || state.fastTravelOpen) return;
     const canvas = refs.canvas;
     if (!canvas || typeof canvas.requestPointerLock !== 'function') return;
     try {
@@ -347,7 +348,7 @@
       input.value = '';
       if (document.activeElement === input) input.blur();
     }
-    if (wasOpen && refocusGame && flags.allowActionInput && !flags.paused && !state.docViewerOpen) {
+    if (wasOpen && refocusGame && flags.allowActionInput && !flags.paused && !state.docViewerOpen && !state.fastTravelOpen) {
       relockAfterOverlay();
     }
   }
@@ -438,6 +439,36 @@
         return;
       }
 
+      if (state.fastTravelOpen) {
+        if (e.code === 'Tab' || e.key === 'Tab' || e.code === 'Escape' || e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!e.repeat && PL.closeFastTravelModal) {
+            PL.closeFastTravelModal(true);
+          }
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      if ((e.code === 'Tab' || e.key === 'Tab') && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const core = I.core;
+        const gs = core ? core.gameState : null;
+        const inPlayState = !gs || (gs !== C.STATES.MENU && gs !== C.STATES.GAME_OVER);
+        const pauseOv = PL.dom && PL.dom['pause-overlay'];
+        const pauseOpen = !!(pauseOv && !pauseOv.classList.contains('hidden'));
+        if (inPlayState && !state.cheatOpen) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!e.repeat && ((flags.allowActionInput && !flags.paused) || pauseOpen)) {
+            if (PL.openFastTravelModal) PL.openFastTravelModal({ fromPause: pauseOpen });
+          }
+          return;
+        }
+      }
+
       const isBackquote = (e.code === 'Backquote' || e.code === 'IntlBackslash' || e.key === '`' || e.key === '~')
         && !e.ctrlKey && !e.altKey && !e.metaKey;
       if (isBackquote) {
@@ -521,7 +552,7 @@
           triggerInteract();
         }
       } else if (e.code === 'KeyT') {
-        if (callbacks.onSummonTrain) callbacks.onSummonTrain(0);
+        if (!e.repeat && callbacks.onSummonTrain) callbacks.onSummonTrain(e.shiftKey ? -1 : 0);
       } else if (e.code === 'KeyV') {
         if (!state.isSitting && LRT.Weapons && typeof LRT.Weapons.meleeShove === 'function') {
           LRT.Weapons.meleeShove();
@@ -552,7 +583,7 @@
     });
 
     document.addEventListener('mousemove', (e) => {
-      if (flags.paused || !flags.allowActionInput || state.cheatOpen || state.docViewerOpen) return;
+      if (flags.paused || !flags.allowActionInput || state.cheatOpen || state.docViewerOpen || state.fastTravelOpen) return;
       if (document.pointerLockElement !== canvas) return;
       // Chromium pointer lock spike guard
       if (Math.abs(e.movementX) > 180 || Math.abs(e.movementY) > 180) return;
@@ -562,7 +593,7 @@
     });
 
     canvas.addEventListener('mousedown', (e) => {
-      if (flags.paused || !flags.allowActionInput || state.docViewerOpen) return;
+      if (flags.paused || !flags.allowActionInput || state.docViewerOpen || state.fastTravelOpen) return;
       if (state.cheatOpen) {
         closeCheatConsole(true);
         return;
@@ -599,7 +630,7 @@
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
     window.addEventListener('wheel', (e) => {
-      if (flags.paused || !flags.allowActionInput || state.cheatOpen || state.docViewerOpen || !LRT.Weapons) return;
+      if (flags.paused || !flags.allowActionInput || state.cheatOpen || state.docViewerOpen || state.fastTravelOpen || !LRT.Weapons) return;
       const dir = e.deltaY > 0 ? 1 : -1;
       if (typeof LRT.Weapons.cycleWeapon === 'function') {
         LRT.Weapons.cycleWeapon(dir);
@@ -619,7 +650,7 @@
       const nowLocked = document.pointerLockElement === canvas;
       flags.pointerLocked = nowLocked;
       if (nowLocked) {
-        if (flags.paused || !flags.allowActionInput || state.cheatOpen || state.docViewerOpen) {
+        if (flags.paused || !flags.allowActionInput || state.cheatOpen || state.docViewerOpen || state.fastTravelOpen) {
           releaseLock();
           return;
         }
@@ -627,7 +658,7 @@
         suppressPauseUntil = 0;
         return;
       }
-      if (wasLocked && flags.allowActionInput && !flags.paused && !state.cheatOpen && !state.docViewerOpen && performance.now() > suppressPauseUntil && callbacks.onPause) {
+      if (wasLocked && flags.allowActionInput && !flags.paused && !state.cheatOpen && !state.docViewerOpen && !state.fastTravelOpen && performance.now() > suppressPauseUntil && callbacks.onPause) {
         callbacks.onPause();
       }
     });
@@ -1216,7 +1247,7 @@
       if (near) {
         dom['interact-prompt'].classList.remove('hidden');
         const rawTxt = near.prompt || near.label || 'Interact';
-        const cleanTxt = rawTxt.replace(/^\[E\]\s*/i, '');
+        const cleanTxt = rawTxt.replace(/\[E\]\s*/i, '').trim();
         if (dom['interact-label']) dom['interact-label'].textContent = cleanTxt;
       } else {
         dom['interact-prompt'].classList.add('hidden');
@@ -1285,6 +1316,7 @@
     state.invulnCheatTimer = 0;
     state.fastSprint = false;
     state.docViewerOpen = false;
+    state.fastTravelOpen = false;
     directCheatBuffer = '';
     pendingRelock = false;
     suppressPauseUntil = 0;

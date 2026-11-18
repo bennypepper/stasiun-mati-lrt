@@ -48,14 +48,128 @@
     const {
       arch, dims, root, mats, STALL_UV, SIGN_UV,
       matConcreteRough, buckets,
-      addNavChain, glassRecords, registerStairZone
+      addNavChain, glassRecords, registerStairZone,
+      stairZones: ctxStairZones, isInStairExclusion: ctxIsInStairExclusion
     } = ctx;
+
+    const stairZones = ctxStairZones || (ctx.stairZones = []);
+    const isInStairExclusion = ctxIsInStairExclusion || ((x, z, extraX, extraZ) => {
+      const ex = extraX || 0;
+      const ez = extraZ || 0;
+      for (let i = 0; i < stairZones.length; i++) {
+        const s = stairZones[i];
+        if (x >= s.minX - ex && x <= s.maxX + ex && z >= s.minZ - ez && z <= s.maxZ + ez) {
+          return true;
+        }
+      }
+      return false;
+    });
+    const ensureStairZone = (sx, zFoot, zTop) => {
+      const minZ = Math.min(zFoot, zTop) - 2.6;
+      const maxZ = Math.max(zFoot, zTop) + 2.6;
+      for (let i = 0; i < stairZones.length; i++) {
+        const s = stairZones[i];
+        if (s.sx !== undefined && Math.abs(s.sx - sx) < 0.05 && Math.abs(s.minZ - minZ) < 0.05 && Math.abs(s.maxZ - maxZ) < 0.05) {
+          return;
+        }
+      }
+      registerStairZone(sx, zFoot, zTop);
+    };
+
+    station._structuralCols = [];
+    station._stairZones = stairZones;
+    const recordStructuralCol = (x, z, minY, maxY, tag) => {
+      station._structuralCols.push({ x, z, minY, maxY, tag: tag || 'col' });
+    };
 
     const {
       bConcrete, bConcreteRough, bTerrazzo, bChecker, bTactile,
       bRoof, bTruss, bSteelDark, bJpo, bStall, bSign, bBanner,
       bStairStepsConc, bStairStepsSteel, bStairSlopeBvh
     } = buckets;
+
+    const buildTacticalSupplyCabinet = (x, y, z, yaw, style) => {
+      const st = style || 'tactical';
+      const isDepotStyle = st === 'depot';
+      const isEmergStyle = st === 'emergency';
+      const bodyH = isDepotStyle ? 1.01 : 0.86;
+      const deckY = y + 0.08 + bodyH;
+      const topY = deckY + 0.06; // 1.15m for depot (aligns with Field Log at 1.16m), 1.00m for others
+      const cos = Math.cos(yaw || 0);
+      const sin = Math.sin(yaw || 0);
+      const toW = (lx, lz) => [x + lx * cos + lz * sin, z - lx * sin + lz * cos];
+
+      // 1) Heavy steel plinth base + main armored cabinet carcass
+      addBox(bSteelDark, 1.08, 0.08, 0.62, x, y + 0.04, z, 0, yaw, 0);
+      addBox(bSteelDark, 1.00, bodyH, 0.54, x, y + 0.08 + bodyH * 0.5, z, 0, yaw, 0);
+
+      // 2) Brushed steel vertical corner trim & louvered side vents
+      for (const sx of [-0.49, 0.49]) {
+        for (const sz of [-0.26, 0.26]) {
+          const cp = toW(sx, sz);
+          addBox(bTruss, 0.05, bodyH + 0.02, 0.05, cp[0], y + 0.08 + bodyH * 0.5, cp[1], 0, yaw, 0);
+        }
+        const vp = toW(sx * 1.03, 0);
+        for (let vy = 0.22; vy < bodyH - 0.14; vy += 0.14) {
+          addBox(bTruss, 0.02, 0.04, 0.28, vp[0], y + 0.08 + vy, vp[1], 0, yaw, 0);
+        }
+      }
+
+      // 3) Dual front cabinet door leaves + brushed stainless pull handles + center seam
+      const doorH = bodyH - 0.14;
+      const doorCY = y + 0.08 + doorH * 0.5 + 0.03;
+      for (const dx of [-0.23, 0.23]) {
+        const dp = toW(dx, 0.275);
+        addAtlasBox(bStall, 0.42, doorH, 0.03, dp[0], doorCY, dp[1], yaw, null, STALL_UV.rotioCreamSolid);
+        const hp = toW(dx + (dx < 0 ? 0.14 : -0.14), 0.298);
+        addBox(bTruss, 0.03, 0.18, 0.03, hp[0], doorCY + 0.04, hp[1], 0, yaw, 0);
+      }
+      const seamP = toW(0, 0.282);
+      addBox(bSteelDark, 0.03, doorH + 0.02, 0.03, seamP[0], doorCY, seamP[1], 0, yaw, 0);
+
+      // 4) High-visibility safety stripe band + emissive status/keypad module (+ Red Cross for emergency)
+      const bandP = toW(0, 0.282);
+      addBox(isEmergStyle ? bJpo : bTactile, 0.98, 0.075, 0.028, bandP[0], deckY - 0.05, bandP[1], 0, yaw, 0);
+      const ledP = toW(-0.34, 0.294);
+      addAtlasBox(bSign, 0.16, 0.09, 0.025, ledP[0], doorCY + 0.16, ledP[1], yaw, null, SIGN_UV.evakuasiGreen);
+      const warnP = toW(0.32, 0.294);
+      addAtlasBox(bSign, 0.18, 0.12, 0.025, warnP[0], doorCY + 0.16, warnP[1], yaw, null, SIGN_UV.safetyWarn);
+      if (isEmergStyle) {
+        const crP = toW(0.23, 0.295);
+        addAtlasBox(bSign, 0.20, 0.065, 0.025, crP[0], doorCY - 0.04, crP[1], yaw, null, SIGN_UV.hydrantRedSolid);
+        addAtlasBox(bSign, 0.065, 0.20, 0.025, crP[0], doorCY - 0.04, crP[1], yaw, null, SIGN_UV.hydrantRedSolid);
+      }
+
+      // 5) Brushed stainless steel top worktop + scaled 3-LOD GLTF tactical crate(s) on top
+      addBox(bTruss, 1.06, 0.06, 0.60, x, deckY + 0.03, z, 0, yaw, 0);
+      const cloneFn = (LRT.AssetLoader && typeof LRT.AssetLoader.cloneModel === 'function')
+        ? LRT.AssetLoader.cloneModel
+        : null;
+      const placeCabinetProp = (modelKey, lx, lz, ryOff, targetH) => {
+        const wp = toW(lx, lz);
+        if (typeof station._placeNormalizedModel === 'function') {
+          station._placeNormalizedModel(modelKey, wp[0], topY, wp[1], (yaw || 0) + ryOff, targetH);
+        } else if (cloneFn) {
+          const mdl = cloneFn(modelKey);
+          if (mdl) {
+            mdl.position.set(wp[0], topY, wp[1]);
+            mdl.rotation.y = (yaw || 0) + ryOff;
+            root.add(mdl);
+          }
+        }
+      };
+      if (isDepotStyle) {
+        // Leave center (0, topY, 0) clear for Depot Field Log folder placed by station_nav_props at y=1.16!
+        placeCabinetProp('ammo_box', -0.28, 0.02, 0.18, 0.22);
+      } else if (isEmergStyle) {
+        placeCabinetProp('medical_box', -0.22, 0.0, 0.14, 0.16);
+        placeCabinetProp('ammo_box', 0.24, 0.02, -0.22, 0.20);
+      } else {
+        placeCabinetProp('ammo_box', -0.22, 0.0, 0.24, 0.22);
+        placeCabinetProp('medical_box', 0.24, 0.02, -0.15, 0.14);
+      }
+      return topY;
+    };
 
     const railCfg = computeRailConfig(arch, dims);
     const {
@@ -120,6 +234,43 @@
     const p2MaxX = track2X - 1.46;
     const p2MinX = p2MaxX - 5.20;
 
+    // Trackside Emergency Maintenance Climb Steps (y = -0.55m, 0.42m wide)
+    // Aligned with every breakable PSD doorway (dims.psdCentersZ) + open non-PSD bay ends so players
+    // who breach any PSD door onto the -1.10m trackbed can jump onto the step and climb back onto any platform!
+    const psdStepZs = Array.isArray(dims.psdCentersZ) && dims.psdCentersZ.length > 0
+      ? dims.psdCentersZ
+      : [-23.25, -17.55, -11.85, -5.70, 0.0, 5.70, 11.85, 17.55, 23.25];
+    const psdStepLen = Math.min(1.80, dims.psdDoorClearWidth || 1.50);
+    const buildTracksideClimbSteps = (wallX, sideSign, zList, stepLen, skipSpans) => {
+      const stepX = wallX + sideSign * 0.21;
+      const lenZ = stepLen || 1.50;
+      const halfZ = lenZ * 0.5;
+      const brkOff = Math.max(0.35, halfZ - 0.18);
+      for (let ci = 0; ci < zList.length; ci++) {
+        const sz = zList[ci];
+        if (sz < platMinZ + 2.0 || sz > platMaxZ - 2.0) continue;
+        if (skipSpans && skipSpans.some((sp) => sz >= sp[0] - 1.0 && sz <= sp[1] + 1.0)) continue;
+        addBox(bTactile, 0.42, 0.06, lenZ, stepX, -0.55, sz, 0, 0, 0, 0.8, 1.5);
+        addBox(bSteelDark, 0.38, 0.12, 0.08, wallX + sideSign * 0.19, -0.64, sz - brkOff);
+        addBox(bSteelDark, 0.38, 0.12, 0.08, wallX + sideSign * 0.19, -0.64, sz + brkOff);
+        station._addCollider(stepX - 0.21, -0.65, sz - halfZ, stepX + 0.21, -0.52, sz + halfZ, 'metal', {
+          blocksWalk: true, blocksBullets: false
+        });
+      }
+    };
+    buildTracksideClimbSteps(p1MinX, -1, psdStepZs, psdStepLen);
+    if (!isIsland) {
+      buildTracksideClimbSteps(p2MaxX, 1, psdStepZs, psdStepLen);
+    } else {
+      buildTracksideClimbSteps(p1MaxX, 1, psdStepZs, psdStepLen);
+      if (isCawang) {
+        buildTracksideClimbSteps(i2MinX, -1, [-58.0, 58.0], 1.80, [[-11.6, 23.6]]);
+      }
+      if (arch.hasDepotShed) {
+        buildTracksideClimbSteps(track2X + 1.60, 1, [40.0, 56.0], 1.80);
+      }
+    }
+
     // Exterior Grounded Stair or Smooth Ramp connecting highY <-> lowY along axis ('x' or 'z')
     const buildGroundedTransition = (cx, cz, width, run, highY, lowY, axis, highAtNeg, isStair) => {
       const hw = width * 0.5;
@@ -130,6 +281,22 @@
       const maxZ = axis === 'z' ? cz + hr : cz + hw;
       const y0 = highAtNeg ? highY : lowY;
       const y1 = highAtNeg ? lowY : highY;
+      const minY = Math.min(lowY, highY);
+      const maxY = Math.max(lowY, highY);
+
+      stairZones.push({
+        minX: minX - 1.2,
+        maxX: maxX + 1.2,
+        minZ: minZ - 1.2,
+        maxZ: maxZ + 1.2,
+        rawMinX: minX,
+        rawMaxX: maxX,
+        rawMinZ: minZ,
+        rawMaxZ: maxZ,
+        minY: minY,
+        maxY: maxY + 1.0,
+        isTransition: true
+      });
 
       if (isStair) {
         const steps = Math.max(5, Math.round(Math.abs(highY - lowY) * 7));
@@ -153,8 +320,6 @@
       }
 
       // Handrails + Side Guard Colliders (prevents clipping sideways into ramp/stairs!)
-      const minY = Math.min(lowY, highY);
-      const maxY = Math.max(lowY, highY);
       if (axis === 'x') {
         for (const sideSign of [-1, 1]) {
           const rz = cz + sideSign * (hw + 0.06);
@@ -248,15 +413,15 @@
       addBox(bSteelDark, 0.22, 1.40, platLen - 14, i2MinX + 0.12, 0.70, 0);
       station._addCollider(i2MinX, 0, platMinZ + 7, i2MinX + 0.26, 1.5, platMaxZ - 7, 'metal');
 
-      // Island 2 East outer wall with 6m Open East Street Exit Portal at z in [10 .. 16]
-      const i2DoorZ0 = 10.0, i2DoorZ1 = 16.0;
+      // Island 2 East outer wall with 6m Open East Street Exit Portal at z in [12 .. 18]
+      const i2DoorZ0 = 12.0, i2DoorZ1 = 18.0;
       const i2S = i2DoorZ0 - platMinZ;
       const i2N = platMaxZ - i2DoorZ1;
       addBox(bConcrete, 0.35, 1.25, i2S, i2MaxX - 0.18, 0.62, platMinZ + i2S * 0.5);
       addBox(bConcrete, 0.35, 1.25, i2N, i2MaxX - 0.18, 0.62, i2DoorZ1 + i2N * 0.5);
       station._addCollider(i2MaxX - 0.38, 0, platMinZ, i2MaxX, 2.6, i2DoorZ0, 'concrete');
       station._addCollider(i2MaxX - 0.38, 0, i2DoorZ1, i2MaxX, 2.6, platMaxZ, 'concrete');
-      buildGroundedTransition(i2MaxX + 1.8, 13.0, 5.2, 3.6, 0.0, SIDEWALK_Y, 'x', true, true);
+      buildGroundedTransition(i2MaxX + 1.8, 15.0, 5.2, 3.6, 0.0, SIDEWALK_Y, 'x', true, true);
 
       for (let lz = platMinZ + 4; lz <= platMaxZ - 4; lz += 6.5) {
         if (lz > i2DoorZ0 - 2 && lz < i2DoorZ1 + 2) continue;
@@ -280,8 +445,8 @@
         root.add(derelictTrain);
       }
       station._addCollider(wreckX - 1.38, -1.0, -11.6, wreckX + 1.48, 3.15, 23.6, 'metal');
-      addAtlasBox(bStall, 0.95, 0.85, 0.55, i2MaxX - 2.2, 0.425, 22.0, -Math.PI * 0.5, null, STALL_UV.jaklingko);
-      station._addCollider(i2MaxX - 2.7, 0, 21.5, i2MaxX - 1.7, 0.9, 22.5, 'metal');
+      buildTacticalSupplyCabinet(i2MaxX - 2.2, 0.0, 22.0, -Math.PI * 0.5, 'emergency');
+      station._addCollider(i2MaxX - 2.55, 0, 21.42, i2MaxX - 1.85, 1.20, 22.58, 'metal');
       const i2Used = station._usedIds.has('island2_supply');
       station.interactables.push({
         id: 'island2_supply', type: 'balcony_supply', x: i2MaxX - 2.6, y: 1.0, z: 22.0,
@@ -349,7 +514,7 @@
       const yBot = botYArg !== undefined ? botYArg : 0.0;
       const yTarget = topY !== undefined ? topY : UPPER_FLOOR_Y;
       const rise = yTarget - yBot;
-      registerStairZone(sx, zFoot, zTop);
+      ensureStairZone(sx, zFoot, zTop);
       const steps = Math.max(12, Math.round(Math.abs(rise) * 4.2));
       const stepRise = rise / steps;
       const dir = zTop > zFoot ? 1 : -1;
@@ -457,6 +622,61 @@
     let cStairFootZ = concMidZ - 5.0;
     let cStairTopZ = concMidZ + 5.0;
     let stairWellMinX = concMaxX - 3.0;
+    if (!isIsland) {
+      cStairX = concMaxX - 2.35;
+      if (jpoZ > 0) {
+        cStairFootZ = concMidZ - 5.0;
+        cStairTopZ = concMidZ + 5.0;
+      } else {
+        cStairFootZ = concMidZ + 5.0;
+        cStairTopZ = concMidZ - 5.0;
+      }
+      stairWellMinX = concMaxX - 3.6;
+    }
+
+    // Pre-compute Secondary JPO (jpo2) metrics & pre-register ALL JPO/Concourse/Depot stairZones
+    // before ANY structural column or pier loop runs!
+    const hasJpo2 = !!(arch.hasDualJpo || arch.hasGardenTerrace);
+    const jpo2Z = hasJpo2 ? (isCawang ? 44.0 : (isIsland ? (jpoZ > 0 ? -38.0 : 38.0) : (jpoZ > 0 ? -34.0 : 34.0))) : null;
+    const jpo2Depth = 4.8;
+    const jpo2MinX = isIsland ? (isCawang ? -7.6 : p1MinX + 1.4) : -11.3;
+    const gxBridgeMin = track2X + 1.85;
+    const jpo2MaxX = arch.hasGardenTerrace ? (gxBridgeMin + 4.8) : (isIsland ? (isCawang ? i2MaxX + 0.6 : p1MaxX + 0.2) : p1MaxX + 0.2);
+    const jpo2CX = hasJpo2 ? (jpo2MinX + jpo2MaxX) * 0.5 : null;
+    const jpo2NearZ = hasJpo2 ? (jpo2Z > 0 ? jpo2Z - jpo2Depth * 0.5 : jpo2Z + jpo2Depth * 0.5) : null;
+    const jpo2FarZ = hasJpo2 ? (jpo2Z > 0 ? jpo2Z + jpo2Depth * 0.5 : jpo2Z - jpo2Depth * 0.5) : null;
+    const j2StairFootZ = hasJpo2 ? (jpo2Z > 0 ? jpo2NearZ - 9.5 : jpo2NearZ + 9.5) : null;
+
+    if (!isIsland) ensureStairZone(cStairX, cStairFootZ, cStairTopZ);
+    ensureStairZone(stairX, stairFootZ, stairTopZ);
+    if (!isIsland) {
+      ensureStairZone(-9.4, stairFootZ, stairTopZ);
+    } else {
+      const jExitDirPre = jpoZ >= 0 ? -1 : 1;
+      const jExitBotZPre = jpoNearZ + jExitDirPre * 11.5;
+      ensureStairZone(jpoSpanMinX + 1.7, jExitBotZPre, jpoNearZ);
+      ensureStairZone(jpoSpanMaxX - 1.7, jExitBotZPre, jpoNearZ);
+      if (isCawang) ensureStairZone(i2MinX + 4.6, jpoFarZ + 10.5, jpoFarZ);
+    }
+    if (hasJpo2) {
+      ensureStairZone(stairX, j2StairFootZ, jpo2NearZ);
+      if (!isIsland) ensureStairZone(-9.4, j2StairFootZ, jpo2NearZ);
+      else if (isCawang) ensureStairZone(i2MinX + 4.6, j2StairFootZ, jpo2NearZ);
+      if (arch.hasGardenTerrace) ensureStairZone(gxBridgeMin + 1.4, j2StairFootZ, jpo2NearZ);
+    }
+    if (arch.hasDepotShed) {
+      const depZ0Pre = 36.0;
+      const craneNearZPre = 52.0 - 5.0 * 0.5;
+      const depEastMinXPre = track2X + 1.60;
+      const eastStairXPre = depEastMinXPre + 2.2;
+      const wcCXPre = (-6.0 - 1.85) * 0.5;
+      ensureStairZone(p1MinX + 4.8, craneNearZPre - 9.5, craneNearZPre);
+      ensureStairZone(-4.0, craneNearZPre - 9.5, craneNearZPre);
+      ensureStairZone(eastStairXPre, craneNearZPre - 9.5, craneNearZPre);
+      ensureStairZone((depEastMinXPre + depotMaxX) * 0.5, depZ0Pre - 2.6, depZ0Pre);
+      ensureStairZone(wcCXPre, depZ0Pre - 2.6, depZ0Pre);
+      ensureStairZone(depotMaxX + 1.35, 41.5, 44.5);
+    }
 
     if (!isIsland) {
       const cz = concMidZ;
@@ -514,8 +734,13 @@
       const marqGeo = new THREE.ExtrudeGeometry(marqShape, { depth: 11.4, bevelEnabled: false, curveSegments: 8 });
       marqGeo.translate(concMaxX - 0.1, 4.15, concMidZ - 5.7);
       bRoof.push(prepGeo(marqGeo, false));
-      addCylinder(bTruss, 0.11, 0.14, 5.0, 8, concMaxX + 4.3, 1.75, concMidZ - 5.2);
-      addCylinder(bTruss, 0.11, 0.14, 5.0, 8, concMaxX + 4.3, 1.75, concMidZ + 5.2);
+      const marqColX = concMaxX + 4.65;
+      for (const mz of [concMidZ - 5.5, concMidZ + 5.5]) {
+        if (!isInStairExclusion(marqColX, mz, 0.25, 0.25)) {
+          addCylinder(bTruss, 0.11, 0.14, 5.0, 8, marqColX, 1.75, mz);
+          recordStructuralCol(marqColX, mz, SIDEWALK_Y, 4.25, 'marquee_col');
+        }
+      }
 
       // Monumental East Concourse Stairs (5.2m wide) + Sloped 1:6 ADA Ramp (3.2m wide) down to -0.82 sidewalk!
       buildGroundedTransition(concMaxX + 1.7, concMidZ - 2.1, 5.2, 3.4, 0.0, SIDEWALK_Y, 'x', true, true);
@@ -531,7 +756,10 @@
         addBox(bTactile, 0.45, 0.015, 11.4, hxMax - 0.45, SIDEWALK_Y + 0.25, haltZ);
         addBox(bJpo, 3.6, 0.20, 12.6, hCX, SIDEWALK_Y + 3.15, haltZ, 0, 0, 0, 2, 4);
         for (const hpz of [haltZ - 5.2, haltZ, haltZ + 5.2]) {
-          addCylinder(bSteelDark, 0.10, 0.12, 3.1, 8, hxMin + 0.35, SIDEWALK_Y + 1.55, hpz);
+          if (!isInStairExclusion(hxMin + 0.35, hpz, 0.9, 0.9)) {
+            addCylinder(bSteelDark, 0.10, 0.12, 3.1, 8, hxMin + 0.35, SIDEWALK_Y + 1.55, hpz);
+            recordStructuralCol(hxMin + 0.35, hpz, SIDEWALK_Y, SIDEWALK_Y + 3.10, 'feeder_col');
+          }
         }
         // Realistic TransJakarta Security Tactical Locker Cabinet (dual steel doors, louver grille, keypad & blue header)
         const lkBaseY = SIDEWALK_Y + 0.24;
@@ -584,17 +812,8 @@
       addBox(bSteelDark, 0.12, 0.90, 0.12, concMinX + 0.10, UPPER_FLOOR_Y + 0.67, concMaxZ - 0.12);
 
       // Interior Grand Staircase to 2nd Floor Balcony
-      cStairX = concMaxX - 2.35;
-      if (jpoZ > 0) {
-        cStairFootZ = concMidZ - 5.0;
-        cStairTopZ = concMidZ + 5.0;
-      } else {
-        cStairFootZ = concMidZ + 5.0;
-        cStairTopZ = concMidZ - 5.0;
-      }
       const cStairMinZ = Math.min(cStairFootZ, cStairTopZ);
       const cStairMaxZ = Math.max(cStairFootZ, cStairTopZ);
-      stairWellMinX = concMaxX - 3.6;
 
       const mainBalcW = stairWellMinX - concMinX;
       const mainBalcCX = concMinX + mainBalcW * 0.5;
@@ -632,20 +851,42 @@
 
       // Beveled Concourse Columns supporting Balcony
       const balcColZs = [concMinZ + 1.5, concMidZ + 4.0, concMaxZ - 1.5];
+      const balcColX = concMinX + 0.35;
       for (let bc = 0; bc < balcColZs.length; bc++) {
-        addBox(bConcrete, 0.62, 0.32, 0.62, concMinX + 0.35, 0.16, balcColZs[bc]); // Beveled plinth base
-        addBox(bConcrete, 0.46, UPPER_FLOOR_Y - 0.56, 0.46, concMinX + 0.35, (UPPER_FLOOR_Y - 0.28) * 0.5 + 0.14, balcColZs[bc]);
-        station._addCollider(concMinX + 0.10, 0, balcColZs[bc] - 0.25, concMinX + 0.60, UPPER_FLOOR_Y, balcColZs[bc] + 0.25, 'concrete');
+        let bz = balcColZs[bc];
+        if (isInStairExclusion(balcColX, bz, 0.9, 0.9)) {
+          const candZ = bz < concMidZ ? (concMidZ - 7.5) : (concMidZ + 8.5);
+          if (candZ >= concMinZ + 1.5 && candZ <= concMaxZ - 1.5 && !isInStairExclusion(balcColX, candZ, 0.9, 0.9)) {
+            bz = candZ;
+          } else {
+            continue;
+          }
+        }
+        addBox(bConcrete, 0.62, 0.32, 0.62, balcColX, 0.16, bz); // Beveled plinth base
+        addBox(bConcrete, 0.46, UPPER_FLOOR_Y - 0.56, 0.46, balcColX, (UPPER_FLOOR_Y - 0.28) * 0.5 + 0.14, bz);
+        recordStructuralCol(balcColX, bz, 0.0, UPPER_FLOOR_Y - 0.28, 'balcony_col');
+        station._addCollider(concMinX + 0.10, 0, bz - 0.25, concMinX + 0.60, UPPER_FLOOR_Y, bz + 0.25, 'concrete');
       }
 
       const eastRoofMinX = canopyMaxX - 0.25;
       const eastRoofW = concMaxX - eastRoofMinX;
       if (eastRoofW > 0.4) {
         const eastRoofCX = eastRoofMinX + eastRoofW * 0.5;
+        const eastRoofColX = eastRoofMinX + 0.12;
         addBox(bConcrete, eastRoofW, 0.22, concLen, eastRoofCX, eaveY - 0.02, cz, 0, 0, 0, 2, concLen * 0.25);
         for (let rz = concMinZ + 2; rz <= concMaxZ - 2; rz += 15) {
-          addCylinder(bTruss, 0.12, 0.12, eaveY - UPPER_FLOOR_Y + 0.05, 6, eastRoofMinX + 0.12, (UPPER_FLOOR_Y + eaveY) * 0.5, rz);
-          station._addCollider(eastRoofMinX, UPPER_FLOOR_Y, rz - 0.15, eastRoofMinX + 0.25, eaveY, rz + 0.15, 'metal');
+          let useRz = rz;
+          if (isInStairExclusion(eastRoofColX, useRz, 0.9, 0.9)) {
+            const altRz = useRz < concMidZ ? (cStairMinZ - 3.6) : (cStairMaxZ + 3.6);
+            if (altRz >= concMinZ + 1.2 && altRz <= concMaxZ - 1.2 && !isInStairExclusion(eastRoofColX, altRz, 0.9, 0.9)) {
+              useRz = altRz;
+            } else {
+              continue;
+            }
+          }
+          addCylinder(bTruss, 0.12, 0.12, eaveY - UPPER_FLOOR_Y + 0.05, 6, eastRoofColX, (UPPER_FLOOR_Y + eaveY) * 0.5, useRz);
+          recordStructuralCol(eastRoofColX, useRz, UPPER_FLOOR_Y, eaveY, 'east_roof_col');
+          station._addCollider(eastRoofMinX, UPPER_FLOOR_Y, useRz - 0.15, eastRoofMinX + 0.25, eaveY, useRz + 0.15, 'metal');
         }
       }
 
@@ -672,8 +913,16 @@
         for (let pi = 0; pi < pierCount; pi++) {
           const pFrac = pierCount === 1 ? 0.5 : pi / (pierCount - 1);
           const pz = swZ0 + 0.6 + (swLen - 1.2) * pFrac;
-          addBox(bConcrete, 0.60, colH, 0.60, swMinX + 0.35, colCY, pz);
-          addBox(bConcrete, 0.60, colH, 0.60, swMaxX - 0.35, colCY, pz);
+          const swPierW = swMinX + 0.45;
+          const swPierE = swMaxX - 0.35;
+          if (!isInStairExclusion(swPierW, pz, 0.05, 0.05)) {
+            addBox(bConcrete, 0.55, colH, 0.55, swPierW, colCY, pz);
+            recordStructuralCol(swPierW, pz, STREET_GROUND_Y, UPPER_FLOOR_Y - 0.5, 'skywalk_pier');
+          }
+          if (!isInStairExclusion(swPierE, pz, 0.05, 0.05)) {
+            addBox(bConcrete, 0.55, colH, 0.55, swPierE, colCY, pz);
+            recordStructuralCol(swPierE, pz, STREET_GROUND_Y, UPPER_FLOOR_Y - 0.5, 'skywalk_pier');
+          }
           addBox(bConcrete, swW + 0.2, 0.55, 0.75, swX, UPPER_FLOOR_Y - 0.55, pz);
         }
       }
@@ -779,15 +1028,21 @@
       const jColCY = (UPPER_FLOOR_Y - 0.30 + STREET_GROUND_Y) * 0.5;
       for (let jp = 0; jp < pierXs.length; jp++) {
         const jpx = pierXs[jp];
+        const nearStairX = stairZones.some((s) => s.sx !== undefined && Math.abs(jpx - s.sx) < 2.8);
+        const shaftW = nearStairX ? 0.46 : 0.64;
+        const plinthW = nearStairX ? 0.55 : 0.88;
+        const collHalf = nearStairX ? 0.275 : 0.36;
         const pzA = jz - depth * 0.5 + 0.45;
         const pzB = jz + depth * 0.5 - 0.45;
-        addBox(bConcrete, 0.68, jColH, 0.68, jpx, jColCY, pzA, 0, 0, 0, 1, 3);
-        addBox(bConcrete, 0.68, jColH, 0.68, jpx, jColCY, pzB, 0, 0, 0, 1, 3);
-        addBox(bConcrete, 0.92, 0.32, 0.92, jpx, STREET_GROUND_Y + 0.16, pzA);
-        addBox(bConcrete, 0.92, 0.32, 0.92, jpx, STREET_GROUND_Y + 0.16, pzB);
-        addBox(bConcrete, 0.90, 0.55, depth, jpx, UPPER_FLOOR_Y - 0.55, jz);
-        station._addCollider(jpx - 0.38, STREET_GROUND_Y, pzA - 0.38, jpx + 0.38, UPPER_FLOOR_Y, pzA + 0.38, 'concrete');
-        station._addCollider(jpx - 0.38, STREET_GROUND_Y, pzB - 0.38, jpx + 0.38, UPPER_FLOOR_Y, pzB + 0.38, 'concrete');
+        addBox(bConcrete, shaftW, jColH, shaftW, jpx, jColCY, pzA, 0, 0, 0, 1, 3);
+        addBox(bConcrete, shaftW, jColH, shaftW, jpx, jColCY, pzB, 0, 0, 0, 1, 3);
+        addBox(bConcrete, plinthW, 0.32, plinthW, jpx, STREET_GROUND_Y + 0.16, pzA);
+        addBox(bConcrete, plinthW, 0.32, plinthW, jpx, STREET_GROUND_Y + 0.16, pzB);
+        addBox(bConcrete, Math.max(shaftW + 0.18, 0.72), 0.55, depth, jpx, UPPER_FLOOR_Y - 0.55, jz);
+        recordStructuralCol(jpx, pzA, STREET_GROUND_Y, UPPER_FLOOR_Y - 0.30, 'jpo_pier');
+        recordStructuralCol(jpx, pzB, STREET_GROUND_Y, UPPER_FLOOR_Y - 0.30, 'jpo_pier');
+        station._addCollider(jpx - collHalf, STREET_GROUND_Y, pzA - collHalf, jpx + collHalf, UPPER_FLOOR_Y, pzA + collHalf, 'concrete');
+        station._addCollider(jpx - collHalf, STREET_GROUND_Y, pzB - collHalf, jpx + collHalf, UPPER_FLOOR_Y, pzB + collHalf, 'concrete');
       }
 
       const wallMat = isCawang ? bRoof : bJpo;
@@ -806,16 +1061,39 @@
       addBox(wallMat, w, 0.22, depth + 0.2, cx, jpoPergolaY, jz, 0, 0, 0, w * 0.2, 1);
       const pergColH = jpoPergolaY - UPPER_FLOOR_Y;
       const pergColCY = UPPER_FLOOR_Y + pergColH * 0.5;
+      let lastPx = -1e9;
+      const emitPergolaPost = (px, sideZ, ops) => {
+        if (ops.some((o) => px >= o[0] - 0.35 && px <= o[1] + 0.35)) return;
+        if (isInStairExclusion(px, sideZ, 0.9, 0.9)) return;
+        addBox(bSteelDark, 0.24, pergColH, 0.24, px, pergColCY, sideZ);
+        recordStructuralCol(px, sideZ, UPPER_FLOOR_Y, jpoPergolaY, 'jpo_pergola_col');
+      };
       for (let px = spanMinX + 0.35; px <= spanMaxX - 0.25; px += 7.5) {
-        if (!farOps.some((o) => px >= o[0] - 0.25 && px <= o[1] + 0.25)) {
-          addBox(bSteelDark, 0.24, pergColH, 0.24, px, pergColCY, farSide);
-        }
-        if (!nearOps.some((o) => px >= o[0] - 0.25 && px <= o[1] + 0.25)) {
-          addBox(bSteelDark, 0.24, pergColH, 0.24, px, pergColCY, nearSide);
-        }
+        emitPergolaPost(px, farSide, farOps);
+        emitPergolaPost(px, nearSide, nearOps);
+        lastPx = px;
       }
-      addBox(bSteelDark, 0.24, pergColH, 0.24, spanMaxX - 0.35, pergColCY, farSide);
-      addBox(bSteelDark, 0.24, pergColH, 0.24, spanMaxX - 0.35, pergColCY, nearSide);
+      if (Math.abs((spanMaxX - 0.35) - lastPx) > 1.2) {
+        emitPergolaPost(spanMaxX - 0.35, farSide, farOps);
+        emitPergolaPost(spanMaxX - 0.35, nearSide, nearOps);
+      }
+    };
+
+    const addJpoWayfindingGantry = (sx, sy, sz, ryRot, uvRect, mountRoofY) => {
+      const sw = 3.2, sh = 0.62, sd = 0.10;
+      addBox(bSteelDark, sw + 0.08, sh + 0.06, sd, sx, sy, sz, 0, ryRot, 0);
+      const rodOff = 1.20;
+      const rCos = Math.cos(ryRot), rSin = Math.sin(ryRot);
+      const rodBotY = sy + sh * 0.5;
+      for (const sgn of [-1, 1]) {
+        const rx = sx + sgn * rodOff * rCos;
+        const rz = sz - sgn * rodOff * rSin;
+        const roofY = mountRoofY !== undefined ? mountRoofY : (getCanopyArchY(rx) + 0.08);
+        const rodLen = Math.max(0.20, roofY - rodBotY);
+        addBox(bSteelDark, 0.04, rodLen, 0.04, rx, rodBotY + rodLen * 0.5, rz);
+      }
+      addAtlasQuad(bSign, sw, sh, sx + Math.sin(ryRot) * (sd * 0.5 + 0.01), sy, sz + Math.cos(ryRot) * (sd * 0.5 + 0.01), 0, ryRot, 0, uvRect);
+      addAtlasQuad(bSign, sw, sh, sx - Math.sin(ryRot) * (sd * 0.5 + 0.01), sy, sz - Math.cos(ryRot) * (sd * 0.5 + 0.01), 0, ryRot + Math.PI, 0, uvRect);
     };
 
     const nearSideZ = jpoNearZ + (jpoFarZ > jpoNearZ ? 0.10 : -0.10);
@@ -833,8 +1111,8 @@
       }
     }
     const primaryPiers = isIsland
-      ? (isCawang ? [jpoSpanMinX + 0.55, p1MinX + 0.65, p1MaxX - 0.65, i2MinX + 0.65, jpoSpanMaxX - 0.55] : [jpoSpanMinX + 0.45, p1MinX + 0.65, p1MaxX - 0.65, jpoSpanMaxX - 0.55])
-      : [jpoSpanMinX + 0.55, p1MaxX - 0.35, jpoSpanMaxX - 0.55];
+      ? (isCawang ? [jpoSpanMinX + 0.24, p1MinX + 0.65, p1MaxX - 0.65, i2MinX + 0.65, jpoSpanMaxX - 0.24] : [jpoSpanMinX + 0.24, p1MinX + 0.65, p1MaxX - 0.65, jpoSpanMaxX - 0.24])
+      : [p2MinX + 0.42, p1MaxX - 0.28, jpoSpanMaxX - 0.55];
 
     buildJpoBridgeSpan(jpoZ, jpoDepth, jpoSpanMinX, jpoSpanMaxX, jpoNearZ, jpoFarZ, nearOpenings, farOpenings, primaryPiers);
 
@@ -849,8 +1127,8 @@
 
     const supX = isIsland ? jpoCX : (concMinX + 2.4);
     const supZ = isIsland ? jpoZ : concMidZ;
-    addAtlasBox(bStall, 0.95, 0.85, 0.55, supX, UPPER_FLOOR_Y + 0.425, supZ, 0, null, STALL_UV.jaklingko);
-    station._addCollider(supX - 0.5, UPPER_FLOOR_Y, supZ - 0.3, supX + 0.5, UPPER_FLOOR_Y + 0.9, supZ + 0.3, 'metal');
+    buildTacticalSupplyCabinet(supX, UPPER_FLOOR_Y, supZ, 0, 'tactical');
+    station._addCollider(supX - 0.56, UPPER_FLOOR_Y, supZ - 0.34, supX + 0.56, UPPER_FLOOR_Y + 1.05, supZ + 0.34, 'metal');
     const balUsed = station._usedIds.has('balcony_supply');
     station.interactables.push({
       id: 'balcony_supply', type: 'balcony_supply', x: supX, y: UPPER_FLOOR_Y + 1.0, z: supZ + 0.5,
@@ -878,23 +1156,33 @@
       buildStairRamp(-9.4, stairFootZ, stairTopZ, UPPER_FLOOR_Y, 0.0);
     } else if (isCawang) {
       buildStairRamp(i2MinX + 4.6, jpoFarZ + 10.5, jpoFarZ, UPPER_FLOOR_Y, 0.0);
-      addAtlasBox(bStall, 3.5, 0.72, 2.0, i2MinX + 2.5, UPPER_FLOOR_Y + 2.55, 0, 0, null, STALL_UV.indomaretHeader);
-      addAtlasBox(bStall, 2.6, 2.05, 1.0, i2MinX + 2.5, UPPER_FLOOR_Y + 1.02, 0, 0, null, STALL_UV.indomaretCooler);
-      station._addCollider(i2MinX + 0.8, UPPER_FLOOR_Y, -0.7, i2MinX + 4.2, UPPER_FLOOR_Y + 2.6, 0.7, 'metal');
+      // Overhead Station Directory & Wayfinding Board (replaces legacy duplicate Indomaret block on Cawang JPO)
+      addJpoWayfindingGantry(i2MinX + 2.5, 6.42, 0.0, 0.0, SIGN_UV.jpoWayfinding, jpoPergolaY);
+    }
+
+    // 2nd-Floor JPO Stair-Head Wayfinding Gantries on JPO 1 across ALL stations
+    {
+      const jpoDirSign = jpoFarZ > jpoNearZ ? 1 : -1;
+      const nearGantryZ = jpoNearZ + jpoDirSign * 0.65;
+      if (isCawang) {
+        addJpoWayfindingGantry(stairX, 6.42, jpoNearZ + 1.95, 0.0, SIGN_UV.jpoWayfinding, jpoPergolaY);
+        addJpoWayfindingGantry(i2MinX + 4.6, 6.42, jpoFarZ - 1.95, 0.0, SIGN_UV.jpoWayfinding, jpoPergolaY);
+        addJpoWayfindingGantry(jpoCX, 6.42, 0.0, Math.PI * 0.5, SIGN_UV.jpoWayfinding, jpoPergolaY);
+      } else {
+        addJpoWayfindingGantry(stairX, 6.42, nearGantryZ, 0.0, SIGN_UV.jpoWayfinding, jpoPergolaY);
+        if (!isIsland) {
+          addJpoWayfindingGantry(-9.4, 6.42, nearGantryZ, 0.0, SIGN_UV.peron2, jpoPergolaY);
+          addJpoWayfindingGantry(jpoCX, 6.42, jpoZ, Math.PI * 0.5, SIGN_UV.jpoWayfinding, jpoPergolaY);
+        } else {
+          addJpoWayfindingGantry(jpoSpanMinX + 1.7, 6.42, nearGantryZ, 0.0, SIGN_UV.exitYellow, jpoPergolaY);
+          addJpoWayfindingGantry(jpoSpanMaxX - 1.7, 6.42, nearGantryZ, 0.0, SIGN_UV.exitYellow, jpoPergolaY);
+          addJpoWayfindingGantry(jpoCX, 6.42, jpoZ, Math.PI * 0.5, SIGN_UV.jpoWayfinding, jpoPergolaY);
+        }
+      }
     }
 
     // Secondary Opposite JPO Skybridge (360-degree multi-level loop!)
-    let jpo2Z = null, jpo2NearZ = null, jpo2CX = null;
-    if (arch.hasDualJpo || arch.hasGardenTerrace) {
-      jpo2Z = isCawang ? 44.0 : (isIsland ? (jpoZ > 0 ? -38.0 : 38.0) : (jpoZ > 0 ? -34.0 : 34.0));
-      const jpo2Depth = 4.8;
-      const jpo2MinX = isIsland ? (isCawang ? -7.6 : p1MinX + 1.4) : -11.3;
-      const gxBridgeMin = track2X + 1.85;
-      const jpo2MaxX = arch.hasGardenTerrace ? (gxBridgeMin + 2.8) : (isIsland ? (isCawang ? i2MaxX + 0.6 : p1MaxX + 0.2) : p1MaxX + 0.2);
-      jpo2CX = (jpo2MinX + jpo2MaxX) * 0.5;
-      jpo2NearZ = jpo2Z > 0 ? jpo2Z - jpo2Depth * 0.5 : jpo2Z + jpo2Depth * 0.5;
-      const jpo2FarZ = jpo2Z > 0 ? jpo2Z + jpo2Depth * 0.5 : jpo2Z - jpo2Depth * 0.5;
-      const j2StairFootZ = jpo2Z > 0 ? jpo2NearZ - 9.5 : jpo2NearZ + 9.5;
+    if (hasJpo2) {
       const j2Ops = [[stairX - 1.18, stairX + 1.18]];
       if (!isIsland) j2Ops.push([-9.4 - 1.18, -9.4 + 1.18]);
       else if (isCawang) j2Ops.push([i2MinX + 4.6 - 1.18, i2MinX + 4.6 + 1.18]);
@@ -903,14 +1191,28 @@
       const j2Piers = isCawang
         ? [jpo2MinX + 0.55, p1MinX + 0.65, p1MaxX - 0.65, i2MinX + 0.65, jpo2MaxX - 0.55]
         : (arch.hasGardenTerrace
-          ? [jpo2MinX + 0.55, p1MaxX - 0.65, gxBridgeMin + 0.55, jpo2MaxX - 0.55]
-          : (isIsland ? [jpo2MinX + 0.55, p1MaxX - 0.65] : [jpo2MinX + 0.55, jpo2MaxX - 0.45]));
+          ? [jpo2MinX + 0.55, p1MaxX - 0.65, jpo2MaxX - 0.55]
+          : (isIsland ? [jpo2MinX + 0.55, p1MaxX - 0.65] : [p2MinX + 0.42, p1MaxX - 0.28]));
       buildJpoBridgeSpan(jpo2Z, jpo2Depth, jpo2MinX, jpo2MaxX, jpo2NearZ, jpo2FarZ, j2Ops, [], j2Piers);
 
       buildStairRamp(stairX, j2StairFootZ, jpo2NearZ, UPPER_FLOOR_Y, 0.0);
       if (!isIsland) buildStairRamp(-9.4, j2StairFootZ, jpo2NearZ, UPPER_FLOOR_Y, 0.0);
       else if (isCawang) buildStairRamp(i2MinX + 4.6, j2StairFootZ, jpo2NearZ, UPPER_FLOOR_Y, 0.0);
       if (arch.hasGardenTerrace) buildStairRamp(gxBridgeMin + 1.4, j2StairFootZ, jpo2NearZ, UPPER_FLOOR_Y, 0.0);
+
+      // 2nd-Floor JPO 2 Stair-Head Wayfinding Gantries
+      const j2DirSign = jpo2Z > 0 ? 1 : -1;
+      const j2GantryZ = jpo2NearZ + j2DirSign * 0.65;
+      addJpoWayfindingGantry(stairX, 6.42, j2GantryZ, 0.0, SIGN_UV.jpoWayfinding, jpoPergolaY);
+      if (!isIsland) {
+        addJpoWayfindingGantry(-9.4, 6.42, j2GantryZ, 0.0, SIGN_UV.peron2, jpoPergolaY);
+      } else if (isCawang) {
+        addJpoWayfindingGantry(i2MinX + 4.6, 6.42, j2GantryZ, 0.0, SIGN_UV.jpoWayfinding, jpoPergolaY);
+      }
+      if (arch.hasGardenTerrace) {
+        addJpoWayfindingGantry(gxBridgeMin + 1.4, 6.42, j2GantryZ, 0.0, SIGN_UV.jpoWayfinding, jpoPergolaY);
+      }
+      addJpoWayfindingGantry(jpo2CX + 1.6, 6.42, jpo2Z, Math.PI * 0.5, SIGN_UV.jpoWayfinding, jpoPergolaY);
     }
 
     // Harjamukti North Maintenance Depot Shed (grounded at y = -1.16 .. 0.0, keeps Track 1 & Track 2 100% open!)
@@ -984,8 +1286,8 @@
         addCylinder(bSteelDark, 0.40, 0.40, 1.9, 10, depMaxX - 1.8, 0.40, wz + 0.50, 0, 0, Math.PI * 0.5);
         station._addCollider(depMaxX - 2.9, 0, wz - 0.85, depMaxX - 0.7, 0.95, wz + 0.85, 'metal');
       }
-      addAtlasBox(bStall, 1.05, 1.15, 0.60, depMaxX - 1.2, 0.58, 54.0, -Math.PI * 0.5, null, STALL_UV.jaklingko);
-      station._addCollider(depMaxX - 1.6, 0, 53.3, depMaxX - 0.8, 1.2, 54.7, 'metal');
+      buildTacticalSupplyCabinet(depMaxX - 1.2, 0.0, 54.0, -Math.PI * 0.5, 'depot');
+      station._addCollider(depMaxX - 1.56, 0, 53.40, depMaxX - 0.84, 1.25, 54.60, 'metal');
       const depUsed = station._usedIds.has('depot_supply');
       station.interactables.push({
         id: 'depot_supply', type: 'balcony_supply', x: depMaxX - 1.8, y: 1.0, z: 54.0,
@@ -1031,8 +1333,23 @@
       station._addCollider(gxMin - 0.05, 0, -29.6, gxMin + 0.2, 1.2, gZ1, 'metal');
 
       for (let pz = gZ0 + 3; pz <= gZ1 - 3; pz += 6) {
-        addBox(bJpo, gW - 0.6, 0.18, 0.22, gCX, 3.45, pz);
-        addBox(bSteelDark, 0.18, 3.45, 0.18, gxMax - 0.4, 1.72, pz);
+        const j2StMin = hasJpo2 ? Math.min(j2StairFootZ, jpo2NearZ) - 0.8 : 999;
+        const j2StMax = hasJpo2 ? Math.max(j2StairFootZ, jpo2NearZ) + 0.8 : -999;
+        if (pz >= j2StMin && pz <= j2StMax) {
+          // Keep pergola crossbeam strictly east of the JPO 2 garden stair at gxMin + 1.4
+          const eastBeamStart = gxMin + 2.9;
+          const eastBeamEnd = gxMax - 0.3;
+          if (eastBeamEnd > eastBeamStart + 0.4) {
+            addBox(bJpo, eastBeamEnd - eastBeamStart, 0.18, 0.22, (eastBeamStart + eastBeamEnd) * 0.5, 3.45, pz);
+          }
+        } else {
+          addBox(bJpo, gW - 0.6, 0.18, 0.22, gCX, 3.45, pz);
+        }
+        const gPostX = gxMax - 0.4;
+        if (!isInStairExclusion(gPostX, pz, 0.9, 0.9)) {
+          addBox(bSteelDark, 0.18, 3.45, 0.18, gPostX, 1.72, pz);
+          recordStructuralCol(gPostX, pz, 0.0, 3.45, 'garden_pergola_col');
+        }
       }
       const planterSpots = [[gxMax - 2.2, -45], [gxMax - 2.2, -28], [gxMin + 2.4, -45], [gxMin + 2.4, -21]];
       for (let pt = 0; pt < planterSpots.length; pt++) {
@@ -1169,22 +1486,46 @@
           }
         }
       }
-      // Full-height canopy columns with beveled concrete plinth bases!
+      // Full-height canopy columns with beveled concrete plinth bases (skipping/flanking all stair exclusions)!
+      const emitCanopyColumn = (colX, cz, baseY, topY, allowFlankPair) => {
+        if (!isInStairExclusion(colX, cz, 0.9, 0.9)) {
+          const plinthH = 0.45;
+          const shaftH = topY - baseY;
+          addCylinder(bConcrete, 0.18, 0.24, plinthH, 8, colX, baseY + plinthH * 0.5, cz);
+          addCylinder(bTruss, 0.12, 0.14, shaftH, 8, colX, baseY + shaftH * 0.5, cz);
+          recordStructuralCol(colX, cz, baseY, topY, 'canopy_col');
+          return;
+        }
+        if (allowFlankPair && Math.abs(cz) < 1.0) {
+          addBox(bTruss, 0.22, 0.28, 9.4, colX, topY - 0.14, cz);
+          for (const fz of [cz - 4.6, cz + 4.6]) {
+            if (!isInStairExclusion(colX, fz, 0.9, 0.9)) {
+              const plinthH = 0.45;
+              const shaftH = topY - baseY;
+              addCylinder(bConcrete, 0.18, 0.24, plinthH, 8, colX, baseY + plinthH * 0.5, fz);
+              addCylinder(bTruss, 0.12, 0.14, shaftH, 8, colX, baseY + shaftH * 0.5, fz);
+              recordStructuralCol(colX, fz, baseY, topY, 'canopy_col');
+            }
+          }
+          return;
+        }
+        // Bridge skipped stair-bay column with a longitudinal portal truss header beam
+        addBox(bTruss, 0.22, 0.28, bayStep, colX, topY - 0.14, cz);
+      };
+
       if (!isIsland) {
-        const p1ColH = getCanopyArchY(p1MaxX - 0.35);
-        addCylinder(bConcrete, 0.18, 0.24, 0.45, 8, p1MaxX - 0.35, 0.225, z);
-        addCylinder(bTruss, 0.12, 0.14, p1ColH + 0.15, 8, p1MaxX - 0.35, p1ColH * 0.5, z);
-        addCylinder(bConcrete, 0.18, 0.24, 0.45, 8, canopyMinX + 0.15, 0.225, z);
-        addCylinder(bTruss, 0.12, 0.14, eaveY + 0.15, 8, canopyMinX + 0.15, eaveY * 0.5, z);
+        const colE = p1MaxX - 0.35;
+        const p1ColH = getCanopyArchY(colE);
+        emitCanopyColumn(colE, z, 0.0, p1ColH + 0.15, false);
+        const colW = canopyMinX + 0.15;
+        emitCanopyColumn(colW, z, SIDEWALK_Y, eaveY + 0.15, true);
       } else {
-        const colA = isCawang ? 6.26 : p1MinX + 2.6;
-        const colB = isCawang ? i2MaxX - 4.2 : p1MaxX - 2.6;
+        const colA = p1MinX + 1.85;
+        const colB = isCawang ? (i2MaxX - 1.85) : (p1MaxX - 1.85);
         const hA = getCanopyArchY(colA);
         const hB = getCanopyArchY(colB);
-        addCylinder(bConcrete, 0.18, 0.24, 0.45, 8, colA, 0.225, z);
-        addCylinder(bTruss, 0.12, 0.14, hA + 0.15, 8, colA, hA * 0.5, z);
-        addCylinder(bConcrete, 0.18, 0.24, 0.45, 8, colB, 0.225, z);
-        addCylinder(bTruss, 0.12, 0.14, hB + 0.15, 8, colB, hB * 0.5, z);
+        emitCanopyColumn(colA, z, 0.0, hA + 0.15, false);
+        emitCanopyColumn(colB, z, 0.0, hB + 0.15, false);
       }
     }
 
@@ -1198,8 +1539,8 @@
       addCylinder(bTruss, 0.09, 0.09, platLen, 6, px, py, 0, Math.PI * 0.5, 0, 0);
     }
 
-    // Station Name Banners with dark steel frames & full-height suspension rods to canopy arch!
-    const addHangingBanner = (bx, by, bz, ryRot) => {
+    // Station Name & Directional Peron Banners with dark steel frames & full-height suspension rods to canopy arch!
+    const addHangingBanner = (bx, by, bz, ryRot, signUv) => {
       const bw = 2.8, bh = 0.68, bd = 0.10;
       addBox(bSteelDark, bw + 0.08, bh + 0.06, bd, bx, by, bz, 0, ryRot, 0);
       const rodOff = 1.05;
@@ -1212,15 +1553,23 @@
         const rodLen = Math.max(0.3, roofY - rodBotY);
         addBox(bSteelDark, 0.04, rodLen, 0.04, rx, rodBotY + rodLen * 0.5, rz);
       }
-      addAtlasQuad(bBanner, bw, bh, bx + Math.sin(ryRot) * (bd * 0.5 + 0.01), by, bz + Math.cos(ryRot) * (bd * 0.5 + 0.01), 0, ryRot, 0, [0, 0, 1, 1]);
-      addAtlasQuad(bBanner, bw, bh, bx - Math.sin(ryRot) * (bd * 0.5 + 0.01), by, bz - Math.cos(ryRot) * (bd * 0.5 + 0.01), 0, ryRot + Math.PI, 0, [0, 0, 1, 1]);
+      const targetBucket = signUv ? bSign : bBanner;
+      const rect = signUv || [0, 0, 1, 1];
+      addAtlasQuad(targetBucket, bw, bh, bx + Math.sin(ryRot) * (bd * 0.5 + 0.01), by, bz + Math.cos(ryRot) * (bd * 0.5 + 0.01), 0, ryRot, 0, rect);
+      addAtlasQuad(targetBucket, bw, bh, bx - Math.sin(ryRot) * (bd * 0.5 + 0.01), by, bz - Math.cos(ryRot) * (bd * 0.5 + 0.01), 0, ryRot + Math.PI, 0, rect);
     };
     const midBannerZ = Math.abs(jpoZ) < 6.0 ? -22.0 : 0.0;
     addHangingBanner(p1MinX + 0.55, 3.35, -14.0, Math.PI * 0.5);
     addHangingBanner(p1MinX + 0.55, 3.35, 14.0, Math.PI * 0.5);
-    addHangingBanner(p1MinX + (isIsland ? 3.8 : 2.55), 3.35, midBannerZ, 0.0);
+    addHangingBanner(p1MinX + (isIsland ? 2.45 : 2.55), 3.35, midBannerZ, 0.0, SIGN_UV.peron1);
     if (!isIsland) {
-      addHangingBanner(p2MaxX - 2.45, 3.35, 0.0, 0.0);
+      addHangingBanner(p2MaxX - 2.45, 3.35, 0.0, 0.0, SIGN_UV.peron2);
+      addHangingBanner(p2MaxX - 0.55, 3.35, -14.0, -Math.PI * 0.5, SIGN_UV.peron2);
+      addHangingBanner(p2MaxX - 0.55, 3.35, 14.0, -Math.PI * 0.5, SIGN_UV.peron2);
+    } else {
+      addHangingBanner(p1MaxX - 2.45, 3.35, midBannerZ, 0.0, SIGN_UV.peron2);
+      addHangingBanner(p1MaxX - 0.55, 3.35, -14.0, -Math.PI * 0.5, SIGN_UV.peron2);
+      addHangingBanner(p1MaxX - 0.55, 3.35, 14.0, -Math.PI * 0.5, SIGN_UV.peron2);
     }
 
     // Cawang Interchange Illuminated Overhead Track Signage (Tracks 1-4 + JPO Stair Wayfinding)
@@ -1291,7 +1640,8 @@
     const psdFrameGeo = new THREE.BoxGeometry(0.08, 0.36, halfDoor - 0.04);
     station.disposableGeometries.push(psdFrameGeo);
 
-    const buildPsdRow = (rowX, signDirX, outDoors) => {
+    const buildPsdRow = (rowX, signDirX, outDoors, headerUv) => {
+      const psdHeaderRect = headerUv || SIGN_UV.psdHeader;
       // Offset PSD screen 5cm platform-ward from platform edge so steel frames & signage never clip the train hull (±1.37m)
       const rcX = rowX + signDirX * 0.05;
       const signYaw = signDirX > 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
@@ -1327,8 +1677,8 @@
           const tileW = (spanLen - 0.1) / tileCount;
           for (let tc = 0; tc < tileCount; tc++) {
             const tz = z0 + 0.05 + (tc + 0.5) * tileW;
-            addAtlasQuad(bSign, tileW - 0.04, 0.24, rcX + 0.09, 1.30, tz, 0, Math.PI * 0.5, 0, SIGN_UV.psdHeader);
-            addAtlasQuad(bSign, tileW - 0.04, 0.24, rcX - 0.09, 1.30, tz, 0, -Math.PI * 0.5, 0, SIGN_UV.psdHeader);
+            addAtlasQuad(bSign, tileW - 0.04, 0.24, rcX + 0.09, 1.30, tz, 0, Math.PI * 0.5, 0, psdHeaderRect);
+            addAtlasQuad(bSign, tileW - 0.04, 0.24, rcX - 0.09, 1.30, tz, 0, -Math.PI * 0.5, 0, psdHeaderRect);
           }
         }
         station._addCollider(rcX - 0.10, 0, z0, rcX + 0.10, 1.45, z0 + 0.44, 'metal');
@@ -1375,8 +1725,35 @@
     station.psdDoors = [];
     station.psdDoors2 = [];
     station.navGraph = null;
-    station._psdFrameInst = buildPsdRow(psdX, 1, station.psdDoors);
-    station._psdFrameInst2 = buildPsdRow(psd2X, -1, station.psdDoors2);
+    station._psdFrameInst = buildPsdRow(psdX, 1, station.psdDoors, SIGN_UV.psdHeader);
+    station._psdFrameInst2 = buildPsdRow(psd2X, -1, station.psdDoors2, SIGN_UV.psdHeaderP2 || SIGN_UV.psdHeader);
+
+    // Assert zero structural column/pier overlap with stairZones across all 6 station archetypes
+    for (let ci = 0; ci < station._structuralCols.length; ci++) {
+      const col = station._structuralCols[ci];
+      for (let si = 0; si < stairZones.length; si++) {
+        const s = stairZones[si];
+        if (s.isTransition) {
+          if (col.x >= s.minX && col.x <= s.maxX && col.z >= s.minZ && col.z <= s.maxZ && col.minY < s.maxY && col.maxY > s.minY) {
+            throw new Error('[StationArch] Structural column (' + col.tag + ' at ' + col.x.toFixed(2) + ',' + col.z.toFixed(2) + ') overlaps transition stairZone on ' + (arch.id || 'station'));
+          }
+          continue;
+        }
+        if (s.sx !== undefined) {
+          const zLo = Math.min(s.footZ, s.topZ);
+          const zHi = Math.max(s.footZ, s.topZ);
+          const physOverlap = Math.abs(col.x - s.sx) < 1.25 && col.z >= zLo - 0.15 && col.z <= zHi + 0.15 && col.minY < (UPPER_FLOOR_Y + 1.0) && col.maxY > 0.0;
+          if (physOverlap) {
+            throw new Error('[StationArch] Structural column (' + col.tag + ' at ' + col.x.toFixed(2) + ',' + col.z.toFixed(2) + ') overlaps physical stair at x=' + s.sx + ' on ' + (arch.id || 'station'));
+          }
+          if (col.tag !== 'jpo_pier') {
+            if (col.x >= s.minX && col.x <= s.maxX && col.z >= s.minZ && col.z <= s.maxZ) {
+              throw new Error('[StationArch] Non-pier structural column (' + col.tag + ' at ' + col.x.toFixed(2) + ',' + col.z.toFixed(2) + ') overlaps stairZone at x=' + s.sx + ' on ' + (arch.id || 'station'));
+            }
+          }
+        }
+      }
+    }
 
     // Export shared layout metrics for station_nav_props
     ctx.layout = layout;
@@ -1572,7 +1949,9 @@
       etx.arc(72, r.y + 64, 32, 0, Math.PI * 2);
       etx.fill();
 
-      // Main label
+      // Main label (explicitly reset textBaseline from badge's 'middle' to 'alphabetic' on both canvases)
+      ctx.textBaseline = 'alphabetic';
+      etx.textBaseline = 'alphabetic';
       ctx.textAlign = 'left';
       ctx.fillStyle = i === 3 ? '#FDE68A' : '#FFFFFF';
       ctx.font = 'bold 44px sans-serif';
@@ -1588,6 +1967,8 @@
       etx.fillText(r.text, 130, r.y + 50);
 
       // Direction arrow
+      ctx.textBaseline = 'alphabetic';
+      etx.textBaseline = 'alphabetic';
       ctx.textAlign = 'right';
       ctx.fillStyle = r.stripe;
       ctx.font = 'bold 58px sans-serif';

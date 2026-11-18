@@ -386,6 +386,7 @@
     slot.attackCooldown = cfg.attackCooldown;
     slot.attackTimer = 0.25 + Math.random() * 0.4;
     slot.spitTimer = 1.2 + Math.random() * 1.4;
+    slot.spitAnimTimer = 0;
     slot.spitBlocked = false;
     slot.staggerTimer = 0;
     slot.hitFlashTimer = 0;
@@ -393,6 +394,9 @@
     slot.fallAngle = 0;
     slot.fallSign = Math.random() > 0.5 ? 1 : -1;
     slot.animPhase = Math.random() * Math.PI * 2;
+    slot.moveBlend = 0;
+    slot.smoothSteerX = 0;
+    slot.smoothSteerZ = 0;
     slot.seed = Math.random() * 100;
     slot.limbBias = Math.random() > 0.5 ? 1 : -1;
     slot.steerCommit = 0;
@@ -1293,21 +1297,28 @@
     return hasLineOfSightToPlayer(z, playerPos);
   }
 
+  function rotateYawToward(z, targetYaw, rate, dt) {
+    let diffYaw = targetYaw - z.yaw;
+    while (diffYaw > Math.PI) diffYaw -= Math.PI * 2;
+    while (diffYaw < -Math.PI) diffYaw += Math.PI * 2;
+    z.yaw += diffYaw * Math.min(1, dt * rate);
+  }
+
   function steerAndMove(z, idx, goalX, goalZ, moveSpd, moveStep, isBackpedaling, dist3D, distHoriz, pdx, pdz, directLine) {
+    const tier = getDifficultyTier();
     let baseAng = Math.atan2(goalX - z.x, goalZ - z.z);
     if (z.chargeTimer > 0) {
       baseAng = Math.atan2(z.chargeDirX, z.chargeDirZ);
       z.yaw = baseAng;
     } else if (isBackpedaling) {
       baseAng = z._backpedalAng;
-      z.yaw = Math.atan2(pdx, pdz);
+      rotateYawToward(z, Math.atan2(pdx, pdz), tier.yawRate * 1.25, moveStep);
     } else if (z.aggroState === 'CHASE' && !directLine) {
       if (z.variant === 'walker') {
         if (dist3D >= 3.2) {
           baseAng += Math.sin(z.animPhase * 0.7 + z.seed) * 0.04 * z.limbBias;
         }
       } else if (z.variant === 'runner' && distHoriz > 5.0 && !z.hasNavWp) {
-        const tier = getDifficultyTier();
         const flankOffset = z.steerDir * Math.min(tier.runnerFlankAngle, 1.4 / distHoriz);
         baseAng += flankOffset;
       }
@@ -1385,9 +1396,22 @@
     _sepVel.z = Math.cos(chosenAng) * moveSpd;
     E.applyZombieSeparation(z, idx, E.zombies, E.activeHighWater, _sepVel);
 
-    z.x += _sepVel.x * moveStep;
-    z.z += _sepVel.z * moveStep;
-    z.animPhase += moveStep * (3.4 + moveSpd * 1.9);
+    // Blend steering velocity smoothly and rotate facing along actual velocity (eliminates sideways crab-walking)
+    const steerBlend = Math.min(1.0, moveStep * (z.chargeTimer > 0 || directLine ? 14.0 : 9.0));
+    z.smoothSteerX += (_sepVel.x - z.smoothSteerX) * steerBlend;
+    z.smoothSteerZ += (_sepVel.z - z.smoothSteerZ) * steerBlend;
+
+    z.x += z.smoothSteerX * moveStep;
+    z.z += z.smoothSteerZ * moveStep;
+
+    if (z.chargeTimer <= 0 && !isBackpedaling) {
+      const steerMag = Math.hypot(z.smoothSteerX, z.smoothSteerZ);
+      if (steerMag > 0.15) {
+        const moveAng = Math.atan2(z.smoothSteerX, z.smoothSteerZ);
+        const yawMult = z.aggroState === 'PATROL' ? 0.72 : 1.05;
+        rotateYawToward(z, moveAng, tier.yawRate * yawMult, moveStep);
+      }
+    }
   }
 
   function update(dt, playerPos, spatialGrid, trainColliders, onPlayerHit, onDropPickup, opts) {
@@ -1698,6 +1722,7 @@
       if (z.hornVulnTimer > 0) z.hornVulnTimer = Math.max(0, z.hornVulnTimer - step);
       if (z.attackTimer > 0) z.attackTimer = Math.max(0, z.attackTimer - step);
       if (z.spitTimer > 0) z.spitTimer = Math.max(0, z.spitTimer - step);
+      if (z.spitAnimTimer > 0) z.spitAnimTimer = Math.max(0, z.spitAnimTimer - step);
       if (z.lureTimer > 0) z.lureTimer = Math.max(0, z.lureTimer - step);
       if (z.buffTimer > 0) z.buffTimer = Math.max(0, z.buffTimer - step);
       if (z.screamTimer > 0) z.screamTimer = Math.max(0, z.screamTimer - step);
@@ -1781,8 +1806,13 @@
       }
 
       const hasLure = z.lureTimer > 0;
+      const preMoveX = z.x;
+      const preMoveZ = z.z;
 
       if (z.aggroState === 'IDLE' && !hasLure) {
+        z.moveBlend += (0 - z.moveBlend) * Math.min(1, moveStep * 10.0);
+        z.smoothSteerX *= 0.5;
+        z.smoothSteerZ *= 0.5;
         z.animPhase += moveStep * 0.85;
         if (!z.groundedOnce) {
           E.gatherNearbyColliders(z.x, z.z, 2.0, spatialGrid, tc);
@@ -1792,6 +1822,9 @@
       } else if (z.aggroState === 'PATROL' && !hasLure) {
         if (z.patrolWaitTimer > 0) {
           z.patrolWaitTimer -= moveStep;
+          z.moveBlend += (0 - z.moveBlend) * Math.min(1, moveStep * 10.0);
+          z.smoothSteerX = 0;
+          z.smoothSteerZ = 0;
           z.animPhase += moveStep * 0.85;
           if (!z.groundedOnce) {
             E.gatherNearbyColliders(z.x, z.z, 2.0, spatialGrid, tc);
@@ -1807,19 +1840,20 @@
           const pDist = Math.hypot(pdx, pdz);
           if (pDist <= 1.25) {
             z.patrolWaitTimer = 1.5 + Math.random() * 2.5;
+            z.moveBlend += (0 - z.moveBlend) * Math.min(1, moveStep * 10.0);
+            z.smoothSteerX = 0;
+            z.smoothSteerZ = 0;
             z.animPhase += moveStep * 0.85;
           } else {
-            const targetYaw = Math.atan2(pdx, pdz);
-            let diffYaw = targetYaw - z.yaw;
-            while (diffYaw > Math.PI) diffYaw -= Math.PI * 2;
-            while (diffYaw < -Math.PI) diffYaw += Math.PI * 2;
-            z.yaw += diffYaw * Math.min(1, moveStep * tier.yawRate * 0.65);
-
             E.gatherNearbyColliders(z.x, z.z, 2.4, spatialGrid, tc);
             const patrolSpd = z.speed * tier.roamSpeedMult;
             steerAndMove(z, i, z.patrolTargetX, z.patrolTargetZ, patrolSpd, moveStep, false, pDist, pDist, pdx, pdz);
             E.resolveCollisions(z, 0.38 * z.scale, moveStep);
             z.groundedOnce = true;
+            const actualSpd = Math.hypot(z.x - preMoveX, z.z - preMoveZ) / Math.max(0.001, moveStep);
+            const targetBlend = Math.min(1.0, actualSpd / Math.max(0.1, z.speed));
+            z.moveBlend += (targetBlend - z.moveBlend) * Math.min(1.0, moveStep * 10.0);
+            z.animPhase += moveStep * (1.2 + actualSpd * 2.35);
             E.updateStuckRecovery(z, moveStep, pDist, 1.25);
           }
         }
@@ -1842,6 +1876,9 @@
           z.patrolOriginX = z.x;
           z.patrolOriginZ = z.z;
           z.patrolWaitTimer = 1.6 + Math.random() * 1.5;
+          z.moveBlend += (0 - z.moveBlend) * Math.min(1, moveStep * 10.0);
+          z.smoothSteerX = 0;
+          z.smoothSteerZ = 0;
           z.animPhase += moveStep * 0.85;
         } else {
           z.navTimer -= moveStep;
@@ -1853,21 +1890,23 @@
           const goalX = z.hasNavWp ? z.wpX : targetX;
           const goalZ = z.hasNavWp ? z.wpZ : targetZ;
 
-          const targetYaw = Math.atan2(goalX - z.x, goalZ - z.z);
-          let diffYaw = targetYaw - z.yaw;
-          while (diffYaw > Math.PI) diffYaw -= Math.PI * 2;
-          while (diffYaw < -Math.PI) diffYaw += Math.PI * 2;
-          z.yaw += diffYaw * Math.min(1, moveStep * tier.yawRate);
-
           if (z.alertDelay <= 0) {
             E.gatherNearbyColliders(z.x, z.z, 2.6, spatialGrid, tc);
             const invSpd = z.speed * (z.staggerTimer > 0 ? 0.22 : 0.85) * (isDaylightOutbreak() ? (getDaylightMods().speedMult || 1.22) : 1.0);
             steerAndMove(z, i, goalX, goalZ, invSpd, moveStep, false, dist3D, distHoriz, pdx, pdz);
             E.resolveCollisions(z, 0.38 * z.scale, moveStep);
             z.groundedOnce = true;
+            const actualSpd = Math.hypot(z.x - preMoveX, z.z - preMoveZ) / Math.max(0.001, moveStep);
+            const targetBlend = Math.min(1.0, actualSpd / Math.max(0.1, z.speed));
+            z.moveBlend += (targetBlend - z.moveBlend) * Math.min(1.0, moveStep * 10.0);
+            z.animPhase += moveStep * (1.2 + actualSpd * 2.35);
             E.updateStuckRecovery(z, moveStep, dist3D, 1.5);
           } else {
-            z.animPhase += moveStep * 1.8;
+            rotateYawToward(z, Math.atan2(goalX - z.x, goalZ - z.z), tier.yawRate, moveStep);
+            z.moveBlend += (0 - z.moveBlend) * Math.min(1, moveStep * 10.0);
+            z.smoothSteerX = 0;
+            z.smoothSteerZ = 0;
+            z.animPhase += moveStep * 1.4;
           }
         }
       } else {
@@ -1940,12 +1979,6 @@
           const goalZ = (!isInsideCabin && !isDoorCrossing && z.hasNavWp) ? z.wpZ : targetZ;
           const dx = goalX - z.x;
           const dz = goalZ - z.z;
-
-          const targetYaw = Math.atan2(dx, dz);
-          let diffYaw = targetYaw - z.yaw;
-          while (diffYaw > Math.PI) diffYaw -= Math.PI * 2;
-          while (diffYaw < -Math.PI) diffYaw += Math.PI * 2;
-          z.yaw += diffYaw * Math.min(1, moveStep * tier.yawRate);
 
           if (z.alertDelay <= 0) {
             E.gatherNearbyColliders(z.x, z.z, 2.8, spatialGrid, tc);
@@ -2027,9 +2060,9 @@
           if (z.chargeTimer > 0) moveSpd = z.speed * tier.bruteChargeMult * (isDaylightOutbreak() ? (getDaylightMods().speedMult || 1.22) : 1.0);
           if (z.shriekTimer > 0 || z.chargeWindup > 0) moveSpd = 0;
 
-          // 4. Spitter active backpedaling when player pushes inside 5.5m
+          // 4. Spitter active backpedaling when player pushes inside 2.4m
           let isBackpedaling = false;
-          if (z.variant === 'spitter' && !z.hasNavWp && !isDoorCrossing && !isInsideCabin && dist3D < 5.5 && Math.abs(pdy) <= 0.85 && z.staggerTimer <= 0 && playerPos) {
+          if (z.variant === 'spitter' && !z.hasNavWp && !isDoorCrossing && !isInsideCabin && dist3D < 2.4 && Math.abs(pdy) <= 0.85 && z.staggerTimer <= 0 && playerPos) {
             _v1.set(z.x, z.y + 1.45 * z.scale, z.z);
             _v2.set(playerPos.x - _v1.x, ((playerPos.y || 0) + 1.2) - _v1.y, playerPos.z - _v1.z).normalize();
             let losBlocked = false;
@@ -2057,23 +2090,39 @@
           }
 
           const meleeRange = z.variant === 'spitter' ? 1.75 : z.attackRange;
-          const stopDist = (z.variant === 'spitter' && !z.hasNavWp && !isDoorCrossing && !isInsideCabin && Math.abs(pdy) <= 1.2 && !z.spitBlocked && distHoriz <= 13.5)
-            ? 7.5
+          const stopDist = (z.variant === 'spitter' && !z.hasNavWp && !isDoorCrossing && !isInsideCabin && Math.abs(pdy) <= 1.2 && !z.spitBlocked && distHoriz <= 6.8)
+            ? 4.8
             : (meleeRange * 0.82);
 
           const isEnteringDoor = doorAssign >= 0;
           const moveCheckDist = isEnteringDoor ? Math.hypot(goalX - z.x, goalZ - z.z) : dist3D;
           const effStopDist = isEnteringDoor ? 0.22 : stopDist;
+          const shouldMove = (moveCheckDist > effStopDist || isBackpedaling || z.chargeTimer > 0) && z.alertDelay <= 0 && z.shriekTimer <= 0 && z.chargeWindup <= 0;
 
-          if ((moveCheckDist > effStopDist || isBackpedaling || z.chargeTimer > 0) && z.alertDelay <= 0 && z.shriekTimer <= 0 && z.chargeWindup <= 0) {
+          if (shouldMove) {
             steerAndMove(z, i, goalX, goalZ, moveSpd, moveStep, isBackpedaling, dist3D, distHoriz, pdx, pdz, isDoorCrossing || isInsideCabin);
           } else {
-            z.animPhase += moveStep * 2.2;
+            // Stopped in combat/spit range or winding up: face player smoothly and stand planted
+            const faceDx = z.alertDelay > 0 ? dx : pdx;
+            const faceDz = z.alertDelay > 0 ? dz : pdz;
+            if (faceDx * faceDx + faceDz * faceDz > 1e-4) {
+              rotateYawToward(z, Math.atan2(faceDx, faceDz), tier.yawRate * 1.15, moveStep);
+            }
+            z.moveBlend += (0 - z.moveBlend) * Math.min(1.0, moveStep * 12.0);
+            z.smoothSteerX = 0;
+            z.smoothSteerZ = 0;
+            z.animPhase += moveStep * 1.4;
           }
 
           if (z.alertDelay <= 0) {
             E.resolveCollisions(z, 0.38 * z.scale, moveStep);
             z.groundedOnce = true;
+            if (shouldMove) {
+              const actualSpd = Math.hypot(z.x - preMoveX, z.z - preMoveZ) / Math.max(0.001, moveStep);
+              const targetBlend = Math.min(1.0, actualSpd / Math.max(0.1, z.speed));
+              z.moveBlend += (targetBlend - z.moveBlend) * Math.min(1.0, moveStep * 10.0);
+              z.animPhase += moveStep * (1.2 + actualSpd * 2.35);
+            }
             E.updateStuckRecovery(z, moveStep, moveCheckDist, effStopDist);
           } else if (!z.groundedOnce) {
             E.gatherNearbyColliders(z.x, z.z, 2.0, spatialGrid, tc);
@@ -2121,7 +2170,7 @@
             }
           }
 
-          if (z.variant === 'spitter' && playerPos && distHoriz >= 3.2 && distHoriz <= 14.0 && dist3D <= 14.5 && Math.abs(pdy) <= 5.5 && z.spitTimer <= 0 && z.staggerTimer <= 0 && z.alertDelay <= 0) {
+          if (z.variant === 'spitter' && playerPos && distHoriz >= 1.6 && distHoriz <= 6.5 && dist3D <= 7.0 && Math.abs(pdy) <= 4.5 && z.spitTimer <= 0 && z.staggerTimer <= 0 && z.alertDelay <= 0) {
             const mouthY = z.y + 1.46 * z.scale;
             const targetY = (playerPos.y || 0) + 1.05;
             _v1.set(z.x, mouthY, z.z);
@@ -2139,8 +2188,8 @@
               if (trainHit) blocked = true;
             }
             // Also verify ballistic arc apex clearance so Spitters do not lob blindly into low lintels/ceilings
-            if (!blocked && distHoriz > 3.5) {
-              const ft = Math.max(0.26, Math.min(1.40, distHoriz / 11.0));
+            if (!blocked && distHoriz > 2.2) {
+              const ft = Math.max(0.36, Math.min(0.88, distHoriz / 8.4));
               const apexY = (mouthY + targetY) * 0.5 + 0.125 * 11.5 * ft * ft;
               _v3.set((z.x + playerPos.x) * 0.5, apexY, (z.z + playerPos.z) * 0.5);
               _v4.subVectors(_v3, _v1);
@@ -2497,6 +2546,10 @@
           continue;
         }
       } else {
+        if (z.spitAnimTimer > 0) z.spitAnimTimer = Math.max(0, z.spitAnimTimer - step);
+        z.moveBlend += (0 - (z.moveBlend || 0)) * Math.min(1, step * 8.0);
+        z.smoothSteerX = 0;
+        z.smoothSteerZ = 0;
         z.vx *= Math.max(0, 1 - step * 8.0);
         z.vz *= Math.max(0, 1 - step * 8.0);
         z.x += z.vx * step;

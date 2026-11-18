@@ -928,18 +928,22 @@
 
   function buildSignageAtlas(maxAniso) {
     const w = 2048;
-    const h = 1024;
+    const h = 2048;
     const cA = makeCanvas(w, h);
     const ctx = cA.getContext('2d');
     const cE = makeCanvas(w, h);
     const etx = cE.getContext('2d');
     ctx.scale(2, 2);
     etx.scale(2, 2);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    etx.textAlign = 'left';
+    etx.textBaseline = 'alphabetic';
 
     ctx.fillStyle = '#16325C';
-    ctx.fillRect(0, 0, 1024, 512);
+    ctx.fillRect(0, 0, 1024, 1024);
     etx.fillStyle = '#000000';
-    etx.fillRect(0, 0, 1024, 512);
+    etx.fillRect(0, 0, 1024, 1024);
 
     // TILE 1 (0..512, 0..160): PSD Navy Header (Kereta 3 Pintu 2 + CB/BK Directions)
     ctx.fillStyle = '#16325C';
@@ -1153,6 +1157,11 @@
     ctx.font = 'bold 14px sans-serif';
     ctx.fillText('LAYANAN PENUMPANG LRT', 792, 462);
 
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    etx.textAlign = 'left';
+    etx.textBaseline = 'alphabetic';
+
     etx.fillStyle = '#1C3966';
     etx.fillRect(768, 360, 256, 152);
     etx.fillStyle = '#D49B1A';
@@ -1163,6 +1172,255 @@
     etx.fillStyle = '#FFE08A';
     etx.font = 'bold 14px sans-serif';
     etx.fillText('LAYANAN PENUMPANG LRT', 792, 462);
+
+    // TILE 7 (0..512, 512..672): PSD Header Peron 2 (JALUR 2 • KERETA KEMBALI ← in Amber/Blue)
+    ctx.fillStyle = '#16325C';
+    ctx.fillRect(0, 512, 512, 160);
+    ctx.fillStyle = '#D97706';
+    ctx.fillRect(0, 512, 512, 10);
+    ctx.fillStyle = '#F59E0B';
+    ctx.fillRect(0, 664, 512, 8);
+    etx.fillStyle = '#1B355C';
+    etx.fillRect(0, 512, 512, 160);
+    etx.fillStyle = '#D97706';
+    etx.fillRect(0, 512, 512, 8);
+
+    ctx.fillStyle = '#D97706';
+    ctx.beginPath();
+    ctx.arc(54, 588, 28, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    etx.fillStyle = '#D97706';
+    etx.beginPath();
+    etx.arc(54, 588, 26, 0, Math.PI * 2);
+    etx.fill();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    etx.textAlign = 'center';
+    etx.textBaseline = 'middle';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 30px sans-serif';
+    ctx.fillText('2', 54, 589);
+    etx.fillStyle = '#FFFBEB';
+    etx.font = 'bold 30px sans-serif';
+    etx.fillText('2', 54, 589);
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    etx.textAlign = 'left';
+    etx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#FEF3C7';
+    ctx.font = 'bold 24px sans-serif';
+    ctx.fillText('JALUR 2 • KERETA KEMBALI ←', 98, 572);
+    etx.fillStyle = '#FDE68A';
+    etx.font = 'bold 24px sans-serif';
+    etx.fillText('JALUR 2 • KERETA KEMBALI ←', 98, 572);
+
+    ctx.fillStyle = '#FDBA74';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText('← ARAH KEMBALI STASIUN SEBELUMNYA', 98, 602);
+    etx.fillStyle = '#F59E0B';
+    etx.font = 'bold 14px sans-serif';
+    etx.fillText('← ARAH KEMBALI STASIUN SEBELUMNYA', 98, 602);
+
+    for (let c = 0; c < 6; c++) {
+      ctx.fillStyle = c === 2 ? '#F59E0B' : '#64748B';
+      ctx.fillRect(98 + c * 24, 624, 20, 12);
+    }
+    ctx.fillStyle = '#CBD5E1';
+    ctx.font = '12px sans-serif';
+    ctx.fillText('DAHULUKAN PENUMPANG TURUN', 252, 635);
+
+    // TILE 8 (512..1024, 512..672): Peron 1 Hanging Banner (PERON 1 • ARAH MISI MAJU →)
+    ctx.fillStyle = '#0F2A4A';
+    ctx.fillRect(512, 512, 512, 160);
+    ctx.fillStyle = '#10B981';
+    ctx.fillRect(512, 512, 512, 10);
+    ctx.fillStyle = '#E5D429';
+    ctx.fillRect(512, 664, 512, 8);
+    etx.fillStyle = '#123359';
+    etx.fillRect(512, 512, 512, 160);
+    etx.fillStyle = '#10B981';
+    etx.fillRect(512, 512, 512, 8);
+
+    ctx.fillStyle = '#059669';
+    ctx.beginPath();
+    ctx.arc(568, 592, 34, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#38BDF8';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    etx.fillStyle = '#059669';
+    etx.beginPath();
+    etx.arc(568, 592, 32, 0, Math.PI * 2);
+    etx.fill();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    etx.textAlign = 'center';
+    etx.textBaseline = 'middle';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 38px sans-serif';
+    ctx.fillText('1', 568, 593);
+    etx.fillStyle = '#ECFDF5';
+    etx.font = 'bold 38px sans-serif';
+    etx.fillText('1', 568, 593);
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    etx.textAlign = 'left';
+    etx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 25px sans-serif';
+    ctx.fillText('PERON 1 • ARAH MISI MAJU →', 618, 578);
+    etx.fillStyle = '#D1FAE5';
+    etx.font = 'bold 25px sans-serif';
+    etx.fillText('PERON 1 • ARAH MISI MAJU →', 618, 578);
+
+    ctx.fillStyle = '#6EE7B7';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText('LRT JABODEBEK  •  KERETA MAJU', 618, 616);
+    etx.fillStyle = '#34D399';
+    etx.font = 'bold 16px sans-serif';
+    etx.fillText('LRT JABODEBEK  •  KERETA MAJU', 618, 616);
+
+    // TILE 9 (0..512, 672..832): Peron 2 Hanging Banner (PERON 2 • JALUR KEMBALI ←)
+    ctx.fillStyle = '#24170B';
+    ctx.fillRect(0, 672, 512, 160);
+    ctx.fillStyle = '#F59E0B';
+    ctx.fillRect(0, 672, 512, 10);
+    ctx.fillStyle = '#EA580C';
+    ctx.fillRect(0, 824, 512, 8);
+    etx.fillStyle = '#2E1C0D';
+    etx.fillRect(0, 672, 512, 160);
+    etx.fillStyle = '#F59E0B';
+    etx.fillRect(0, 672, 512, 8);
+
+    ctx.fillStyle = '#D97706';
+    ctx.beginPath();
+    ctx.arc(56, 752, 34, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#FCD34D';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    etx.fillStyle = '#D97706';
+    etx.beginPath();
+    etx.arc(56, 752, 32, 0, Math.PI * 2);
+    etx.fill();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    etx.textAlign = 'center';
+    etx.textBaseline = 'middle';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 38px sans-serif';
+    ctx.fillText('2', 56, 753);
+    etx.fillStyle = '#FFFBEB';
+    etx.font = 'bold 38px sans-serif';
+    etx.fillText('2', 56, 753);
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    etx.textAlign = 'left';
+    etx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#FFFBEB';
+    ctx.font = 'bold 25px sans-serif';
+    ctx.fillText('PERON 2 • JALUR KEMBALI ←', 106, 738);
+    etx.fillStyle = '#FDE68A';
+    etx.font = 'bold 25px sans-serif';
+    etx.fillText('PERON 2 • JALUR KEMBALI ←', 106, 738);
+
+    ctx.fillStyle = '#FDBA74';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText('← KERETA KEMBALI KE STASIUN LALU', 106, 776);
+    etx.fillStyle = '#FB923C';
+    etx.font = 'bold 16px sans-serif';
+    etx.fillText('← KERETA KEMBALI KE STASIUN LALU', 106, 776);
+
+    // TILE 10 (0..1024, 832..1024): 2nd-Floor JPO Wayfinding Gantry
+    ctx.fillStyle = '#111E33';
+    ctx.fillRect(0, 832, 1024, 192);
+    ctx.fillStyle = '#E5D429';
+    ctx.fillRect(0, 832, 1024, 10);
+    ctx.fillRect(0, 1014, 1024, 10);
+    etx.fillStyle = '#13243D';
+    etx.fillRect(0, 832, 1024, 192);
+    etx.fillStyle = '#E5D429';
+    etx.fillRect(0, 832, 1024, 6);
+
+    // Zone cards
+    ctx.fillStyle = '#0B2E26';
+    ctx.fillRect(14, 850, 332, 156);
+    ctx.fillStyle = '#10B981';
+    ctx.fillRect(14, 850, 332, 6);
+    etx.fillStyle = '#0F3B31';
+    etx.fillRect(14, 850, 332, 156);
+
+    ctx.fillStyle = '#1A2B45';
+    ctx.fillRect(360, 850, 304, 156);
+    ctx.fillStyle = '#E5D429';
+    ctx.fillRect(360, 850, 304, 6);
+    etx.fillStyle = '#203554';
+    etx.fillRect(360, 850, 304, 156);
+
+    ctx.fillStyle = '#2E1B08';
+    ctx.fillRect(678, 850, 332, 156);
+    ctx.fillStyle = '#F59E0B';
+    ctx.fillRect(678, 850, 332, 6);
+    etx.fillStyle = '#3B220A';
+    etx.fillRect(678, 850, 332, 156);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    etx.textAlign = 'center';
+    etx.textBaseline = 'alphabetic';
+
+    ctx.fillStyle = '#ECFDF5';
+    ctx.font = 'bold 24px sans-serif';
+    ctx.fillText('← PERON 1 (MAJU)', 180, 922);
+    etx.fillStyle = '#A7F3D0';
+    ctx.font = 'bold 24px sans-serif';
+    etx.fillText('← PERON 1 (MAJU)', 180, 922);
+    ctx.fillStyle = '#6EE7B7';
+    ctx.font = 'bold 15px sans-serif';
+    ctx.fillText('ARAH MISI MAJU • BERIKUTNYA', 180, 964);
+    etx.fillStyle = '#34D399';
+    etx.font = 'bold 15px sans-serif';
+    etx.fillText('ARAH MISI MAJU • BERIKUTNYA', 180, 964);
+
+    ctx.fillStyle = '#FEF9C3';
+    ctx.font = 'bold 26px sans-serif';
+    ctx.fillText('CONCOURSE ↓', 512, 922);
+    etx.fillStyle = '#FDE047';
+    etx.font = 'bold 26px sans-serif';
+    etx.fillText('CONCOURSE ↓', 512, 922);
+    ctx.fillStyle = '#E2E8F0';
+    ctx.font = 'bold 15px sans-serif';
+    ctx.fillText('LOKET • EXIT JALAN RAYA', 512, 964);
+    etx.fillStyle = '#CBD5E1';
+    etx.font = 'bold 15px sans-serif';
+    etx.fillText('LOKET • EXIT JALAN RAYA', 512, 964);
+
+    ctx.fillStyle = '#FFFBEB';
+    ctx.font = 'bold 24px sans-serif';
+    ctx.fillText('PERON 2 (KEMBALI) →', 844, 922);
+    etx.fillStyle = '#FDE68A';
+    etx.font = 'bold 24px sans-serif';
+    etx.fillText('PERON 2 (KEMBALI) →', 844, 922);
+    ctx.fillStyle = '#FDBA74';
+    ctx.font = 'bold 15px sans-serif';
+    ctx.fillText('JALUR KEMBALI STASIUN LALU', 844, 964);
+    etx.fillStyle = '#FB923C';
+    etx.font = 'bold 15px sans-serif';
+    etx.fillText('JALUR KEMBALI STASIUN LALU', 844, 964);
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    etx.textAlign = 'left';
+    etx.textBaseline = 'alphabetic';
 
     return {
       map: finalizeCanvasTexture(cA, true, false, maxAniso),

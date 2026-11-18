@@ -16,6 +16,26 @@
   const _cityStepInProgress = Object.freeze({ done: false });
   const _cityStepDone = Object.freeze({ done: true });
   const _persistentCityLights = [];
+  let _warungSprintTimer = 0;
+
+  const CORNER_NOTES_DATA = {
+    note_nw_corner: {
+      title: 'Log Medis Posko PMI Barat Laut',
+      body: 'POSKO DARURAT PMI — SEKTOR BARAT LAUT\n\nAmbulans unit JKT-04 terhenti di jalan kolektor barat saat gelombang panik menyebar dari persimpangan.\n\nSisa pelat pelindung PMI dan tas P3K darurat sudah kami siapkan di meja pemeriksaan utama. Jika masih ada petugas atau warga yang bertahan, ambil perlengkapan tersebut.'
+    },
+    note_ne_corner: {
+      title: 'Manifes Gudang Logistik Utara',
+      body: 'PT EKSPEDISI NUSANTARA — POS SEKURITI TIMUR LAUT\n\nPengiriman peti logistik darurat tertahan di dermaga muat utara sebelum gerbang tol ditutup total.\n\nDi balik tumpukan palet di atas dermaga terdapat peti cadangan amunisi penuh dan peluncur berat untuk unit respons cepat. Ramp barat dermaga masih bisa dilalui.'
+    },
+    note_sw_corner: {
+      title: 'Perintah Sekat Konvoi Barat Daya',
+      body: 'POS SEKAT MILITER — KORIDOR BARAT DAYA\n\nSemua akses dari jalan kolektor barat daya telah disekat dengan karung pasir dan truk taktis.\n\nCadangan pelat rompi dan dua magasin peluru masih tersimpan di peti amunisi di bawah tenda komando. Tetap waspada terhadap pergerakan dari arah perlintasan sebidang.'
+    },
+    note_se_corner: {
+      title: 'Buku Jaga Poskamling RT/RW & Warung Kopi',
+      body: 'POSKAMLING SEKTOR TENGGARA — CATATAN RONDA MALAM\n\nPak Hansip memukul kentongan tiga kali saat listrik padam dan sirine stasiun berbunyi.\n\nWarung Kopi di sebelah masih menyisakan termos kopi panas racikan khusus dan bekal malam di atas meja. Minumlah untuk memulihkan tenaga sebelum kembali ke peron.'
+    }
+  };
 
   function evalTrafficBlink(worldX, worldZ, t) {
     return typeof P.evalTrafficSignalBlink === 'function'
@@ -33,6 +53,9 @@
     trafficSignalPositions: [],
     _lootboxGlows: null,
     _lootboxVisuals: null,
+    _streetBeacons: null,
+    cornerHubs: null,
+    layoutBounds: null,
     _fieldLogGlints: null,
     _fieldLogPropAssets: null,
     destructibleProps: null,
@@ -245,7 +268,15 @@
       this.trafficSignalPositions = [];
       this._lootboxGlows = null;
       this._lootboxVisuals = null;
+      this._streetBeacons = null;
+      this.cornerHubs = null;
+      this.layoutBounds = null;
       this._fieldLogGlints = null;
+      if (_warungSprintTimer > 0) {
+        _warungSprintTimer = 0;
+        const pState = LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function' ? LRT.PlayerUI.getState() : null;
+        if (pState) pState.fastSprint = false;
+      }
       this._fieldLogPropAssets = null;
       this.destructibleProps = null;
       this._concourseBounds = null;
@@ -310,6 +341,7 @@
       this.trafficSignalPositions = [];
       this._lootboxGlows = {};
       this._lootboxVisuals = [];
+      this._streetBeacons = {};
       this._fieldLogGlints = [];
       this._fieldLogPropAssets = null;
       this.destructibleProps = [];
@@ -543,6 +575,27 @@
           if (fg.mat) fg.mat.opacity = 0.22 + 0.14 * Math.sin(this._timeAccum * 2.8 + i * 1.1);
         }
       }
+      if (this._streetBeacons) {
+        let bi = 0;
+        for (const bk in this._streetBeacons) {
+          const sb = this._streetBeacons[bk];
+          if (sb && !sb.used && sb.mesh && sb.mesh.visible && sb.mat) {
+            sb.mat.opacity = 0.44 + 0.22 * Math.sin(this._timeAccum * 3.0 + bi * 1.3);
+          }
+          bi++;
+        }
+      }
+      if (_warungSprintTimer > 0) {
+        const prevT = _warungSprintTimer;
+        _warungSprintTimer = Math.max(0, _warungSprintTimer - Math.max(0, dt || 0));
+        if (prevT > 0 && _warungSprintTimer === 0) {
+          const pState = LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function' ? LRT.PlayerUI.getState() : null;
+          if (pState) pState.fastSprint = false;
+          if (LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
+            LRT.PlayerUI.setNotice('Efek Kopi Warung habis — kecepatan lari kembali normal.', '#94a3b8');
+          }
+        }
+      }
       const focusPos = camPos || this._lastCamPos;
       if (focusPos) {
         this._repositionPooledLights(focusPos, this._suppressPooledLights);
@@ -754,10 +807,160 @@
       }
     },
 
+    _syncStreetBeacons: function () {
+      if (!this._streetBeacons) return;
+      for (const id in this._streetBeacons) {
+        const sb = this._streetBeacons[id];
+        if (!sb) continue;
+        const it = this.interactables ? this.interactables.find((x) => x.id === id) : null;
+        const used = !!((it && it.used) || (this._usedIds && this._usedIds.has(id)));
+        sb.used = used;
+        if (sb.mesh) sb.mesh.visible = !used;
+        if (sb.mat) sb.mat.opacity = used ? 0.0 : 0.62;
+      }
+    },
+
+    interactNote: function (id) {
+      if (!this.interactables) return { ok: false };
+      const it = this.interactables.find((x) => x.id === id);
+      if (!it) return { ok: false };
+      const note = CORNER_NOTES_DATA[it.id];
+      if (!note) return { ok: false };
+      if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+        LRT.Audio.play('paper_rustle', { gain: 0.72 });
+      }
+      it.used = true;
+      if (it.label && it.label.indexOf('(Sudah Dibaca)') === -1) {
+        it.label = it.label + ' (Sudah Dibaca)';
+      }
+      it.prompt = it.label;
+      if (this._usedIds) this._usedIds.add(it.id);
+      this._markFieldLogGlintUsed(it.id);
+      return {
+        ok: true,
+        type: 'field_log',
+        action: 'field_log',
+        logTitle: note.title,
+        logBody: note.body,
+        message: 'Membaca: ' + note.title
+      };
+    },
+
     interact: function (id) {
       if (!this.interactables) return { ok: false };
       const it = this.interactables.find((x) => x.id === id);
       if (!it) return { ok: false };
+
+      if (it.type === 'field_log' || CORNER_NOTES_DATA[it.id]) {
+        return this.interactNote(id);
+      }
+
+      if (it.id === 'city_nw_medpost' || it.type === 'corner_medpost') {
+        if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+          LRT.Audio.play('crate_open', { gain: 0.80 });
+          if (!it.used) LRT.Audio.play('loot_chime', { gain: 0.65 });
+        }
+        const fresh = !it.used;
+        it.used = true;
+        it.label = '[E] Kotak Medis Darurat PMI (Sudah Diambil)';
+        it.prompt = it.label;
+        if (this._usedIds) this._usedIds.add(it.id);
+        this._syncStreetBeacons();
+        if (fresh && LRT.PlayerUI && typeof LRT.PlayerUI.addArmor === 'function') {
+          LRT.PlayerUI.addArmor(35, 100);
+        }
+        return {
+          ok: true,
+          type: 'corner_medpost',
+          action: 'street_stash',
+          heal: fresh ? 25 : 0,
+          healAmount: fresh ? 25 : 0,
+          armor: fresh ? 35 : 0,
+          message: fresh ? 'Kotak Medis Darurat PMI: +35 Armor & +25 HP!' : 'Kotak Medis Darurat PMI sudah diambil.'
+        };
+      }
+
+      if (it.id === 'city_ne_depot' || it.type === 'corner_depot') {
+        if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+          LRT.Audio.play('crate_open', { gain: 0.85 });
+          if (!it.used) LRT.Audio.play('loot_chime', { gain: 0.65 });
+        }
+        const fresh = !it.used;
+        it.used = true;
+        it.label = '[E] Peti Logistik Gudang Utara (Sudah Diambil)';
+        it.prompt = it.label;
+        if (this._usedIds) this._usedIds.add(it.id);
+        this._syncStreetBeacons();
+        if (fresh && LRT.Weapons) {
+          const prog = typeof LRT.Weapons.getProgressionState === 'function' ? LRT.Weapons.getProgressionState() : null;
+          const unlocked = prog && Array.isArray(prog.unlockedWeapons) ? prog.unlockedWeapons : [];
+          if (unlocked.indexOf('rpg') === -1 && typeof LRT.Weapons.unlockWeapon === 'function') {
+            LRT.Weapons.unlockWeapon('rpg', 3);
+          }
+          if (typeof LRT.Weapons.addAmmo === 'function') {
+            LRT.Weapons.addAmmo('all', 999);
+            LRT.Weapons.addAmmo('rpg', 3);
+          }
+        }
+        return {
+          ok: true,
+          type: 'corner_depot',
+          action: 'street_stash',
+          ammo: fresh ? { type: 'all', amount: 999 } : null,
+          message: fresh ? 'Peti Logistik Gudang Utara: Amunisi Penuh & Heavy Ammo!' : 'Peti Logistik Gudang Utara sudah kosong.'
+        };
+      }
+
+      if (it.id === 'city_sw_convoy' || it.type === 'corner_convoy') {
+        if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+          LRT.Audio.play('crate_open', { gain: 0.82 });
+          if (!it.used) LRT.Audio.play('loot_chime', { gain: 0.65 });
+        }
+        const fresh = !it.used;
+        it.used = true;
+        it.label = '[E] Peti Amunisi Konvoi Militer (Sudah Diambil)';
+        it.prompt = it.label;
+        if (this._usedIds) this._usedIds.add(it.id);
+        this._syncStreetBeacons();
+        if (fresh && LRT.PlayerUI && typeof LRT.PlayerUI.addArmor === 'function') {
+          LRT.PlayerUI.addArmor(25, 100);
+        }
+        return {
+          ok: true,
+          type: 'corner_convoy',
+          action: 'street_stash',
+          armor: fresh ? 25 : 0,
+          ammo: fresh ? { type: 'all', amount: 34 } : null,
+          message: fresh ? 'Peti Amunisi Konvoi Militer: +25 Armor & +2 Mag!' : 'Peti Amunisi Konvoi Militer sudah diambil.'
+        };
+      }
+
+      if (it.id === 'city_se_warung' || it.type === 'corner_warung') {
+        if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+          LRT.Audio.play('paper_rustle', { gain: 0.72 });
+          if (!it.used) LRT.Audio.play('loot_chime', { gain: 0.62 });
+        }
+        const fresh = !it.used;
+        it.used = true;
+        it.label = '[E] Termos Kopi & Bekal Pos Ronda (Sudah Diminum)';
+        it.prompt = it.label;
+        if (this._usedIds) this._usedIds.add(it.id);
+        this._syncStreetBeacons();
+        if (fresh) {
+          const pState = LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function' ? LRT.PlayerUI.getState() : null;
+          if (pState) pState.fastSprint = true;
+          _warungSprintTimer = 45.0;
+        }
+        return {
+          ok: true,
+          type: 'corner_warung',
+          action: 'street_stash',
+          heal: fresh ? 25 : 0,
+          healAmount: fresh ? 25 : 0,
+          fastSprint: fresh ? 45 : 0,
+          message: fresh ? 'Termos Kopi & Bekal Pos Ronda: +25 HP & Fast Sprint 45s aktif!' : 'Termos Kopi & Bekal Pos Ronda sudah habis.'
+        };
+      }
 
       if (it.type === 'power_box' || it.id === 'city_pln_box') {
         if (LRT.Audio && typeof LRT.Audio.play === 'function') {

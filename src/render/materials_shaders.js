@@ -228,16 +228,20 @@
       shutter260: [0.875, 0.0, 1.0, 0.5]
     },
     SIGN_UV: {
-      psdHeader: [0.0, 0.6875, 0.5, 1.0],
-      exitYellow: [0.5, 0.6875, 0.875, 1.0],
-      evakuasiGreen: [0.875, 0.6875, 1.0, 1.0],
-      smartTravelAd: [0.0, 0.296875, 0.5, 0.6875],
-      safetyWarn: [0.5, 0.296875, 0.8125, 0.6875],
-      hydrantRed: [0.8125, 0.296875, 1.0, 0.6875],
-      hydrantRedSolid: [0.8135, 0.32, 0.820, 0.66],
-      routeMap: [0.0, 0.0, 0.5, 0.296875],
-      callTrain: [0.5, 0.0, 0.75, 0.296875],
-      loketHeader: [0.75, 0.0, 1.0, 0.296875]
+      psdHeader: [0.0, 0.84375, 0.5, 1.0],
+      exitYellow: [0.5, 0.84375, 0.875, 1.0],
+      evakuasiGreen: [0.875, 0.84375, 1.0, 1.0],
+      smartTravelAd: [0.0, 0.6484375, 0.5, 0.84375],
+      safetyWarn: [0.5, 0.6484375, 0.8125, 0.84375],
+      hydrantRed: [0.8125, 0.6484375, 1.0, 0.84375],
+      hydrantRedSolid: [0.8135, 0.66, 0.820, 0.83],
+      routeMap: [0.0, 0.5, 0.5, 0.6484375],
+      callTrain: [0.5, 0.5, 0.75, 0.6484375],
+      loketHeader: [0.75, 0.5, 1.0, 0.6484375],
+      psdHeaderP2: [0.0, 0.34375, 0.5, 0.5],
+      peron1: [0.5, 0.34375, 1.0, 0.5],
+      peron2: [0.0, 0.1875, 0.5, 0.34375],
+      jpoWayfinding: [0.0, 0.0, 1.0, 0.1875]
     },
 
     setEnvironmentTexture: function (envTexOrKey, scene, renderer) {
@@ -862,10 +866,12 @@
       }
 
       ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
       ctx.fillStyle = '#FFFFFF';
       ctx.font = 'bold 34px sans-serif';
       ctx.fillText(cfg.name || 'Dukuh Atas BSI', textStartX, 64);
       etx.textAlign = 'left';
+      etx.textBaseline = 'alphabetic';
       etx.fillStyle = '#9EC5F8';
       etx.font = 'bold 34px sans-serif';
       etx.fillText(cfg.name || 'Dukuh Atas BSI', textStartX, 64);

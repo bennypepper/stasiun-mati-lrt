@@ -774,17 +774,12 @@
     const rail = (LRT.Station && typeof LRT.Station.getRailConfig === 'function')
       ? LRT.Station.getRailConfig()
       : { isIsland: false, track1X: 0.0, track2X: -4.70, platEdge1X: 1.46, platEdge2X: -6.16 };
-    const pState = LRT.PlayerUI ? LRT.PlayerUI.getState() : null;
-    const px = pState ? pState.pos.x : 3.0;
+    const archetypes = C.ARCHETYPES || [];
+    const totalStations = archetypes.length || 6;
     let dir = (dirOverride === -1 || dirOverride === 1) ? dirOverride : 0;
     if (dir === 0) {
-      if (CORE.stationIndex > 0) {
-        if (!rail.isIsland && px < 0) dir = -1;
-        else if (rail.isIsland && Math.abs(px - rail.track2X) < Math.abs(px - rail.track1X)) dir = -1;
-        else dir = 1;
-      } else {
-        dir = 1;
-      }
+      // [T] hotkey ALWAYS summons Peron 1 Forward Mission Train (never auto-backtracks on Island east side)
+      dir = 1;
     }
     if (dir === -1 && CORE.stationIndex <= 0) {
       if (LRT.Audio) LRT.Audio.play('station_chime', { gain: 0.55 });
@@ -816,24 +811,28 @@
       }
     }
 
-    const archetypes = C.ARCHETYPES || [];
-    const nextIdx = Math.max(0, CORE.stationIndex + dir);
-    const nextArch = archetypes.length ? archetypes[nextIdx % archetypes.length] : null;
-    const nextName = (dir === -1 ? '← ' : '') + ((nextArch && nextArch.name) || 'Stasiun Berikutnya');
+    const nextIdx = dir === -1
+      ? Math.max(0, CORE.stationIndex - 1)
+      : (CORE.stationIndex + 1) % totalStations;
+    const targetArch = archetypes.length ? archetypes[nextIdx] : null;
+    const isFinalExtraction = (dir === 1 && CORE.stationIndex >= totalStations - 1 && CORE.gameMode === MODES.SURVIVAL);
+    const targetName = isFinalExtraction
+      ? `ZONA EVAKUASI (${(targetArch && targetArch.name) || 'Dukuh Atas BSI'})`
+      : ((targetArch && targetArch.name) || (dir === -1 ? 'Stasiun Sebelumnya' : 'Stasiun Berikutnya'));
 
     CORE.activeTravelDir = dir;
     CORE.gameState = STATES.TRAIN_APPROACHING;
     LRT.Train.startApproach({
       trackX: dir === -1 ? rail.track2X : rail.track1X,
       direction: dir,
-      nextStationName: nextName
+      nextStationName: targetName
     });
     if (LRT.Audio) LRT.Audio.play('station_chime', { gain: 0.85 });
     LRT.PlayerUI.setNotice(
       dir === -1
-        ? `KERETA ARAH PULANG MENDEKATI PERON 2 (← ${nextArch ? nextArch.name : 'PREV'})`
-        : `KERETA LRT MENDEKATI PERON 1 (→ ${nextArch ? nextArch.name : 'NEXT'})`,
-      '#38bdf8'
+        ? `🟠 KERETA KEMBALI (PERON 2) MENUJU ${targetName} SEDANG MENDEKAT`
+        : `🟢 KERETA MAJU (PERON 1) MENUJU ${targetName} SEDANG MENDEKAT`,
+      dir === -1 ? '#f59e0b' : '#22c55e'
     );
     if (dir === 1 && CORE.gameMode === MODES.SURVIVAL) {
       campaignState.trainCallActive = true;
@@ -957,7 +956,8 @@
   }
 
   function handlePlayerHit(dmg, srcPos) {
-    if (CORE.gameMode === MODES.EXPLORATION || CORE.gameState === STATES.GAME_OVER) return;
+    const pState = (LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function') ? LRT.PlayerUI.getState() : null;
+    if ((pState && pState.fastTravelOpen) || CORE.gameMode === MODES.EXPLORATION || CORE.gameState === STATES.GAME_OVER) return;
     const died = LRT.PlayerUI.takeDamage(dmg, srcPos);
     if (died) {
       CORE.gameState = STATES.GAME_OVER;
@@ -1389,6 +1389,7 @@
   }
 
   function updateTrainCampaign(dt, pState) {
+    if (pState && pState.fastTravelOpen) return false;
     // Victory check 1.5s into cruise from Station 5 heading forward
     if (CORE.gameState === STATES.TRAIN_CRUISE && CORE.stationIndex === 5 && CORE.activeTravelDir === 1 && !campaignState.campaignVictory) {
       CORE.victoryCruiseTimer += dt;
@@ -1590,6 +1591,7 @@
   }
 
   function updateSurvivalAndVoChecks(dt, pState, stationGrid, trainCols, enemyOpts) {
+    if (pState && pState.fastTravelOpen) return;
     if (!CORE.tutorialActive) tickAutosave(dt);
     // Survival wave logic (plus animate/update any manually spawned zombies in exploration mode)
     const hasCustomZombies = LRT.Enemies && typeof LRT.Enemies.getAliveCount === 'function' && LRT.Enemies.getAliveCount() > 0;
@@ -1857,8 +1859,46 @@
   CORE.isStationPrimaryObjectiveComplete = isStationPrimaryObjectiveComplete;
   CORE.pickPlayerSpawnPos = pickPlayerSpawnPos;
   CORE.spawnCurrentWave = spawnCurrentWave;
+  function jumpToStation(idx) {
+    const total = (C.ARCHETYPES && C.ARCHETYPES.length) ? C.ARCHETYPES.length : 6;
+    const targetIdx = Math.max(0, Math.min(total - 1, idx | 0));
+    let st = null;
+    if (window.__LRT_DEBUG__ && typeof window.__LRT_DEBUG__.jumpToStation === 'function') {
+      st = window.__LRT_DEBUG__.jumpToStation(targetIdx);
+    } else {
+      saveCurrentStationUsedIds();
+      if (LRT.Station && LRT.Station.dispose) LRT.Station.dispose(CORE.scene);
+      if (LRT.Enemies && LRT.Enemies.reset) LRT.Enemies.reset();
+      if (LRT.Enemies && typeof LRT.Enemies.setDifficulty === 'function') LRT.Enemies.setDifficulty(CORE.difficultyKey);
+      if (LRT.Enemies && typeof LRT.Enemies.setAtmosphereMode === 'function') LRT.Enemies.setAtmosphereMode(getAtmosphereMode());
+      if (LRT.Train && LRT.Train.reset) LRT.Train.reset(CORE.gameMode);
+      CORE.stationIndex = targetIdx;
+      CORE.activeTravelDir = 1;
+      CORE.prevTrainState = 'AWAY';
+      CORE.rideCompleteReady = false;
+      CORE.gameState = STATES.STATION_ACTIVE;
+      if (typeof CORE.syncMenuLights === 'function') CORE.syncMenuLights();
+      st = typeof CORE.buildStation === 'function' ? CORE.buildStation(CORE.stationIndex, 0) : null;
+      const sp = (st && st.spawnPos) || pickPlayerSpawnPos();
+      if (LRT.PlayerUI && typeof LRT.PlayerUI.reset === 'function') {
+        LRT.PlayerUI.reset(sp, CORE.gameMode === MODES.EXPLORATION || !!CORE.tutorialActive, CORE.gameMode);
+      }
+      if (typeof CORE.updateCityVisibility === 'function') {
+        CORE.updateCityVisibility(LRT.PlayerUI ? LRT.PlayerUI.getState() : null);
+      }
+      if (typeof CORE.updateSunTracking === 'function') CORE.updateSunTracking(sp.x, sp.z);
+      if (typeof CORE.renderFrame === 'function') CORE.renderFrame();
+    }
+    campaignState.visitedStations.add(CORE.stationIndex);
+    if (CORE.gameMode === MODES.SURVIVAL && !CORE.tutorialActive && typeof writeSave === 'function') {
+      writeSave();
+    }
+    return st;
+  }
+
   CORE.summonTrain = summonTrain;
   CORE.departTrainNow = departTrainNow;
+  CORE.jumpToStation = jumpToStation;
   CORE.collectEnemyDrop = collectEnemyDrop;
   CORE.handleEnemyDrop = handleEnemyDrop;
   CORE.handlePlayerHit = handlePlayerHit;
@@ -1868,4 +1908,22 @@
   CORE.spawnStationRoamers = spawnStationRoamers;
   CORE.updateTrainCampaign = updateTrainCampaign;
   CORE.updateSurvivalAndVoChecks = updateSurvivalAndVoChecks;
+
+  const directorApi = LRT.Director || {};
+  directorApi.jumpToStation = jumpToStation;
+  directorApi.summonTrain = summonTrain;
+  directorApi.departTrainNow = departTrainNow;
+  directorApi.getCampaignState = () => campaignState;
+  Object.defineProperty(directorApi, 'stationIndex', {
+    configurable: true,
+    enumerable: true,
+    get: () => CORE.stationIndex,
+    set: (v) => { CORE.stationIndex = v | 0; }
+  });
+  Object.defineProperty(directorApi, 'activeTravelDir', {
+    configurable: true,
+    enumerable: true,
+    get: () => CORE.activeTravelDir
+  });
+  LRT.Director = directorApi;
 })(window.LRT = window.LRT || {});

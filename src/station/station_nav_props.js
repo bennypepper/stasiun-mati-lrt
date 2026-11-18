@@ -441,12 +441,879 @@
     });
   }
 
+  function makeCanvasTex(station, w, h, drawFn, repeat) {
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext('2d');
+    drawFn(ctx, w, h);
+    const tex = new THREE.CanvasTexture(c);
+    if ('colorSpace' in tex && THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+    if (repeat) {
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+    }
+    tex.anisotropy = 4;
+    tex.needsUpdate = true;
+    station.disposableTextures.push(tex);
+    return tex;
+  }
+
+  function addPbrPart(station, parent, geo, mat, x, y, z, rx, ry, rz) {
+    station.disposableGeometries.push(geo);
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x || 0, y || 0, z || 0);
+    if (rx) m.rotation.x = rx;
+    if (ry) m.rotation.y = ry;
+    if (rz) m.rotation.z = rz;
+    m.castShadow = false;
+    m.receiveShadow = true;
+    parent.add(m);
+    return m;
+  }
+
+  function addBenchProp(station, root, id, x, y, z, rotY, playerYaw, seatOffX, seatOffZ, standOffX, standOffZ, scaleX) {
+    const cityInt = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.city;
+    const benchProto = (cityInt && typeof cityInt.getParkBenchProto === 'function') ? cityInt.getParkBenchProto() : null;
+    const sx = scaleX || 1.0;
+    const cos = Math.abs(Math.cos(rotY));
+    const sin = Math.abs(Math.sin(rotY));
+    const bw = 1.90 * sx;
+    const bd = 0.68;
+    const hw = (cos * bw + sin * bd) * 0.5;
+    const hd = (sin * bw + cos * bd) * 0.5;
+
+    if (benchProto && benchProto.parts && benchProto.parts.length) {
+      const bGrp = new THREE.Group();
+      bGrp.position.set(x, y, z);
+      bGrp.rotation.y = rotY;
+      if (sx !== 1.0) bGrp.scale.set(sx, 1, 1);
+      for (let bp = 0; bp < benchProto.parts.length; bp++) {
+        const bm = new THREE.Mesh(benchProto.parts[bp].geo, benchProto.parts[bp].mat);
+        bm.castShadow = false;
+        bm.receiveShadow = true;
+        bGrp.add(bm);
+      }
+      root.add(bGrp);
+    } else {
+      const bGrp = new THREE.Group();
+      bGrp.position.set(x, y, z);
+      bGrp.rotation.y = rotY;
+      const ironMat = new THREE.MeshStandardMaterial({ color: 0x242a32, roughness: 0.45, metalness: 0.72 });
+      const teakMat = new THREE.MeshStandardMaterial({ color: 0x7c4d2c, roughness: 0.72, metalness: 0.05 });
+      station.disposableMaterials.push(ironMat, teakMat);
+      addPbrPart(station, bGrp, new THREE.BoxGeometry(1.76 * sx, 0.05, 0.48), teakMat, 0, 0.45, 0.02);
+      addPbrPart(station, bGrp, new THREE.BoxGeometry(1.76 * sx, 0.36, 0.05), teakMat, 0, 0.68, -0.22, -0.14);
+      for (const lx of [-0.76 * sx, 0.76 * sx]) {
+        addPbrPart(station, bGrp, new THREE.BoxGeometry(0.08, 0.44, 0.54), ironMat, lx, 0.22, 0);
+      }
+      root.add(bGrp);
+    }
+
+    station._addCollider(x - hw, y, z - hd, x + hw, y + 0.88, z + hd, 'wood', { blocksBullets: false });
+    station.interactables.push({
+      id: id,
+      type: 'bench',
+      sittable: true,
+      x: x,
+      y: y + 0.55,
+      z: z,
+      seatPos: { x: x + seatOffX, y: y + 0.02, z: z + seatOffZ },
+      standPos: { x: x + standOffX, y: y + 0.02, z: z + standOffZ },
+      yaw: playerYaw,
+      label: '[E] Duduk di Bangku Stasiun',
+      prompt: '[E] Duduk di Bangku Stasiun'
+    });
+  }
+
+  function addTrashBinProp(station, root, x, y, z) {
+    const cityInt = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.city;
+    const trashProto = (cityInt && typeof cityInt.getTrashCanProto === 'function') ? cityInt.getTrashCanProto() : null;
+    if (trashProto && trashProto.parts && trashProto.parts.length) {
+      const tGrp = new THREE.Group();
+      tGrp.position.set(x, y, z);
+      for (let tp = 0; tp < trashProto.parts.length; tp++) {
+        const tm = new THREE.Mesh(trashProto.parts[tp].geo, trashProto.parts[tp].mat);
+        tm.castShadow = false;
+        tm.receiveShadow = true;
+        tGrp.add(tm);
+      }
+      root.add(tGrp);
+    } else {
+      const binMat = new THREE.MeshStandardMaterial({ color: 0x1e5c3a, roughness: 0.48, metalness: 0.35 });
+      const lidMat = new THREE.MeshStandardMaterial({ color: 0x262c34, roughness: 0.36, metalness: 0.65 });
+      station.disposableMaterials.push(binMat, lidMat);
+      addPbrPart(station, root, new THREE.CylinderGeometry(0.24, 0.21, 0.76, 10), binMat, x, y + 0.38, z);
+      addPbrPart(station, root, new THREE.CylinderGeometry(0.26, 0.25, 0.08, 10), lidMat, x, y + 0.78, z);
+    }
+    station._addCollider(x - 0.28, y, z - 0.28, x + 0.28, y + 0.92, z + 0.28, 'metal', { blocksBullets: false });
+  }
+
+  function buildWalkInIndomaret(station, ctx, indoX, indoZ, indoYaw) {
+    const { root, glassRecords } = ctx;
+    const cos = Math.cos(indoYaw);
+    const sin = Math.sin(indoYaw);
+    const inW = (lx, lz) => [indoX + lx * cos + lz * sin, indoZ - lx * sin + lz * cos];
+    const addIndoCollider = (lx, lz, w, d, minY, maxY, tag, opts) => {
+      const [wx, wz] = inW(lx, lz);
+      const hw = (Math.abs(cos) * w + Math.abs(sin) * d) * 0.5;
+      const hd = (Math.abs(sin) * w + Math.abs(cos) * d) * 0.5;
+      return station._addCollider(wx - hw, minY, wz - hd, wx + hw, maxY, wz + hd, tag || 'metal', opts);
+    };
+
+    const grp = new THREE.Group();
+    grp.name = 'IndomaretPointWalkIn';
+    grp.position.set(indoX, 0, indoZ);
+    grp.rotation.y = indoYaw;
+    root.add(grp);
+
+    // Rich PBR materials & procedural CanvasTextures
+    const floorTex = makeCanvasTex(station, 256, 256, (c, w, h) => {
+      c.fillStyle = '#e6e4de';
+      c.fillRect(0, 0, w, h);
+      const step = 64;
+      for (let y = 0; y < h; y += step) {
+        for (let x = 0; x < w; x += step) {
+          c.fillStyle = ((x / step + y / step) & 1) ? '#dcd9d1' : '#ebe9e3';
+          c.fillRect(x + 2, y + 2, step - 4, step - 4);
+        }
+      }
+      c.strokeStyle = '#b4b0a6';
+      c.lineWidth = 2;
+      for (let i = 0; i <= w; i += step) {
+        c.beginPath(); c.moveTo(i, 0); c.lineTo(i, h); c.stroke();
+        c.beginPath(); c.moveTo(0, i); c.lineTo(w, i); c.stroke();
+      }
+    }, true);
+    floorTex.repeat.set(3, 2);
+
+    const fasciaMap = makeCanvasTex(station, 512, 128, (c, w, h) => {
+      c.fillStyle = '#183f82';
+      c.fillRect(0, 0, 272, h);
+      c.fillStyle = '#1e509e';
+      c.fillRect(0, 0, 272, 74);
+      c.fillStyle = '#d62328';
+      c.fillRect(0, 74, 272, 30);
+      c.fillStyle = '#f5c71a';
+      c.fillRect(0, 104, 272, 24);
+      c.fillStyle = '#ffffff';
+      c.font = 'bold 26px sans-serif';
+      c.fillText('INDOMARET', 18, 42);
+      c.font = 'bold 17px sans-serif';
+      c.fillStyle = '#fde68a';
+      c.fillText('POINT  •  MINIMARKET', 18, 66);
+
+      c.fillStyle = '#161f1b';
+      c.fillRect(272, 0, 240, h);
+      c.fillStyle = '#0e7c41';
+      c.fillRect(272, 0, 240, 18);
+      c.fillRect(272, 110, 240, 18);
+      c.fillStyle = '#f8fafc';
+      c.font = 'bold 26px sans-serif';
+      c.fillText('POINT COFFEE', 288, 56);
+      c.fillStyle = '#4ade80';
+      c.font = 'bold 14px sans-serif';
+      c.fillText('FRESH BREW  •  COLD DRINKS', 288, 86);
+    }, false);
+    const fasciaEm = makeCanvasTex(station, 512, 128, (c) => {
+      c.fillStyle = '#102956';
+      c.fillRect(0, 0, 272, 74);
+      c.fillStyle = '#4f0c0e';
+      c.fillRect(0, 74, 272, 30);
+      c.fillStyle = '#5c4806';
+      c.fillRect(0, 104, 272, 24);
+      c.fillStyle = '#ffffff';
+      c.font = 'bold 26px sans-serif';
+      c.fillText('INDOMARET', 18, 42);
+      c.fillStyle = '#0b1812';
+      c.fillRect(272, 0, 240, 128);
+      c.fillStyle = '#0c8c48';
+      c.fillRect(272, 0, 240, 18);
+      c.fillRect(272, 110, 240, 18);
+      c.fillStyle = '#d9fce6';
+      c.font = 'bold 26px sans-serif';
+      c.fillText('POINT COFFEE', 288, 56);
+    }, false);
+
+    const chillerMap = makeCanvasTex(station, 512, 512, (c, w, h) => {
+      c.fillStyle = '#0e1726';
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = '#164e8c';
+      c.fillRect(10, 10, w - 20, 56);
+      c.fillStyle = '#ffffff';
+      c.font = 'bold 24px sans-serif';
+      c.textAlign = 'center';
+      c.fillText('CHILLER MINUMAN DINGIN', w * 0.5, 47);
+
+      // Twin refrigerated glass bays
+      for (const bayX of [16, 264]) {
+        c.fillStyle = '#cbe7f7';
+        c.fillRect(bayX, 76, 232, 418);
+        c.strokeStyle = '#1e293b';
+        c.lineWidth = 6;
+        c.strokeRect(bayX, 76, 232, 418);
+        const palette = ['#ef4444', '#16a34a', '#2563eb', '#eab308', '#f97316', '#06b6d4', '#8b5cf6'];
+        for (let row = 0; row < 5; row++) {
+          const sy = 96 + row * 78;
+          c.fillStyle = '#334155';
+          c.fillRect(bayX + 6, sy + 56, 220, 8);
+          for (let col = 0; col < 7; col++) {
+            const bx = bayX + 16 + col * 30;
+            const bCol = palette[(row * 3 + col) % palette.length];
+            c.fillStyle = '#0f172a';
+            c.fillRect(bx + 5, sy + 6, 10, 7);
+            c.fillStyle = bCol;
+            c.fillRect(bx, sy + 13, 20, 42);
+            c.fillStyle = '#f8fafc';
+            c.fillRect(bx + 2, sy + 24, 16, 11);
+          }
+        }
+      }
+    }, false);
+    const chillerEm = makeCanvasTex(station, 512, 512, (c, w) => {
+      c.fillStyle = '#000000';
+      c.fillRect(0, 0, w, 512);
+      c.fillStyle = '#1e5aa8';
+      c.fillRect(10, 10, w - 20, 56);
+      c.fillStyle = '#dbeafe';
+      c.font = 'bold 24px sans-serif';
+      c.textAlign = 'center';
+      c.fillText('CHILLER MINUMAN DINGIN', w * 0.5, 47);
+      for (const bayX of [20, 268]) {
+        c.fillStyle = '#2b5570';
+        c.fillRect(bayX, 82, 224, 406);
+      }
+    }, false);
+
+    const menuMap = makeCanvasTex(station, 512, 256, (c, w, h) => {
+      c.fillStyle = '#161b18';
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = '#0e7c41';
+      c.fillRect(0, 0, w, 52);
+      c.fillStyle = '#e5b82e';
+      c.fillRect(0, 52, w, 6);
+      c.fillStyle = '#ffffff';
+      c.font = 'bold 28px sans-serif';
+      c.fillText('POINT COFFEE  •  MENU', 20, 36);
+      const items = [
+        ['Palm Sugar Latte', 'Rp 22K'],
+        ['Espresso Double Shot', 'Rp 18K'],
+        ['Matcha Green Tea', 'Rp 25K'],
+        ['Cold Brew Boost (+HP/Sprint)', 'GRATIS [E]']
+      ];
+      c.font = 'bold 19px sans-serif';
+      for (let i = 0; i < items.length; i++) {
+        const y = 96 + i * 38;
+        c.fillStyle = i === 3 ? '#4ade80' : '#f1f5f9';
+        c.textAlign = 'left';
+        c.fillText(items[i][0], 22, y);
+        c.textAlign = 'right';
+        c.fillStyle = i === 3 ? '#fde047' : '#cbd5e1';
+        c.fillText(items[i][1], w - 22, y);
+      }
+    }, false);
+    const menuEm = makeCanvasTex(station, 512, 256, (c, w, h) => {
+      c.fillStyle = '#0b120e';
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = '#0c8c48';
+      c.fillRect(0, 0, w, 52);
+      c.fillStyle = '#d1fae5';
+      c.font = 'bold 28px sans-serif';
+      c.fillText('POINT COFFEE  •  MENU', 20, 36);
+      c.font = 'bold 19px sans-serif';
+      c.fillStyle = '#4ade80';
+      c.fillText('Cold Brew Boost (+HP/Sprint)', 22, 210);
+    }, false);
+
+    const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.42, metalness: 0.08 });
+    const wallTileMat = new THREE.MeshStandardMaterial({ color: 0xeaece9, roughness: 0.45, metalness: 0.06 });
+    const steelMat = new THREE.MeshStandardMaterial({ color: 0x262c36, roughness: 0.36, metalness: 0.72 });
+    const brushedMat = new THREE.MeshStandardMaterial({ color: 0xd4dae0, roughness: 0.24, metalness: 0.86 });
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x7c4f2e, roughness: 0.66, metalness: 0.06 });
+    const navyAccentMat = new THREE.MeshStandardMaterial({ color: 0x1e509e, roughness: 0.40, metalness: 0.25 });
+    const redAccentMat = new THREE.MeshStandardMaterial({ color: 0xd62328, roughness: 0.40, metalness: 0.22 });
+    const greenAccentMat = new THREE.MeshStandardMaterial({ color: 0x0e7c41, roughness: 0.42, metalness: 0.20 });
+    const fasciaMat = new THREE.MeshStandardMaterial({
+      map: fasciaMap, emissive: new THREE.Color(0xffffff), emissiveMap: fasciaEm, emissiveIntensity: 0.68, roughness: 0.36, metalness: 0.18
+    });
+    const chillerMat = new THREE.MeshStandardMaterial({
+      map: chillerMap, emissive: new THREE.Color(0xffffff), emissiveMap: chillerEm, emissiveIntensity: 0.75, roughness: 0.22, metalness: 0.16
+    });
+    const menuMat = new THREE.MeshStandardMaterial({
+      map: menuMap, emissive: new THREE.Color(0xffffff), emissiveMap: menuEm, emissiveIntensity: 0.65, roughness: 0.32, metalness: 0.15
+    });
+    const ceilGlowMat = new THREE.MeshStandardMaterial({
+      color: 0xf8fafc, emissive: new THREE.Color(0xfff1d6), emissiveIntensity: 1.25, roughness: 0.25
+    });
+    const pastryGlassMat = new THREE.MeshPhysicalMaterial({
+      color: 0xdbeafe, roughness: 0.06, metalness: 0.08, transparent: true, opacity: 0.34, depthWrite: false
+    });
+    const pastryBunMat = new THREE.MeshStandardMaterial({ color: 0xc87a35, roughness: 0.62, metalness: 0.05 });
+
+    station.disposableMaterials.push(
+      floorMat, wallTileMat, steelMat, brushedMat, woodMat, navyAccentMat, redAccentMat,
+      greenAccentMat, fasciaMat, chillerMat, menuMat, ceilGlowMat, pastryGlassMat, pastryBunMat
+    );
+
+    // 1) Floor reveal & threshold (walkable height 0.04m, well below 0.36m stepHeight)
+    addPbrPart(station, grp, new THREE.BoxGeometry(5.64, 0.03, 3.64), steelMat, 0, 0.015, 0);
+    addPbrPart(station, grp, new THREE.BoxGeometry(5.46, 0.04, 3.46), floorMat, 0, 0.02, 0);
+    addPbrPart(station, grp, new THREE.BoxGeometry(2.40, 0.02, 0.22), brushedMat, 0, 0.01, 1.72);
+
+    // 2) Walk-in shell: Back Wall, Left Wall, Right Wall + Open Front Wings (lx in [-1.20 .. +1.20] OPEN!)
+    addPbrPart(station, grp, new THREE.BoxGeometry(5.60, 2.42, 0.16), wallTileMat, 0, 1.21, -1.72);
+    addPbrPart(station, grp, new THREE.BoxGeometry(5.44, 0.12, 0.04), navyAccentMat, 0, 2.26, -1.63);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.16, 2.42, 3.60), wallTileMat, -2.72, 1.21, 0);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.16, 2.42, 3.60), wallTileMat, 2.72, 1.21, 0);
+    // Exterior decorative cladding stripes on side walls
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.04, 0.16, 3.44), redAccentMat, -2.81, 2.22, 0);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.04, 0.16, 3.44), greenAccentMat, 2.81, 2.22, 0);
+
+    addIndoCollider(0, -1.72, 5.60, 0.16, 0, 2.95, 'concrete');
+    addIndoCollider(-2.72, 0, 0.16, 3.60, 0, 2.95, 'concrete');
+    addIndoCollider(2.72, 0, 0.16, 3.60, 0, 2.95, 'concrete');
+
+    // Front-Left & Front-Right storefront window wings (1.52m each, leaving exact 2.40m central doorway!)
+    for (const sgn of [-1, 1]) {
+      const wx = sgn * 1.96;
+      addPbrPart(station, grp, new THREE.BoxGeometry(1.52, 0.56, 0.16), wallTileMat, wx, 0.28, 1.72);
+      addPbrPart(station, grp, new THREE.BoxGeometry(1.52, 0.06, 0.18), brushedMat, wx, 0.57, 1.72);
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.14, 2.42, 0.18), steelMat, sgn * 2.70, 1.21, 1.72);
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.10, 2.42, 0.18), steelMat, sgn * 1.24, 1.21, 1.72);
+      // Mullion walk collider + solid knee wall & steel jamb bullet colliders + shatterable storefront glass above knee wall
+      addIndoCollider(wx, 1.72, 1.52, 0.18, 0, 2.42, 'metal', { blocksWalk: true, blocksBullets: false });
+      addIndoCollider(wx, 1.72, 1.52, 0.18, 0, 0.58, 'concrete', { blocksWalk: true, blocksBullets: true });
+      addIndoCollider(sgn * 1.24, 1.72, 0.10, 0.18, 0, 2.42, 'metal', { blocksWalk: true, blocksBullets: true });
+
+      const gPos = inW(wx, 1.72);
+      const cWin = addIndoCollider(wx, 1.72, 1.34, 0.10, 0.60, 2.32, 'glass', { blocksWalk: false, blocksBullets: true });
+      glassRecords.push({
+        cx: gPos[0], cy: 1.46, cz: gPos[1], w: 1.34, h: 1.72, d: 0.04,
+        ry: indoYaw, hp: 20, isPsdDoor: false, psdDoorIdx: -1, slideSign: 0, colliderIdx: cWin
+      });
+    }
+    // Overhead doorway header beam (y = 2.32..2.44)
+    addPbrPart(station, grp, new THREE.BoxGeometry(5.60, 0.12, 0.18), steelMat, 0, 2.38, 1.72);
+
+    // 3) Roof soffit, warm ceiling light & illuminated Indomaret Point / Point Coffee fascia (H = 2.95m)
+    addPbrPart(station, grp, new THREE.BoxGeometry(5.74, 0.10, 3.74), steelMat, 0, 2.45, 0.04);
+    addPbrPart(station, grp, new THREE.BoxGeometry(4.60, 0.03, 1.60), ceilGlowMat, 0, 2.39, -0.10);
+    addPbrPart(station, grp, new THREE.BoxGeometry(5.62, 0.42, 3.62), fasciaMat, 0, 2.71, 0);
+    addPbrPart(station, grp, new THREE.BoxGeometry(5.76, 0.04, 3.76), steelMat, 0, 2.93, 0);
+
+    // 4) Interior Left Bay: Illuminated 2-door glass Beverage Chiller
+    addPbrPart(station, grp, new THREE.BoxGeometry(1.90, 2.16, 0.58), steelMat, -1.55, 1.12, -1.32);
+    addPbrPart(station, grp, new THREE.BoxGeometry(1.80, 2.04, 0.04), chillerMat, -1.55, 1.12, -1.02);
+    for (const hX of [-1.62, -1.48]) {
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.03, 0.42, 0.04), brushedMat, hX, 1.08, -0.99);
+    }
+    addIndoCollider(-1.55, -1.32, 1.92, 0.60, 0, 2.20, 'metal', { blocksWalk: true });
+
+    // 5) Interior Left-Center: Stocked Snack Gondola Shelves
+    addPbrPart(station, grp, new THREE.BoxGeometry(1.34, 1.30, 0.10), steelMat, -1.78, 0.69, 0.35);
+    for (const sx of [-2.42, -1.14]) {
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.06, 1.32, 0.44), steelMat, sx, 0.70, 0.35);
+    }
+    const snackPalette = [redAccentMat, navyAccentMat, greenAccentMat, pastryBunMat];
+    for (let tier = 0; tier < 4; tier++) {
+      const sy = 0.24 + tier * 0.32;
+      addPbrPart(station, grp, new THREE.BoxGeometry(1.26, 0.04, 0.42), brushedMat, -1.78, sy, 0.35);
+      for (let pk = 0; pk < 5; pk++) {
+        const px = -2.26 + pk * 0.24;
+        const pMat = snackPalette[(tier + pk) % snackPalette.length];
+        addPbrPart(station, grp, new THREE.BoxGeometry(0.16, 0.20, 0.14), pMat, px, sy + 0.12, 0.24);
+        addPbrPart(station, grp, new THREE.BoxGeometry(0.16, 0.18, 0.14), snackPalette[(tier + pk + 1) % snackPalette.length], px, sy + 0.11, 0.46);
+      }
+    }
+    addIndoCollider(-1.78, 0.35, 1.38, 0.48, 0, 1.38, 'metal', { blocksWalk: true });
+
+    // 6) Interior Right Bay: Point Coffee Bar Counter, Espresso Machine, Pastry Display & Menu Board
+    addPbrPart(station, grp, new THREE.BoxGeometry(2.04, 0.08, 0.52), steelMat, 1.45, 0.08, -0.25);
+    addPbrPart(station, grp, new THREE.BoxGeometry(2.06, 0.84, 0.56), woodMat, 1.45, 0.52, -0.25);
+    addPbrPart(station, grp, new THREE.BoxGeometry(2.14, 0.06, 0.66), brushedMat, 1.45, 0.97, -0.25);
+    addPbrPart(station, grp, new THREE.BoxGeometry(2.10, 0.86, 0.46), steelMat, 1.45, 0.47, -1.38);
+    addPbrPart(station, grp, new THREE.BoxGeometry(2.14, 0.05, 0.50), brushedMat, 1.45, 0.92, -1.38);
+
+    // 2-Group Commercial Espresso Machine
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.56, 0.36, 0.40), steelMat, 0.88, 1.18, -0.25);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.52, 0.06, 0.34), brushedMat, 0.88, 1.38, -0.25);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.58, 0.04, 0.16), brushedMat, 0.88, 1.02, -0.02);
+    // Cup stacks & POS Register
+    addPbrPart(station, grp, new THREE.CylinderGeometry(0.045, 0.038, 0.24, 10), greenAccentMat, 1.24, 1.12, -0.24);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.32, 0.22, 0.18), steelMat, 1.50, 1.11, -0.25);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.26, 0.16, 0.03), chillerMat, 1.50, 1.24, -0.20, -0.35);
+    // Glass Pastry Display Case with golden croissants/buns
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.58, 0.06, 0.38), steelMat, 2.02, 1.03, -0.24);
+    for (const bx of [1.86, 2.02, 2.18]) {
+      addPbrPart(station, grp, new THREE.SphereGeometry(0.055, 8, 6), pastryBunMat, bx, 1.10, -0.24);
+    }
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.56, 0.26, 0.36), pastryGlassMat, 2.02, 1.19, -0.24);
+
+    // Backlit Point Coffee Menu Board on Rear Wall
+    addPbrPart(station, grp, new THREE.BoxGeometry(2.12, 0.82, 0.05), steelMat, 1.45, 1.72, -1.61);
+    addPbrPart(station, grp, new THREE.BoxGeometry(2.04, 0.74, 0.06), menuMat, 1.45, 1.72, -1.59);
+
+    addIndoCollider(1.45, -0.25, 2.12, 0.66, 0, 1.36, 'wood', { blocksWalk: true });
+    addIndoCollider(1.45, -1.38, 2.12, 0.50, 0, 1.18, 'wood', { blocksWalk: true });
+
+    // 7) Interactive Chiller Minuman & Point Coffee inside store (radius: 2.3)
+    const chillIntP = inW(-1.15, -0.95);
+    const chillUsed = station._usedIds.has('indomaret_chiller');
+    station.interactables.push({
+      id: 'indomaret_chiller',
+      type: 'indomaret_chiller',
+      x: chillIntP[0],
+      y: 1.15,
+      z: chillIntP[1],
+      radius: 2.3,
+      label: chillUsed ? '[E] Chiller Indomaret & Point Coffee (Sudah Diambil)' : '[E] Ambil Minuman Dingin & Point Coffee (+20 HP & +15s Fast Sprint)',
+      prompt: chillUsed ? '[E] Chiller Indomaret & Point Coffee (Sudah Diambil)' : '[E] Ambil Minuman Dingin & Point Coffee (+20 HP & +15s Fast Sprint)',
+      used: chillUsed
+    });
+
+    const walkIn = inW(-0.35, 0.55);
+    const frontDoor = inW(0, 2.55);
+    const warmCtr = inW(0, 0.1);
+    return {
+      walkInPos: { x: walkIn[0], y: 0.05, z: walkIn[1], yaw: indoYaw },
+      frontPos: { x: frontDoor[0], y: 0.05, z: frontDoor[1], yaw: indoYaw },
+      warmAnchor: { x: warmCtr[0], y: 2.25, z: warmCtr[1] }
+    };
+  }
+
+  function buildDetailedJaklingkoKiosk(station, root, x, z, yaw) {
+    const grp = new THREE.Group();
+    grp.name = 'JakLingkoKiosk3D';
+    grp.position.set(x, 0, z);
+    grp.rotation.y = yaw;
+    root.add(grp);
+
+    const headerMap = makeCanvasTex(station, 256, 128, (c, w, h) => {
+      c.fillStyle = '#143d87';
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = '#38bdf8';
+      c.fillRect(0, 108, w, 20);
+      c.fillStyle = '#ffffff';
+      c.font = 'bold 30px sans-serif';
+      c.textAlign = 'center';
+      c.fillText('JAKLINGKO', w * 0.5, 52);
+      c.font = 'bold 16px sans-serif';
+      c.fillStyle = '#bae6fd';
+      c.fillText('TOP UP KUE / E-MONEY', w * 0.5, 86);
+    }, false);
+    const screenMap = makeCanvasTex(station, 256, 256, (c, w, h) => {
+      c.fillStyle = '#0c1c36';
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = '#0284c7';
+      c.fillRect(14, 14, w - 28, 46);
+      c.fillStyle = '#ffffff';
+      c.font = 'bold 18px sans-serif';
+      c.textAlign = 'center';
+      c.fillText('PILIH NOMINAL TOP UP', w * 0.5, 44);
+      const btns = ['Rp 20.000', 'Rp 50.000', 'Rp 100.000', 'QRIS / NFC'];
+      for (let i = 0; i < 4; i++) {
+        const bx = 18 + (i % 2) * 114;
+        const by = 78 + Math.floor(i / 2) * 74;
+        c.fillStyle = i === 3 ? '#16a34a' : '#1d4ed8';
+        c.fillRect(bx, by, 104, 58);
+        c.fillStyle = '#f8fafc';
+        c.font = 'bold 15px sans-serif';
+        c.fillText(btns[i], bx + 52, by + 34);
+      }
+    }, false);
+
+    const brushedMat = new THREE.MeshStandardMaterial({ color: 0xd0d7e0, roughness: 0.24, metalness: 0.88 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.42, metalness: 0.58 });
+    const blueMat = new THREE.MeshStandardMaterial({ color: 0x1a4ba0, roughness: 0.36, metalness: 0.28 });
+    const headerMat = new THREE.MeshStandardMaterial({
+      map: headerMap, emissive: new THREE.Color(0xffffff), emissiveMap: headerMap, emissiveIntensity: 0.58, roughness: 0.32
+    });
+    const screenMat = new THREE.MeshStandardMaterial({
+      map: screenMap, emissive: new THREE.Color(0xffffff), emissiveMap: screenMap, emissiveIntensity: 0.88, roughness: 0.16
+    });
+    const nfcLedMat = new THREE.MeshStandardMaterial({
+      color: 0x22d3ee, emissive: new THREE.Color(0x10b981), emissiveIntensity: 1.5, roughness: 0.20
+    });
+    station.disposableMaterials.push(brushedMat, darkMat, blueMat, headerMat, screenMat, nfcLedMat);
+
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.92, 0.08, 0.72), darkMat, 0, 0.04, 0);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.76, 1.92, 0.54), blueMat, 0, 1.04, -0.02);
+    for (const sx of [-0.40, 0.40]) {
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.08, 1.98, 0.62), brushedMat, sx, 1.07, 0);
+    }
+    // Top backlit header box
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.84, 0.28, 0.64), darkMat, 0, 1.94, 0);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.76, 0.22, 0.03), headerMat, 0, 1.94, 0.32);
+    // Sloped touchscreen bezel & screen
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.70, 0.54, 0.22), darkMat, 0, 1.38, 0.20, -0.32);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.58, 0.42, 0.04), screenMat, 0, 1.38, 0.30, -0.32);
+    // Utility tray shelf (top flush at y = 1.04, z = +0.44 in local space) + NFC pad & LED
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.74, 0.05, 0.32), brushedMat, 0, 1.015, 0.42);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.22, 0.03, 0.16), darkMat, -0.22, 1.05, 0.42);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.18, 0.015, 0.04), nfcLedMat, -0.22, 1.07, 0.46);
+    // Bill acceptor & card dispenser pocket
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.24, 0.10, 0.06), darkMat, 0.18, 0.84, 0.26);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.52, 0.22, 0.06), darkMat, 0, 0.52, 0.26);
+
+    station._addCollider(x - 0.48, 0, z - 0.44, x + 0.48, 2.10, z + 0.44, 'metal');
+  }
+
+  function buildDetailedCowayStation(station, root, x, z, yaw) {
+    const grp = new THREE.Group();
+    grp.name = 'CowayStation3D';
+    grp.position.set(x, 0, z);
+    grp.rotation.y = yaw;
+    root.add(grp);
+
+    const headerMap = makeCanvasTex(station, 256, 128, (c, w, h) => {
+      c.fillStyle = '#d41e2a';
+      c.fillRect(0, 0, w, 78);
+      c.fillStyle = '#f1f5f9';
+      c.fillRect(0, 78, w, 50);
+      c.fillStyle = '#ffffff';
+      c.font = 'bold 34px sans-serif';
+      c.textAlign = 'center';
+      c.fillText('coway', w * 0.5, 50);
+      c.fillStyle = '#1e3a8a';
+      c.font = 'bold 16px sans-serif';
+      c.fillText('AIR MINUM STERIL RO GRATIS', w * 0.5, 110);
+    }, false);
+
+    const whiteMat = new THREE.MeshStandardMaterial({ color: 0xeef3f6, roughness: 0.28, metalness: 0.12 });
+    const steelMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.22, metalness: 0.88 });
+    const darkNicheMat = new THREE.MeshStandardMaterial({ color: 0x1e252e, roughness: 0.42, metalness: 0.68 });
+    const headerMat = new THREE.MeshStandardMaterial({
+      map: headerMap, emissive: new THREE.Color(0xffffff), emissiveMap: headerMap, emissiveIntensity: 0.45, roughness: 0.32
+    });
+    const hotLedMat = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: new THREE.Color(0xef4444), emissiveIntensity: 1.5 });
+    const coldLedMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: new THREE.Color(0x38bdf8), emissiveIntensity: 1.5 });
+    const okLedMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: new THREE.Color(0x22c55e), emissiveIntensity: 1.4 });
+    station.disposableMaterials.push(whiteMat, steelMat, darkNicheMat, headerMat, hotLedMat, coldLedMat, okLedMat);
+
+    // Base plinth & upright white body with stainless trim pillars
+    addPbrPart(station, grp, new THREE.BoxGeometry(1.14, 0.08, 0.64), darkNicheMat, 0, 0.04, 0);
+    addPbrPart(station, grp, new THREE.BoxGeometry(1.06, 1.84, 0.50), whiteMat, 0, 1.00, -0.04);
+    for (const sx of [-0.52, 0.52]) {
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.06, 1.86, 0.56), steelMat, sx, 1.01, -0.01);
+    }
+    // Top Coway illuminated branding fascia
+    addPbrPart(station, grp, new THREE.BoxGeometry(1.04, 0.34, 0.56), whiteMat, 0, 1.74, -0.01);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.96, 0.30, 0.04), headerMat, 0, 1.74, 0.27);
+    // Recessed stainless water dispensing niche framed by upper/lower cheeks & side panels
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.76, 0.14, 0.16), whiteMat, 0, 1.44, 0.21);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.16, 0.60, 0.16), whiteMat, -0.44, 1.08, 0.21);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.16, 0.60, 0.16), whiteMat, 0.44, 1.08, 0.21);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.72, 0.56, 0.04), darkNicheMat, 0, 1.08, 0.18);
+    // Perforated stainless drip tray shelf
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.74, 0.06, 0.22), steelMat, 0, 0.77, 0.24);
+    // Dual chrome spigots (Hot + Cold) + Hot/Cold/Normal status LEDs
+    addPbrPart(station, grp, new THREE.CylinderGeometry(0.022, 0.018, 0.12, 8), steelMat, -0.16, 1.24, 0.25);
+    addPbrPart(station, grp, new THREE.CylinderGeometry(0.022, 0.018, 0.12, 8), steelMat, 0.16, 1.24, 0.25);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.08, 0.03, 0.02), hotLedMat, -0.16, 1.44, 0.29);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.08, 0.03, 0.02), okLedMat, 0, 1.44, 0.29);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.08, 0.03, 0.02), coldLedMat, 0.16, 1.44, 0.29);
+    // Lower filtration access door
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.92, 0.68, 0.10), whiteMat, 0, 0.40, 0.22);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.14, 0.03, 0.03), steelMat, 0, 0.62, 0.28);
+
+    station._addCollider(x - 0.60, 0, z - 0.36, x + 0.60, 1.98, z + 0.36, 'metal');
+  }
+
+  function buildCallTrainPidsSign(station, ctx, x, z, isPrev, destName) {
+    const { root, getCanopyArchY, isCawang, jpoZ, jpoNearZ, jpoFarZ } = ctx;
+    const grp = new THREE.Group();
+    grp.name = isPrev ? 'CallTrainConsoleP2' : 'CallTrainConsoleP1';
+    root.add(grp);
+
+    const accentHex = isPrev ? 0xf59e0b : 0x10b981;
+    const ledMat = new THREE.MeshStandardMaterial({
+      color: accentHex, emissive: new THREE.Color(accentHex), emissiveIntensity: 1.75, roughness: 0.22, metalness: 0.15
+    });
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x1e2530, roughness: 0.42, metalness: 0.72 });
+    station.disposableMaterials.push(ledMat, frameMat);
+
+    // Console color-coded base & hood LED strips
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.48, 0.06, 0.48), ledMat, x, 0.05, z);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.48, 0.04, 0.48), ledMat, x, 1.44, z);
+
+    // Overhead Platform PIDS Signboard (y = 3.10m, suspended clear of Cawang JPO soffit & canopies)
+    const signY = 3.10;
+    const signW = 2.24;
+    const signH = 0.56;
+    const roofY = (isCawang && z >= jpoNearZ - 0.5 && z <= jpoFarZ + 0.5)
+      ? 3.97
+      : (getCanopyArchY(x) + 0.08);
+    const rodLen = Math.max(0.25, roofY - (signY + signH * 0.5));
+
+    const pidsMap = makeCanvasTex(station, 512, 160, (c, w, h) => {
+      c.fillStyle = isPrev ? '#241406' : '#08241d';
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = isPrev ? '#f59e0b' : '#10b981';
+      c.fillRect(0, 0, w, 14);
+      c.fillRect(0, h - 10, w, 10);
+      // Badge
+      c.fillStyle = isPrev ? '#d97706' : '#059669';
+      c.fillRect(14, 24, 68, 112);
+      c.fillStyle = '#ffffff';
+      c.font = 'bold 34px sans-serif';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText(isPrev ? 'P2' : 'P1', 48, 80);
+      // Direction & Destination
+      c.textAlign = 'left';
+      c.textBaseline = 'alphabetic';
+      c.fillStyle = isPrev ? '#fde68a' : '#6ee7b7';
+      c.font = 'bold 20px sans-serif';
+      c.fillText(isPrev ? '← KEMBALI (PERON 2)' : '→ MAJU (PERON 1)', 98, 52);
+      c.fillStyle = '#ffffff';
+      c.font = 'bold 29px sans-serif';
+      c.fillText(String(destName || '').toUpperCase().slice(0, 22), 98, 96);
+      c.fillStyle = '#cbd5e1';
+      c.font = 'bold 15px sans-serif';
+      c.fillText('LRT JABODEBEK  •  TEKAN [E] PANGGIL KERETA', 98, 130);
+    }, false);
+    const pidsEm = makeCanvasTex(station, 512, 160, (c, w, h) => {
+      c.fillStyle = isPrev ? '#1c0f04' : '#051a14';
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = isPrev ? '#f59e0b' : '#10b981';
+      c.fillRect(0, 0, w, 12);
+      c.textAlign = 'left';
+      c.textBaseline = 'alphabetic';
+      c.fillStyle = isPrev ? '#fde68a' : '#6ee7b7';
+      c.font = 'bold 20px sans-serif';
+      c.fillText(isPrev ? '← KEMBALI (PERON 2)' : '→ MAJU (PERON 1)', 98, 52);
+      c.fillStyle = '#e2f8f0';
+      c.font = 'bold 29px sans-serif';
+      c.fillText(String(destName || '').toUpperCase().slice(0, 22), 98, 96);
+    }, false);
+    const pidsMat = new THREE.MeshStandardMaterial({
+      map: pidsMap, emissive: new THREE.Color(0xffffff), emissiveMap: pidsEm, emissiveIntensity: 0.78, roughness: 0.30
+    });
+    station.disposableMaterials.push(pidsMat);
+
+    addPbrPart(station, grp, new THREE.BoxGeometry(signW + 0.08, signH + 0.06, 0.12), frameMat, x, signY, z);
+    addPbrPart(station, grp, new THREE.PlaneGeometry(signW, signH), pidsMat, x, signY, z + 0.065);
+    addPbrPart(station, grp, new THREE.PlaneGeometry(signW, signH), pidsMat, x, signY, z - 0.065, 0, Math.PI, 0);
+    for (const rx of [-0.85, 0.85]) {
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.04, rodLen, 0.04), frameMat, x + rx, signY + signH * 0.5 + rodLen * 0.5, z);
+    }
+  }
+
+  function buildJpo2SkybridgeLounge(station, ctx) {
+    const {
+      root, arch, isIsland, isCawang, p1MinX, p1MaxX, i2MaxX, track2X,
+      jpo2Z, jpoPergolaY, isInStairExclusion
+    } = ctx;
+    if (jpo2Z === null || jpo2Z === undefined) return null;
+
+    const UPPER_FLOOR_Y = S.CONST.UPPER_FLOOR_Y;
+    const farDir = jpo2Z > 0 ? 1 : -1;
+    const farZ = jpo2Z + farDir * 1.92;
+    const nearZ = jpo2Z - farDir * 1.82;
+    const faceYaw = farDir > 0 ? Math.PI : 0;
+    const benchRotY = farDir > 0 ? 0 : Math.PI;
+    const benchPlayerYaw = farDir > 0 ? Math.PI : 0;
+
+    // Guaranteed stair-free lounge center X across all archetypes
+    let loungeCX = -2.0;
+    if (isCawang) loungeCX = 12.4;
+    else if (arch.hasGardenTerrace) loungeCX = 11.4;
+    else if (isIsland) loungeCX = 9.95;
+
+    const grp = new THREE.Group();
+    grp.name = 'JPO2SkybridgeLounge';
+    root.add(grp);
+
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x222933, roughness: 0.38, metalness: 0.72 });
+    const brushedMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.24, metalness: 0.88 });
+    const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xdbeafe, roughness: 0.06, metalness: 0.1, transparent: true, opacity: 0.26, depthWrite: false });
+    const soilMat = new THREE.MeshStandardMaterial({ color: 0x3b2a1e, roughness: 0.92 });
+    const leafMatA = new THREE.MeshStandardMaterial({ color: 0x2f6b32, roughness: 0.78 });
+    const leafMatB = new THREE.MeshStandardMaterial({ color: 0x458b3d, roughness: 0.74 });
+    const cctvDomeMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.12, metalness: 0.45 });
+    const cctvLedMat = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: new THREE.Color(0xef4444), emissiveIntensity: 1.6 });
+    station.disposableMaterials.push(frameMat, brushedMat, glassMat, soilMat, leafMatA, leafMatB, cctvDomeMat, cctvLedMat);
+
+    // 1) Standing Backlit Peta Rute & Integrasi LRT Jabodebek Board
+    const routeMapTex = makeCanvasTex(station, 512, 320, (c, w, h) => {
+      c.fillStyle = '#f8fafc';
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = '#16325c';
+      c.fillRect(0, 0, w, 54);
+      c.fillStyle = '#e5b82e';
+      c.fillRect(0, 54, w, 6);
+      c.fillStyle = '#ffffff';
+      c.font = 'bold 21px sans-serif';
+      c.fillText('PETA RUTE & INTEGRASI LRT JABODEBEK', 18, 34);
+
+      c.strokeStyle = '#1d4ed8';
+      c.lineWidth = 8;
+      c.beginPath(); c.moveTo(42, 145); c.lineTo(310, 145); c.lineTo(468, 108); c.stroke();
+      c.strokeStyle = '#15803d';
+      c.lineWidth = 8;
+      c.beginPath(); c.moveTo(310, 145); c.lineTo(468, 188); c.stroke();
+
+      const stops = ['Dukuh Atas', 'Setiabudi', 'Kuningan', 'Cikoko', 'Cawang'];
+      for (let i = 0; i < stops.length; i++) {
+        const sx = 44 + i * 66;
+        const isHere = arch && arch.name && arch.name.toLowerCase().indexOf(stops[i].toLowerCase()) !== -1;
+        c.fillStyle = isHere ? '#ef4444' : '#ffffff';
+        c.beginPath(); c.arc(sx, 145, isHere ? 10 : 7, 0, Math.PI * 2); c.fill();
+        c.strokeStyle = '#16325c'; c.lineWidth = 2.5; c.stroke();
+        c.fillStyle = '#0f172a';
+        c.font = isHere ? 'bold 12px sans-serif' : '11px sans-serif';
+        c.textAlign = 'center';
+        c.fillText(stops[i], sx, 174);
+      }
+      c.textAlign = 'left';
+      c.fillStyle = '#1e293b';
+      c.font = 'bold 14px sans-serif';
+      c.fillText('TRANSIT: KRL Commuter  •  TransJakarta  •  Whoosh Halim', 22, 238);
+      c.fillStyle = '#0e7c41';
+      c.fillRect(20, 260, 472, 42);
+      c.fillStyle = '#ffffff';
+      c.font = 'bold 15px sans-serif';
+      c.fillText('AREA TUNGGU JPO 2  •  PERON 1 (MAJU)  |  PERON 2 (KEMBALI)', 32, 286);
+    }, false);
+    const routeBoardMat = new THREE.MeshStandardMaterial({
+      map: routeMapTex, emissive: new THREE.Color(0xffffff), emissiveMap: routeMapTex, emissiveIntensity: 0.38, roughness: 0.36
+    });
+    station.disposableMaterials.push(routeBoardMat);
+
+    addPbrPart(station, grp, new THREE.BoxGeometry(1.56, 0.08, 0.28), frameMat, loungeCX, UPPER_FLOOR_Y + 0.04, farZ);
+    for (const px of [-0.74, 0.74]) {
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.08, 2.02, 0.14), frameMat, loungeCX + px, UPPER_FLOOR_Y + 1.01, farZ);
+    }
+    addPbrPart(station, grp, new THREE.BoxGeometry(1.52, 1.04, 0.12), frameMat, loungeCX, UPPER_FLOOR_Y + 1.48, farZ);
+    addPbrPart(station, grp, new THREE.PlaneGeometry(1.44, 0.94), routeBoardMat, loungeCX, UPPER_FLOOR_Y + 1.48, farZ - farDir * 0.065, 0, faceYaw, 0);
+    station._addCollider(loungeCX - 0.82, UPPER_FLOOR_Y, farZ - 0.16, loungeCX + 0.82, UPPER_FLOOR_Y + 2.05, farZ + 0.16, 'metal');
+
+    // 2) Dual Automated Beverage & Snack Vending Machines
+    const buildVending = (vx, isSnack) => {
+      const vz = jpo2Z + farDir * 1.76;
+      const vMap = makeCanvasTex(station, 256, 512, (c, w, h) => {
+        c.fillStyle = isSnack ? '#7c2d12' : '#0c356a';
+        c.fillRect(0, 0, w, h);
+        c.fillStyle = isSnack ? '#f59e0b' : '#0ea5e9';
+        c.fillRect(0, 0, w, 64);
+        c.fillStyle = '#ffffff';
+        c.font = 'bold 22px sans-serif';
+        c.textAlign = 'center';
+        c.fillText(isSnack ? 'SNACK MART' : 'COLD DRINKS', w * 0.5, 42);
+        c.fillStyle = '#e0f2fe';
+        c.fillRect(20, 82, 216, 268);
+        const cols = isSnack ? ['#ef4444', '#f59e0b', '#eab308', '#8b5cf6'] : ['#06b6d4', '#16a34a', '#2563eb', '#dc2626'];
+        for (let r = 0; r < 5; r++) {
+          const ry = 94 + r * 52;
+          c.fillStyle = '#334155';
+          c.fillRect(24, ry + 36, 208, 6);
+          for (let col = 0; col < 5; col++) {
+            c.fillStyle = cols[(r + col) % cols.length];
+            c.fillRect(32 + col * 40, ry + 8, 28, 28);
+          }
+        }
+        c.fillStyle = '#111827';
+        c.fillRect(36, 376, 184, 96);
+      }, false);
+      const vEm = makeCanvasTex(station, 256, 512, (c, w, h) => {
+        c.fillStyle = '#000000'; c.fillRect(0, 0, w, h);
+        c.fillStyle = isSnack ? '#92400e' : '#0369a1';
+        c.fillRect(0, 0, w, 64);
+        c.fillStyle = '#3b566e';
+        c.fillRect(24, 86, 208, 260);
+      }, false);
+      const vFaceMat = new THREE.MeshStandardMaterial({
+        map: vMap, emissive: new THREE.Color(0xffffff), emissiveMap: vEm, emissiveIntensity: 0.72, roughness: 0.26
+      });
+      station.disposableMaterials.push(vFaceMat);
+
+      const vGrp = new THREE.Group();
+      vGrp.position.set(vx, UPPER_FLOOR_Y, vz);
+      vGrp.rotation.y = faceYaw;
+      grp.add(vGrp);
+      addPbrPart(station, vGrp, new THREE.BoxGeometry(0.80, 1.98, 0.60), frameMat, 0, 0.99, 0);
+      addPbrPart(station, vGrp, new THREE.BoxGeometry(0.74, 1.90, 0.03), vFaceMat, 0, 0.99, 0.30);
+      addPbrPart(station, vGrp, new THREE.BoxGeometry(0.66, 0.96, 0.02), glassMat, 0, 1.18, 0.32);
+      addPbrPart(station, vGrp, new THREE.BoxGeometry(0.12, 0.24, 0.04), brushedMat, 0.28, 0.98, 0.32);
+      station._addCollider(vx - 0.43, UPPER_FLOOR_Y, vz - 0.34, vx + 0.43, UPPER_FLOOR_Y + 2.00, vz + 0.34, 'metal');
+    };
+    buildVending(loungeCX - 1.38, false);
+    buildVending(loungeCX + 1.38, true);
+
+    // 3) Planters with Lush Greenery & Trash Bins
+    for (const pxOff of [-2.05, 2.05]) {
+      const px = loungeCX + pxOff;
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.42, 0.36, 0.42), frameMat, px, UPPER_FLOOR_Y + 0.18, farZ);
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.36, 0.04, 0.36), soilMat, px, UPPER_FLOOR_Y + 0.35, farZ);
+      addPbrPart(station, grp, new THREE.DodecahedronGeometry(0.22, 0), leafMatA, px, UPPER_FLOOR_Y + 0.56, farZ);
+      addPbrPart(station, grp, new THREE.DodecahedronGeometry(0.16, 0), leafMatB, px + 0.06, UPPER_FLOOR_Y + 0.72, farZ - 0.04);
+      station._addCollider(px - 0.24, UPPER_FLOOR_Y, farZ - 0.24, px + 0.24, UPPER_FLOOR_Y + 0.75, farZ + 0.24, 'concrete', { blocksBullets: false });
+    }
+    const binXLeft = isIsland && !isCawang && !arch.hasGardenTerrace ? loungeCX - 2.05 : loungeCX - 2.65;
+    const binZ = isIsland && !isCawang && !arch.hasGardenTerrace ? (jpo2Z + farDir * 1.25) : farZ;
+    addTrashBinProp(station, grp, binXLeft, UPPER_FLOOR_Y, binZ);
+    if (!(isIsland && !isCawang && !arch.hasGardenTerrace)) {
+      addTrashBinProp(station, grp, loungeCX + 2.65, UPPER_FLOOR_Y, farZ);
+    }
+
+    // 4) Two Sittable Commuter Benches (sittable: true) + Skybridge Tactical Bench with jpo2_supply
+    const benchScaleX = (isIsland && !isCawang && !arch.hasGardenTerrace) ? 0.80 : 0.92;
+    const seatZOff = farDir * 0.24;
+    const standZOff = farDir * 0.92;
+    addBenchProp(station, grp, 'bench_jpo2_0', loungeCX - 1.48, UPPER_FLOOR_Y, nearZ, benchRotY, benchPlayerYaw, 0, seatZOff, 0, standZOff, benchScaleX);
+    addBenchProp(station, grp, 'bench_jpo2_1', loungeCX + 1.48, UPPER_FLOOR_Y, nearZ, benchRotY, benchPlayerYaw, 0, seatZOff, 0, standZOff, benchScaleX);
+
+    // Tactical Bench + Tas Logistik JPO Sekunder (jpo2_supply)
+    const bagMat = new THREE.MeshStandardMaterial({ color: 0x3b4d36, roughness: 0.65, metalness: 0.14 });
+    const strapMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.42, metalness: 0.45 });
+    const crossMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, emissive: new THREE.Color(0x7f1d1d), emissiveIntensity: 0.55, roughness: 0.35 });
+    station.disposableMaterials.push(bagMat, strapMat, crossMat);
+
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.84, 0.06, 0.46), brushedMat, loungeCX, UPPER_FLOOR_Y + 0.45, nearZ);
+    for (const lx of [-0.36, 0.36]) {
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.06, 0.42, 0.42), frameMat, loungeCX + lx, UPPER_FLOOR_Y + 0.21, nearZ);
+    }
+    // 3D Tactical Logistics Bag sitting on Tactical Bench
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.54, 0.24, 0.32), bagMat, loungeCX, UPPER_FLOOR_Y + 0.60, nearZ, 0, 0.12, 0);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.10, 0.26, 0.34), strapMat, loungeCX - 0.14, UPPER_FLOOR_Y + 0.60, nearZ, 0, 0.12, 0);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.10, 0.26, 0.34), strapMat, loungeCX + 0.14, UPPER_FLOOR_Y + 0.60, nearZ, 0, 0.12, 0);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.12, 0.03, 0.04), crossMat, loungeCX, UPPER_FLOOR_Y + 0.73, nearZ);
+    addPbrPart(station, grp, new THREE.BoxGeometry(0.04, 0.03, 0.12), crossMat, loungeCX, UPPER_FLOOR_Y + 0.73, nearZ);
+    station._addCollider(loungeCX - 0.44, UPPER_FLOOR_Y, nearZ - 0.26, loungeCX + 0.44, UPPER_FLOOR_Y + 0.80, nearZ + 0.26, 'metal');
+
+    const jpo2Used = station._usedIds.has('jpo2_supply');
+    station.interactables.push({
+      id: 'jpo2_supply',
+      type: 'jpo2_supply',
+      x: loungeCX,
+      y: UPPER_FLOOR_Y + 0.75,
+      z: nearZ,
+      label: jpo2Used ? '[E] Tas Logistik JPO Sekunder (Sudah Diambil)' : '[E] Ambil Tas Logistik JPO Sekunder (+20 Amunisi & +15 HP)',
+      prompt: jpo2Used ? '[E] Tas Logistik JPO Sekunder (Sudah Diambil)' : '[E] Ambil Tas Logistik JPO Sekunder (+20 Amunisi & +15 HP)',
+      used: jpo2Used
+    });
+    placeFieldLogProp(station, grp, 'jpo2_supply', loungeCX + 0.26, UPPER_FLOOR_Y + 0.485, nearZ + farDir * 0.08, 0.2, jpo2Used);
+
+    // 5) Ceiling CCTV Domes under JPO 2 Pergola Soffit
+    const cctvY = (jpoPergolaY || 6.95) - 0.14;
+    for (const [cxOff, czOff] of [[-1.5, farDir * 1.2], [1.5, -farDir * 1.2]]) {
+      addPbrPart(station, grp, new THREE.CylinderGeometry(0.12, 0.12, 0.06, 12), frameMat, loungeCX + cxOff, cctvY, jpo2Z + czOff);
+      addPbrPart(station, grp, new THREE.SphereGeometry(0.10, 12, 8), cctvDomeMat, loungeCX + cxOff, cctvY - 0.06, jpo2Z + czOff);
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.025, 0.025, 0.025), cctvLedMat, loungeCX + cxOff + 0.08, cctvY - 0.04, jpo2Z + czOff);
+    }
+
+    return {
+      loungeCX: loungeCX,
+      loungePos: { x: loungeCX, y: UPPER_FLOOR_Y + 0.05, z: jpo2Z, yaw: benchPlayerYaw }
+    };
+  }
+
   function buildStallsAndTubes(station, ctx) {
     const { UPPER_FLOOR_Y } = S.CONST;
     const { addBox, addAtlasBox, addAtlasQuad } = S;
     const {
       arch, STALL_UV, SIGN_UV, buckets, glassRecords, isInStairExclusion,
-      isIsland, isCawang, p1MinX, p1MaxX, p2MaxX,
+      isIsland, isCawang, p1MinX, p1MaxX, p2MinX, p2MaxX, i2MaxX, track2X,
       concMinX, concMaxX, concMinZ, concMaxZ, concMidZ, cw, concLen,
       platMinZ, platMaxZ, getCanopyArchY,
       stairX, stairFootZ, jpoZ, jpoDepth, jpoCX, jpoPergolaY, jpo2Z, jpo2CX,
@@ -515,84 +1382,13 @@
 
     buildRotioKiosk(rotioX, rotioZ, rotioYaw);
 
-    const indoX = isIsland ? (p1MinX + p1MaxX) * 0.5 : concMaxX - 2.1;
-    const indoZ = isIsland ? 12.5 : concMaxZ - 3.6;
     const indoYaw = isIsland ? 0 : -Math.PI * 0.5;
-    const indoCos = Math.cos(indoYaw);
-    const indoSin = Math.sin(indoYaw);
-    const inW = (lx, lz) => [indoX + lx * indoCos + lz * indoSin, indoZ - lx * indoSin + lz * indoCos];
-
-    // 1) Recessed dark-steel floor reveal & interior minimarket slab
-    addBox(bSteelDark, 5.48, 0.10, 2.38, indoX, 0.05, indoZ, 0, indoYaw, 0);
-    addBox(bStall, 5.26, 0.12, 2.16, indoX, 0.06, indoZ, 0, indoYaw, 0);
-    // 2) Subway-tiled rear wall & cream/steel end walls + structural storefront mullions
-    const inBack = inW(0, -1.04);
-    addAtlasBox(bStall, 5.52, 2.30, 0.18, inBack[0], 1.21, inBack[1], indoYaw, null, STALL_UV.rotioSubwayTile);
-    for (const sSide of [-1, 1]) {
-      const inEnd = inW(sSide * 2.66, 0);
-      addAtlasBox(bStall, 0.20, 2.30, 2.26, inEnd[0], 1.21, inEnd[1], indoYaw, null, STALL_UV.rotioCreamSolid);
-      const colF = inW(sSide * 2.68, 1.05);
-      addBox(bSteelDark, 0.14, 2.36, 0.14, colF[0], 1.22, colF[1], 0, indoYaw, 0);
+    let indoX = isIsland ? (p1MinX + p1MaxX) * 0.5 : concMaxX - 2.25;
+    let indoZ = isIsland ? 14.0 : concMaxZ - 5.5;
+    if (isIsland && isInStairExclusion(indoX, indoZ, 2.9, 2.0)) {
+      indoZ = 32.0; // Harjamukti: JPO 1 stair sits at z = 11.8..21.3
     }
-    const midCol = inW(0.0, 1.05);
-    addBox(bSteelDark, 0.14, 2.36, 0.14, midCol[0], 1.22, midCol[1], 0, indoYaw, 0);
-
-    // 3) Left bay (-2.5..-0.1): Recessed 2-door glass beverage chiller housing + snack gondola shelves
-    const chillBack = inW(-1.32, -0.72);
-    addBox(bSteelDark, 2.42, 2.14, 0.54, chillBack[0], 1.15, chillBack[1], 0, indoYaw, 0);
-    for (const cd of [-0.58, 0.58]) {
-      const doorP = inW(-1.32 + cd, -0.44);
-      addAtlasBox(bStall, 1.08, 1.82, 0.06, doorP[0], 1.08, doorP[1], indoYaw,
-        { 4: STALL_UV.indomaretCooler, 5: STALL_UV.indomaretCooler }, STALL_UV.rotioCreamSolid);
-    }
-    const gondolaP = inW(-1.30, 0.24);
-    addBox(bSteelDark, 1.88, 1.12, 0.44, gondolaP[0], 0.62, gondolaP[1], 0, indoYaw, 0);
-    for (const sy of [0.34, 0.68, 1.02]) {
-      addAtlasBox(bStall, 1.94, 0.05, 0.50, gondolaP[0], sy, gondolaP[1], indoYaw, null, STALL_UV.rotioCreamSolid);
-    }
-
-    // 4) Right bay (+0.1..+2.5): Open Point Coffee counter, espresso machine, pastry case, POS & menu board
-    const barApron = inW(1.32, 0.62);
-    addAtlasBox(bStall, 2.48, 0.88, 0.52, barApron[0], 0.50, barApron[1], indoYaw, null, STALL_UV.loketWood);
-    addBox(bTruss, 2.56, 0.06, 0.64, barApron[0], 0.97, barApron[1], 0, indoYaw, 0);
-    // Point Coffee espresso machine + cup stack + pastry case + cash register
-    const espPos = inW(0.68, 0.54);
-    addBox(bSteelDark, 0.48, 0.42, 0.38, espPos[0], 1.21, espPos[1], 0, indoYaw, 0);
-    addBox(bTruss, 0.44, 0.08, 0.28, espPos[0], 1.44, espPos[1], 0, indoYaw, 0);
-    const cupPos = inW(1.06, 0.52);
-    addAtlasBox(bStall, 0.14, 0.30, 0.14, cupPos[0], 1.15, cupPos[1], indoYaw, null, STALL_UV.rotioCreamSolid);
-    const posM = inW(1.42, 0.56);
-    addBox(bSteelDark, 0.36, 0.24, 0.24, posM[0], 1.12, posM[1], 0, indoYaw, 0);
-    const pastPos = inW(1.98, 0.58);
-    addAtlasBox(bStall, 0.64, 0.18, 0.38, pastPos[0], 1.09, pastPos[1], indoYaw, null, STALL_UV.rotioBuns);
-    const menuP = inW(1.32, -0.90);
-    addAtlasBox(bStall, 2.10, 0.78, 0.08, menuP[0], 1.72, menuP[1], indoYaw,
-      { 4: STALL_UV.rotioMenuBoard, 5: STALL_UV.rotioMenuBoard }, STALL_UV.rotioCreamSolid);
-    const ceilStrip = inW(0, -0.10);
-    addBox(bTruss, 4.40, 0.04, 0.36, ceilStrip[0], 2.33, ceilStrip[1], 0, indoYaw, 0);
-
-    // 5) Overhanging canopy soffit + Indomaret Point backlit fascia header + dark coping trim
-    const roofP = inW(0, 0.08);
-    addBox(bSteelDark, 5.72, 0.12, 2.60, roofP[0], 2.40, roofP[1], 0, indoYaw, 0);
-    addAtlasBox(bStall, 5.56, 0.58, 2.32, indoX, 2.75, indoZ, indoYaw, null, STALL_UV.indomaretHeader);
-    addBox(bSteelDark, 5.66, 0.06, 2.42, indoX, 3.06, indoZ, 0, indoYaw, 0);
-
-    station._addCollider(indoX - 1.5, 0, indoZ - 2.6, indoX + 1.5, 3.1, indoZ + 2.6, 'metal');
-    // Framed shatterable storefront glass panes
-    for (const gxOff of [-1.85, -0.75]) {
-      const gp = inW(gxOff, 1.04);
-      const cid = station._addCollider(gp[0] - 0.5, 0.2, gp[1] - 0.5, gp[0] + 0.5, 2.3, gp[1] + 0.5, 'glass', { blocksWalk: false });
-      glassRecords.push({
-        cx: gp[0], cy: 1.24, cz: gp[1], w: 1.04, h: 2.04, d: 0.04,
-        ry: indoYaw, hp: 20, isPsdDoor: false, psdDoorIdx: -1, slideSign: 0, colliderIdx: cid
-      });
-    }
-    const gCoffee = inW(1.98, 0.80);
-    const cidC = station._addCollider(gCoffee[0] - 0.35, 1.0, gCoffee[1] - 0.35, gCoffee[0] + 0.35, 1.6, gCoffee[1] + 0.35, 'glass', { blocksWalk: false });
-    glassRecords.push({
-      cx: gCoffee[0], cy: 1.22, cz: gCoffee[1], w: 0.64, h: 0.44, d: 0.04,
-      ry: indoYaw, hp: 14, isPsdDoor: false, psdDoorIdx: -1, slideSign: 0, colliderIdx: cidC
-    });
+    const indoInfo = buildWalkInIndomaret(station, ctx, indoX, indoZ, indoYaw);
 
     // Access by KAI Turnstiles (chamfered purple cabinets, brushed stainless plinth/bezel, angled RFID reader, 3-arm chrome tripod)
     const gateBaseX = isIsland ? (p1MinX + 2.2) : (concMinX + 2.2);
@@ -737,10 +1533,9 @@
 
     const jakX = isIsland ? p1MaxX - 2.0 : concMinX + 3.8;
     const jakZ = isIsland ? -16.0 : concMaxZ - 1.8;
-    addAtlasBox(bStall, 0.85, 2.05, 0.65, jakX, 1.02, jakZ, 0, null, STALL_UV.jaklingko);
+    const jakYaw = isIsland ? 0 : Math.PI;
     const jakTrayZ = isIsland ? (jakZ + 0.44) : (jakZ - 0.44);
-    addBox(bSteelDark, 0.56, 0.04, 0.30, jakX, 1.02, jakTrayZ);
-    station._addCollider(jakX - 0.45, 0, jakZ - 0.35, jakX + 0.45, 2.05, jakZ + 0.35, 'metal');
+    buildDetailedJaklingkoKiosk(station, ctx.root, jakX, jakZ, jakYaw);
     const jakUsed = station._usedIds.has('jaklingko_kiosk');
     station.interactables.push({
       id: 'jaklingko_kiosk', type: 'jaklingko', x: jakX, y: 1.2, z: jakZ,
@@ -752,8 +1547,8 @@
 
     const cowX = isIsland ? p1MaxX - 2.0 : concMinX + 5.4;
     const cowZ = isIsland ? -13.5 : concMaxZ - 1.8;
-    addAtlasBox(bStall, 1.15, 1.95, 0.65, cowX, 0.98, cowZ, 0, null, STALL_UV.coway);
-    station._addCollider(cowX - 0.6, 0, cowZ - 0.35, cowX + 0.6, 1.95, cowZ + 0.35, 'metal');
+    const cowYaw = isIsland ? 0 : Math.PI;
+    buildDetailedCowayStation(station, ctx.root, cowX, cowZ, cowYaw);
     const cowUsed = station._usedIds.has('coway_water');
     station.interactables.push({
       id: 'coway_water', type: 'coway', x: cowX, y: 1.1, z: cowZ,
@@ -762,15 +1557,26 @@
       used: cowUsed
     });
 
+    const stationsList = (LRT.Config && (LRT.Config.stations || LRT.Config.ARCHETYPES))
+      || (LRT.CONFIG && LRT.CONFIG.stations)
+      || [];
+    const stIdx = typeof station._stationIndex === 'number' ? station._stationIndex : 0;
+    const totalSt = stationsList.length || 6;
+    const nextSt = (stIdx + 1 < totalSt) ? stationsList[stIdx + 1] : null;
+    const prevSt = (stIdx > 0) ? stationsList[stIdx - 1] : null;
+    const nextName = (nextSt && nextSt.name) ? nextSt.name : (stIdx >= totalSt - 1 ? 'Ekstraksi Evakuasi' : 'Stasiun Berikutnya');
+    const prevName = (prevSt && prevSt.name) ? prevSt.name : 'Terminal Awal';
+
     const callX = p1MinX + 1.45;
     const callZ = -2.85;
     addBox(bSteelDark, 0.42, 1.35, 0.42, callX, 0.68, callZ);
     addAtlasBox(bSign, 0.46, 0.44, 0.46, callX, 1.22, callZ, Math.PI * 0.5, null, SIGN_UV.callTrain);
     station._addCollider(callX - 0.25, 0, callZ - 0.25, callX + 0.25, 1.45, callZ + 0.25, 'metal');
+    buildCallTrainPidsSign(station, ctx, callX, callZ, false, nextName);
     station.interactables.push({
       id: 'call_train', type: 'call_train', x: callX, y: 1.2, z: callZ,
-      label: '[E] Panggil Kereta LRT Peron 1 (→ Stasiun Berikutnya)',
-      prompt: '[E] Panggil Kereta LRT Peron 1 (→ Stasiun Berikutnya)', used: false
+      label: '[E] Panggil Kereta LRT Peron 1 → MAJU (Tujuan: ' + nextName + ')',
+      prompt: '[E] Panggil Kereta LRT Peron 1 → MAJU (Tujuan: ' + nextName + ')', used: false
     });
 
     const call2X = (isIsland ? p1MaxX : p2MaxX) - 1.45;
@@ -778,10 +1584,11 @@
     addBox(bSteelDark, 0.42, 1.35, 0.42, call2X, 0.68, call2Z);
     addAtlasBox(bSign, 0.46, 0.44, 0.46, call2X, 1.22, call2Z, -Math.PI * 0.5, null, SIGN_UV.callTrain);
     station._addCollider(call2X - 0.25, 0, call2Z - 0.25, call2X + 0.25, 1.45, call2Z + 0.25, 'metal');
+    buildCallTrainPidsSign(station, ctx, call2X, call2Z, true, prevName);
     station.interactables.push({
       id: 'call_train_prev', type: 'call_train_prev', x: call2X, y: 1.2, z: call2Z,
-      label: '[E] Panggil Kereta LRT Peron 2 (← Stasiun Sebelumnya)',
-      prompt: '[E] Panggil Kereta LRT Peron 2 (← Stasiun Sebelumnya)', used: false
+      label: '[E] Panggil Kereta LRT Peron 2 ← KEMBALI (Tujuan: ' + prevName + ')',
+      prompt: '[E] Panggil Kereta LRT Peron 2 ← KEMBALI (Tujuan: ' + prevName + ')', used: false
     });
 
     const exX = p1MaxX - 1.1;
@@ -842,6 +1649,23 @@
       addAtlasBox(bSign, 0.34, 1.18, 0.74, hx, 0.60, hUseZ, 0,
         { 0: SIGN_UV.hydrantRed, 1: SIGN_UV.hydrantRed }, SIGN_UV.hydrantRedSolid);
       station._addCollider(hx - 0.20, 0, hUseZ - 0.40, hx + 0.20, 1.24, hUseZ + 0.40, 'metal');
+    }
+
+    // JPO 2 Skybridge Commuter Lounge & Transit Hub + Side-Dual Peron 2 Waiting Amenities
+    const jpo2LoungeRes = buildJpo2SkybridgeLounge(station, ctx);
+    if (!isIsland) {
+      const p2BenchX = p2MinX + 1.45;
+      const p2Candidates = [-42, -14, 14, 42, -28, 28];
+      let p2Placed = 0;
+      for (let bi = 0; bi < p2Candidates.length && p2Placed < 3; bi++) {
+        const bz = p2Candidates[bi];
+        if (isInStairExclusion(p2BenchX, bz, 0.55, 1.25)) continue;
+        addBenchProp(station, ctx.root, 'bench_p2_' + p2Placed, p2BenchX, 0.0, bz, Math.PI * 0.5, -Math.PI * 0.5, 0.14, 0, 0.92, 0, 1.0);
+        if (!isInStairExclusion(p2BenchX, bz + 1.45, 0.4, 0.4)) {
+          addTrashBinProp(station, ctx.root, p2BenchX, 0.0, bz + 1.45);
+        }
+        p2Placed++;
+      }
     }
 
     // Fluorescent Tubes & Batten Housings
@@ -921,6 +1745,12 @@
     ctx.rotioZ = rotioZ;
     ctx.indoX = indoX;
     ctx.indoZ = indoZ;
+    ctx.indoYaw = indoYaw;
+    ctx.indoWalkInPos = indoInfo.walkInPos;
+    ctx.indoFrontPos = indoInfo.frontPos;
+    ctx.indoWarmAnchor = indoInfo.warmAnchor;
+    ctx.loungeCX = jpo2LoungeRes ? jpo2LoungeRes.loungeCX : null;
+    ctx.jpo2LoungePos = jpo2LoungeRes ? jpo2LoungeRes.loungePos : null;
     ctx.lkX = lkX;
     ctx.lkZ = lkZ;
     ctx.shX = shX;
@@ -1091,12 +1921,12 @@
       { x: rotioX + 2.15, y: 0.22, z: rotioZ + 2.10, sx: 0.42, sy: 0.82, sz: 0.42, rx: 1.45, ry: 0.7, rz: 0.3, color: 0xe6b81a, halfH: 0.22, dynamic: true }
     ];
     const metalPropSpecs = [];
-    const benchZs = [-42, -14, 14, 42];
+    const benchZs = isIsland ? [-40, -20, 26, 42] : [-42, -14, 14, 42];
     for (let bi = 0; bi < benchZs.length; bi++) {
       const bz = benchZs[bi];
       const tx = p1MinX + 3.4;
       if (!isInStairExclusion(tx, bz + 2.2, 0.5, 0.5)) {
-        paintPropSpecs.push({ x: tx, y: 0.45, z: bz + 2.2, sx: 0.55, sy: 0.90, sz: 0.40, rx: 0, ry: 0, rz: 0, color: 0x3b82c4, halfH: 0.45, dynamic: true });
+        addTrashBinProp(station, ctx.root, tx, 0.0, bz + 2.2);
       }
       if (!isInStairExclusion(tx, bz, 0.5, 1.2)) {
         const cityInt = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.city;
@@ -1116,6 +1946,7 @@
           station.interactables.push({
             id: 'bench_plat_' + bi,
             type: 'bench',
+            sittable: true,
             x: tx,
             y: 0.55,
             z: bz,
@@ -1298,8 +2129,9 @@
     if (!isInStairExclusion(rotioX - 2.3, rotioZ + 1.8, 0.4, 0.4)) {
       station._placeNormalizedModel('WetFloorSign_01', rotioX - 2.3, 0.0, rotioZ + 1.8, 0.35, 0.64);
     }
-    if (!isInStairExclusion(p1MinX + 2.8, 12.0, 0.4, 0.4)) {
-      station._placeNormalizedModel('WetFloorSign_01', p1MinX + 2.8, 0.0, 12.0, -0.4, 0.64);
+    const wetSignZ = isIsland ? 6.5 : 12.0;
+    if (!isInStairExclusion(p1MinX + 2.8, wetSignZ, 0.4, 0.4)) {
+      station._placeNormalizedModel('WetFloorSign_01', p1MinX + 2.8, 0.0, wetSignZ, -0.4, 0.64);
     }
     if (!isIsland) {
       station._placeNormalizedModel('CoffeeCart_01', concMinX + 8.6, 0.0, concMidZ + 7.2, -Math.PI * 0.5, 1.80, null, 'wood');
@@ -1476,7 +2308,7 @@
       // ISLAND_CENTRAL (Setiabudi)
       socketPool.push(
         { id: 'sock_island_rotio_spine', x: (p1MinX + p1MaxX) * 0.5, y: 0.0, z: rotioZ - 2.35, ry: Math.PI, riskLuck: 0.36, title: "Peti Taktis Belakang Roti'O" },
-        { id: 'sock_island_indo_spine', x: p1MinX + 2.2, y: 0.0, z: indoZ + 1.5, ry: Math.PI * 0.5, riskLuck: 0.42, title: 'Peti Taktis Sayap Indomaret' },
+        { id: 'sock_island_indo_spine', x: p1MinX + 1.8, y: 0.0, z: indoZ + 2.6, ry: Math.PI * 0.5, riskLuck: 0.42, title: 'Peti Taktis Sayap Indomaret' },
         { id: 'sock_island_south_bay', x: (p1MinX + p1MaxX) * 0.5, y: 0.0, z: platMinZ + 8.5, ry: 0.0, riskLuck: 0.68, title: 'Peti Taktis Ujung Selatan Setiabudi' },
         { id: 'sock_island_north_bay', x: p1MaxX - 2.0, y: 0.0, z: platMaxZ - 9.5, ry: -Math.PI * 0.5, riskLuck: 0.64, title: 'Peti Taktis Ujung Utara Setiabudi' },
         { id: 'sock_island_jpo_relay', x: jpoCX - 2.0, y: UPPER_FLOOR_Y, z: jpoZ + 1.2, ry: 0.0, riskLuck: 0.46, title: 'Peti Taktis Relai JPO Setiabudi' },
@@ -1899,12 +2731,15 @@
       { x: isIsland ? (p1MinX + p1Width * 0.5) : (concMinX + cw * 0.5), y: 3.65, z: concMidZ },
       { x: jpoCX, y: 6.35, z: jpoZ }
     ];
+    if (ctx.indoWarmAnchor) {
+      station._warmLightAnchors.push(ctx.indoWarmAnchor);
+    }
     if (lkX !== null && lkZ !== null) {
       addPooledLight(lkX - 0.15, 2.22, lkZ, 0xffd194, 4.6, 16, 'warm');
       station._warmLightAnchors.push({ x: lkX - 0.15, y: 2.22, z: lkZ });
     }
     if (jpo2Z !== null && ctx.jpo2CX !== null) {
-      station._warmLightAnchors.push({ x: ctx.jpo2CX, y: 6.35, z: jpo2Z });
+      station._warmLightAnchors.push({ x: ctx.loungeCX !== null && ctx.loungeCX !== undefined ? ctx.loungeCX : ctx.jpo2CX, y: 6.35, z: jpo2Z });
     }
 
     station._coolLightAnchors = [];

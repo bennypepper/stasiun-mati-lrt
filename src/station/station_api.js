@@ -33,9 +33,14 @@
     destructibles: null,
 
     _psdOpen: 0,
+    _psdOpen1: 0,
+    _psdOpen2: 0,
     _psdTarget: 0,
     _stationIndex: 0,
     _archetype: null,
+    ctx: null,
+    arch: null,
+    _chillerSprintTimer: 0,
     _mood: null,
     _moodKey: 'MONSOON_OVERCAST',
     _mode: 'survival',
@@ -253,6 +258,15 @@
       this._track1Barricade = null;
       this._groundPickups = null;
       this._groundPickupAssets = null;
+      if (this._chillerSprintTimer > 0 && LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function') {
+        const pSt = LRT.PlayerUI.getState();
+        if (pSt && pSt.fastSprint) pSt.fastSprint = false;
+      }
+      this._chillerSprintTimer = 0;
+      this.ctx = null;
+      this.arch = null;
+      this._psdOpen1 = 0;
+      this._psdOpen2 = 0;
       this._powerRestored = true;
       this._usedIds = new Set();
       this._isBuilding = false;
@@ -445,6 +459,8 @@
         glassRecords: [],
         stairZones, registerStairZone, isInStairExclusion
       };
+      this.ctx = ctx;
+      this.arch = arch;
 
       this._buildState = {
         phase: 0,
@@ -575,6 +591,8 @@
       this._psdTarget = clamped;
       this._psdOpen = clamped;
       const useTrack2 = trackDir === -1;
+      if (useTrack2) this._psdOpen2 = clamped;
+      else this._psdOpen1 = clamped;
       const doors = useTrack2 ? (this.psdDoors2 || []) : (this.psdDoors || []);
       const frameInst = useTrack2 ? this._psdFrameInst2 : this._psdFrameInst;
       const slideDist = 0.78 * clamped;
@@ -583,14 +601,41 @@
       for (let i = 0; i < doors.length; i++) {
         const d = doors[i];
         const coll = this.colliders[d.colliderIdx];
+        const gL = this.glassPanes[d.leftGlassIdx];
+        const gR = this.glassPanes[d.rightGlassIdx];
+
+        if ((d.coll && d.coll.broken) || (coll && coll.broken)) {
+          if (coll) {
+            coll.isOpen = true;
+            coll.blocksWalk = false;
+            coll.disabled = true;
+            coll.blocksBullets = false;
+          }
+          if (frameInst) {
+            _tmpDummy.rotation.set(0, 0, 0);
+            _tmpDummy.scale.set(0, 0, 0);
+            _tmpDummy.position.set(gL ? gL.cx : 0, 0.18, d.z);
+            _tmpDummy.updateMatrix();
+            frameInst.setMatrixAt(d.leftFrameInst, _tmpDummy.matrix);
+            frameInst.setMatrixAt(d.rightFrameInst, _tmpDummy.matrix);
+          }
+          if (this._glassInst) {
+            _tmpDummy.rotation.set(0, 0, 0);
+            _tmpDummy.scale.set(0, 0, 0);
+            _tmpDummy.position.set(gL ? gL.cx : 0, 0.85, d.z);
+            _tmpDummy.updateMatrix();
+            if (gL) this._glassInst.setMatrixAt(gL.instIdx, _tmpDummy.matrix);
+            if (gR) this._glassInst.setMatrixAt(gR.instIdx, _tmpDummy.matrix);
+          }
+          continue;
+        }
+
         if (coll) {
           coll.isOpen = isPassable;
           coll.blocksWalk = !isPassable;
           coll.disabled = isPassable;
           coll.blocksBullets = !isPassable;
         }
-        const gL = this.glassPanes[d.leftGlassIdx];
-        const gR = this.glassPanes[d.rightGlassIdx];
 
         if (frameInst) {
           _tmpDummy.rotation.set(0, 0, 0);
@@ -665,6 +710,21 @@
       if (!this.rootGroup || this._isBuilding) return;
       this._timeAccum += dt;
       this._beaconSharedTime.value = this._timeAccum;
+
+      if (this._chillerSprintTimer > 0) {
+        this._chillerSprintTimer = Math.max(0, this._chillerSprintTimer - dt);
+        const pSprintSt = (LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function') ? LRT.PlayerUI.getState() : null;
+        if (this._chillerSprintTimer <= 0) {
+          if (pSprintSt && pSprintSt.fastSprint) {
+            pSprintSt.fastSprint = false;
+            if (typeof LRT.PlayerUI.setNotice === 'function') {
+              LRT.PlayerUI.setNotice('Efek Point Coffee berakhir — Fast Sprint OFF', '#94a3b8');
+            }
+          }
+        } else if (pSprintSt && !pSprintSt.fastSprint) {
+          pSprintSt.fastSprint = true;
+        }
+      }
 
       const offsetZ = this.rootGroup.position.z || 0;
       const pRef = playerPos || (LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function' ? LRT.PlayerUI.getState().pos : null);
@@ -1203,7 +1263,10 @@
         const isActive = activeSet && activeSet.has(b.id);
         let tier = null;
         if (b.isTrain) {
-          if (isActive) tier = this._beaconMats.cyan;
+          if (isActive) {
+            const isPrev = b.id === 'call_train_prev' || b.id === 'call_train_p2' || (b.item && b.item.type === 'call_train_prev');
+            tier = isPrev ? this._beaconMats.amber : this._beaconMats.cyan;
+          }
         } else if (b.isLootbox) {
           tier = isActive
             ? this._beaconMats.amber
@@ -1510,14 +1573,27 @@
       const radSq = rad * rad;
       const dmgVal = maxDmg || 25;
       const impVal = impulse || 2;
-      const slideDist = 0.78 * this._psdOpen;
 
       let glassDirty = false;
       let glassBrokenNow = false;
       for (let i = 0; i < this.glassPanes.length; i++) {
         const g = this.glassPanes[i];
         if (g.broken) continue;
-        const curZ = g.isPsdDoor ? (g.cz + g.slideSign * slideDist) : g.cz;
+
+        let doorRec = null;
+        let isTrack2Door = false;
+        if (g.isPsdDoor) {
+          if (this.psdDoors) doorRec = this.psdDoors.find((d) => d.colliderIdx === g.colliderIdx) || null;
+          if (!doorRec && this.psdDoors2) {
+            doorRec = this.psdDoors2.find((d) => d.colliderIdx === g.colliderIdx) || null;
+            if (doorRec) isTrack2Door = true;
+          }
+          if (!doorRec && this.psdDoors && g.psdDoorIdx >= 0) {
+            doorRec = this.psdDoors[g.psdDoorIdx] || null;
+          }
+        }
+        const doorSlide = g.isPsdDoor ? 0.78 * (isTrack2Door ? this._psdOpen2 : this._psdOpen1) : 0;
+        const curZ = g.isPsdDoor ? (g.cz + g.slideSign * doorSlide) : g.cz;
         const halfW = g.ry > 0.5 ? g.d * 0.5 : g.w * 0.5;
         const halfD = g.ry > 0.5 ? g.w * 0.5 : g.d * 0.5;
         const cx = Math.max(g.cx - halfW, Math.min(lx, g.cx + halfW));
@@ -1530,29 +1606,62 @@
           const falloff = isExplosion ? Math.max(0.15, 1.0 - dist / rad) : 1.0;
           g.hp -= dmgVal * falloff;
           if (g.hp <= 0) {
+            g.hp = 0;
             g.broken = true;
             this._brokenGlassCount++;
             glassBrokenNow = true;
             glassDirty = true;
             _tmpDummy.position.set(g.cx, g.cy, curZ);
+            _tmpDummy.rotation.set(0, 0, 0);
             _tmpDummy.scale.set(0, 0, 0);
             _tmpDummy.updateMatrix();
             if (this._glassInst) this._glassInst.setMatrixAt(g.instIdx, _tmpDummy.matrix);
 
             const coll = this.colliders[g.colliderIdx];
-            if (coll) {
-              if (!g.isPsdDoor) {
+            if (g.isPsdDoor) {
+              if (coll) {
+                coll.broken = true;
+                coll.isOpen = true;
+                coll.blocksWalk = false;
+                coll.disabled = true;
                 coll.blocksBullets = false;
-                if (coll.minY > 0.2) {
-                  coll.blocksWalk = false;
-                  coll.disabled = true;
+              }
+              if (doorRec) {
+                const frameInst = isTrack2Door ? this._psdFrameInst2 : this._psdFrameInst;
+                if (frameInst) {
+                  _tmpDummy.position.set(g.cx, 0.18, curZ);
+                  _tmpDummy.rotation.set(0, 0, 0);
+                  _tmpDummy.scale.set(0, 0, 0);
+                  _tmpDummy.updateMatrix();
+                  if (doorRec.leftFrameInst !== undefined) frameInst.setMatrixAt(doorRec.leftFrameInst, _tmpDummy.matrix);
+                  if (doorRec.rightFrameInst !== undefined) frameInst.setMatrixAt(doorRec.rightFrameInst, _tmpDummy.matrix);
+                  frameInst.instanceMatrix.needsUpdate = true;
                 }
-              } else {
-                const doorRec = this.psdDoors[g.psdDoorIdx];
-                if (doorRec && this.glassPanes[doorRec.leftGlassIdx].broken && this.glassPanes[doorRec.rightGlassIdx].broken) {
-                  coll.blocksBullets = false;
+                const leafIndices = [doorRec.leftGlassIdx, doorRec.rightGlassIdx];
+                for (let li = 0; li < leafIndices.length; li++) {
+                  const partner = this.glassPanes[leafIndices[li]];
+                  if (partner && !partner.broken) {
+                    partner.hp = 0;
+                    partner.broken = true;
+                    this._brokenGlassCount++;
+                    const partnerZ = partner.cz + partner.slideSign * doorSlide;
+                    _tmpDummy.position.set(partner.cx, partner.cy, partnerZ);
+                    _tmpDummy.rotation.set(0, 0, 0);
+                    _tmpDummy.scale.set(0, 0, 0);
+                    _tmpDummy.updateMatrix();
+                    if (this._glassInst) this._glassInst.setMatrixAt(partner.instIdx, _tmpDummy.matrix);
+                    if (LRT.Weapons && LRT.Weapons.spawnGlassShards) {
+                      _tmpVec.set(partner.cx, partner.cy, partnerZ + offsetZ);
+                      LRT.Weapons.spawnGlassShards(_tmpVec, 14, null);
+                    }
+                  }
                 }
               }
+            } else if (coll && (coll.mat === 'glass' || coll.tag === 'glass' || coll.minY >= 0)) {
+              coll.broken = true;
+              coll.blocksWalk = false;
+              coll.disabled = true;
+              coll.blocksBullets = false;
             }
             if (LRT.Weapons && LRT.Weapons.spawnGlassShards) {
               _tmpVec.set(g.cx, g.cy, curZ + offsetZ);
@@ -1739,11 +1848,12 @@
 
       for (let i = 0; i < this.interactables.length; i++) {
         const it = this.interactables[i];
+        const maxDist = (typeof it.radius === 'number' && it.radius > 0) ? it.radius : 2.75;
         const dx = it.x - pos.x;
         const dy = it.y - pos.y;
         const dz = (it.z + offsetZ) - pos.z;
         const dist = Math.hypot(dx, dy, dz);
-        if (dist > 2.75) continue;
+        if (dist > maxDist) continue;
         let dot = 1.0;
         if (lookDir && dist > 0.05) {
           dot = (dx * lookDir.x + dy * lookDir.y + dz * lookDir.z) / dist;
@@ -1937,6 +2047,64 @@
           res.logBody = 'Jumat sore, pukul 16.30.\n\nMas Doni, kalau nanti malam listrik stasiun mati lagi, tolong oven gas jangan langsung dimatikan. Dari tadi di luar banyak orang berlarian dan berteriak, tapi wangi kopi dan mentega dari kedai kita lumayan bikin anak-anak yang mengungsi di peron dua jadi sedikit lebih tenang.\n\nTadi petugas stasiun sempat minta sepuluh bungkus roti hangat karena kereta tujuan Harjamukti berhenti mendadak di tengah jalur. Persediaan tepung kita masih cukup sampai hari Senin. Jaga diri baik-baik ya.\n\nSalam,\nBudi';
         }
         return res;
+      }
+
+      if (it.type === 'indomaret_chiller' || it.id === 'indomaret_chiller') {
+        const fresh = !it.used;
+        if (LRT.Audio && LRT.Audio.play) {
+          LRT.Audio.play(fresh ? 'pickup_medkit' : 'paper_rustle', { gain: 0.78 });
+          if (fresh) LRT.Audio.play('water_pour', { gain: 0.55 });
+        }
+        const heal = fresh ? 20 : 0;
+        const sprintSec = fresh ? 15 : 0;
+        it.used = true;
+        it.label = '[E] Chiller Indomaret & Point Coffee (Sudah Diambil)';
+        it.prompt = it.label;
+        if (this._usedIds) this._usedIds.add(id);
+        this._markFieldLogGlintUsed(id);
+        this._syncObjectiveBeacons();
+        if (fresh && LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function') {
+          const pState = LRT.PlayerUI.getState();
+          if (pState && (!pState.fastSprint || this._chillerSprintTimer > 0)) {
+            this._chillerSprintTimer = Math.max(this._chillerSprintTimer || 0, sprintSec);
+            pState.fastSprint = true;
+          }
+        }
+        return {
+          ok: true,
+          type: 'indomaret_chiller',
+          action: 'indomaret_chiller',
+          heal: heal,
+          healAmount: heal,
+          fastSprintSec: sprintSec,
+          sprintDuration: sprintSec,
+          message: fresh
+            ? 'Point Coffee & Minuman Chiller: +20 HP & +15s Fast Sprint!'
+            : 'Chiller Indomaret & Point Coffee sudah diambil di stasiun ini.'
+        };
+      }
+
+      if (it.type === 'jpo2_supply' || it.id === 'jpo2_supply') {
+        if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('crate_open', { gain: 0.78 });
+        const fresh = !it.used;
+        it.used = true;
+        it.label = '[E] Tas Logistik JPO Sekunder (Sudah Diambil)';
+        it.prompt = it.label;
+        if (this._usedIds) this._usedIds.add(id);
+        this._markFieldLogGlintUsed(id);
+        this._syncObjectiveBeacons();
+        return {
+          ok: true,
+          type: 'jpo2_supply',
+          action: 'jpo2_supply',
+          heal: fresh ? 15 : 0,
+          healAmount: fresh ? 15 : 0,
+          ammo: fresh ? { type: 'all', amount: 20 } : null,
+          ammoBonus: fresh ? 1 : 0,
+          message: fresh
+            ? 'Tas Logistik JPO Sekunder: +20 Amunisi & +15 HP diamankan!'
+            : 'Tas Logistik JPO Sekunder sudah diambil.'
+        };
       }
 
       if (it.type === 'coway') {

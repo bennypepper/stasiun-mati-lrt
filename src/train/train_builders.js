@@ -186,6 +186,10 @@
   T.texPisCanvas = null;
   T.texPisCtx = null;
   T.texPisMap = null;
+  T.texDestCanvas = null;
+  T.texDestCtx = null;
+  T.texDestMap = null;
+  T.destBoardMat = null;
   T.texScorchFallback = null;
   T.baseLcdMat = null;
 
@@ -520,7 +524,15 @@
     T.texPisMap = new THREE.CanvasTexture(T.texPisCanvas);
     T.texPisMap.colorSpace = THREE.SRGBColorSpace;
     T.texPisMap.anisotropy = 8;
-    repaintPisLcd(T.currentStationName);
+
+    // 3b. Dynamic Exterior Nose & Platform-Side LED Destination Board Texture (1024x192)
+    T.texDestCanvas = makeCanvas(1024, 192);
+    T.texDestCtx = T.texDestCanvas.getContext('2d');
+    T.texDestMap = new THREE.CanvasTexture(T.texDestCanvas);
+    T.texDestMap.colorSpace = THREE.SRGBColorSpace;
+    T.texDestMap.anisotropy = 8;
+
+    repaintPisLcd(T.currentStationName, T.travelDir);
 
     // 4. Fallback Scorch Decal Texture (in case LRT.Materials.mats.scorchDecal absent)
     const cS = makeCanvas(128, 128);
@@ -536,41 +548,105 @@
     T.texScorchFallback.colorSpace = THREE.SRGBColorSpace;
   }
 
-  function repaintPisLcd(stationName) {
+  function repaintDestBoard(stationName, travelDir, isArrival) {
+    if (!T.texDestCtx || !T.texDestMap) return;
+    const ctx = T.texDestCtx;
+    const dir = (typeof travelDir === 'number') ? travelDir : (typeof T.travelDir === 'number' ? T.travelDir : 1);
+    const isForward = dir >= 0;
+    const cleanName = String(stationName || 'Cawang')
+      .replace(/^[←→]\s*/g, '')
+      .replace(/^TIBA:\s*/i, '')
+      .trim() || 'Cawang';
+
+    ctx.setTransform(2, 0, 0, 2, 0, 0);
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+
+    // Matte black LED sign background & metallic inner bezel
+    ctx.fillStyle = '#070A0F';
+    ctx.fillRect(0, 0, 512, 96);
+    ctx.strokeStyle = isForward ? '#10B981' : '#F59E0B';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(4, 4, 504, 88);
+
+    // Left direction badge (Emerald MAJU -> vs Amber <- KEMBALI)
+    ctx.fillStyle = isForward ? '#064E3B' : '#451A03';
+    ctx.fillRect(10, 10, 154, 76);
+    ctx.strokeStyle = isForward ? '#34D399' : '#FBBF24';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(10, 10, 154, 76);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = isForward ? '#34D399' : '#FBBF24';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.fillText(isForward ? 'MAJU →' : '← KEMBALI', 87, 44);
+    ctx.fillStyle = isForward ? '#A7F3D0' : '#FDE68A';
+    ctx.font = 'bold 13px monospace';
+    ctx.fillText(isForward ? 'PERON 1' : 'PERON 2', 87, 68);
+
+    // Right destination station readout
+    ctx.textAlign = 'left';
+    ctx.fillStyle = isForward ? '#6EE7B7' : '#FCD34D';
+    ctx.font = 'bold 11px monospace';
+    ctx.fillText(isArrival ? 'STASIUN SAAT INI / ARRIVED' : 'TUJUAN AKHIR / DESTINATION', 180, 30);
+
+    ctx.fillStyle = isForward ? '#ECFDF5' : '#FEF3C7';
+    ctx.font = 'bold 26px sans-serif';
+    ctx.fillText(cleanName.toUpperCase(), 180, 68, 316);
+
+    T.texDestMap.needsUpdate = true;
+  }
+
+  function repaintPisLcd(stationName, travelDir) {
+    const dir = (typeof travelDir === 'number') ? travelDir : (typeof T.travelDir === 'number' ? T.travelDir : 1);
+    const isForward = dir >= 0;
+    const rawName = String(stationName || 'Cawang');
+    const isArrival = /^TIBA:\s*/i.test(rawName);
+    const cleanName = rawName.replace(/^[←→]\s*/g, '').replace(/^TIBA:\s*/i, '').trim() || 'Cawang';
+
+    repaintDestBoard(cleanName, dir, isArrival);
+
     if (!T.texPisCtx || !T.texPisMap) return;
     const ctx = T.texPisCtx;
     ctx.setTransform(2, 0, 0, 2, 0, 0);
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+
     ctx.fillStyle = '#182438';
     ctx.fillRect(0, 0, 512, 128);
     ctx.fillStyle = '#EDF3FB';
     ctx.fillRect(10, 10, 492, 108);
 
-    // KAI header bar
+    // KAI header bar + color-coded direction pill
     ctx.fillStyle = '#16325C';
     ctx.fillRect(10, 10, 492, 34);
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 16px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('KAI  LRT JABODEBEK', 22, 33);
-    ctx.fillStyle = '#E5D429';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillText('GoA-3 OTOMATIS', 488, 33);
+    ctx.font = 'bold 15px sans-serif';
+    ctx.fillText('KAI  LRT JABODEBEK', 20, 32);
+
+    ctx.fillStyle = isForward ? '#059669' : '#D97706';
+    ctx.fillRect(298, 14, 196, 26);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(isForward ? 'MAJU →  •  PERON 1' : '← KEMBALI  •  PERON 2', 396, 32);
 
     ctx.textAlign = 'left';
+    ctx.fillStyle = isForward ? '#065F46' : '#92400E';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText(isArrival ? 'TIBA DI STASIUN:' : 'TUJUAN BERIKUTNYA:', 22, 60);
+
     ctx.fillStyle = '#0F172A';
     ctx.font = 'bold 21px sans-serif';
-    ctx.fillText('Next Station: ' + (stationName || 'Cawang'), 22, 72);
+    ctx.fillText(cleanName, 22, 82, 468);
 
     // Route bar CB + BK
-    ctx.fillStyle = '#1D4ED8';
-    ctx.fillRect(22, 92, 224, 10);
-    ctx.fillStyle = '#15803D';
-    ctx.fillRect(246, 92, 244, 10);
-    for (let i = 0; i < 8; i++) {
-      ctx.fillStyle = i === 3 ? '#E5D429' : '#FFFFFF';
+    ctx.fillStyle = isForward ? '#10B981' : '#F59E0B';
+    ctx.fillRect(22, 96, 468, 8);
+    for (let i = 0; i < 6; i++) {
+      ctx.fillStyle = '#FFFFFF';
       ctx.beginPath();
-      ctx.arc(36 + i * 62, 97, 6, 0, Math.PI * 2);
+      ctx.arc(38 + i * 87, 100, 6, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = '#1E293B';
       ctx.lineWidth = 1.5;
@@ -1047,14 +1123,8 @@
       }
       pushMatGeom(shieldGeoms, shieldGeo, 0, 0.39, (zTip + zMid) * 0.5 + s * 0.025, -0.10, ry, 0, 'YXZ');
 
-      // 2. LED Destination Header Strip right above windshield ('YXZ' fixes rear pitch)
-      const destGeo = new THREE.PlaneGeometry(1.16, 0.16);
-      const destUV = destGeo.attributes.uv;
-      const du = LIVERY_UV.destLed;
-      destUV.setXY(0, du[0], du[3]);
-      destUV.setXY(1, du[2], du[3]);
-      destUV.setXY(2, du[0], du[1]);
-      destUV.setXY(3, du[2], du[1]);
+      // 2. Dynamic LED Destination Header Strip right above windshield ('YXZ' fixes rear pitch)
+      const destGeo = new THREE.PlaneGeometry(1.28, 0.21);
       pushMatGeom(destGeoms, destGeo, 0, 2.48, carCenterZ + s * 7.68, -0.58, ry, 0, 'YXZ');
 
       // 3. 4 Top LED Brow Lights (merged per front/rear emissive color)
@@ -1101,6 +1171,12 @@
       pushMatGeom(hoseGeoms, new THREE.CylinderGeometry(0.028, 0.028, 0.42, 8), 0.34 * s, -0.41, czCoup + s * 0.06, 0, ry, -0.22, 'YXZ');
     }
 
+    // Platform-side (+X) dynamic exterior destination LED boards above center doors (zero extra draw calls!)
+    for (let c = 0; c < TD.carCentersZ.length; c++) {
+      const sideDestGeo = new THREE.PlaneGeometry(1.52, 0.24);
+      pushMatGeom(destGeoms, sideDestGeo, TD.halfWidth + 0.014, 2.42, TD.carCentersZ[c], 0, Math.PI * 0.5, 0, 'YXZ');
+    }
+
     const shieldMat = new THREE.MeshPhysicalMaterial({
       map: T.texNoseAtlas,
       roughness: 0.18,
@@ -1112,7 +1188,18 @@
       polygonOffsetFactor: -1
     });
     group.add(new THREE.Mesh(mergeStaticGeoms(shieldGeoms), shieldMat));
-    group.add(new THREE.Mesh(mergeStaticGeoms(destGeoms), mats.trainBody));
+
+    if (!T.destBoardMat && T.texDestMap) {
+      T.destBoardMat = new THREE.MeshStandardMaterial({
+        map: T.texDestMap,
+        emissive: new THREE.Color(0xffffff),
+        emissiveMap: T.texDestMap,
+        emissiveIntensity: 1.55,
+        roughness: 0.22,
+        metalness: 0.12
+      });
+    }
+    group.add(new THREE.Mesh(mergeStaticGeoms(destGeoms), T.destBoardMat || mats.trainBody));
 
     const frontLampMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
@@ -2088,6 +2175,7 @@
   T.mergeStaticGeoms = mergeStaticGeoms;
   T.pushMatGeom = pushMatGeom;
   T.buildProceduralTrainTextures = buildProceduralTrainTextures;
+  T.repaintDestBoard = repaintDestBoard;
   T.repaintPisLcd = repaintPisLcd;
   T.createMeshBuilder = createMeshBuilder;
   T.cloneMatWithVertexColors = cloneMatWithVertexColors;

@@ -190,6 +190,7 @@
           <span class="pill-ind active" id="pill-lighting">L Cahaya</span>
           <span class="pill-ind active" id="pill-hud">H Layar</span>
           <span class="pill-ind" id="pill-mute">M Suara</span>
+          <span class="pill-ind" id="pill-fast-travel">Tab Peta &amp; Fast Travel</span>
         </div>
       </div>
 
@@ -245,6 +246,47 @@
     <div class="doc-footer">
       <span class="doc-footer-hint hidden">Tekan E atau Esc untuk menutup</span>
       <button class="doc-close-btn" id="btn-doc-close" type="button">Tutup</button>
+    </div>
+  </div>
+
+  <!-- GTA V-Style Fast Travel & Station Inspector Modal ([Tab] / Pause Menu) -->
+  <div id="fast-travel-modal" class="fast-travel-modal hidden" role="dialog" aria-modal="true" aria-labelledby="ft-modal-title">
+    <div class="ft-shell">
+      <div class="ft-topbar">
+        <div class="ft-title-block">
+          <div class="ft-kicker">KORIDOR SELATAN LRT &middot; NAVIGASI CEPAT</div>
+          <h2 class="ft-title" id="ft-modal-title">FAST TRAVEL &amp; STATION INSPECTOR</h2>
+          <div class="ft-meta" id="ft-active-meta">Stasiun Aktif: Dukuh Atas BSI (01)</div>
+        </div>
+        <div class="ft-topbar-actions">
+          <div class="ft-atmos-group" id="ft-atmos-group" role="group" aria-label="Atmosphere Lighting Presets">
+            <span class="ft-atmos-label">SUASANA:</span>
+            <button class="ft-atmos-btn" data-ft-mood="GOLDEN_DUSK" type="button">Sunset</button>
+            <button class="ft-atmos-btn" data-ft-mood="HAZY_DUSK" type="button">Dusk</button>
+            <button class="ft-atmos-btn" data-ft-mood="BLACKOUT_EMERGENCY" type="button">Night</button>
+            <button class="ft-atmos-btn" data-ft-mood="DAYLIGHT_CLEAR" type="button">Daylight</button>
+          </div>
+          <button class="ft-close-btn" id="btn-fast-travel-close" type="button">TUTUP [TAB / ESC]</button>
+        </div>
+      </div>
+
+      <div class="ft-columns">
+        <section class="ft-col ft-col-stations" aria-label="6 LRT Stations">
+          <div class="ft-col-head">
+            <span class="ft-col-title">STASIUN LRT JABODEBEK (01&ndash;06)</span>
+            <span class="ft-col-sub">Klik stasiun untuk melompat</span>
+          </div>
+          <div class="ft-station-list" id="ft-station-list"></div>
+        </section>
+
+        <section class="ft-col ft-col-zones" aria-label="10 Intra-Station &amp; City Zones">
+          <div class="ft-col-head">
+            <span class="ft-col-title">ZONA STASIUN &amp; KOTA (10 TITIK)</span>
+            <span class="ft-col-sub" id="ft-zones-sub">Teleport aman di stasiun aktif</span>
+          </div>
+          <div class="ft-zone-grid" id="ft-zone-grid"></div>
+        </section>
+      </div>
     </div>
   </div>
 
@@ -469,7 +511,9 @@
           <div class="ctrl-row"><span class="ctrl-key">E</span><span class="ctrl-desc">Interact / Tap Kartu</span></div>
           <div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-desc">Flashlight</span></div>
           <div class="ctrl-row"><span class="ctrl-key">L</span><span class="ctrl-desc">Cycle Lighting</span></div>
-          <div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-desc">Summon / Depart LRT</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-desc">Summon Peron 1 / Depart LRT</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">SHIFT + T</span><span class="ctrl-desc">Summon Peron 2 (Return LRT)</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">TAB</span><span class="ctrl-desc">Peta &amp; Fast Travel</span></div>
           <div class="ctrl-row"><span class="ctrl-key">F3</span><span class="ctrl-desc">FPS Telemetry</span></div>
           <div class="ctrl-row"><span class="ctrl-key">H</span><span class="ctrl-desc">Toggle HUD</span></div>
           <div class="ctrl-row"><span class="ctrl-key">M</span><span class="ctrl-desc">Mute Audio</span></div>
@@ -492,6 +536,10 @@
         <button class="zenith-item" id="btn-resume" type="button">
           <span class="zenith-item-title">RESUME</span>
           <span class="zenith-item-sub">Return to station platform</span>
+        </button>
+        <button class="zenith-item" id="btn-pause-fast-travel" type="button">
+          <span class="zenith-item-title">🗺️ FAST TRAVEL &amp; INSPECTOR [TAB]</span>
+          <span class="zenith-item-sub">Jump across 6 stations, 10 zones &amp; atmosphere</span>
         </button>
         <button class="zenith-item" id="btn-restart-mode" type="button">
           <span class="zenith-item-title">RESTART</span>
@@ -700,7 +748,9 @@
           <div class="ctrl-row"><span class="ctrl-key">E</span><span class="ctrl-desc">Interact / Tap Kartu</span></div>
           <div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-desc">Flashlight</span></div>
           <div class="ctrl-row"><span class="ctrl-key">L</span><span class="ctrl-desc">Cycle Lighting</span></div>
-          <div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-desc">Summon / Depart LRT</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-desc">Summon Peron 1 / Depart LRT</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">SHIFT + T</span><span class="ctrl-desc">Summon Peron 2 (Return LRT)</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">TAB</span><span class="ctrl-desc">Peta &amp; Fast Travel</span></div>
           <div class="ctrl-row"><span class="ctrl-key">F3</span><span class="ctrl-desc">FPS Telemetry</span></div>
           <div class="ctrl-row"><span class="ctrl-key">H</span><span class="ctrl-desc">Toggle HUD</span></div>
           <div class="ctrl-row"><span class="ctrl-key">M</span><span class="ctrl-desc">Mute Audio</span></div>

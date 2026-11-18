@@ -567,7 +567,17 @@
 
   // Persistent module-level cached materials for procedural Jakarta vehicles & props
   let _vehPaintMat = null;
+  let _vehPaintedVertexMat = null;
   let _vehTrimMat = null;
+  let _vehGlassMat = null;
+  let _vehRubberMat = null;
+  let _vehAlloyMat = null;
+  let _vehHeadlightMat = null;
+  let _vehTaillightMat = null;
+  let _vehAmberMat = null;
+  let _gerobakDisplayGlassMat = null;
+  let _propWoodMat = null;
+  let _propConcreteMat = null;
   let _trafficAmberMat = null;
   let _highwaySignMat = null;
   let _cityLodMat = null;
@@ -594,12 +604,25 @@
     if (!_vehPaintMat) {
       _vehPaintMat = new THREE.MeshStandardMaterial({
         color: 0xffffff,
-        roughness: 0.34,
-        metalness: 0.44,
-        envMapIntensity: 1.2
+        roughness: 0.28,
+        metalness: 0.55,
+        envMapIntensity: 1.35
       });
     }
     return _vehPaintMat;
+  }
+
+  function getVehiclePaintedVertexMaterial() {
+    if (!_vehPaintedVertexMat) {
+      _vehPaintedVertexMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        vertexColors: true,
+        roughness: 0.28,
+        metalness: 0.55,
+        envMapIntensity: 1.3
+      });
+    }
+    return _vehPaintedVertexMat;
   }
 
   function getVehicleTrimMaterial() {
@@ -607,11 +630,126 @@
       _vehTrimMat = new THREE.MeshStandardMaterial({
         color: 0xffffff,
         vertexColors: true,
-        roughness: 0.68,
-        metalness: 0.16
+        roughness: 0.64,
+        metalness: 0.22
       });
     }
     return _vehTrimMat;
+  }
+
+  function getCabinGlassMaterial() {
+    if (!_vehGlassMat) {
+      _vehGlassMat = new THREE.MeshStandardMaterial({
+        color: 0x101c26,
+        roughness: 0.12,
+        metalness: 0.20,
+        envMapIntensity: 1.55
+      });
+    }
+    return _vehGlassMat;
+  }
+
+  function getRubberTireMaterial() {
+    if (!_vehRubberMat) {
+      _vehRubberMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        vertexColors: true,
+        roughness: 0.90,
+        metalness: 0.04
+      });
+    }
+    return _vehRubberMat;
+  }
+
+  function getAlloyMetalMaterial() {
+    if (!_vehAlloyMat) {
+      _vehAlloyMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        vertexColors: true,
+        roughness: 0.30,
+        metalness: 0.82,
+        envMapIntensity: 1.35
+      });
+    }
+    return _vehAlloyMat;
+  }
+
+  function getHeadlightEmissiveMaterial() {
+    if (!_vehHeadlightMat) {
+      _vehHeadlightMat = new THREE.MeshStandardMaterial({
+        color: 0xf4f2e6,
+        emissive: new THREE.Color(0xfff1cc),
+        emissiveIntensity: 0.72,
+        roughness: 0.18,
+        metalness: 0.15
+      });
+    }
+    return _vehHeadlightMat;
+  }
+
+  function getTaillightEmissiveMaterial() {
+    if (!_vehTaillightMat) {
+      _vehTaillightMat = new THREE.MeshStandardMaterial({
+        color: 0xb91c1c,
+        emissive: new THREE.Color(0xdc2626),
+        emissiveIntensity: 0.65,
+        roughness: 0.22,
+        metalness: 0.12
+      });
+    }
+    return _vehTaillightMat;
+  }
+
+  function getAmberAccentEmissiveMaterial() {
+    if (!_vehAmberMat) {
+      _vehAmberMat = new THREE.MeshStandardMaterial({
+        color: 0xf59e0b,
+        emissive: new THREE.Color(0xf59e0b),
+        emissiveIntensity: 0.90,
+        roughness: 0.28,
+        metalness: 0.10
+      });
+    }
+    return _vehAmberMat;
+  }
+
+  function getWarmDisplayGlassMaterial() {
+    if (!_gerobakDisplayGlassMat) {
+      _gerobakDisplayGlassMat = new THREE.MeshStandardMaterial({
+        color: 0xfef3c7,
+        emissive: new THREE.Color(0xf59e0b),
+        emissiveIntensity: 0.58,
+        roughness: 0.16,
+        metalness: 0.12,
+        transparent: true,
+        opacity: 0.80
+      });
+    }
+    return _gerobakDisplayGlassMat;
+  }
+
+  function getWoodPbrMaterial() {
+    if (!_propWoodMat) {
+      _propWoodMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        vertexColors: true,
+        roughness: 0.72,
+        metalness: 0.04
+      });
+    }
+    return _propWoodMat;
+  }
+
+  function getConcretePbrMaterial() {
+    if (!_propConcreteMat) {
+      _propConcreteMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        vertexColors: true,
+        roughness: 0.90,
+        metalness: 0.03
+      });
+    }
+    return _propConcreteMat;
   }
 
   function getTrafficAmberMaterial() {
@@ -748,39 +886,65 @@
     return parts;
   }
 
-  function addWheelPair(trimBucket, radius, width, y, z, halfTrack) {
+  function addWheelPair(rubberBucket, alloyBucket, radius, width, y, z, halfTrack) {
     for (const sx of [-halfTrack, halfTrack]) {
-      addColoredCylinder(trimBucket, radius, radius, width, 10, sx, y, z, 0, 0, Math.PI * 0.5, 0x191b1f, 0.75);
-      addColoredCylinder(trimBucket, radius * 0.56, radius * 0.56, width + 0.02, 8, sx, y, z, 0, 0, Math.PI * 0.5, 0x6e747c, 0.85);
+      const sideSign = sx < 0 ? -1 : 1;
+      addColoredCylinder(rubberBucket, radius, radius, width, 12, sx, y, z, 0, 0, Math.PI * 0.5, 0x16181c, 0.78);
+      addColoredCylinder(alloyBucket, radius * 0.58, radius * 0.58, width + 0.018, 10, sx, y, z, 0, 0, Math.PI * 0.5, 0xb8c0ca, 0.88);
+      addColoredCylinder(alloyBucket, radius * 0.22, radius * 0.22, 0.025, 8, sx + sideSign * (width * 0.5 + 0.008), y, z, 0, 0, Math.PI * 0.5, 0x2d333b, 0.92);
     }
   }
 
-  // Indonesian Sedan & MPV (Avanza/Innova) prototypes: paint part (for instanceColor) + trim part
+  function addLicensePlate(rubberBucket, alloyBucket, x, y, z, isYellowPublic) {
+    addColoredBox(rubberBucket, 0.44, 0.13, 0.025, x, y, z, 0, 0, 0, 0x121417, 0.9);
+    const faceCol = isYellowPublic ? 0xeab308 : 0xe2e8f0;
+    const faceZ = z >= 0 ? z + 0.010 : z - 0.010;
+    addColoredBox(alloyBucket, 0.38, 0.09, 0.014, x, y, faceZ, 0, 0, 0, faceCol, 0.95);
+  }
+
+  // Indonesian Sedan & MPV (Avanza/Innova) prototypes: paint part (for instanceColor) + PBR glass/rubber/alloy/lights
   function getSedanMpvProto(variant) {
-    const cacheKey = 'proc_veh_' + variant;
+    const cacheKey = 'proc_veh_v2_' + variant;
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
 
     const isMpv = variant === 'mpv_ajar';
     const bPaint = [];
-    const bTrim = [];
+    const bGlass = [];
+    const bRubber = [];
+    const bAlloy = [];
+    const bHeadlight = [];
+    const bTaillight = [];
 
     const len = isMpv ? 4.42 : 4.24;
     const w = isMpv ? 1.74 : 1.70;
     const wheelR = isMpv ? 0.34 : 0.31;
 
-    // 4 wheels + dark undercarriage + front/rear bumpers
-    addWheelPair(bTrim, wheelR, 0.22, wheelR, 1.32, w * 0.46);
-    addWheelPair(bTrim, wheelR, 0.22, wheelR, -1.32, w * 0.46);
-    addColoredBox(bTrim, w * 0.90, 0.16, len * 0.92, 0, wheelR * 0.75, 0, 0, 0, 0, 0x181a1d, 0.8);
-    addColoredBox(bTrim, w * 0.98, 0.26, 0.24, 0, wheelR + 0.12, len * 0.48, 0, 0, 0, 0x2a2e33, 0.75);
-    addColoredBox(bTrim, w * 0.98, 0.26, 0.24, 0, wheelR + 0.12, -len * 0.48, 0, 0, 0, 0x2a2e33, 0.75);
-    // Headlights & taillights
-    addColoredBox(bTrim, 0.32, 0.14, 0.08, -w * 0.34, wheelR + 0.38, len * 0.49, 0, 0, 0, 0xd8d6c4, 0.9);
-    addColoredBox(bTrim, 0.32, 0.14, 0.08, w * 0.34, wheelR + 0.38, len * 0.49, 0, 0, 0, 0xd8d6c4, 0.9);
-    addColoredBox(bTrim, 0.30, 0.14, 0.08, -w * 0.34, wheelR + 0.42, -len * 0.49, 0, 0, 0, 0x992020, 0.85);
-    addColoredBox(bTrim, 0.30, 0.14, 0.08, w * 0.34, wheelR + 0.42, -len * 0.49, 0, 0, 0, 0x992020, 0.85);
-    // Grille
-    addColoredBox(bTrim, w * 0.44, 0.20, 0.06, 0, wheelR + 0.34, len * 0.49, 0, 0, 0, 0x1b1e22, 0.8);
+    // 4 rubber tires + silver alloy rims + dark undercarriage + front/rear bumpers
+    addWheelPair(bRubber, bAlloy, wheelR, 0.22, wheelR, 1.32, w * 0.46);
+    addWheelPair(bRubber, bAlloy, wheelR, 0.22, wheelR, -1.32, w * 0.46);
+    addColoredBox(bRubber, w * 0.90, 0.16, len * 0.92, 0, wheelR * 0.75, 0, 0, 0, 0, 0x181a1d, 0.8);
+    addColoredBox(bRubber, w * 0.98, 0.25, 0.24, 0, wheelR + 0.11, len * 0.48, 0, 0, 0, 0x1f2328, 0.75);
+    addColoredBox(bRubber, w * 0.98, 0.25, 0.24, 0, wheelR + 0.11, -len * 0.48, 0, 0, 0, 0x1f2328, 0.75);
+    // Front & rear Indonesian license plates + chrome exhaust pipe
+    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.12, len * 0.505, false);
+    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.16, -len * 0.505, false);
+    addColoredCylinder(bAlloy, 0.032, 0.036, 0.22, 8, w * 0.28, wheelR * 0.58, -len * 0.49, Math.PI * 0.5, 0, 0, 0x9ca3af, 0.88);
+    // Emissive headlights & taillights
+    addBox(bHeadlight, 0.32, 0.13, 0.07, -w * 0.34, wheelR + 0.38, len * 0.492);
+    addBox(bHeadlight, 0.32, 0.13, 0.07, w * 0.34, wheelR + 0.38, len * 0.492);
+    addBox(bTaillight, 0.30, 0.13, 0.07, -w * 0.34, wheelR + 0.42, -len * 0.492);
+    addBox(bTaillight, 0.30, 0.13, 0.07, w * 0.34, wheelR + 0.42, -len * 0.492);
+    // Chrome-rimmed front grille + dark slats + door handles + side mirrors
+    addColoredBox(bAlloy, w * 0.48, 0.22, 0.05, 0, wheelR + 0.34, len * 0.488, 0, 0, 0, 0xb8c0cc, 0.9);
+    addColoredBox(bRubber, w * 0.42, 0.16, 0.06, 0, wheelR + 0.34, len * 0.492, 0, 0, 0, 0x16181c, 0.8);
+    for (const sx of [-1, 1]) {
+      addColoredBox(bAlloy, 0.10, 0.035, 0.04, sx * (w * 0.5 + 0.04), wheelR + 0.64, 0.66, 0, 0, 0, 0x374151, 0.9);
+      addColoredBox(bAlloy, 0.14, 0.09, 0.10, sx * (w * 0.5 + 0.10), wheelR + 0.66, 0.65, 0, sx * 0.12, 0, 0x9ca3af, 0.92);
+      if (!(isMpv && sx < 0)) {
+        addColoredBox(bAlloy, 0.03, 0.035, 0.14, sx * (w * 0.505), wheelR + 0.48, 0.18, 0, 0, 0, 0xcbd5e1, 0.9);
+      }
+      addColoredBox(bAlloy, 0.03, 0.035, 0.14, sx * (w * 0.505), wheelR + 0.48, -0.58, 0, 0, 0, 0xcbd5e1, 0.9);
+    }
 
     // Lower painted chassis body
     addPaintBox(bPaint, w, 0.56, len * 0.96, 0, wheelR + 0.32, 0);
@@ -789,28 +953,32 @@
       // Avanza/Innova longer greenhouse + roof rack rails + ajar driver door & popped hood
       addPaintBox(bPaint, w * 0.88, 0.58, 2.52, 0, wheelR + 0.86, -0.34);
       // Popped hood (+Z front) tilted up ~14 deg + dark engine bay underneath
-      addColoredBox(bTrim, w * 0.78, 0.24, 1.05, 0, wheelR + 0.50, 1.38, 0, 0, 0, 0x1d1f23, 0.7);
+      addColoredBox(bRubber, w * 0.78, 0.24, 1.05, 0, wheelR + 0.50, 1.38, 0, 0, 0, 0x1d1f23, 0.7);
       addPaintBox(bPaint, w * 0.92, 0.07, 1.12, 0, wheelR + 0.72, 1.34, -0.24, 0, 0);
       // Slightly ajar front-left door
       addPaintBox(bPaint, 0.08, 0.54, 0.92, -w * 0.5 - 0.18, wheelR + 0.34, 0.22, 0, -0.38, 0);
-      addColoredBox(bTrim, 0.06, 0.42, 0.78, -w * 0.5 - 0.18, wheelR + 0.80, 0.22, 0, -0.38, 0, 0x1b2833, 0.8);
-      // Tinted cabin windows & roof rails
-      addColoredBox(bTrim, w * 0.80, 0.44, 0.12, 0, wheelR + 0.84, 0.92, -0.35, 0, 0, 0x1b2a36, 0.85);
-      addColoredBox(bTrim, w * 0.90, 0.42, 2.25, 0, wheelR + 0.85, -0.38, 0, 0, 0, 0x1a2630, 0.85);
-      addColoredBox(bTrim, 0.06, 0.06, 2.10, -w * 0.36, wheelR + 1.18, -0.35, 0, 0, 0, 0x2a2d32, 0.9);
-      addColoredBox(bTrim, 0.06, 0.06, 2.10, w * 0.36, wheelR + 1.18, -0.35, 0, 0, 0, 0x2a2d32, 0.9);
+      addBox(bGlass, 0.06, 0.42, 0.78, -w * 0.5 - 0.18, wheelR + 0.80, 0.22, 0, -0.38, 0);
+      // Glossy dark cabin glass & alloy roof rails
+      addBox(bGlass, w * 0.80, 0.44, 0.12, 0, wheelR + 0.84, 0.92, -0.35, 0, 0);
+      addBox(bGlass, w * 0.90, 0.42, 2.25, 0, wheelR + 0.85, -0.38);
+      addColoredBox(bAlloy, 0.06, 0.06, 2.10, -w * 0.36, wheelR + 1.18, -0.35, 0, 0, 0, 0x9ca3af, 0.9);
+      addColoredBox(bAlloy, 0.06, 0.06, 2.10, w * 0.36, wheelR + 1.18, -0.35, 0, 0, 0, 0x9ca3af, 0.9);
     } else {
-      // Compact Indonesian sedan greenhouse + trunk
+      // Compact Indonesian sedan greenhouse + trunk + glossy dark glass
       addPaintBox(bPaint, w * 0.86, 0.48, 1.85, 0, wheelR + 0.82, -0.10);
-      addColoredBox(bTrim, w * 0.78, 0.38, 0.12, 0, wheelR + 0.78, 0.84, -0.45, 0, 0, 0x1b2a36, 0.85);
-      addColoredBox(bTrim, w * 0.78, 0.36, 0.12, 0, wheelR + 0.78, -1.04, 0.45, 0, 0, 0x1b2a36, 0.85);
-      addColoredBox(bTrim, w * 0.88, 0.34, 1.56, 0, wheelR + 0.80, -0.10, 0, 0, 0, 0x1a2630, 0.85);
+      addBox(bGlass, w * 0.78, 0.38, 0.12, 0, wheelR + 0.78, 0.84, -0.45, 0, 0);
+      addBox(bGlass, w * 0.78, 0.36, 0.12, 0, wheelR + 0.78, -1.04, 0.45, 0, 0);
+      addBox(bGlass, w * 0.88, 0.34, 1.56, 0, wheelR + 0.80, -0.10);
     }
 
     const proto = {
       parts: mergePartBuckets([
         { bucket: bPaint, mat: getVehiclePaintMaterial() },
-        { bucket: bTrim, mat: getVehicleTrimMaterial() }
+        { bucket: bGlass, mat: getCabinGlassMaterial() },
+        { bucket: bRubber, mat: getRubberTireMaterial() },
+        { bucket: bAlloy, mat: getAlloyMetalMaterial() },
+        { bucket: bHeadlight, mat: getHeadlightEmissiveMaterial() },
+        { bucket: bTaillight, mat: getTaillightEmissiveMaterial() }
       ]),
       size: { x: w, y: isMpv ? 1.66 : 1.44, z: len }
     };
@@ -818,232 +986,314 @@
     return proto;
   }
 
-  // Blue Bird / JakLingko Angkot Minivan (sky-blue & white livery + roof rack)
+  // Blue Bird / JakLingko Angkot Minivan (crisp PBR paint, glossy glass, alloy rims, mirrors & yellow plate)
   function getAngkotProto() {
-    const cacheKey = 'proc_veh_angkot';
+    const cacheKey = 'proc_veh_angkot_v2';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
 
-    const bTrim = [];
+    const bBody = [];
+    const bGlass = [];
+    const bRubber = [];
+    const bAlloy = [];
+    const bHeadlight = [];
+    const bTaillight = [];
+    const bAmber = [];
+
     const len = 3.92;
     const w = 1.62;
     const wheelR = 0.31;
 
-    addWheelPair(bTrim, wheelR, 0.20, wheelR, 1.24, w * 0.45);
-    addWheelPair(bTrim, wheelR, 0.20, wheelR, -1.24, w * 0.45);
-    // Bumpers & lights
-    addColoredBox(bTrim, w * 0.98, 0.24, 0.20, 0, wheelR + 0.08, len * 0.49, 0, 0, 0, 0x23272c, 0.75);
-    addColoredBox(bTrim, w * 0.98, 0.24, 0.20, 0, wheelR + 0.08, -len * 0.49, 0, 0, 0, 0x23272c, 0.75);
-    addColoredBox(bTrim, 0.26, 0.14, 0.06, -w * 0.34, wheelR + 0.34, len * 0.50, 0, 0, 0, 0xeee6c8, 0.9);
-    addColoredBox(bTrim, 0.26, 0.14, 0.06, w * 0.34, wheelR + 0.34, len * 0.50, 0, 0, 0, 0xeee6c8, 0.9);
+    addWheelPair(bRubber, bAlloy, wheelR, 0.20, wheelR, 1.24, w * 0.45);
+    addWheelPair(bRubber, bAlloy, wheelR, 0.20, wheelR, -1.24, w * 0.45);
+    // Rubber bumpers & undercarriage + yellow public transport plates
+    addColoredBox(bRubber, w * 0.90, 0.14, len * 0.92, 0, wheelR * 0.78, 0, 0, 0, 0, 0x16181c, 0.8);
+    addColoredBox(bRubber, w * 0.98, 0.24, 0.20, 0, wheelR + 0.08, len * 0.49, 0, 0, 0, 0x1e2226, 0.75);
+    addColoredBox(bRubber, w * 0.98, 0.24, 0.20, 0, wheelR + 0.08, -len * 0.49, 0, 0, 0, 0x1e2226, 0.75);
+    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.09, len * 0.515, true);
+    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.11, -len * 0.515, true);
+    // Emissive headlights & taillights
+    addBox(bHeadlight, 0.26, 0.14, 0.06, -w * 0.34, wheelR + 0.34, len * 0.495);
+    addBox(bHeadlight, 0.26, 0.14, 0.06, w * 0.34, wheelR + 0.34, len * 0.495);
+    addBox(bTaillight, 0.24, 0.16, 0.06, -w * 0.36, wheelR + 0.38, -len * 0.495);
+    addBox(bTaillight, 0.24, 0.16, 0.06, w * 0.36, wheelR + 0.38, -len * 0.495);
 
-    // Sky-blue lower skirt & body
-    addColoredBox(bTrim, w, 0.68, len * 0.96, 0, wheelR + 0.34, 0, 0, 0, 0, 0x1e82cc, 0.78);
-    // White JakLingko/Blue Bird stripe band
-    addColoredBox(bTrim, w + 0.02, 0.14, len * 0.96, 0, wheelR + 0.66, 0, 0, 0, 0, 0xe8edf2, 0.9);
-    // Upper white cabin & roof
-    addColoredBox(bTrim, w * 0.94, 0.58, len * 0.88, 0, wheelR + 0.98, -0.08, 0, 0, 0, 0xe6ebf0, 0.88);
-    // Dark window band (front + sides)
-    addColoredBox(bTrim, w * 0.84, 0.42, 0.10, 0, wheelR + 0.96, len * 0.42, -0.18, 0, 0, 0x192530, 0.85);
-    addColoredBox(bTrim, w * 0.96, 0.38, len * 0.68, 0, wheelR + 0.96, -0.14, 0, 0, 0, 0x1a2632, 0.85);
-    // Yellow JakLingko route sign on roof brow + roof luggage rack
-    addColoredBox(bTrim, 0.78, 0.16, 0.18, 0, wheelR + 1.34, len * 0.30, 0, 0, 0, 0xf2c928, 0.9);
-    addColoredBox(bTrim, w * 0.74, 0.06, 2.20, 0, wheelR + 1.31, -0.35, 0, 0, 0, 0x383e45, 0.85);
-    addColoredBox(bTrim, 0.05, 0.10, 2.20, -w * 0.36, wheelR + 1.35, -0.35, 0, 0, 0, 0x383e45, 0.85);
-    addColoredBox(bTrim, 0.05, 0.10, 2.20, w * 0.36, wheelR + 1.35, -0.35, 0, 0, 0, 0x383e45, 0.85);
+    // Sky-blue lower skirt & body + white JakLingko band + upper cabin
+    addColoredBox(bBody, w, 0.68, len * 0.96, 0, wheelR + 0.34, 0, 0, 0, 0, 0x1e82cc, 0.82);
+    addColoredBox(bBody, w + 0.02, 0.14, len * 0.96, 0, wheelR + 0.66, 0, 0, 0, 0, 0xe8edf2, 0.92);
+    addColoredBox(bBody, w * 0.94, 0.58, len * 0.88, 0, wheelR + 0.98, -0.08, 0, 0, 0, 0xe6ebf0, 0.90);
+    // Glossy dark cabin glass (front windshield, side & rear windows)
+    addBox(bGlass, w * 0.84, 0.42, 0.10, 0, wheelR + 0.96, len * 0.42, -0.18, 0, 0);
+    addBox(bGlass, w * 0.96, 0.38, len * 0.68, 0, wheelR + 0.96, -0.14);
+    addBox(bGlass, w * 0.78, 0.36, 0.08, 0, wheelR + 0.96, -len * 0.46);
+    // Chrome grille, twin side mirrors & alloy roof luggage rack
+    addColoredBox(bAlloy, w * 0.44, 0.16, 0.04, 0, wheelR + 0.32, len * 0.49, 0, 0, 0, 0xb8c0cc, 0.9);
+    for (const sx of [-1, 1]) {
+      addColoredBox(bAlloy, 0.12, 0.11, 0.08, sx * (w * 0.5 + 0.08), wheelR + 0.82, len * 0.35, 0, 0, 0, 0x9ca3af, 0.9);
+    }
+    addColoredBox(bAlloy, w * 0.74, 0.05, 2.20, 0, wheelR + 1.31, -0.35, 0, 0, 0, 0x94a3b8, 0.88);
+    addColoredBox(bAlloy, 0.05, 0.10, 2.20, -w * 0.36, wheelR + 1.35, -0.35, 0, 0, 0, 0x94a3b8, 0.88);
+    addColoredBox(bAlloy, 0.05, 0.10, 2.20, w * 0.36, wheelR + 1.35, -0.35, 0, 0, 0, 0x94a3b8, 0.88);
+    // Illuminated amber JakLingko route sign on roof brow
+    addBox(bAmber, 0.78, 0.16, 0.18, 0, wheelR + 1.34, len * 0.30);
 
     const proto = {
-      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      parts: mergePartBuckets([
+        { bucket: bBody, mat: getVehiclePaintedVertexMaterial() },
+        { bucket: bGlass, mat: getCabinGlassMaterial() },
+        { bucket: bRubber, mat: getRubberTireMaterial() },
+        { bucket: bAlloy, mat: getAlloyMetalMaterial() },
+        { bucket: bHeadlight, mat: getHeadlightEmissiveMaterial() },
+        { bucket: bTaillight, mat: getTaillightEmissiveMaterial() },
+        { bucket: bAmber, mat: getAmberAccentEmissiveMaterial() }
+      ]),
       size: { x: w, y: 1.72, z: len }
     };
     _cityProtoCache.set(cacheKey, proto);
     return proto;
   }
 
-  // TransJakarta BRT Bus Wreck (tactical cover landmark)
+  // TransJakarta BRT Bus Wreck (crisp PBR paint, glossy glass, coach mirrors, AC rooftop unit, LED brow)
   function getTransJakartaBusProto() {
-    const cacheKey = 'proc_veh_tj_bus';
+    const cacheKey = 'proc_veh_tj_bus_v2';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
 
-    const bTrim = [];
+    const bBody = [];
+    const bGlass = [];
+    const bRubber = [];
+    const bAlloy = [];
+    const bHeadlight = [];
+    const bTaillight = [];
+    const bAmber = [];
+
     const len = 10.6;
     const w = 2.46;
     const wheelR = 0.50;
 
-    addWheelPair(bTrim, wheelR, 0.32, wheelR, 3.15, w * 0.45);
-    addWheelPair(bTrim, wheelR, 0.32, wheelR, -2.85, w * 0.45);
-    // Heavy chassis + dark wheel arches
-    addColoredBox(bTrim, w * 0.94, 0.32, len * 0.96, 0, wheelR * 0.85, 0, 0, 0, 0, 0x1c2024, 0.75);
-    // Lower TransJakarta sky-blue body
-    addColoredBox(bTrim, w, 1.05, len, 0, wheelR + 0.52, 0, 0, 0, 0, 0x1b74c4, 0.80);
-    // White upper bus hull
-    addColoredBox(bTrim, w * 0.99, 1.38, len * 0.98, 0, wheelR + 1.72, 0, 0, 0, 0, 0xe8edf2, 0.88);
-    // Navy & red livery stripe
-    addColoredBox(bTrim, w + 0.02, 0.16, len + 0.02, 0, wheelR + 1.08, 0, 0, 0, 0, 0x0e2f5c, 0.9);
-    addColoredBox(bTrim, w + 0.02, 0.08, len * 0.96, 0, wheelR + 0.24, 0, 0, 0, 0, 0xc82428, 0.9);
-    // Panoramic dark side windows & split front windshield
-    addColoredBox(bTrim, w + 0.02, 0.86, len * 0.84, 0, wheelR + 1.78, -0.25, 0, 0, 0, 0x17222c, 0.85);
-    addColoredBox(bTrim, w * 0.88, 1.02, 0.12, 0, wheelR + 1.64, len * 0.49, 0, 0, 0, 0x141d26, 0.85);
-    // Front orange destination LED brow + crumpled front bumper
-    addColoredBox(bTrim, 1.65, 0.22, 0.14, 0, wheelR + 2.26, len * 0.495, 0, 0, 0, 0xf59e0b, 0.95);
-    addColoredBox(bTrim, w * 1.02, 0.34, 0.26, 0.06, wheelR + 0.12, len * 0.50, 0.06, 0.04, -0.04, 0x262b30, 0.75);
-    // Rooftop HVAC pods
-    addColoredBox(bTrim, 1.48, 0.34, 3.60, 0, wheelR + 2.58, 0.4, 0, 0, 0, 0x9aa2aa, 0.85);
-    addColoredBox(bTrim, 1.32, 0.26, 2.20, 0, wheelR + 2.54, -3.2, 0, 0, 0, 0x8a929a, 0.85);
+    addWheelPair(bRubber, bAlloy, wheelR, 0.32, wheelR, 3.15, w * 0.45);
+    addWheelPair(bRubber, bAlloy, wheelR, 0.32, wheelR, -2.85, w * 0.45);
+    // Heavy rubber chassis + crumpled front bumper + rear bumper + license plates
+    addColoredBox(bRubber, w * 0.94, 0.32, len * 0.96, 0, wheelR * 0.85, 0, 0, 0, 0, 0x16191d, 0.75);
+    addColoredBox(bRubber, w * 1.02, 0.34, 0.26, 0.06, wheelR + 0.12, len * 0.50, 0.06, 0.04, -0.04, 0x22262b, 0.75);
+    addColoredBox(bRubber, w * 1.00, 0.30, 0.22, 0, wheelR + 0.12, -len * 0.50, 0, 0, 0, 0x22262b, 0.75);
+    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.14, len * 0.52, true);
+    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.18, -len * 0.515, true);
+
+    // Lower TransJakarta sky-blue body + upper white hull + navy/red livery bands
+    addColoredBox(bBody, w, 1.05, len, 0, wheelR + 0.52, 0, 0, 0, 0, 0x1b74c4, 0.84);
+    addColoredBox(bBody, w * 0.99, 1.38, len * 0.98, 0, wheelR + 1.72, 0, 0, 0, 0, 0xe8edf2, 0.90);
+    addColoredBox(bBody, w + 0.02, 0.16, len + 0.02, 0, wheelR + 1.08, 0, 0, 0, 0, 0x0e2f5c, 0.9);
+    addColoredBox(bBody, w + 0.02, 0.08, len * 0.96, 0, wheelR + 0.24, 0, 0, 0, 0, 0xc82428, 0.9);
+
+    // Glossy dark panoramic side windows + split front windshield + rear window
+    addBox(bGlass, w + 0.02, 0.86, len * 0.84, 0, wheelR + 1.78, -0.25);
+    addBox(bGlass, w * 0.88, 1.02, 0.12, 0, wheelR + 1.64, len * 0.49);
+    addBox(bGlass, w * 0.82, 0.74, 0.10, 0, wheelR + 1.82, -len * 0.49);
+    // Front center wiper mullion & twin tall coach side mirrors
+    addColoredBox(bAlloy, 0.08, 1.04, 0.14, 0, wheelR + 1.64, len * 0.495, 0, 0, 0, 0x64748b, 0.9);
+    for (const sx of [-1, 1]) {
+      addColoredBox(bAlloy, 0.28, 0.05, 0.05, sx * (w * 0.5 + 0.12), wheelR + 1.98, len * 0.49, 0, 0, 0, 0x94a3b8, 0.9);
+      addColoredBox(bAlloy, 0.08, 0.34, 0.14, sx * (w * 0.5 + 0.24), wheelR + 1.82, len * 0.51, 0, 0, 0, 0x334155, 0.9);
+    }
+
+    // Emissive headlights, taillights & front orange LED destination brow
+    addBox(bHeadlight, 0.38, 0.16, 0.08, -w * 0.34, wheelR + 0.46, len * 0.502);
+    addBox(bHeadlight, 0.38, 0.16, 0.08, w * 0.34, wheelR + 0.46, len * 0.502);
+    addBox(bTaillight, 0.36, 0.22, 0.08, -w * 0.36, wheelR + 0.56, -len * 0.502);
+    addBox(bTaillight, 0.36, 0.22, 0.08, w * 0.36, wheelR + 0.56, -len * 0.502);
+    addBox(bAmber, 1.65, 0.22, 0.14, 0, wheelR + 2.26, len * 0.495);
+
+    // Detailed Rooftop AC / HVAC Unit (painted shroud + alloy rails + dark fan intake louvers)
+    addColoredBox(bAlloy, 1.56, 0.06, 3.72, 0, wheelR + 2.43, 0.4, 0, 0, 0, 0x94a3b8, 0.88);
+    addColoredBox(bBody, 1.48, 0.32, 3.60, 0, wheelR + 2.60, 0.4, 0, 0, 0, 0xd1d5db, 0.88);
+    for (const fz of [-0.65, 0.40, 1.45]) {
+      addColoredBox(bRubber, 1.06, 0.06, 0.72, 0, wheelR + 2.77, fz, 0, 0, 0, 0x1e2228, 0.85);
+      addColoredBox(bAlloy, 1.12, 0.04, 0.78, 0, wheelR + 2.76, fz, 0, 0, 0, 0x64748b, 0.90);
+    }
+    addColoredBox(bAlloy, 1.52, 0.14, 3.20, 0, wheelR + 2.60, 0.4, 0, 0, 0, 0x475569, 0.85);
+    addColoredBox(bBody, 1.32, 0.26, 2.20, 0, wheelR + 2.55, -3.2, 0, 0, 0, 0xcbd5e1, 0.86);
+    addColoredBox(bRubber, 0.94, 0.05, 1.40, 0, wheelR + 2.69, -3.2, 0, 0, 0, 0x1e2228, 0.85);
 
     const proto = {
-      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
-      size: { x: w, y: 3.12, z: len }
+      parts: mergePartBuckets([
+        { bucket: bBody, mat: getVehiclePaintedVertexMaterial() },
+        { bucket: bGlass, mat: getCabinGlassMaterial() },
+        { bucket: bRubber, mat: getRubberTireMaterial() },
+        { bucket: bAlloy, mat: getAlloyMetalMaterial() },
+        { bucket: bHeadlight, mat: getHeadlightEmissiveMaterial() },
+        { bucket: bTaillight, mat: getTaillightEmissiveMaterial() },
+        { bucket: bAmber, mat: getAmberAccentEmissiveMaterial() }
+      ]),
+      size: { x: w, y: 3.24, z: len }
     };
     _cityProtoCache.set(cacheKey, proto);
     return proto;
   }
 
-  // Detailed Abandoned Indonesian Ojol Scooter (Gojek/Grab green & black courier livery)
+  // Detailed Abandoned Indonesian Ojol Scooter (Gojek/Grab green & black courier livery with PBR materials)
   function getOjolProto() {
-    const cacheKey = 'proc_veh_ojol_v2';
+    const cacheKey = 'proc_veh_ojol_v3';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
 
-    const bTrim = [];
-    // Front & rear rubber tires + silver 5-spoke hub rims + brake rotor (12-seg wheels)
-    for (const wz of [0.64, -0.62]) {
-      addColoredCylinder(bTrim, 0.25, 0.25, 0.11, 12, 0, 0.25, wz, 0, 0, Math.PI * 0.5, 0x16181c, 0.78);
-      addColoredCylinder(bTrim, 0.155, 0.155, 0.125, 10, 0, 0.25, wz, 0, 0, Math.PI * 0.5, 0x9ca3af, 0.88);
-      addColoredCylinder(bTrim, 0.06, 0.06, 0.135, 8, 0, 0.25, wz, 0, 0, Math.PI * 0.5, 0x1e2228, 0.9);
-    }
-    // Front telescopic fork tubes & arched mudguard fender
-    for (const fx of [-0.085, 0.085]) {
-      addColoredCylinder(bTrim, 0.022, 0.022, 0.54, 6, fx, 0.50, 0.54, -0.26, 0, 0, 0xb8c0cc, 0.9);
-    }
-    addColoredBox(bTrim, 0.15, 0.05, 0.34, 0, 0.49, 0.63, -0.22, 0, 0, 0x15803d, 0.85);
-    // Lower engine casing / CVT swingarm + muffler exhaust pipe
-    addColoredBox(bTrim, 0.24, 0.16, 0.62, -0.04, 0.27, -0.34, 0, 0, 0, 0x262930, 0.82);
-    addColoredCylinder(bTrim, 0.045, 0.052, 0.48, 8, 0.16, 0.26, -0.44, Math.PI * 0.5 - 0.18, 0, 0, 0x3f444d, 0.85);
-    addColoredBox(bTrim, 0.025, 0.08, 0.34, 0.19, 0.26, -0.44, -0.18, 0, 0, 0xcfd4dc, 0.9);
-    // Recessed step-through floorboard deck
-    addColoredBox(bTrim, 0.34, 0.08, 0.56, 0, 0.25, 0.08, 0, 0, 0, 0x1c1f24, 0.8);
-    addColoredBox(bTrim, 0.38, 0.10, 0.58, 0, 0.19, 0.06, 0, 0, 0, 0x16a34a, 0.82);
-    // Angled front leg-shield fairing (two-tone Gojek green + matte charcoal inner knee panel)
-    addColoredBox(bTrim, 0.38, 0.56, 0.22, 0, 0.58, 0.45, -0.24, 0, 0, 0x16a34a, 0.86);
-    addColoredBox(bTrim, 0.32, 0.48, 0.10, 0, 0.57, 0.35, -0.24, 0, 0, 0x22262c, 0.82);
-    // Front headlamp cowl + visor + amber turn signals
-    addColoredBox(bTrim, 0.26, 0.14, 0.12, 0, 0.68, 0.53, -0.18, 0, 0, 0xeef6ff, 0.95);
-    addColoredBox(bTrim, 0.06, 0.06, 0.06, -0.13, 0.68, 0.51, 0, 0, 0, 0xf59e0b, 0.92);
-    addColoredBox(bTrim, 0.06, 0.06, 0.06, 0.13, 0.68, 0.51, 0, 0, 0, 0xf59e0b, 0.92);
-    // Steering stem, sculpted speedometer cowl, swept handlebars + grips + twin mirrors
-    addColoredBox(bTrim, 0.22, 0.11, 0.18, 0, 0.95, 0.34, -0.12, 0, 0, 0x15803d, 0.88);
-    addColoredBox(bTrim, 0.14, 0.04, 0.12, 0, 1.00, 0.31, -0.45, 0, 0, 0x101820, 0.95);
-    addColoredBox(bTrim, 0.66, 0.045, 0.06, 0, 0.95, 0.32, 0, 0, 0, 0x1f2429, 0.9);
-    addColoredCylinder(bTrim, 0.025, 0.025, 0.14, 6, -0.32, 0.95, 0.31, 0, 0, Math.PI * 0.5, 0x111317, 0.85);
-    addColoredCylinder(bTrim, 0.025, 0.025, 0.14, 6, 0.32, 0.95, 0.31, 0, 0, Math.PI * 0.5, 0x111317, 0.85);
-    for (const sx of [-1, 1]) {
-      addColoredCylinder(bTrim, 0.01, 0.01, 0.16, 5, sx * 0.25, 1.04, 0.32, 0, 0, -sx * 0.24, 0x26292e, 0.85);
-      addColoredBox(bTrim, 0.11, 0.065, 0.025, sx * 0.28, 1.12, 0.32, 0, 0, 0, 0x1a1e24, 0.9);
-    }
-    // Tapered rear side body panels + contoured matte leather saddle + rear grab rail
-    addColoredBox(bTrim, 0.36, 0.34, 0.70, 0, 0.53, -0.36, 0.05, 0, 0, 0x16a34a, 0.84);
-    addColoredBox(bTrim, 0.30, 0.12, 0.64, 0, 0.72, -0.26, -0.06, 0, 0, 0x181a1f, 0.86);
-    addColoredBox(bTrim, 0.24, 0.07, 0.30, 0, 0.77, -0.10, 0.08, 0, 0, 0x20232a, 0.9);
-    // Tail light + rear fender/plate
-    addColoredBox(bTrim, 0.20, 0.08, 0.06, 0, 0.56, -0.73, 0, 0, 0, 0xdc2626, 0.9);
-    addColoredBox(bTrim, 0.16, 0.14, 0.04, 0, 0.40, -0.76, -0.22, 0, 0, 0x111316, 0.9);
-    // Side kickstand + Ojol thermal delivery box (Gojek green/white stripe)
-    addColoredCylinder(bTrim, 0.015, 0.015, 0.28, 5, -0.14, 0.13, -0.10, 0, 0, 0.52, 0x26292e, 0.85);
-    addColoredBox(bTrim, 0.42, 0.34, 0.40, 0, 0.93, -0.62, 0, 0, 0, 0x15803d, 0.88);
-    addColoredBox(bTrim, 0.44, 0.055, 0.42, 0, 1.11, -0.62, 0, 0, 0, 0x181a1e, 0.9);
-    addColoredBox(bTrim, 0.43, 0.045, 0.41, 0, 0.94, -0.62, 0, 0, 0, 0xe5e7eb, 0.95);
+    const bBody = [];
+    const bGlass = [];
+    const bRubber = [];
+    const bAlloy = [];
+    const bHeadlight = [];
+    const bTaillight = [];
+    const bAmber = [];
 
-    // Slight natural 7.5 deg kickstand lean
-    for (let i = 0; i < bTrim.length; i++) {
-      bTrim[i].rotateZ(0.13);
+    // Front & rear rubber tires + silver alloy rims + center brake rotors
+    for (const wz of [0.64, -0.62]) {
+      addColoredCylinder(bRubber, 0.25, 0.25, 0.11, 12, 0, 0.25, wz, 0, 0, Math.PI * 0.5, 0x16181c, 0.78);
+      addColoredCylinder(bAlloy, 0.155, 0.155, 0.125, 10, 0, 0.25, wz, 0, 0, Math.PI * 0.5, 0xb4bcc6, 0.88);
+      addColoredCylinder(bAlloy, 0.06, 0.06, 0.135, 8, 0, 0.25, wz, 0, 0, Math.PI * 0.5, 0x2a3038, 0.9);
+    }
+    // Front telescopic fork tubes & arched painted mudguard fender
+    for (const fx of [-0.085, 0.085]) {
+      addColoredCylinder(bAlloy, 0.022, 0.022, 0.54, 6, fx, 0.50, 0.54, -0.26, 0, 0, 0xcbd5e1, 0.92);
+    }
+    addColoredBox(bBody, 0.15, 0.05, 0.34, 0, 0.49, 0.63, -0.22, 0, 0, 0x15803d, 0.86);
+    // Lower engine casing / CVT swingarm + muffler exhaust pipe + chrome heatshield
+    addColoredBox(bRubber, 0.24, 0.16, 0.62, -0.04, 0.27, -0.34, 0, 0, 0, 0x262930, 0.82);
+    addColoredCylinder(bAlloy, 0.045, 0.052, 0.48, 8, 0.16, 0.26, -0.44, Math.PI * 0.5 - 0.18, 0, 0, 0x3f444d, 0.85);
+    addColoredBox(bAlloy, 0.025, 0.08, 0.34, 0.19, 0.26, -0.44, -0.18, 0, 0, 0xd1d5db, 0.92);
+    // Recessed step-through floorboard deck
+    addColoredBox(bRubber, 0.34, 0.08, 0.56, 0, 0.25, 0.08, 0, 0, 0, 0x1c1f24, 0.8);
+    addColoredBox(bBody, 0.38, 0.10, 0.58, 0, 0.19, 0.06, 0, 0, 0, 0x16a34a, 0.84);
+    // Angled front leg-shield fairing (two-tone Gojek green + matte inner knee panel)
+    addColoredBox(bBody, 0.38, 0.56, 0.22, 0, 0.58, 0.45, -0.24, 0, 0, 0x16a34a, 0.86);
+    addColoredBox(bRubber, 0.32, 0.48, 0.10, 0, 0.57, 0.35, -0.24, 0, 0, 0x22262c, 0.82);
+    // Emissive front headlamp + amber turn signals
+    addBox(bHeadlight, 0.24, 0.13, 0.10, 0, 0.68, 0.535, -0.18);
+    addBox(bAmber, 0.06, 0.06, 0.06, -0.13, 0.68, 0.51);
+    addBox(bAmber, 0.06, 0.06, 0.06, 0.13, 0.68, 0.51);
+    // Steering stem, speedometer cowl, visor, handlebars + grips + twin mirrors
+    addColoredBox(bBody, 0.22, 0.11, 0.18, 0, 0.95, 0.34, -0.12, 0, 0, 0x15803d, 0.88);
+    addBox(bGlass, 0.14, 0.04, 0.12, 0, 1.00, 0.31, -0.45);
+    addColoredBox(bAlloy, 0.66, 0.045, 0.06, 0, 0.95, 0.32, 0, 0, 0, 0x334155, 0.9);
+    addColoredCylinder(bRubber, 0.025, 0.025, 0.14, 6, -0.32, 0.95, 0.31, 0, 0, Math.PI * 0.5, 0x111317, 0.85);
+    addColoredCylinder(bRubber, 0.025, 0.025, 0.14, 6, 0.32, 0.95, 0.31, 0, 0, Math.PI * 0.5, 0x111317, 0.85);
+    for (const sx of [-1, 1]) {
+      addColoredCylinder(bAlloy, 0.01, 0.01, 0.16, 5, sx * 0.25, 1.04, 0.32, 0, 0, -sx * 0.24, 0x9ca3af, 0.9);
+      addBox(bGlass, 0.11, 0.065, 0.025, sx * 0.28, 1.12, 0.32);
+    }
+    // Tapered rear side body panels + contoured leather saddle + rear grab rail
+    addColoredBox(bBody, 0.36, 0.34, 0.70, 0, 0.53, -0.36, 0.05, 0, 0, 0x16a34a, 0.85);
+    addColoredBox(bRubber, 0.30, 0.12, 0.64, 0, 0.72, -0.26, -0.06, 0, 0, 0x181a1f, 0.86);
+    addColoredBox(bAlloy, 0.24, 0.07, 0.30, 0, 0.77, -0.10, 0.08, 0, 0, 0x64748b, 0.9);
+    // Tail light + rear fender & license plate
+    addBox(bTaillight, 0.20, 0.08, 0.06, 0, 0.56, -0.73);
+    addColoredBox(bRubber, 0.18, 0.14, 0.04, 0, 0.40, -0.76, -0.22, 0, 0, 0x111316, 0.9);
+    addColoredBox(bAlloy, 0.14, 0.06, 0.02, 0, 0.39, -0.78, -0.22, 0, 0, 0xe2e8f0, 0.95);
+    // Side kickstand + Ojol thermal delivery box (Gojek green/white stripe)
+    addColoredCylinder(bAlloy, 0.015, 0.015, 0.28, 5, -0.14, 0.13, -0.10, 0, 0, 0.52, 0x64748b, 0.85);
+    addColoredBox(bBody, 0.42, 0.34, 0.40, 0, 0.93, -0.62, 0, 0, 0, 0x15803d, 0.88);
+    addColoredBox(bRubber, 0.44, 0.055, 0.42, 0, 1.11, -0.62, 0, 0, 0, 0x181a1e, 0.9);
+    addColoredBox(bBody, 0.43, 0.045, 0.41, 0, 0.94, -0.62, 0, 0, 0, 0xe5e7eb, 0.95);
+
+    // Slight natural 7.5 deg kickstand lean across all parts
+    for (const bkt of [bBody, bGlass, bRubber, bAlloy, bHeadlight, bTaillight, bAmber]) {
+      for (let i = 0; i < bkt.length; i++) {
+        bkt[i].rotateZ(0.13);
+      }
     }
 
     const proto = {
-      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      parts: mergePartBuckets([
+        { bucket: bBody, mat: getVehiclePaintedVertexMaterial() },
+        { bucket: bGlass, mat: getCabinGlassMaterial() },
+        { bucket: bRubber, mat: getRubberTireMaterial() },
+        { bucket: bAlloy, mat: getAlloyMetalMaterial() },
+        { bucket: bHeadlight, mat: getHeadlightEmissiveMaterial() },
+        { bucket: bTaillight, mat: getTaillightEmissiveMaterial() },
+        { bucket: bAmber, mat: getAmberAccentEmissiveMaterial() }
+      ]),
       size: { x: 0.72, y: 1.18, z: 1.85 }
     };
     _cityProtoCache.set(cacheKey, proto);
     return proto;
   }
 
-  // Grounded Cast-Iron & Stained-Teak Jakarta Park Bench (replaces broken GLTF)
+  // Grounded Cast-Iron & Stained-Teak Jakarta Park Bench
   function getParkBenchProto() {
-    const cacheKey = 'proc_prop_park_bench_v1';
+    const cacheKey = 'proc_prop_park_bench_v2';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
 
-    const bTrim = [];
-    // Two cast-iron end frames + center stiffener strut (grounded at y = 0)
+    const bMetal = [];
+    const bWood = [];
     for (const fx of [-0.82, 0.82]) {
-      addColoredBox(bTrim, 0.10, 0.03, 0.62, fx, 0.015, 0.02, 0, 0, 0, 0x1e2329, 0.85); // base pad
-      addColoredBox(bTrim, 0.06, 0.42, 0.07, fx, 0.21, 0.24, 0, 0, 0, 0x242a32, 0.85);  // front leg
-      addColoredBox(bTrim, 0.06, 0.42, 0.07, fx, 0.21, -0.22, 0, 0, 0, 0x242a32, 0.85); // back leg
-      addColoredBox(bTrim, 0.06, 0.06, 0.56, fx, 0.42, 0.01, 0, 0, 0, 0x242a32, 0.85);  // seat rail
-      addColoredBox(bTrim, 0.055, 0.48, 0.065, fx, 0.66, -0.25, -0.14, 0, 0, 0x242a32, 0.88); // backrest post
-      // Welded armrest loop connected cleanly from seat rail to backrest post
-      addColoredBox(bTrim, 0.055, 0.20, 0.055, fx, 0.52, 0.22, 0, 0, 0, 0x242a32, 0.88);
-      addColoredBox(bTrim, 0.065, 0.045, 0.46, fx, 0.62, 0.01, 0, 0, 0, 0x2b313a, 0.92);
+      addColoredBox(bMetal, 0.10, 0.03, 0.62, fx, 0.015, 0.02, 0, 0, 0, 0x1e2329, 0.85);
+      addColoredBox(bMetal, 0.06, 0.42, 0.07, fx, 0.21, 0.24, 0, 0, 0, 0x242a32, 0.85);
+      addColoredBox(bMetal, 0.06, 0.42, 0.07, fx, 0.21, -0.22, 0, 0, 0, 0x242a32, 0.85);
+      addColoredBox(bMetal, 0.06, 0.06, 0.56, fx, 0.42, 0.01, 0, 0, 0, 0x242a32, 0.85);
+      addColoredBox(bMetal, 0.055, 0.48, 0.065, fx, 0.66, -0.25, -0.14, 0, 0, 0x242a32, 0.88);
+      addColoredBox(bMetal, 0.055, 0.20, 0.055, fx, 0.52, 0.22, 0, 0, 0, 0x242a32, 0.88);
+      addColoredBox(bMetal, 0.065, 0.045, 0.46, fx, 0.62, 0.01, 0, 0, 0, 0x2b313a, 0.92);
     }
-    addColoredBox(bTrim, 0.05, 0.39, 0.06, 0, 0.20, -0.02, 0, 0, 0, 0x242a32, 0.85); // center brace
-    addColoredBox(bTrim, 1.64, 0.045, 0.045, 0, 0.36, -0.02, 0, 0, 0, 0x242a32, 0.85); // under-seat tie bar
+    addColoredBox(bMetal, 0.05, 0.39, 0.06, 0, 0.20, -0.02, 0, 0, 0, 0x242a32, 0.85);
+    addColoredBox(bMetal, 1.64, 0.045, 0.045, 0, 0.36, -0.02, 0, 0, 0, 0x242a32, 0.85);
 
-    // 4 Stained teak wood seat planks
     for (let s = 0; s < 4; s++) {
       const sz = -0.17 + s * 0.125;
-      addColoredBox(bTrim, 1.84, 0.042, 0.095, 0, 0.455, sz, 0, 0, 0, 0x7a4b2a, 0.86);
+      addColoredBox(bWood, 1.84, 0.042, 0.095, 0, 0.455, sz, 0, 0, 0, 0x7a4b2a, 0.86);
     }
-    // 3 Stained teak backrest planks matching -0.14 backrest angle
     for (let r = 0; r < 3; r++) {
       const ry = 0.58 + r * 0.125;
       const rz = -0.22 - r * 0.018;
-      addColoredBox(bTrim, 1.84, 0.088, 0.038, 0, ry, rz, -0.14, 0, 0, 0x7c4d2c, 0.88);
+      addColoredBox(bWood, 1.84, 0.088, 0.038, 0, ry, rz, -0.14, 0, 0, 0x7c4d2c, 0.88);
     }
 
     const proto = {
-      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      parts: mergePartBuckets([
+        { bucket: bMetal, mat: getAlloyMetalMaterial() },
+        { bucket: bWood, mat: getWoodPbrMaterial() }
+      ]),
       size: { x: 1.90, y: 0.90, z: 0.68 }
     };
     _cityProtoCache.set(cacheKey, proto);
     return proto;
   }
 
-  // Ultra-low-poly Sloped Concrete Jersey Road Barrier (~36 tris vs 60,928-tri GLTF!)
+  // Ultra-low-poly Sloped Concrete Jersey Road Barrier
   function getRoadBarrierProto() {
-    const cacheKey = 'proc_prop_road_barrier_v1';
+    const cacheKey = 'proc_prop_road_barrier_v2';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
-    const bTrim = [];
-    // Wide concrete foot + sloped waist + hazard yellow/dark band top
-    addColoredBox(bTrim, 1.62, 0.24, 0.64, 0, 0.12, 0, 0, 0, 0, 0x7d8084, 0.82);
-    addColoredBox(bTrim, 1.60, 0.40, 0.38, 0, 0.44, 0, 0, 0, 0, 0x8e9296, 0.86);
-    addColoredBox(bTrim, 1.58, 0.20, 0.24, 0, 0.74, 0, 0, 0, 0, 0x9aa0a6, 0.90);
-    // Black & amber hazard reflection cap strip
-    addColoredBox(bTrim, 0.50, 0.14, 0.26, -0.48, 0.72, 0, 0, 0, 0, 0xd99b18, 0.94);
-    addColoredBox(bTrim, 0.50, 0.14, 0.26, 0.48, 0.72, 0, 0, 0, 0, 0x20242a, 0.92);
+    const bConcrete = [];
+    const bPaint = [];
+    addColoredBox(bConcrete, 1.62, 0.24, 0.64, 0, 0.12, 0, 0, 0, 0, 0x7d8084, 0.82);
+    addColoredBox(bConcrete, 1.60, 0.40, 0.38, 0, 0.44, 0, 0, 0, 0, 0x8e9296, 0.86);
+    addColoredBox(bConcrete, 1.58, 0.20, 0.24, 0, 0.74, 0, 0, 0, 0, 0x9aa0a6, 0.90);
+    addColoredBox(bPaint, 0.50, 0.14, 0.26, -0.48, 0.72, 0, 0, 0, 0, 0xd99b18, 0.94);
+    addColoredBox(bPaint, 0.50, 0.14, 0.26, 0.48, 0.72, 0, 0, 0, 0, 0x20242a, 0.92);
 
     const proto = {
-      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      parts: mergePartBuckets([
+        { bucket: bConcrete, mat: getConcretePbrMaterial() },
+        { bucket: bPaint, mat: getVehiclePaintedVertexMaterial() }
+      ]),
       size: { x: 1.62, y: 0.84, z: 0.64 }
     };
     _cityProtoCache.set(cacheKey, proto);
     return proto;
   }
 
-  // Jakarta PJU Street Lamp (~76 tris vs 30,050-tri GLTF! Arm extends +X cleanly over roadway)
+  // Jakarta PJU Street Lamp (Arm extends +X cleanly over roadway)
   function getStreetLampProto() {
-    const cacheKey = 'proc_prop_street_lamp_v2';
+    const cacheKey = 'proc_prop_street_lamp_v3';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
-    const bTrim = [];
+    const bMetal = [];
     const bBulb = [];
-    // Concrete octagonal pedestal base + tapered dark-iron pole + curved cantilever arm along +X + hood
-    addColoredCylinder(bTrim, 0.17, 0.22, 0.58, 8, 0, 0.29, 0, 0, 0, 0, 0x262b31, 0.80);
-    addColoredCylinder(bTrim, 0.065, 0.105, 4.05, 8, 0, 2.55, 0, 0, 0, 0, 0x23282e, 0.84);
-    addColoredBox(bTrim, 1.15, 0.09, 0.09, 0.46, 4.66, 0, 0, 0, 0.14, 0x2c323a, 0.88);
-    addColoredBox(bTrim, 0.52, 0.09, 0.28, 1.05, 4.74, 0, 0, 0, 0, 0x353c46, 0.90);
+    addColoredCylinder(bMetal, 0.17, 0.22, 0.58, 8, 0, 0.29, 0, 0, 0, 0, 0x262b31, 0.80);
+    addColoredCylinder(bMetal, 0.065, 0.105, 4.05, 8, 0, 2.55, 0, 0, 0, 0, 0x23282e, 0.84);
+    addColoredBox(bMetal, 1.15, 0.09, 0.09, 0.46, 4.66, 0, 0, 0, 0.14, 0x2c323a, 0.88);
+    addColoredBox(bMetal, 0.52, 0.09, 0.28, 1.05, 4.74, 0, 0, 0, 0, 0x353c46, 0.90);
     const bulb = new THREE.BoxGeometry(0.40, 0.06, 0.22);
     bulb.translate(1.05, 4.68, 0);
     bBulb.push(prepGeo(bulb, false));
 
     const proto = {
       parts: mergePartBuckets([
-        { bucket: bTrim, mat: getVehicleTrimMaterial() },
+        { bucket: bMetal, mat: getAlloyMetalMaterial() },
         { bucket: bBulb, mat: getLampBulbMaterial() }
       ]),
       size: { x: 1.35, y: 4.80, z: 0.45 }
@@ -1052,108 +1302,120 @@
     return proto;
   }
 
-  // Fire Hydrant (~68 tris vs 43,158-tri GLTF!)
+  // Fire Hydrant (painted red cast iron + brushed alloy nozzle caps)
   function getFireHydrantProto() {
-    const cacheKey = 'proc_prop_fire_hydrant_v1';
+    const cacheKey = 'proc_prop_fire_hydrant_v2';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
-    const bTrim = [];
-    addColoredCylinder(bTrim, 0.17, 0.19, 0.10, 8, 0, 0.05, 0, 0, 0, 0, 0x451212, 0.80);
-    addColoredCylinder(bTrim, 0.12, 0.13, 0.56, 8, 0, 0.38, 0, 0, 0, 0, 0xb91c1c, 0.84);
-    addColoredCylinder(bTrim, 0.14, 0.11, 0.12, 8, 0, 0.70, 0, 0, 0, 0, 0xdc2626, 0.90);
-    addColoredCylinder(bTrim, 0.04, 0.05, 0.08, 6, 0, 0.79, 0, 0, 0, 0, 0xd4d4d8, 0.95);
-    addColoredCylinder(bTrim, 0.055, 0.055, 0.36, 6, 0, 0.52, 0, 0, 0, Math.PI * 0.5, 0xcbd5e1, 0.92);
-    addColoredCylinder(bTrim, 0.07, 0.07, 0.12, 6, 0, 0.50, 0.12, Math.PI * 0.5, 0, 0, 0xcbd5e1, 0.92);
+    const bPaint = [];
+    const bAlloy = [];
+    addColoredCylinder(bPaint, 0.17, 0.19, 0.10, 8, 0, 0.05, 0, 0, 0, 0, 0x451212, 0.80);
+    addColoredCylinder(bPaint, 0.12, 0.13, 0.56, 8, 0, 0.38, 0, 0, 0, 0, 0xb91c1c, 0.84);
+    addColoredCylinder(bPaint, 0.14, 0.11, 0.12, 8, 0, 0.70, 0, 0, 0, 0, 0xdc2626, 0.90);
+    addColoredCylinder(bAlloy, 0.04, 0.05, 0.08, 6, 0, 0.79, 0, 0, 0, 0, 0xd4d4d8, 0.95);
+    addColoredCylinder(bAlloy, 0.055, 0.055, 0.36, 6, 0, 0.52, 0, 0, 0, Math.PI * 0.5, 0xcbd5e1, 0.92);
+    addColoredCylinder(bAlloy, 0.07, 0.07, 0.12, 6, 0, 0.50, 0.12, Math.PI * 0.5, 0, 0, 0xcbd5e1, 0.92);
 
     const proto = {
-      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      parts: mergePartBuckets([
+        { bucket: bPaint, mat: getVehiclePaintedVertexMaterial() },
+        { bucket: bAlloy, mat: getAlloyMetalMaterial() }
+      ]),
       size: { x: 0.38, y: 0.83, z: 0.38 }
     };
     _cityProtoCache.set(cacheKey, proto);
     return proto;
   }
 
-  // PLN Concrete Utility Pole (~52 tris vs 28,839-tri GLTF!)
+  // PLN Concrete Utility Pole
   function getPowerPoleProto(variantIdx) {
-    const cacheKey = `proc_prop_power_pole_v1_${variantIdx || 0}`;
+    const cacheKey = `proc_prop_power_pole_v2_${variantIdx || 0}`;
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
-    const bTrim = [];
-    addColoredCylinder(bTrim, 0.11, 0.19, 6.80, 7, 0, 3.40, 0, 0, 0, 0, 0x8b8e92, 0.82);
-    addColoredCylinder(bTrim, 0.175, 0.178, 0.45, 7, 0, 1.35, 0, 0, 0, 0, 0xeab308, 0.9);
-    // Steel crossarms + ceramic insulators
-    addColoredBox(bTrim, 1.85, 0.08, 0.09, 0, 6.25, 0, 0, 0, 0, 0x4b5563, 0.88);
+    const bConcrete = [];
+    const bAlloy = [];
+    addColoredCylinder(bConcrete, 0.11, 0.19, 6.80, 7, 0, 3.40, 0, 0, 0, 0, 0x8b8e92, 0.82);
+    addColoredCylinder(bConcrete, 0.175, 0.178, 0.45, 7, 0, 1.35, 0, 0, 0, 0, 0xeab308, 0.9);
+    addColoredBox(bAlloy, 1.85, 0.08, 0.09, 0, 6.25, 0, 0, 0, 0, 0x4b5563, 0.88);
     if ((variantIdx || 0) === 1) {
-      addColoredBox(bTrim, 1.55, 0.08, 0.09, 0, 5.55, 0, 0, 0, 0, 0x4b5563, 0.88);
-      addColoredCylinder(bTrim, 0.24, 0.24, 0.72, 8, 0.28, 4.75, 0, 0, 0, 0, 0x475569, 0.85);
+      addColoredBox(bAlloy, 1.55, 0.08, 0.09, 0, 5.55, 0, 0, 0, 0, 0x4b5563, 0.88);
+      addColoredCylinder(bAlloy, 0.24, 0.24, 0.72, 8, 0.28, 4.75, 0, 0, 0, 0, 0x475569, 0.85);
     }
     for (const ix of [-0.78, 0, 0.78]) {
-      addColoredCylinder(bTrim, 0.04, 0.05, 0.14, 6, ix, 6.35, 0, 0, 0, 0, 0xd1d5db, 0.94);
+      addColoredCylinder(bAlloy, 0.04, 0.05, 0.14, 6, ix, 6.35, 0, 0, 0, 0, 0xd1d5db, 0.94);
     }
 
     const proto = {
-      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      parts: mergePartBuckets([
+        { bucket: bConcrete, mat: getConcretePbrMaterial() },
+        { bucket: bAlloy, mat: getAlloyMetalMaterial() }
+      ]),
       size: { x: 1.9, y: 6.8, z: 0.5 }
     };
     _cityProtoCache.set(cacheKey, proto);
     return proto;
   }
 
-  // Grounded PLN Power Feeder Pillar on concrete plinth (~48 tris vs 21,272-tri GLTF!)
+  // Grounded PLN Power Feeder Pillar on concrete plinth
   function getPowerBoxProto() {
-    const cacheKey = 'proc_prop_power_box_v2';
+    const cacheKey = 'proc_prop_power_box_v3';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
-    const bTrim = [];
-    // Concrete foundation pedestal resting cleanly at y = 0
-    addColoredBox(bTrim, 0.84, 0.34, 0.56, 0, 0.17, 0, 0, 0, 0, 0x6b7280, 0.80);
-    // Steel relay cabinet housing + sloped rain hood
-    addColoredBox(bTrim, 0.76, 1.08, 0.46, 0, 0.88, 0, 0, 0, 0, 0x475569, 0.84);
-    addColoredBox(bTrim, 0.82, 0.08, 0.52, 0, 1.46, 0, 0, 0, 0, 0x334155, 0.90);
-    // Center door seam, handle & high-voltage yellow hazard diamond/plate on +Z front face
-    addColoredBox(bTrim, 0.03, 0.96, 0.02, 0, 0.88, 0.24, 0, 0, 0, 0x1e293b, 0.90);
-    addColoredBox(bTrim, 0.05, 0.14, 0.04, 0.08, 0.88, 0.24, 0, 0, 0, 0x1f2937, 0.92);
-    addColoredBox(bTrim, 0.18, 0.18, 0.02, 0.20, 1.10, 0.24, 0, 0, 0, 0xeab308, 0.96);
+    const bConcrete = [];
+    const bMetal = [];
+    addColoredBox(bConcrete, 0.84, 0.34, 0.56, 0, 0.17, 0, 0, 0, 0, 0x6b7280, 0.80);
+    addColoredBox(bMetal, 0.76, 1.08, 0.46, 0, 0.88, 0, 0, 0, 0, 0x475569, 0.84);
+    addColoredBox(bMetal, 0.82, 0.08, 0.52, 0, 1.46, 0, 0, 0, 0, 0x334155, 0.90);
+    addColoredBox(bMetal, 0.03, 0.96, 0.02, 0, 0.88, 0.24, 0, 0, 0, 0x1e293b, 0.90);
+    addColoredBox(bMetal, 0.05, 0.14, 0.04, 0.08, 0.88, 0.24, 0, 0, 0, 0x1f2937, 0.92);
+    addColoredBox(bMetal, 0.18, 0.18, 0.02, 0.20, 1.10, 0.24, 0, 0, 0, 0xeab308, 0.96);
 
     const proto = {
-      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      parts: mergePartBuckets([
+        { bucket: bConcrete, mat: getConcretePbrMaterial() },
+        { bucket: bMetal, mat: getAlloyMetalMaterial() }
+      ]),
       size: { x: 0.84, y: 1.50, z: 0.56 }
     };
     _cityProtoCache.set(cacheKey, proto);
     return proto;
   }
 
-  // Cast-Iron Manhole Cover (~16 tris vs 50,408-tri GLTF!)
+  // Cast-Iron Manhole Cover
   function getManholeProto() {
-    const cacheKey = 'proc_prop_manhole_v1';
+    const cacheKey = 'proc_prop_manhole_v2';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
-    const bTrim = [];
-    addColoredCylinder(bTrim, 0.36, 0.38, 0.03, 10, 0, 0.015, 0, 0, 0, 0, 0x26292e, 0.85);
-    addColoredCylinder(bTrim, 0.30, 0.30, 0.036, 10, 0, 0.018, 0, 0, 0, 0, 0x373c44, 0.90);
+    const bAlloy = [];
+    addColoredCylinder(bAlloy, 0.36, 0.38, 0.03, 10, 0, 0.015, 0, 0, 0, 0, 0x26292e, 0.85);
+    addColoredCylinder(bAlloy, 0.30, 0.30, 0.036, 10, 0, 0.018, 0, 0, 0, 0, 0x373c44, 0.90);
     const proto = {
-      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      parts: mergePartBuckets([{ bucket: bAlloy, mat: getAlloyMetalMaterial() }]),
       size: { x: 0.76, y: 0.04, z: 0.76 }
     };
     _cityProtoCache.set(cacheKey, proto);
     return proto;
   }
 
-  // Jakarta Municipal Street Trash Bin (~32 tris vs 51,424-tri GLTF!)
+  // Jakarta Municipal Street Trash Bin
   function getTrashCanProto() {
-    const cacheKey = 'proc_prop_trash_can_v1';
+    const cacheKey = 'proc_prop_trash_can_v2';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
-    const bTrim = [];
-    addColoredCylinder(bTrim, 0.25, 0.22, 0.76, 8, 0, 0.38, 0, 0, 0, 0, 0x1e5c3a, 0.82);
-    addColoredCylinder(bTrim, 0.27, 0.26, 0.08, 8, 0, 0.78, 0, 0, 0, 0, 0x23282e, 0.90);
-    addColoredBox(bTrim, 0.28, 0.16, 0.28, 0, 0.86, 0, 0, 0, 0, 0x2a3038, 0.88);
+    const bBody = [];
+    const bAlloy = [];
+    addColoredCylinder(bBody, 0.25, 0.22, 0.76, 8, 0, 0.38, 0, 0, 0, 0, 0x1e5c3a, 0.82);
+    addColoredCylinder(bAlloy, 0.27, 0.26, 0.08, 8, 0, 0.78, 0, 0, 0, 0, 0x23282e, 0.90);
+    addColoredBox(bAlloy, 0.28, 0.16, 0.28, 0, 0.86, 0, 0, 0, 0, 0x2a3038, 0.88);
     const proto = {
-      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      parts: mergePartBuckets([
+        { bucket: bBody, mat: getVehiclePaintedVertexMaterial() },
+        { bucket: bAlloy, mat: getAlloyMetalMaterial() }
+      ]),
       size: { x: 0.54, y: 0.94, z: 0.54 }
     };
     _cityProtoCache.set(cacheKey, proto);
     return proto;
   }
 
-  // Tied Plastic Trash Bags (~24 tris vs 35,856-tri GLTF!)
+  // Tied Plastic Trash Bags
   function getTrashBagProto() {
-    const cacheKey = 'proc_prop_trash_bag_v1';
+    const cacheKey = 'proc_prop_trash_bag_v2';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
     const bTrim = [];
     addColoredCylinder(bTrim, 0.16, 0.24, 0.44, 7, -0.06, 0.22, 0.02, 0, 0, 0.12, 0x16191d, 0.82);
@@ -1166,16 +1428,20 @@
     return proto;
   }
 
-  // Concrete Boulevard Planter Box (~28 tris vs 24,282-tri GLTF!)
+  // Concrete Boulevard Planter Box
   function getPlanterBoxProto() {
-    const cacheKey = 'proc_prop_planter_box_v1';
+    const cacheKey = 'proc_prop_planter_box_v2';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
-    const bTrim = [];
-    addColoredBox(bTrim, 1.32, 0.42, 0.62, 0, 0.21, 0, 0, 0, 0, 0x767a80, 0.82);
-    addColoredBox(bTrim, 1.38, 0.06, 0.68, 0, 0.43, 0, 0, 0, 0, 0x8f949a, 0.90);
-    addColoredBox(bTrim, 1.18, 0.08, 0.48, 0, 0.41, 0, 0, 0, 0, 0x3b2a1e, 0.85);
+    const bConcrete = [];
+    const bSoil = [];
+    addColoredBox(bConcrete, 1.32, 0.42, 0.62, 0, 0.21, 0, 0, 0, 0, 0x767a80, 0.82);
+    addColoredBox(bConcrete, 1.38, 0.06, 0.68, 0, 0.43, 0, 0, 0, 0, 0x8f949a, 0.90);
+    addColoredBox(bSoil, 1.18, 0.08, 0.48, 0, 0.41, 0, 0, 0, 0, 0x3b2a1e, 0.85);
     const proto = {
-      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      parts: mergePartBuckets([
+        { bucket: bConcrete, mat: getConcretePbrMaterial() },
+        { bucket: bSoil, mat: getRubberTireMaterial() }
+      ]),
       size: { x: 1.38, y: 0.46, z: 0.68 }
     };
     _cityProtoCache.set(cacheKey, proto);
@@ -1409,33 +1675,55 @@
     }
   }
 
-  // Jakarta Gerobak Kaki Lima (street food pushcart)
+  // Jakarta Gerobak Kaki Lima (street food pushcart with illuminated warm glass display case)
   function getGerobakProto() {
-    const cacheKey = 'proc_prop_gerobak';
+    const cacheKey = 'proc_prop_gerobak_v2';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
 
-    const bTrim = [];
-    // Two spoked side wheels + front rest leg
-    addColoredCylinder(bTrim, 0.32, 0.32, 0.07, 10, -0.46, 0.32, 0.0, 0, 0, Math.PI * 0.5, 0x26292e, 0.8);
-    addColoredCylinder(bTrim, 0.32, 0.32, 0.07, 10, 0.46, 0.32, 0.0, 0, 0, Math.PI * 0.5, 0x26292e, 0.8);
-    addColoredBox(bTrim, 0.08, 0.36, 0.08, 0, 0.18, 0.62, 0, 0, 0, 0x5c3d28, 0.75);
-    // Lower royal-blue & teak wooden cabinet
-    addColoredBox(bTrim, 0.82, 0.68, 1.56, 0, 0.70, 0, 0, 0, 0, 0x1d68a8, 0.78);
-    addColoredBox(bTrim, 0.84, 0.08, 1.60, 0, 1.06, 0, 0, 0, 0, 0x7c5132, 0.85);
-    // Upper display glass cabinet + interior warm wood shelf
-    addColoredBox(bTrim, 0.70, 0.56, 1.24, 0, 1.38, 0.08, 0, 0, 0, 0xa8c6d8, 0.88);
-    addColoredBox(bTrim, 0.06, 0.62, 0.06, -0.34, 1.38, -0.52, 0, 0, 0, 0x6b442a, 0.85);
-    addColoredBox(bTrim, 0.06, 0.62, 0.06, 0.34, 1.38, -0.52, 0, 0, 0, 0x6b442a, 0.85);
-    addColoredBox(bTrim, 0.06, 0.62, 0.06, -0.34, 1.38, 0.68, 0, 0, 0, 0x6b442a, 0.85);
-    addColoredBox(bTrim, 0.06, 0.62, 0.06, 0.34, 1.38, 0.68, 0, 0, 0, 0x6b442a, 0.85);
-    // Pitched awning roof (terracotta/tarp blue-orange) + push handle
-    addColoredBox(bTrim, 1.12, 0.08, 1.76, 0, 1.78, 0, 0, 0, 0.08, 0xc85828, 0.88);
-    addColoredBox(bTrim, 0.06, 0.06, 0.42, -0.34, 0.98, -0.92, 0, 0, 0, 0x7c5132, 0.85);
-    addColoredBox(bTrim, 0.06, 0.06, 0.42, 0.34, 0.98, -0.92, 0, 0, 0, 0x7c5132, 0.85);
-    addColoredBox(bTrim, 0.74, 0.06, 0.06, 0, 0.98, -1.10, 0, 0, 0, 0x7c5132, 0.85);
+    const bBody = [];
+    const bWood = [];
+    const bRubber = [];
+    const bAlloy = [];
+    const bWarmGlass = [];
+    const bAmber = [];
+
+    // Two spoked rubber wheels + steel hubs & axle + front teak rest leg
+    addColoredCylinder(bRubber, 0.32, 0.32, 0.07, 10, -0.46, 0.32, 0.0, 0, 0, Math.PI * 0.5, 0x16181c, 0.8);
+    addColoredCylinder(bRubber, 0.32, 0.32, 0.07, 10, 0.46, 0.32, 0.0, 0, 0, Math.PI * 0.5, 0x16181c, 0.8);
+    addColoredCylinder(bAlloy, 0.22, 0.22, 0.05, 8, -0.46, 0.32, 0.0, 0, 0, Math.PI * 0.5, 0x9ca3af, 0.88);
+    addColoredCylinder(bAlloy, 0.22, 0.22, 0.05, 8, 0.46, 0.32, 0.0, 0, 0, Math.PI * 0.5, 0x9ca3af, 0.88);
+    addColoredCylinder(bAlloy, 0.03, 0.03, 0.94, 6, 0, 0.32, 0.0, 0, 0, Math.PI * 0.5, 0x64748b, 0.9);
+    addColoredBox(bWood, 0.08, 0.36, 0.08, 0, 0.18, 0.62, 0, 0, 0, 0x5c3d28, 0.78);
+
+    // Lower royal-blue painted cabinet + stained teak countertop & push handle
+    addColoredBox(bBody, 0.82, 0.68, 1.56, 0, 0.70, 0, 0, 0, 0, 0x1d68a8, 0.82);
+    addColoredBox(bWood, 0.84, 0.08, 1.60, 0, 1.06, 0, 0, 0, 0, 0x7c5132, 0.86);
+    addColoredBox(bWood, 0.06, 0.06, 0.42, -0.34, 0.98, -0.92, 0, 0, 0, 0x7c5132, 0.85);
+    addColoredBox(bWood, 0.06, 0.06, 0.42, 0.34, 0.98, -0.92, 0, 0, 0, 0x7c5132, 0.85);
+    addColoredBox(bWood, 0.74, 0.06, 0.06, 0, 0.98, -1.10, 0, 0, 0, 0x7c5132, 0.85);
+
+    // Teak display corner posts + interior shelf + warm glowing food case + stainless panci pot
+    addColoredBox(bWood, 0.06, 0.62, 0.06, -0.34, 1.38, -0.52, 0, 0, 0, 0x6b442a, 0.85);
+    addColoredBox(bWood, 0.06, 0.62, 0.06, 0.34, 1.38, -0.52, 0, 0, 0, 0x6b442a, 0.85);
+    addColoredBox(bWood, 0.06, 0.62, 0.06, -0.34, 1.38, 0.68, 0, 0, 0, 0x6b442a, 0.85);
+    addColoredBox(bWood, 0.06, 0.62, 0.06, 0.34, 1.38, 0.68, 0, 0, 0, 0x6b442a, 0.85);
+    addColoredBox(bWood, 0.62, 0.04, 1.12, 0, 1.34, 0.08, 0, 0, 0, 0x8b5a36, 0.90);
+    addColoredCylinder(bAlloy, 0.16, 0.14, 0.22, 10, 0, 1.21, -0.22, 0, 0, 0, 0xd1d5db, 0.92);
+    addBox(bAmber, 0.42, 0.04, 0.92, 0, 1.62, 0.08);
+    addBox(bWarmGlass, 0.70, 0.56, 1.24, 0, 1.38, 0.08);
+
+    // Painted pitched awning roof
+    addColoredBox(bBody, 1.12, 0.08, 1.76, 0, 1.78, 0, 0, 0, 0.08, 0xc85828, 0.88);
 
     const proto = {
-      parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
+      parts: mergePartBuckets([
+        { bucket: bBody, mat: getVehiclePaintedVertexMaterial() },
+        { bucket: bWood, mat: getWoodPbrMaterial() },
+        { bucket: bRubber, mat: getRubberTireMaterial() },
+        { bucket: bAlloy, mat: getAlloyMetalMaterial() },
+        { bucket: bWarmGlass, mat: getWarmDisplayGlassMaterial() },
+        { bucket: bAmber, mat: getAmberAccentEmissiveMaterial() }
+      ]),
       size: { x: 1.12, y: 1.90, z: 1.92 }
     };
     _cityProtoCache.set(cacheKey, proto);
@@ -1444,24 +1732,20 @@
 
   // Cantilever Traffic Signal Pole (amber lens blink via shader; paired with 1 pooled amber PointLight)
   function getTrafficSignalProto() {
-    const cacheKey = 'proc_prop_traffic_signal';
+    const cacheKey = 'proc_prop_traffic_signal_v2';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
 
-    const bTrim = [];
+    const bMetal = [];
+    const bHood = [];
     const bAmberLens = [];
 
-    // Vertical mast (4.9m) + base flange
-    addColoredCylinder(bTrim, 0.10, 0.14, 4.9, 8, 0, 2.45, 0, 0, 0, 0, 0x3b424a, 0.75);
-    addColoredBox(bTrim, 0.42, 0.16, 0.42, 0, 0.08, 0, 0, 0, 0, 0x262a30, 0.8);
-    // Cantilever arm extending +X over street
-    addColoredCylinder(bTrim, 0.07, 0.09, 3.1, 8, 1.50, 4.68, 0, 0, 0, Math.PI * 0.5, 0x3b424a, 0.85);
-    // 3-aspect signal housing hanging at x = 2.45
-    addColoredBox(bTrim, 0.38, 1.04, 0.34, 2.45, 4.10, 0, 0, 0, 0, 0x1a1d22, 0.85);
-    // Dark red & green unlit lenses + hood visors
+    addColoredCylinder(bMetal, 0.10, 0.14, 4.9, 8, 0, 2.45, 0, 0, 0, 0, 0x3b424a, 0.78);
+    addColoredBox(bMetal, 0.42, 0.16, 0.42, 0, 0.08, 0, 0, 0, 0, 0x262a30, 0.82);
+    addColoredCylinder(bMetal, 0.07, 0.09, 3.1, 8, 1.50, 4.68, 0, 0, 0, Math.PI * 0.5, 0x3b424a, 0.85);
+    addColoredBox(bHood, 0.38, 1.04, 0.34, 2.45, 4.10, 0, 0, 0, 0, 0x1a1d22, 0.85);
     for (const lz of [-0.18, 0.18]) {
-      addColoredCylinder(bTrim, 0.11, 0.11, 0.06, 8, 2.45, 4.40, lz, Math.PI * 0.5, 0, 0, 0x451212, 0.9);
-      addColoredCylinder(bTrim, 0.11, 0.11, 0.06, 8, 2.45, 3.80, lz, Math.PI * 0.5, 0, 0, 0x103820, 0.9);
-      // Blinking amber lens (both faces)
+      addColoredCylinder(bHood, 0.11, 0.11, 0.06, 8, 2.45, 4.40, lz, Math.PI * 0.5, 0, 0, 0x451212, 0.9);
+      addColoredCylinder(bHood, 0.11, 0.11, 0.06, 8, 2.45, 3.80, lz, Math.PI * 0.5, 0, 0, 0x103820, 0.9);
       const lens = new THREE.CylinderGeometry(0.115, 0.115, 0.07, 8);
       transformGeo(lens, 2.45, 4.10, lz, Math.PI * 0.5, 0, 0);
       bAmberLens.push(prepGeo(lens, false));
@@ -1469,7 +1753,8 @@
 
     const proto = {
       parts: mergePartBuckets([
-        { bucket: bTrim, mat: getVehicleTrimMaterial() },
+        { bucket: bMetal, mat: getAlloyMetalMaterial() },
+        { bucket: bHood, mat: getRubberTireMaterial() },
         { bucket: bAmberLens, mat: getTrafficAmberMaterial() }
       ]),
       size: { x: 3.1, y: 4.9, z: 0.45 }
@@ -1691,6 +1976,169 @@
     }
   }
 
+  // Indonesian PMI Emergency Ambulance Prototype (PBR paint, glossy cab glass, alloy rims, red cross & lightbar)
+  function getAmbulanceProto() {
+    const cacheKey = 'proc_veh_ambulance_v1';
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+
+    const bBody = [];
+    const bGlass = [];
+    const bRubber = [];
+    const bAlloy = [];
+    const bHeadlight = [];
+    const bTaillight = [];
+
+    const w = 2.06;
+    const len = 5.26;
+    const wheelR = 0.36;
+
+    addWheelPair(bRubber, bAlloy, wheelR, 0.24, wheelR, 1.56, w * 0.45);
+    addWheelPair(bRubber, bAlloy, wheelR, 0.24, wheelR, -1.48, w * 0.45);
+    // Chassis + bumpers + license plates
+    addColoredBox(bRubber, w * 0.90, 0.18, len * 0.94, 0, wheelR * 0.80, 0, 0, 0, 0, 0x16181c, 0.8);
+    addColoredBox(bRubber, w * 1.01, 0.26, 0.24, 0, wheelR + 0.10, len * 0.48, 0, 0, 0, 0x1e2228, 0.78);
+    addColoredBox(bRubber, w * 1.01, 0.26, 0.22, 0, wheelR + 0.10, -len * 0.49, 0, 0, 0, 0x1e2228, 0.78);
+    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.11, len * 0.505, false);
+    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.14, -len * 0.51, false);
+
+    // Front cab + hood + high-roof rear medical box
+    addColoredBox(bBody, w * 0.94, 0.72, 1.72, 0, wheelR + 0.42, 1.62, 0, 0, 0, 0xf1f5f9, 0.86);
+    addColoredBox(bBody, w * 0.88, 0.68, 1.12, 0, wheelR + 1.06, 1.32, 0, 0, 0, 0xf1f5f9, 0.90);
+    addColoredBox(bBody, w, 1.64, 3.36, 0, wheelR + 0.94, -0.84, 0, 0, 0, 0xf8fafc, 0.88);
+    // Bold PMI red perimeter stripe & rear emergency chevron trim
+    addColoredBox(bBody, w + 0.025, 0.22, 3.38, 0, wheelR + 0.72, -0.84, 0, 0, 0, 0xdc2626, 0.90);
+    addColoredBox(bBody, w * 0.96, 0.18, 1.74, 0, wheelR + 0.64, 1.62, 0, 0, 0, 0xdc2626, 0.90);
+    // Red cross emblems on left, right, rear & hood
+    for (const sx of [-1, 1]) {
+      const cx = sx * (w * 0.5 + 0.015);
+      addColoredBox(bBody, 0.03, 0.46, 0.16, cx, wheelR + 1.24, -0.85, 0, 0, 0, 0xdc2626, 0.95);
+      addColoredBox(bBody, 0.03, 0.16, 0.46, cx, wheelR + 1.24, -0.85, 0, 0, 0, 0xdc2626, 0.95);
+      addColoredBox(bAlloy, 0.12, 0.14, 0.08, sx * (w * 0.5 + 0.08), wheelR + 0.98, 1.76, 0, 0, 0, 0x94a3b8, 0.9);
+    }
+    addColoredBox(bBody, 0.42, 0.03, 0.14, 0, wheelR + 0.80, 2.04, -0.14, 0, 0, 0xdc2626, 0.95);
+    addColoredBox(bBody, 0.14, 0.03, 0.42, 0, wheelR + 0.80, 2.04, -0.14, 0, 0, 0xdc2626, 0.95);
+    addColoredBox(bBody, 0.42, 0.14, 0.03, 0, wheelR + 1.26, -len * 0.485, 0, 0, 0, 0xdc2626, 0.95);
+    addColoredBox(bBody, 0.14, 0.42, 0.03, 0, wheelR + 1.26, -len * 0.485, 0, 0, 0, 0xdc2626, 0.95);
+
+    // Glossy dark windshield, cab side windows & rear medical bay windows
+    addBox(bGlass, w * 0.82, 0.52, 0.10, 0, wheelR + 1.08, 1.88, -0.24);
+    addBox(bGlass, w * 0.90, 0.46, 0.92, 0, wheelR + 1.06, 1.32);
+    addBox(bGlass, 0.62, 0.44, 0.08, -0.44, wheelR + 1.30, -2.51);
+    addBox(bGlass, 0.62, 0.44, 0.08, 0.44, wheelR + 1.30, -2.51);
+    // Chrome grille, rear door seam & rooftop emergency lightbar
+    addColoredBox(bAlloy, w * 0.48, 0.24, 0.05, 0, wheelR + 0.44, len * 0.48, 0, 0, 0, 0xb8c0cc, 0.9);
+    addColoredBox(bAlloy, 0.03, 1.46, 0.03, 0, wheelR + 0.92, -len * 0.485, 0, 0, 0, 0x64748b, 0.9);
+    addColoredBox(bAlloy, 1.22, 0.06, 0.26, 0, wheelR + 1.80, 0.72, 0, 0, 0, 0x475569, 0.9);
+    addBox(bTaillight, 0.42, 0.12, 0.22, -0.36, wheelR + 1.86, 0.72);
+    addBox(bTaillight, 0.42, 0.12, 0.22, 0.36, wheelR + 1.86, 0.72);
+    addBox(bHeadlight, 0.28, 0.12, 0.22, 0, wheelR + 1.86, 0.72);
+    // Headlights & taillights
+    addBox(bHeadlight, 0.32, 0.16, 0.08, -w * 0.36, wheelR + 0.46, len * 0.485);
+    addBox(bHeadlight, 0.32, 0.16, 0.08, w * 0.36, wheelR + 0.46, len * 0.485);
+    addBox(bTaillight, 0.18, 0.40, 0.08, -w * 0.44, wheelR + 0.54, -len * 0.485);
+    addBox(bTaillight, 0.18, 0.40, 0.08, w * 0.44, wheelR + 0.54, -len * 0.485);
+
+    const proto = {
+      parts: mergePartBuckets([
+        { bucket: bBody, mat: getVehiclePaintedVertexMaterial() },
+        { bucket: bGlass, mat: getCabinGlassMaterial() },
+        { bucket: bRubber, mat: getRubberTireMaterial() },
+        { bucket: bAlloy, mat: getAlloyMetalMaterial() },
+        { bucket: bHeadlight, mat: getHeadlightEmissiveMaterial() },
+        { bucket: bTaillight, mat: getTaillightEmissiveMaterial() }
+      ]),
+      size: { x: w, y: 2.32, z: len }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
+  // TNI Tactical 6x6 Military Utility Truck Prototype
+  function getMilitaryTruckProto() {
+    const cacheKey = 'proc_veh_mil_truck_v1';
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+
+    const bBody = [];
+    const bCanvas = [];
+    const bGlass = [];
+    const bRubber = [];
+    const bAlloy = [];
+    const bHeadlight = [];
+    const bTaillight = [];
+    const bAmber = [];
+
+    const w = 2.30;
+    const len = 6.10;
+    const wheelR = 0.48;
+
+    addWheelPair(bRubber, bAlloy, wheelR, 0.32, wheelR, 1.95, w * 0.45);
+    addWheelPair(bRubber, bAlloy, wheelR, 0.32, wheelR, -1.10, w * 0.45);
+    addWheelPair(bRubber, bAlloy, wheelR, 0.32, wheelR, -2.25, w * 0.45);
+
+    // Heavy steel frame rails + front bullbar bumper + side fuel tanks
+    addColoredBox(bRubber, w * 0.62, 0.24, len * 0.94, 0, wheelR * 0.92, 0, 0, 0, 0, 0x16181c, 0.8);
+    addColoredBox(bAlloy, w * 1.02, 0.32, 0.28, 0, wheelR + 0.16, len * 0.49, 0, 0, 0, 0x2a3028, 0.82);
+    addColoredBox(bAlloy, w * 0.88, 0.28, 0.08, 0, wheelR + 0.42, len * 0.51, 0, 0, 0, 0x1f241d, 0.85);
+    addColoredBox(bBody, 0.34, 0.36, 0.96, -w * 0.38, wheelR + 0.18, 0.35, 0, 0, 0, 0x3b482e, 0.8);
+    addColoredBox(bBody, 0.34, 0.36, 0.96, w * 0.38, wheelR + 0.18, 0.35, 0, 0, 0, 0x3b482e, 0.8);
+
+    // Olive-drab armored hood, cab & lower cargo bed
+    addColoredBox(bBody, w * 0.90, 0.88, 1.15, 0, wheelR + 0.72, 2.25, 0, 0, 0, 0x3f4c31, 0.85);
+    addColoredBox(bBody, w * 0.94, 1.46, 1.38, 0, wheelR + 1.06, 1.08, 0, 0, 0, 0x3d4a2f, 0.88);
+    addColoredBox(bBody, w, 0.78, 3.55, 0, wheelR + 0.76, -1.25, 0, 0, 0, 0x3a462d, 0.84);
+    // Matte khaki canvas troop canopy over cargo bed + rear opening flap
+    addColoredBox(bCanvas, w * 0.96, 1.24, 3.45, 0, wheelR + 1.72, -1.25, 0, 0, 0, 0x5c6344, 0.88);
+    addColoredBox(bRubber, w * 0.74, 0.98, 0.12, 0, wheelR + 1.62, -2.96, 0, 0, 0, 0x181a18, 0.82);
+
+    // Split armored windshield & cab side glass + mirrors + roof beacon
+    addBox(bGlass, w * 0.80, 0.44, 0.10, 0, wheelR + 1.48, 1.78, -0.10);
+    addBox(bGlass, w * 0.96, 0.42, 0.96, 0, wheelR + 1.48, 1.08);
+    for (const sx of [-1, 1]) {
+      addColoredBox(bAlloy, 0.16, 0.22, 0.08, sx * (w * 0.5 + 0.10), wheelR + 1.44, 1.68, 0, 0, 0, 0x2f352e, 0.9);
+    }
+    addBox(bAmber, 0.20, 0.16, 0.20, 0, wheelR + 1.88, 1.38);
+    addBox(bHeadlight, 0.24, 0.18, 0.08, -w * 0.34, wheelR + 0.74, 2.84);
+    addBox(bHeadlight, 0.24, 0.18, 0.08, w * 0.34, wheelR + 0.74, 2.84);
+    addBox(bTaillight, 0.26, 0.14, 0.08, -w * 0.38, wheelR + 0.44, -len * 0.498);
+    addBox(bTaillight, 0.26, 0.14, 0.08, w * 0.38, wheelR + 0.44, -len * 0.498);
+
+    const proto = {
+      parts: mergePartBuckets([
+        { bucket: bBody, mat: getVehiclePaintedVertexMaterial() },
+        { bucket: bCanvas, mat: getConcretePbrMaterial() },
+        { bucket: bGlass, mat: getCabinGlassMaterial() },
+        { bucket: bRubber, mat: getRubberTireMaterial() },
+        { bucket: bAlloy, mat: getAlloyMetalMaterial() },
+        { bucket: bHeadlight, mat: getHeadlightEmissiveMaterial() },
+        { bucket: bTaillight, mat: getTaillightEmissiveMaterial() },
+        { bucket: bAmber, mat: getAmberAccentEmissiveMaterial() }
+      ]),
+      size: { x: w, y: 2.82, z: len }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
+  // Crisp PBR Wooden Cargo Pallet Prototype
+  function getPalletProto() {
+    const cacheKey = 'proc_prop_pallet_v1';
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+    const bWood = [];
+    for (const rx of [-0.52, 0.0, 0.52]) {
+      addColoredBox(bWood, 0.11, 0.09, 1.02, rx, 0.045, 0, 0, 0, 0, 0x6f4a2b, 0.78);
+    }
+    for (let s = 0; s < 5; s++) {
+      const sz = -0.44 + s * 0.22;
+      addColoredBox(bWood, 1.24, 0.032, 0.14, 0, 0.106, sz, 0, 0, 0, 0x8b5e36, 0.88);
+    }
+    const proto = {
+      parts: mergePartBuckets([{ bucket: bWood, mat: getWoodPbrMaterial() }]),
+      size: { x: 1.24, y: 0.122, z: 1.02 }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
   I.city = Object.assign(I.city || {}, {
     STREET_GROUND_Y,
     SIDEWALK_Y,
@@ -1720,7 +2168,17 @@
     getCachedAngsanaTreeParts,
     getCachedAngsanaLeafMaterial,
     getVehiclePaintMaterial,
+    getVehiclePaintedVertexMaterial,
     getVehicleTrimMaterial,
+    getCabinGlassMaterial,
+    getRubberTireMaterial,
+    getAlloyMetalMaterial,
+    getHeadlightEmissiveMaterial,
+    getTaillightEmissiveMaterial,
+    getAmberAccentEmissiveMaterial,
+    getWarmDisplayGlassMaterial,
+    getWoodPbrMaterial,
+    getConcretePbrMaterial,
     getTrafficAmberMaterial,
     evalTrafficSignalBlink,
     updateTrafficSignalTime,
@@ -1731,6 +2189,9 @@
     getAngkotProto,
     getTransJakartaBusProto,
     getOjolProto,
+    getAmbulanceProto,
+    getMilitaryTruckProto,
+    getPalletProto,
     getParkBenchProto,
     getRoadBarrierProto,
     getStreetLampProto,

@@ -27,6 +27,53 @@
   const localInteractables = T.localInteractables;
 
   const EMPTY_DOORWAYS = [];
+
+  function resolveStationList() {
+    if (LRT.Config && Array.isArray(LRT.Config.ARCHETYPES) && LRT.Config.ARCHETYPES.length) {
+      return LRT.Config.ARCHETYPES;
+    }
+    if (LRT.CONFIG && Array.isArray(LRT.CONFIG.stations) && LRT.CONFIG.stations.length) {
+      return LRT.CONFIG.stations;
+    }
+    return [];
+  }
+
+  function resolveStationIndex() {
+    if (LRT.Director && typeof LRT.Director.stationIndex === 'number') return LRT.Director.stationIndex;
+    const core = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core;
+    if (core && typeof core.stationIndex === 'number') return core.stationIndex;
+    if (LRT.Station && typeof LRT.Station._stationIndex === 'number') return LRT.Station._stationIndex;
+    return 0;
+  }
+
+  function formatDepartPrompt(dirOverride) {
+    const stations = resolveStationList();
+    const stIdx = resolveStationIndex();
+    const trainDirection = typeof dirOverride === 'number'
+      ? dirOverride
+      : (typeof T.travelDir === 'number' ? T.travelDir : 1);
+    const total = stations.length || 6;
+    const nextArch = stations.length ? stations[(stIdx + 1) % total] : null;
+    const prevArch = stations.length ? stations[Math.max(0, stIdx - 1) % total] : null;
+    const core = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core;
+    const isFinalExtraction = (stIdx >= total - 1 && core && core.gameMode === 'survival');
+    const nextName = isFinalExtraction
+      ? `ZONA EVAKUASI (${(nextArch && nextArch.name) || 'Dukuh Atas BSI'})`
+      : ((nextArch && nextArch.name) || 'Stasiun Berikutnya');
+    const prevName = (prevArch && prevArch.name) || 'Stasiun Sebelumnya';
+    return trainDirection >= 0
+      ? `🟢 [E] BERANGKAT MAJU → TUJUAN: ${nextName} (Kereta Peron 1)`
+      : `🟠 [E] KEMBALI KE STASIUN SEBELUMNYA ← TUJUAN: ${prevName} (Kereta Peron 2)`;
+  }
+
+  function syncDepartPrompts() {
+    const txt = formatDepartPrompt();
+    for (let i = 0; i < localInteractables.length; i++) {
+      if (localInteractables[i] && localInteractables[i].action === 'depart') {
+        localInteractables[i].promptBoarded = txt;
+      }
+    }
+  }
   const _openDoorwaysPool = [];
   for (let i = 0; i < DOOR_WORLDS_Z.length; i++) {
     _openDoorwaysPool.push({
@@ -228,18 +275,19 @@
     }
 
     // 8. Interactables inside the train (GoA 3 front/rear consoles + 3 center door depart panels + horn)
+    const initialDepartPrompt = formatDepartPrompt(1);
     localInteractables.push({
       id: 'train_depart_front',
       action: 'depart',
       pos: new THREE.Vector3(0.0, 1.05, 25.25),
-      promptBoarded: 'BERANGKAT KE STASIUN BERIKUTNYA / DEPART TRAIN',
+      promptBoarded: initialDepartPrompt,
       promptCruise: null
     });
     localInteractables.push({
       id: 'train_depart_rear',
       action: 'depart',
       pos: new THREE.Vector3(0.0, 1.05, -25.25),
-      promptBoarded: 'BERANGKAT KE STASIUN BERIKUTNYA / DEPART TRAIN',
+      promptBoarded: initialDepartPrompt,
       promptCruise: null
     });
     for (let c = 0; c < 3; c++) {
@@ -247,7 +295,7 @@
         id: 'train_depart_door_' + c,
         action: 'depart',
         pos: new THREE.Vector3(1.12, 1.25, TD.carCentersZ[c] + 0.76),
-        promptBoarded: 'TUTUP PINTU & BERANGKAT / DEPART NOW',
+        promptBoarded: initialDepartPrompt,
         promptCruise: null
       });
     }
@@ -479,8 +527,15 @@
     T.travelDir = (opts && opts.direction === -1) ? -1 : 1;
     if (opts && opts.nextStationName) {
       T.currentStationName = opts.nextStationName;
-      T.repaintPisLcd(T.currentStationName);
+    } else {
+      const stations = resolveStationList();
+      const stIdx = resolveStationIndex();
+      const total = stations.length || 6;
+      const targetIdx = T.travelDir < 0 ? Math.max(0, stIdx - 1) : ((stIdx + 1) % total);
+      T.currentStationName = (stations[targetIdx] && stations[targetIdx].name) || 'Cawang Interchange';
     }
+    T.repaintPisLcd(T.currentStationName, T.travelDir);
+    syncDepartPrompts();
 
     T.state = 'APPROACHING';
     T.trainZ = -180.0 * T.travelDir;
@@ -686,14 +741,8 @@
         setHeadlights(true, 1.15);
         if (T.viaductGroup) T.viaductGroup.visible = false;
         openDoors();
-        if (stationRef && typeof stationRef.getStats === 'function') {
-          const stInfo = stationRef.getStats();
-          const stName = stInfo && (stInfo.stationName || stInfo.name);
-          if (stName) {
-            T.currentStationName = stName;
-            T.repaintPisLcd(T.currentStationName);
-          }
-        }
+        T.repaintPisLcd(T.currentStationName, T.travelDir);
+        syncDepartPrompts();
       }
       T.trainGroup.position.set(T.activeTrackX, 0, T.trainZ);
       T.trainGroup.rotation.set(0, T.travelDir === -1 ? Math.PI : 0, 0);
@@ -804,10 +853,11 @@
             const stInfo = stationRef.getStats();
             const stName = stInfo && (stInfo.stationName || stInfo.name);
             if (stName) {
-              T.currentStationName = stName;
-              T.repaintPisLcd(T.currentStationName);
+              T.currentStationName = 'TIBA: ' + stName;
+              T.repaintPisLcd(T.currentStationName, T.travelDir);
             }
           }
+          syncDepartPrompts();
         }
       }
 
@@ -900,8 +950,12 @@
 
     for (let i = 0; i < localInteractables.length; i++) {
       const item = localInteractables[i];
-      const prompt = T.state === 'BOARDED_WAIT' ? item.promptBoarded : item.promptCruise;
+      let prompt = T.state === 'BOARDED_WAIT' ? item.promptBoarded : item.promptCruise;
       if (!prompt) continue;
+      if (item.action === 'depart' && T.state === 'BOARDED_WAIT') {
+        prompt = formatDepartPrompt();
+        item.promptBoarded = prompt;
+      }
 
       _v1.set(T.localXToWorld(item.pos.x), item.pos.y, T.localZToWorld(item.pos.z));
       const d = _v1.distanceTo(pos);
@@ -915,7 +969,7 @@
           id: item.id,
           action: item.action,
           label: prompt,
-          prompt: '[E] ' + prompt,
+          prompt: prompt.indexOf('[E]') !== -1 ? prompt : ('[E] ' + prompt),
           pos: _v1.clone(),
           distance: d
         };
@@ -931,7 +985,13 @@
       if (item.id === id) {
         if (item.action === 'depart' && T.state === 'BOARDED_WAIT') {
           departNow();
-          return { handled: true, action: 'depart', message: 'Pintu ditutup — LRT berangkat ke stasiun berikutnya!' };
+          return {
+            handled: true,
+            action: 'depart',
+            message: T.travelDir < 0
+              ? '🟠 Pintu ditutup — LRT kembali ke stasiun sebelumnya!'
+              : '🟢 Pintu ditutup — LRT berangkat ke stasiun berikutnya!'
+          };
         }
         if (item.action === 'horn') {
           T.safeAudioPlay('train_horn', { gain: 0.95 });
@@ -1001,13 +1061,17 @@
     raycastTrain: T.raycastTrain,
     applyDamage: T.applyDamage,
     getInteractableNear,
+    getInteractables: () => {
+      syncDepartPrompts();
+      return localInteractables;
+    },
     interact,
     getVisualRoot: () => T.trainVisualRoot,
     getRoot: () => T.trainGroup,
     setWarmupMode,
-    setNextStationName: (name) => {
+    setNextStationName: (name, dir) => {
       T.currentStationName = name || 'Cawang';
-      T.repaintPisLcd(T.currentStationName);
+      T.repaintPisLcd(T.currentStationName, dir !== undefined ? dir : T.travelDir);
     },
     getStats: () => ({
       ...T.stats,

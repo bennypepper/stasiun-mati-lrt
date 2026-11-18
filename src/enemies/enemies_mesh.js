@@ -11,14 +11,14 @@
   const MAX_PUDDLES = 24;
   const MAX_PUDDLE_BUBBLES = 48;
   const BILE_GRAVITY = 11.5;
-  const BILE_HORIZ_SPEED = 11.0;
-  const BILE_MAX_RANGE = 14.5;
+  const BILE_HORIZ_SPEED = 8.4;
+  const BILE_MAX_RANGE = 7.0;
 
   const FALLBACK_TYPES = {
     walker: { id: 'walker', label: 'Commuter Infected', hp: 70, speed: 1.95, damage: 10, attackRange: 1.75, attackCooldown: 1.25, scale: 1.0, armorMult: 1.0 },
     runner: { id: 'runner', label: 'Feral Sprinter', hp: 62, speed: 5.20, damage: 11, attackRange: 1.65, attackCooldown: 0.85, scale: 0.94, armorMult: 1.0 },
     brute: { id: 'brute', label: 'LRT Riot Brute', hp: 230, speed: 1.85, damage: 22, attackRange: 1.95, attackCooldown: 1.45, scale: 1.18, armorMult: 0.50 },
-    spitter: { id: 'spitter', label: 'Toxic Hazmat', hp: 105, speed: 2.05, damage: 14, attackRange: 14.5, attackCooldown: 2.40, scale: 1.04, armorMult: 1.0, deathBlastRadius: 3.6, deathBlastDmg: 30 },
+    spitter: { id: 'spitter', label: 'Toxic Hazmat', hp: 105, speed: 2.05, damage: 14, attackRange: 6.5, attackCooldown: 2.40, scale: 1.04, armorMult: 1.0, deathBlastRadius: 3.6, deathBlastDmg: 30 },
     screamer: { id: 'screamer', label: 'Cyst Screamer', hp: 75, speed: 3.45, damage: 12, attackRange: 1.65, attackCooldown: 1.0, scale: 0.96, armorMult: 1.0, screamRadius: 24.0, screamCooldown: 7.5 }
   };
 
@@ -43,8 +43,14 @@
   const _v1 = new THREE.Vector3();
   const _vKnee = new THREE.Vector3();
   const _vJointLocal = new THREE.Vector3();
+  const _pelvisPos = new THREE.Vector3();
+  const _vHeadPos = new THREE.Vector3();
   const _q1 = new THREE.Quaternion();
   const _qTorso = new THREE.Quaternion();
+  const _qHip = new THREE.Quaternion();
+  const _qHead = new THREE.Quaternion();
+  const _qUpper = new THREE.Quaternion();
+  const _qLocal = new THREE.Quaternion();
   const _e1 = new THREE.Euler();
   const _m4 = new THREE.Matrix4();
   const _pos = new THREE.Vector3();
@@ -77,6 +83,11 @@
   let _bruteArmorMesh = null;
   let _bruteHelmetMesh = null;
   let _spitterBioMesh = null;
+  let _spitterGearMesh = null;
+  let _spitterMaskMesh = null;
+  let _screamerRibMesh = null;
+  let _screamerJawMesh = null;
+  let _screamerCystMesh = null;
   let _ragMesh = null;
   let _headEyeAttr = null;
   let _bileMesh = null;
@@ -186,137 +197,371 @@
     return merged;
   }
 
-  // 512x512 4-quadrant horror atlas:
-  // Top-Left  [u:0..0.5, v:0.5..1]: Torn bloodstained commuter cloth + chest gash + exposed gore seam
-  // Bot-Left  [u:0..0.5, v:0..0.5]: Mud/blood-splattered trousers & work boots
-  // Top-Right [u:0.5..1, v:0.5..1]: Desiccated cadaver skin, capillary marbling, open wounds
-  // Bot-Right [u:0.5..1, v:0..0.5]: Sunken eye socket pinhole (center) & dark toothy gore (sides)
-  function createZombieTexture() {
-    if (typeof document === 'undefined') return null;
+  // 1024x1024 4-quadrant PBR horror atlas (albedo + companion bumpMap & roughnessMap):
+  // Top-Left  [u:0..0.5, v:0.5..1]: Woven commuter garment cloth + folds + arterial blood stains (dry cloth 0.85, wet blood 0.25)
+  // Bot-Left  [u:0..0.375, v:0..0.5]: Denim/twill trousers + trackbed soot; [0.375..0.5, 0.125..0.5]: Ballistic Kevlar & boot leather; [0.375..0.5, 0..0.125]: Smoked visor
+  // Top-Right [u:0.5..0.875, v:0.5..1]: Cadaver skin, veins, wrinkles, wounds; [0.875..1, 0.5..1]: Matted scalp hair
+  // Bot-Right [u:0.5..0.75, v:0..0.5]: Sunken eye cavity & feral iris; [0.75..1, 0..0.297]: Clotted gore & ribs; [0.75..1, 0.297..0.5]: Gumline & teeth
+  function createZombieTextures() {
+    if (typeof document === 'undefined') return { map: null, bumpMap: null, roughnessMap: null };
+    const S = 1024;
     const c = document.createElement('canvas');
-    c.width = 512;
-    c.height = 512;
+    const cB = document.createElement('canvas');
+    const cR = document.createElement('canvas');
+    c.width = cB.width = cR.width = S;
+    c.height = cB.height = cR.height = S;
     const ctx = c.getContext('2d');
-    if (!ctx) return null;
+    const btx = cB.getContext('2d');
+    const rtx = cR.getContext('2d');
+    if (!ctx || !btx || !rtx) return { map: null, bumpMap: null, roughnessMap: null };
 
     let s = 4207;
     const rng = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+    const setR = (t, r, a) => {
+      const v = Math.max(0, Math.min(255, Math.round(r * 255)));
+      t.fillStyle = a !== undefined ? `rgba(${v},${v},${v},${a})` : `rgb(${v},${v},${v})`;
+    };
 
-    // 1. Top-Left (canvas y 0..256, x 0..256) -> UV top-left (shirt/garment weave + dried crimson splatters)
-    ctx.fillStyle = '#dddad2';
-    ctx.fillRect(0, 0, 256, 256);
-    for (let y = 0; y < 256; y += 2) {
-      const n = Math.round(205 + (rng() - 0.5) * 30);
+    // 1. Top-Left (x: 0..512, y: 0..512) -> Woven commuter garment + folds + arterial blood
+    ctx.fillStyle = '#dad7cf';
+    ctx.fillRect(0, 0, 512, 512);
+    btx.fillStyle = '#808080';
+    btx.fillRect(0, 0, 512, 512);
+    setR(rtx, 0.85);
+    rtx.fillRect(0, 0, 512, 512);
+
+    // Fine woven fabric crosshatch (albedo + bump)
+    for (let y = 0; y < 512; y += 3) {
+      const n = Math.round(206 + (rng() - 0.5) * 20);
       ctx.fillStyle = `rgb(${n},${n - 2},${n - 6})`;
-      ctx.fillRect(0, y, 256, 1);
+      ctx.fillRect(0, y, 512, 1);
+      const bn = Math.round(128 + (rng() - 0.5) * 32);
+      btx.fillStyle = `rgb(${bn},${bn},${bn})`;
+      btx.fillRect(0, y, 512, 1);
     }
-    // Cloth folds & grime shading
-    ctx.strokeStyle = 'rgba(42,36,30,0.28)';
-    ctx.lineWidth = 3;
-    for (let i = 0; i < 22; i++) {
-      const y0 = rng() * 250;
+    for (let x = 0; x < 512; x += 3) {
+      const bn = Math.round(128 + (rng() - 0.5) * 24);
+      btx.fillStyle = `rgba(${bn},${bn},${bn},0.45)`;
+      btx.fillRect(x, 0, 1, 512);
+    }
+    // Tailored cloth folds & creases
+    for (let i = 0; i < 36; i++) {
+      const y0 = rng() * 500;
+      const dy1 = (rng() - 0.5) * 44;
+      const dy2 = (rng() - 0.5) * 52;
+      ctx.strokeStyle = 'rgba(38,34,28,0.22)';
+      ctx.lineWidth = 2.5 + rng() * 3.0;
       ctx.beginPath();
       ctx.moveTo(0, y0);
-      ctx.quadraticCurveTo(128, y0 + (rng() - 0.5) * 28, 256, y0 + (rng() - 0.5) * 34);
+      ctx.quadraticCurveTo(256, y0 + dy1, 512, y0 + dy2);
+      ctx.stroke();
+
+      btx.strokeStyle = i % 2 === 0 ? 'rgba(60,60,60,0.35)' : 'rgba(195,195,195,0.28)';
+      btx.lineWidth = 3.5;
+      btx.beginPath();
+      btx.moveTo(0, y0);
+      btx.quadraticCurveTo(256, y0 + dy1, 512, y0 + dy2);
+      btx.stroke();
+    }
+    // Shirt placket & button detail
+    ctx.fillStyle = 'rgba(42,38,34,0.28)';
+    ctx.fillRect(248, 0, 16, 512);
+    btx.fillStyle = 'rgba(175,175,175,0.45)';
+    btx.fillRect(248, 0, 16, 512);
+    for (let b = 48; b < 490; b += 64) {
+      ctx.fillStyle = 'rgba(32,30,28,0.65)';
+      ctx.beginPath();
+      ctx.arc(256, b, 5, 0, Math.PI * 2);
+      ctx.fill();
+      btx.fillStyle = '#d8d8d8';
+      btx.beginPath();
+      btx.arc(256, b, 5, 0, Math.PI * 2);
+      btx.fill();
+    }
+    // Arterial blood splatters & wet gore streaks (roughness drops to 0.25!)
+    for (let i = 0; i < 140; i++) {
+      const gx = rng() * 500, gy = rng() * 500;
+      const rx = 5 + rng() * 36, ry = 7 + rng() * 48;
+      const ang = rng() * Math.PI;
+      const isBlood = rng() > 0.34;
+      ctx.fillStyle = isBlood ? 'rgba(84,12,11,0.50)' : 'rgba(48,42,32,0.34)';
+      ctx.beginPath();
+      ctx.ellipse(gx, gy, rx, ry, ang, 0, Math.PI * 2);
+      ctx.fill();
+      if (isBlood) {
+        setR(rtx, 0.25, 0.72);
+        rtx.beginPath();
+        rtx.ellipse(gx, gy, rx * 0.85, ry * 0.85, ang, 0, Math.PI * 2);
+        rtx.fill();
+      }
+    }
+    // Chest wound tear shading
+    ctx.fillStyle = 'rgba(48,8,8,0.88)';
+    ctx.beginPath();
+    ctx.ellipse(256, 256, 48, 72, 0.14, 0, Math.PI * 2);
+    ctx.fill();
+    setR(rtx, 0.24, 0.92);
+    rtx.beginPath();
+    rtx.ellipse(256, 256, 46, 70, 0.14, 0, Math.PI * 2);
+    rtx.fill();
+
+    // 2. Bottom-Left (x: 0..384, y: 512..1024) -> Denim/twill trousers + mud & blood
+    ctx.fillStyle = '#cfccc4';
+    ctx.fillRect(0, 512, 384, 512);
+    btx.fillStyle = '#808080';
+    btx.fillRect(0, 512, 384, 512);
+    setR(rtx, 0.86);
+    rtx.fillRect(0, 512, 384, 512);
+
+    // Diagonal twill weave
+    for (let x = 0; x < 384; x += 3) {
+      const n = Math.round(192 + (rng() - 0.5) * 24);
+      ctx.fillStyle = `rgb(${n},${n - 3},${n - 7})`;
+      ctx.fillRect(x, 512, 2, 512);
+      const bn = Math.round(128 + (rng() - 0.5) * 28);
+      btx.fillStyle = `rgb(${bn},${bn},${bn})`;
+      btx.fillRect(x, 512, 1, 512);
+    }
+    // Trouser creases & mud/soot hem gradient
+    const mudGrad = ctx.createLinearGradient(0, 770, 0, 1024);
+    mudGrad.addColorStop(0, 'rgba(32,26,20,0)');
+    mudGrad.addColorStop(1, 'rgba(26,20,16,0.72)');
+    ctx.fillStyle = mudGrad;
+    ctx.fillRect(0, 770, 384, 254);
+    for (let i = 0; i < 80; i++) {
+      const bx = rng() * 376, by = 520 + rng() * 494, br = 5 + rng() * 20;
+      const isBlood = rng() > 0.48;
+      ctx.fillStyle = isBlood ? 'rgba(74,12,10,0.44)' : 'rgba(38,34,28,0.34)';
+      ctx.beginPath();
+      ctx.arc(bx, by, br, 0, Math.PI * 2);
+      ctx.fill();
+      if (isBlood) {
+        setR(rtx, 0.28, 0.65);
+        rtx.beginPath();
+        rtx.arc(bx, by, br * 0.8, 0, Math.PI * 2);
+        rtx.fill();
+      }
+    }
+
+    // 2b. Tactical Kevlar / Ballistic Nylon / Boot Leather strip (x: 384..512, y: 512..896)
+    ctx.fillStyle = '#9aa0a8';
+    ctx.fillRect(384, 512, 128, 384);
+    btx.fillStyle = '#808080';
+    btx.fillRect(384, 512, 128, 384);
+    setR(rtx, 0.58);
+    rtx.fillRect(384, 512, 128, 384);
+    for (let y = 516; y < 896; y += 8) {
+      for (let x = 388; x < 512; x += 8) {
+        const shade = ((x + y) % 16 === 0) ? 148 : 118;
+        ctx.fillStyle = `rgb(${shade},${shade + 2},${shade + 5})`;
+        ctx.fillRect(x, y, 6, 6);
+        btx.fillStyle = ((x + y) % 16 === 0) ? '#9e9e9e' : '#646464';
+        btx.fillRect(x, y, 6, 6);
+      }
+    }
+    // MOLLE webbing seams & edge scuffs
+    for (let y = 540; y < 880; y += 44) {
+      ctx.fillStyle = 'rgba(26,30,36,0.55)';
+      ctx.fillRect(384, y, 128, 8);
+      btx.fillStyle = '#c8c8c8';
+      btx.fillRect(384, y, 128, 8);
+    }
+
+    // 2c. Dark Smoked Polycarbonate Visor strip (x: 384..512, y: 896..1024)
+    const visorGrad = ctx.createLinearGradient(384, 896, 512, 1024);
+    visorGrad.addColorStop(0.0, '#141a22');
+    visorGrad.addColorStop(0.45, '#222c38');
+    visorGrad.addColorStop(1.0, '#10151c');
+    ctx.fillStyle = visorGrad;
+    ctx.fillRect(384, 896, 128, 128);
+    btx.fillStyle = '#808080';
+    btx.fillRect(384, 896, 128, 128);
+    setR(rtx, 0.14);
+    rtx.fillRect(384, 896, 128, 128);
+    ctx.strokeStyle = 'rgba(180,200,220,0.16)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 8; i++) {
+      ctx.beginPath();
+      ctx.moveTo(390 + rng() * 40, 904 + rng() * 110);
+      ctx.lineTo(445 + rng() * 60, 904 + rng() * 110);
       ctx.stroke();
     }
-    // Placket / button seam
-    ctx.fillStyle = 'rgba(48,44,40,0.30)';
-    ctx.fillRect(124, 0, 8, 256);
-    // Arterial blood splatters & grime down torso
-    for (let i = 0; i < 95; i++) {
-      const gx = rng() * 250, gy = rng() * 250, rx = 4 + rng() * 26, ry = 5 + rng() * 34;
-      ctx.fillStyle = rng() > 0.35 ? 'rgba(92,16,14,0.44)' : 'rgba(54,48,38,0.34)';
-      ctx.beginPath();
-      ctx.ellipse(gx, gy, rx, ry, rng() * Math.PI, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    // Dark chest wound slash
-    ctx.fillStyle = 'rgba(56,10,10,0.85)';
-    ctx.beginPath();
-    ctx.ellipse(128, 128, 34, 48, 0.2, 0, Math.PI * 2);
-    ctx.fill();
 
-    // 2. Bottom-Left (canvas y 256..512, x 0..256) -> UV bottom-left (trousers & muddy boots)
-    ctx.fillStyle = '#cfccc4';
-    ctx.fillRect(0, 256, 256, 256);
-    for (let x = 0; x < 256; x += 2) {
-      const n = Math.round(192 + (rng() - 0.5) * 26);
-      ctx.fillStyle = `rgb(${n},${n - 3},${n - 7})`;
-      ctx.fillRect(x, 256, 1, 256);
-    }
-    const mudGrad = ctx.createLinearGradient(0, 380, 0, 512);
-    mudGrad.addColorStop(0, 'rgba(35,28,22,0)');
-    mudGrad.addColorStop(1, 'rgba(30,24,18,0.68)');
-    ctx.fillStyle = mudGrad;
-    ctx.fillRect(0, 380, 256, 132);
-    for (let i = 0; i < 55; i++) {
-      ctx.fillStyle = rng() > 0.45 ? 'rgba(78,14,12,0.42)' : 'rgba(42,38,32,0.34)';
-      ctx.beginPath();
-      ctx.arc(rng() * 250, 260 + rng() * 246, 4 + rng() * 16, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // 3. Top-Right (x: 512..896, y: 0..512) -> Necrotic cadaver skin, creases, veins, abrasions
+    ctx.fillStyle = '#d6d2c6';
+    ctx.fillRect(512, 0, 384, 512);
+    btx.fillStyle = '#808080';
+    btx.fillRect(512, 0, 384, 512);
+    setR(rtx, 0.78);
+    rtx.fillRect(512, 0, 384, 512);
 
-    // 3. Top-Right (canvas y 0..256, x 256..512) -> UV top-right (necrotic skin + veins + claw blood)
-    ctx.fillStyle = '#dad8ce';
-    ctx.fillRect(256, 0, 256, 256);
-    for (let i = 0; i < 160; i++) {
-      const sx = 256 + rng() * 256, sy = rng() * 256, r = 4 + rng() * 20;
-      ctx.fillStyle = rng() > 0.40 ? 'rgba(98,104,94,0.20)' : 'rgba(92,42,40,0.22)';
+    // Mottled livor mortis & skin texture
+    for (let i = 0; i < 240; i++) {
+      const sx = 512 + rng() * 384, sy = rng() * 512, r = 5 + rng() * 26;
+      const isBruise = rng() > 0.42;
+      ctx.fillStyle = isBruise ? 'rgba(92,98,88,0.18)' : 'rgba(88,38,38,0.20)';
       ctx.beginPath();
       ctx.arc(sx, sy, r, 0, Math.PI * 2);
       ctx.fill();
+      btx.fillStyle = isBruise ? 'rgba(112,112,112,0.22)' : 'rgba(148,148,148,0.22)';
+      btx.beginPath();
+      btx.arc(sx, sy, r * 0.65, 0, Math.PI * 2);
+      btx.fill();
     }
-    ctx.strokeStyle = 'rgba(58,46,56,0.34)';
-    ctx.lineWidth = 1.6;
-    for (let i = 0; i < 28; i++) {
-      let vx = 264 + rng() * 240, vy = 8 + rng() * 240;
+    // Fine branching subcutaneous veins (albedo + raised bump + slight sheen)
+    for (let i = 0; i < 42; i++) {
+      let vx = 524 + rng() * 360, vy = 12 + rng() * 488;
+      ctx.strokeStyle = 'rgba(54,42,58,0.34)';
+      ctx.lineWidth = 1.6;
+      btx.strokeStyle = 'rgba(165,165,165,0.40)';
+      btx.lineWidth = 2.0;
       ctx.beginPath();
+      btx.beginPath();
       ctx.moveTo(vx, vy);
-      for (let k = 0; k < 5; k++) {
-        vx += (rng() - 0.5) * 34;
-        vy += (rng() - 0.5) * 34;
+      btx.moveTo(vx, vy);
+      for (let k = 0; k < 6; k++) {
+        vx += (rng() - 0.5) * 44;
+        vy += (rng() - 0.5) * 44;
         ctx.lineTo(vx, vy);
+        btx.lineTo(vx, vy);
       }
       ctx.stroke();
+      btx.stroke();
+    }
+    // Skin creases & raw scraped blood patches (wet roughness 0.25)
+    for (let i = 0; i < 38; i++) {
+      const wx = 524 + rng() * 356, wy = 12 + rng() * 488, wr = 3 + rng() * 14;
+      ctx.fillStyle = 'rgba(88,16,14,0.45)';
+      ctx.beginPath();
+      ctx.ellipse(wx, wy, wr * 1.4, wr * 0.7, rng() * Math.PI, 0, Math.PI * 2);
+      ctx.fill();
+      setR(rtx, 0.26, 0.75);
+      rtx.beginPath();
+      rtx.ellipse(wx, wy, wr * 1.3, wr * 0.65, 0, 0, Math.PI * 2);
+      rtx.fill();
     }
 
-    // 4. Bottom-Right (canvas y 256..512, x 256..512) -> UV bottom-right:
-    // Left sub-strip [u: 0.50..0.75]: Dark orbital hollow + tiny pinpoint feral iris
-    ctx.fillStyle = '#181110';
-    ctx.fillRect(256, 256, 128, 256);
-    const eyeGrad = ctx.createRadialGradient(320, 384, 3, 320, 384, 42);
+    // 3b. Matted Scalp & Coarse Hair strip (x: 896..1024, y: 0..512)
+    ctx.fillStyle = '#2c2724';
+    ctx.fillRect(896, 0, 128, 512);
+    btx.fillStyle = '#707070';
+    btx.fillRect(896, 0, 128, 512);
+    setR(rtx, 0.80);
+    rtx.fillRect(896, 0, 128, 512);
+    for (let i = 0; i < 180; i++) {
+      const hx = 898 + rng() * 124;
+      ctx.strokeStyle = rng() > 0.35 ? 'rgba(20,17,15,0.7)' : 'rgba(68,60,54,0.5)';
+      ctx.lineWidth = 1.5 + rng() * 2.0;
+      ctx.beginPath();
+      ctx.moveTo(hx, 0);
+      ctx.quadraticCurveTo(hx + (rng() - 0.5) * 18, 256, hx + (rng() - 0.5) * 24, 512);
+      ctx.stroke();
+
+      btx.strokeStyle = i % 2 === 0 ? '#a8a8a8' : '#4a4a4a';
+      btx.lineWidth = 2.0;
+      btx.beginPath();
+      btx.moveTo(hx, 0);
+      btx.lineTo(hx + (rng() - 0.5) * 14, 512);
+      btx.stroke();
+    }
+
+    // 4. Bottom-Right (x: 512..1024, y: 512..1024):
+    // Left sub-strip [u: 0.50..0.75]: Dark orbital hollow + sharp feral iris (matches headMat aEyeGlow UV check)
+    ctx.fillStyle = '#120b0a';
+    ctx.fillRect(512, 512, 256, 512);
+    btx.fillStyle = '#505050';
+    btx.fillRect(512, 512, 256, 512);
+    setR(rtx, 0.22);
+    rtx.fillRect(512, 512, 256, 512);
+    const eyeGrad = ctx.createRadialGradient(640, 768, 5, 640, 768, 76);
     eyeGrad.addColorStop(0.0, '#ffffff');
     eyeGrad.addColorStop(0.28, '#ffd478');
     eyeGrad.addColorStop(0.62, '#9a3410');
-    eyeGrad.addColorStop(1.0, 'rgba(24,17,16,0)');
+    eyeGrad.addColorStop(1.0, 'rgba(18,11,10,0)');
     ctx.fillStyle = eyeGrad;
     ctx.beginPath();
-    ctx.arc(320, 384, 42, 0, Math.PI * 2);
+    ctx.arc(640, 768, 76, 0, Math.PI * 2);
     ctx.fill();
 
-    // Right sub-strip [u: 0.75..1.00]: Clotted crimson gore, exposed sternum & teeth/bone
-    ctx.fillStyle = '#5e1414';
-    ctx.fillRect(384, 256, 128, 256);
-    for (let i = 0; i < 18; i++) {
-      ctx.fillStyle = '#cfc5ab';
-      ctx.fillRect(390 + (i % 6) * 20, 270 + Math.floor(i / 6) * 82, 12, 26);
+    // Right-Lower sub-strip (x: 768..1024, y: 720..1024) -> Clotted crimson gore & exposed ribs
+    ctx.fillStyle = '#4e0f0f';
+    ctx.fillRect(768, 720, 256, 304);
+    btx.fillStyle = '#686868';
+    btx.fillRect(768, 720, 256, 304);
+    setR(rtx, 0.24);
+    rtx.fillRect(768, 720, 256, 304);
+    for (let y = 740; y < 1005; y += 44) {
+      ctx.fillStyle = '#c8be9e';
+      ctx.fillRect(782, y, 228, 16);
+      ctx.fillStyle = 'rgba(92,14,14,0.55)';
+      ctx.fillRect(782, y + 6, 228, 10);
+      btx.fillStyle = '#d4d4d4';
+      btx.fillRect(782, y, 228, 16);
+      setR(rtx, 0.42);
+      rtx.fillRect(782, y, 228, 14);
     }
 
-    const tex = new THREE.CanvasTexture(c);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.magFilter = THREE.LinearFilter;
-    tex.minFilter = THREE.LinearMipmapLinearFilter;
-    tex.needsUpdate = true;
-    return tex;
+    // Right-Upper sub-strip (x: 768..1024, y: 512..720) -> Dark gumline & yellowed tooth row
+    ctx.fillStyle = '#360a0c';
+    ctx.fillRect(768, 512, 256, 208);
+    btx.fillStyle = '#555555';
+    btx.fillRect(768, 512, 256, 208);
+    setR(rtx, 0.26);
+    rtx.fillRect(768, 512, 256, 208);
+    for (let i = 0; i < 10; i++) {
+      const tx = 776 + i * 24;
+      ctx.fillStyle = i % 3 === 0 ? '#b7aa86' : '#cfc5a4';
+      ctx.fillRect(tx, 548, 18, 134);
+      ctx.fillStyle = 'rgba(72,14,12,0.55)';
+      ctx.fillRect(tx, 548, 18, 28);
+      btx.fillStyle = '#e0e0e0';
+      btx.fillRect(tx, 554, 18, 124);
+      setR(rtx, 0.32);
+      rtx.fillRect(tx, 554, 18, 124);
+    }
+
+    const makeTex = (canvas, isSRGB) => {
+      const t = new THREE.CanvasTexture(canvas);
+      t.colorSpace = isSRGB ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+      t.magFilter = THREE.LinearFilter;
+      t.minFilter = THREE.LinearMipmapLinearFilter;
+      t.needsUpdate = true;
+      return t;
+    };
+
+    return {
+      map: makeTex(c, true),
+      bumpMap: makeTex(cB, false),
+      roughnessMap: makeTex(cR, false)
+    };
+  }
+
+  function sculptGeo(geo, fn) {
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+      const res = fn(x, y, z, i);
+      if (res) {
+        pos.setXYZ(i, res[0], res[1], res[2]);
+      }
+    }
+    pos.needsUpdate = true;
+    geo.computeVertexNormals();
+    return geo;
   }
 
   function buildZombieMeshes() {
     const shirtUv = [0.02, 0.52, 0.48, 0.98];
-    const pantsUv = [0.02, 0.02, 0.48, 0.48];
-    const skinUv = [0.52, 0.52, 0.98, 0.98];
+    const pantsUv = [0.02, 0.02, 0.35, 0.48];
+    const tacticalUv = [0.39, 0.14, 0.48, 0.48];
+    const visorUv = [0.39, 0.02, 0.48, 0.12];
+    const skinUv = [0.52, 0.52, 0.86, 0.98];
+    const hairUv = [0.89, 0.52, 0.98, 0.98];
     const eyeUv = [0.54, 0.08, 0.71, 0.42];
-    const boneGoreUv = [0.77, 0.04, 0.98, 0.46];
+    const boneGoreUv = [0.77, 0.03, 0.98, 0.27];
+    const teethUv = [0.77, 0.31, 0.98, 0.48];
 
     const scaleGeo = (geo, sx, sy, sz) => {
       geo.scale(sx, sy, sz);
@@ -329,178 +574,430 @@
       return g;
     };
 
-    // 1. Sculpted Gaunt Zombie Head (hollow eye sockets, zygomatic bones, screaming gaping jaw, teeth row, tattered scalp)
-    const cranium = makeLathe([
-      [0.015, -0.055],
-      [0.058, -0.035],
-      [0.082, 0.005],
-      [0.094, 0.055],
-      [0.088, 0.105],
-      [0.058, 0.145],
-      [0.002, 0.158]
-    ], 14, 0.86, 1.04, 1.05);
-    const browRidge = scaleGeo(new THREE.CylinderGeometry(0.084, 0.088, 0.026, 10), 0.96, 1.0, 0.52);
-    const cheekL = scaleGeo(new THREE.SphereGeometry(0.036, 8, 6), 1.05, 0.75, 0.85);
-    const cheekR = scaleGeo(new THREE.SphereGeometry(0.036, 8, 6), 1.05, 0.75, 0.85);
-    const jawLower = scaleGeo(new THREE.CylinderGeometry(0.056, 0.040, 0.095, 10), 0.86, 1.0, 1.05);
-    const mawDark = new THREE.BoxGeometry(0.068, 0.052, 0.045);
-    const upperTeeth = new THREE.BoxGeometry(0.058, 0.014, 0.020);
-    const lowerTeeth = new THREE.BoxGeometry(0.052, 0.014, 0.018);
-    const noseBridge = new THREE.ConeGeometry(0.015, 0.038, 6);
+    // 1. Sculpted Anatomical Human Skull & Gaunt Face
+    //    - Well-proportioned cranium (not pinhead), sculpted supraorbital brow ridge,
+    //    - Sunken orbital cavities recessed INSIDE face, flush nasal bridge,
+    //    - Deep gaunt cheekbones, hinged unhinged lower mandible & recessed curved teeth rows
+    const cranium = sculptGeo(
+      scaleGeo(new THREE.SphereGeometry(0.098, 22, 16), 0.85, 1.08, 1.04),
+      (x, y, z) => {
+        let nx = x, ny = y, nz = z;
+        // Slightly flatten temples & narrow lower maxilla
+        if (y < 0.02 && z > 0.0) {
+          const t = Math.min(1.0, (0.02 - y) / 0.10);
+          nx *= 1.0 - 0.24 * t;
+        }
+        // Taper back bottom of skull into occipital base
+        if (y < -0.02 && z < 0.02) {
+          ny -= 0.012;
+          nz *= 0.92;
+        }
+        if (z > 0.015) {
+          // Supraorbital brow ridge
+          const browW = Math.exp(-Math.pow((y - 0.044) / 0.018, 2)) * Math.exp(-Math.pow(x / 0.058, 2));
+          const glabellaDip = Math.exp(-Math.pow(x / 0.013, 2)) * 0.004;
+          nz += browW * 0.013 - browW * glabellaDip;
+
+          // Sunken orbital cavities recessed deeply INSIDE face
+          const orbL = Math.exp(-(Math.pow((x + 0.032) / 0.021, 2) + Math.pow((y - 0.020) / 0.018, 2)));
+          const orbR = Math.exp(-(Math.pow((x - 0.032) / 0.021, 2) + Math.pow((y - 0.020) / 0.018, 2)));
+          nz -= (orbL + orbR) * 0.028;
+
+          // Flush sculpted nasal bridge (no outward cone nose!)
+          const noseRidge = Math.exp(-Math.pow(x / 0.013, 2)) * Math.exp(-Math.pow((y - 0.010) / 0.024, 2));
+          const noseTip = Math.exp(-Math.pow(x / 0.014, 2)) * Math.exp(-Math.pow((y + 0.006) / 0.011, 2));
+          nz += noseRidge * 0.014 + noseTip * 0.012;
+
+          // Prominent zygomatic cheekbones + hollow gaunt buccal cheeks below
+          const cheekL = Math.exp(-(Math.pow((x + 0.048) / 0.020, 2) + Math.pow((y - 0.002) / 0.016, 2)));
+          const cheekR = Math.exp(-(Math.pow((x - 0.048) / 0.020, 2) + Math.pow((y - 0.002) / 0.016, 2)));
+          const hollowL = Math.exp(-(Math.pow((x + 0.040) / 0.022, 2) + Math.pow((y + 0.032) / 0.022, 2)));
+          const hollowR = Math.exp(-(Math.pow((x - 0.040) / 0.022, 2) + Math.pow((y + 0.032) / 0.022, 2)));
+          nz += (cheekL + cheekR) * 0.012 - (hollowL + hollowR) * 0.016;
+          nx += (cheekL * -0.005 + cheekR * 0.005);
+
+          // Recessed oral gap at bottom front of cranium
+          const mouthRecess = Math.exp(-Math.pow(x / 0.034, 2)) * Math.exp(-Math.pow((y + 0.045) / 0.024, 2));
+          nz -= mouthRecess * 0.024;
+        }
+        return [nx, ny, nz];
+      }
+    );
+
+    // Hinged lower jaw (U-shaped mandible arch + gaunt chin, pitched open)
+    const jawArch = scaleGeo(new THREE.TorusGeometry(0.044, 0.015, 7, 14, Math.PI), 0.92, 1.0, 1.15);
+    const chinBlock = scaleGeo(new THREE.BoxGeometry(0.044, 0.032, 0.030), 1.0, 1.0, 1.0);
+    // Dark recessed oral cavity + curved upper & lower teeth rows
+    const mawCavity = scaleGeo(new THREE.CylinderGeometry(0.036, 0.030, 0.056, 10), 0.92, 1.0, 0.78);
+    const upperTeethArc = new THREE.CylinderGeometry(0.036, 0.035, 0.013, 10, 1, true, -0.92, 1.84);
+    const lowerTeethArc = new THREE.CylinderGeometry(0.033, 0.032, 0.013, 10, 1, true, -0.88, 1.76);
+
+    // Sternocleidomastoid contoured neck
     const neckStump = makeLathe([
-      [0.062, -0.065],
-      [0.048, 0.0],
-      [0.054, 0.055]
-    ], 10, 0.92, 1.0, 0.96);
-    const scalpHair = scaleGeo(new THREE.SphereGeometry(0.092, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.48), 0.90, 0.96, 1.06);
+      [0.060, -0.065],
+      [0.046, -0.01],
+      [0.048, 0.04],
+      [0.052, 0.065]
+    ], 12, 0.94, 1.0, 0.96);
+
+    // Ragged matted scalp / hair cap
+    const scalpHair = sculptGeo(
+      scaleGeo(new THREE.SphereGeometry(0.101, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.56), 0.87, 1.02, 1.05),
+      (x, y, z) => {
+        const ang = Math.atan2(x, z);
+        const rag = y < 0.025 ? (Math.sin(ang * 7.0) * 0.010 + Math.cos(ang * 11.0) * 0.006) : 0;
+        return [x, y + rag, z];
+      }
+    );
 
     const headGeo = mergePartGeometries([
-      { geo: cranium, ty: 0.025, uvRect: skinUv },
-      { geo: browRidge, ty: 0.054, tz: 0.055, uvRect: skinUv },
-      { geo: cheekL, tx: -0.048, ty: 0.008, tz: 0.058, uvRect: skinUv },
-      { geo: cheekR, tx: 0.048, ty: 0.008, tz: 0.058, uvRect: skinUv },
-      { geo: jawLower, ty: -0.068, tz: 0.028, rx: 0.34, uvRect: skinUv },
-      { geo: mawDark, ty: -0.035, tz: 0.062, rx: 0.22, uvRect: boneGoreUv },
-      { geo: upperTeeth, ty: -0.014, tz: 0.080, uvRect: boneGoreUv },
-      { geo: lowerTeeth, ty: -0.052, tz: 0.072, rx: 0.34, uvRect: boneGoreUv },
-      { geo: noseBridge, ty: 0.020, tz: 0.092, rx: 1.05, uvRect: skinUv },
-      { geo: neckStump, ty: -0.105, tz: -0.014, uvRect: skinUv },
-      { geo: scalpHair, ty: 0.045, tz: -0.006, rx: -0.14, uvRect: shirtUv },
-      // Sunken dark orbital sockets + small glowing pinpoint feral irises inside
-      { geo: new THREE.PlaneGeometry(0.026, 0.018), tx: -0.034, ty: 0.032, tz: 0.086, ry: -0.22, uvRect: eyeUv },
-      { geo: new THREE.PlaneGeometry(0.026, 0.018), tx: 0.034, ty: 0.032, tz: 0.086, ry: 0.22, uvRect: eyeUv }
+      { geo: cranium, ty: 0.028, uvRect: skinUv },
+      { geo: jawArch, ty: -0.042, tz: 0.024, rx: Math.PI * 0.5 + 0.34, uvRect: skinUv },
+      { geo: chinBlock, ty: -0.068, tz: 0.056, rx: 0.30, uvRect: skinUv },
+      { geo: mawCavity, ty: -0.034, tz: 0.040, rx: 0.20, uvRect: boneGoreUv },
+      { geo: upperTeethArc, ty: -0.022, tz: 0.040, uvRect: teethUv },
+      { geo: lowerTeethArc, ty: -0.054, tz: 0.038, rx: 0.34, uvRect: teethUv },
+      { geo: neckStump, ty: -0.102, tz: -0.014, uvRect: skinUv },
+      { geo: scalpHair, ty: 0.032, tz: -0.006, rx: -0.14, uvRect: hairUv },
+      // Recessed orbital irises seated INSIDE the sunken cavities (eyeUv matched to aEyeGlow shader)
+      { geo: new THREE.CircleGeometry(0.013, 12), tx: -0.032, ty: 0.046, tz: 0.072, ry: -0.16, uvRect: eyeUv },
+      { geo: new THREE.CircleGeometry(0.013, 12), tx: 0.032, ty: 0.046, tz: 0.072, ry: 0.16, uvRect: eyeUv }
     ]);
 
     const eyeGlowArr = new Float32Array(MAX_ENEMIES * 3);
     _headEyeAttr = new THREE.InstancedBufferAttribute(eyeGlowArr, 3);
     headGeo.setAttribute('aEyeGlow', _headEyeAttr);
 
-    // 2. Gaunt Emaciated & Hunched Torso (ribcage contour, vertebrae ridge, clavicle, torn chest gash)
-    const torsoLathe = makeLathe([
-      [0.010, -0.275],
-      [0.142, -0.250],
-      [0.118, -0.140],
-      [0.108, -0.035],
-      [0.148, 0.095],
-      [0.168, 0.215],
-      [0.138, 0.295],
-      [0.062, 0.330],
-      [0.008, 0.335]
-    ], 14, 1.24, 1.0, 0.70);
-    const spineParts = [];
-    for (let sp = 0; sp < 5; sp++) {
-      spineParts.push({
-        geo: new THREE.SphereGeometry(0.024, 6, 5),
-        ty: -0.12 + sp * 0.095,
-        tz: -0.115 - (sp === 2 || sp === 3 ? 0.012 : 0),
-        uvRect: boneGoreUv
+    // 2. Anatomical Gaunt Torso (pelvis, waist, ribcage, pectorals, clavicle, sternal hollow, spinal groove)
+    const torsoLathe = sculptGeo(
+      makeLathe([
+        [0.012, -0.270],
+        [0.140, -0.245], // Pelvis
+        [0.126, -0.170],
+        [0.110, -0.070], // Tapered waist
+        [0.124, 0.020],
+        [0.156, 0.125],  // Ribcage / Pectorals
+        [0.168, 0.215],  // Broad shoulders / deltoid shelf
+        [0.124, 0.275],  // Trapezius
+        [0.062, 0.305],  // Collar base
+        [0.010, 0.312]
+      ], 18, 1.24, 1.0, 0.70),
+      (x, y, z) => {
+        let nx = x, ny = y, nz = z;
+        // Subtle cloth fold & ribcage contour on front/sides
+        if (nz > 0.02) {
+          const sternumDip = Math.exp(-Math.pow(nx / 0.032, 2)) * Math.exp(-Math.pow((ny - 0.13) / 0.09, 2));
+          nz -= sternumDip * 0.016;
+          // Recessed chest gash cavity
+          const gash = Math.exp(-Math.pow((nx - 0.01) / 0.055, 2)) * Math.exp(-Math.pow((ny - 0.10) / 0.075, 2));
+          nz -= gash * 0.014;
+        }
+        // Subtle dorsal spine groove down back (no bead spheres!)
+        if (nz < -0.03) {
+          const groove = Math.exp(-Math.pow(nx / 0.026, 2)) * (ny > -0.18 && ny < 0.24 ? 1 : 0);
+          nz += groove * 0.012;
+        }
+        // Organic garment crease ripples around waist/hips
+        nz += Math.sin(ny * 34.0 + nx * 12.0) * 0.004;
+        return [nx, ny, nz];
+      }
+    );
+
+    // Sculpted recessed rib slats inside the torn chest cavity (curved arcs, not a flat slab)
+    const chestWoundParts = [
+      { geo: scaleGeo(new THREE.CylinderGeometry(0.058, 0.048, 0.145, 10), 1.15, 1.0, 0.24), tx: 0.008, ty: 0.105, tz: 0.092, uvRect: boneGoreUv }
+    ];
+    for (let r = 0; r < 4; r++) {
+      chestWoundParts.push({
+        geo: new THREE.TorusGeometry(0.052, 0.006, 5, 10, Math.PI * 0.55),
+        tx: 0.008, ty: 0.058 + r * 0.030, tz: 0.068,
+        rx: Math.PI * 0.52, rz: -Math.PI * 0.28,
+        uvRect: teethUv
       });
     }
     const torsoGeo = mergePartGeometries([
       { geo: torsoLathe, ty: 0.0, uvRect: shirtUv },
-      { geo: scaleGeo(new THREE.CylinderGeometry(0.095, 0.175, 0.09, 12), 1.20, 1.0, 0.58), ty: 0.275, tz: -0.012, uvRect: shirtUv },
-      { geo: scaleGeo(new THREE.TorusGeometry(0.078, 0.020, 6, 12), 1.05, 1.0, 0.92), ty: 0.310, rx: Math.PI * 0.5, uvRect: shirtUv },
-      // Torn chest wound revealing dark sternum & rib slats
-      { geo: scaleGeo(new THREE.CylinderGeometry(0.070, 0.055, 0.14, 8), 1.2, 1.0, 0.28), ty: 0.11, tz: 0.102, uvRect: boneGoreUv },
-      ...spineParts
+      ...chestWoundParts
     ]);
 
-    // 3. Articulated Upper Arm (Shoulder at (0,0,0) -> Elbow at (0, -0.255, 0))
+    // 3. Articulated Upper Arm (Shoulder (0,0,0) -> Elbow (0, -0.255, 0), anatomical deltoid & frayed sleeve cuff)
+    const upperArmLathe = makeLathe([
+      [0.010, 0.036],
+      [0.056, 0.012],
+      [0.058, -0.045], // Deltoid
+      [0.050, -0.125], // Bicep
+      [0.045, -0.205],
+      [0.052, -0.222], // Frayed sleeve hem flare
+      [0.038, -0.226],
+      [0.036, -0.255], // Elbow joint
+      [0.012, -0.268]
+    ], 12, 0.98, 1.0, 1.02);
     const upperArmGeo = mergePartGeometries([
-      { geo: new THREE.SphereGeometry(0.056, 10, 8), ty: -0.01, uvRect: shirtUv },
-      { geo: new THREE.CylinderGeometry(0.052, 0.042, 0.22, 10), ty: -0.125, uvRect: shirtUv },
-      { geo: scaleGeo(new THREE.TorusGeometry(0.044, 0.012, 5, 10), 1.0, 1.0, 0.95), ty: -0.225, rx: Math.PI * 0.5, uvRect: shirtUv },
-      { geo: new THREE.SphereGeometry(0.038, 8, 6), ty: -0.255, uvRect: skinUv }
+      { geo: upperArmLathe, ty: 0.0, uvRect: shirtUv },
+      { geo: new THREE.SphereGeometry(0.036, 10, 8), ty: -0.255, uvRect: skinUv }
     ]);
 
-    // 4. Articulated Forearm + Splayed Hooked Claws (Elbow at (0,0,0) -> Claw Tips at (0, -0.34, +0.04))
-    const clawFingers = [];
-    for (let f = 0; f < 4; f++) {
-      const fx = -0.022 + f * 0.015;
-      clawFingers.push({
-        geo: new THREE.CylinderGeometry(0.008, 0.005, 0.055, 5),
-        tx: fx, ty: -0.305, tz: 0.012, rx: -0.35, uvRect: boneGoreUv
+    // 4. Articulated Forearm + Anatomical Wrist, Palm, Thumb & Naturally Curled Tattered Fingers
+    //    (Elbow (0,0,0) -> Wrist (0,-0.225,0) -> Finger tips (~-0.33))
+    const forearmLathe = makeLathe([
+      [0.010, 0.020],
+      [0.038, 0.000],
+      [0.042, -0.055], // Brachioradialis muscle bulge
+      [0.033, -0.145],
+      [0.025, -0.215], // Tapered wrist
+      [0.012, -0.225]
+    ], 12, 1.02, 1.0, 0.86);
+    const palmGeo = sculptGeo(
+      new THREE.BoxGeometry(0.054, 0.064, 0.026, 3, 3, 2),
+      (x, y, z) => {
+        const taper = y > 0 ? (1.0 - (y / 0.032) * 0.16) : 1.0;
+        const arch = Math.cos((x / 0.03) * 1.1) * 0.004;
+        return [x * taper, y, z + arch];
+      }
+    );
+    const fingerSpecs = [
+      { x: -0.020, len: 0.050, r: 0.0068, curl: -0.28 }, // Index
+      { x: -0.006, len: 0.056, r: 0.0070, curl: -0.34 }, // Middle
+      { x: 0.008,  len: 0.052, r: 0.0066, curl: -0.38 }, // Ring
+      { x: 0.021,  len: 0.042, r: 0.0058, curl: -0.44 }  // Pinky
+    ];
+    const handParts = [
+      { geo: forearmLathe, ty: 0.0, uvRect: skinUv },
+      // Dorsal wrist tendon ridges
+      { geo: new THREE.CylinderGeometry(0.004, 0.003, 0.095, 5), tx: -0.008, ty: -0.185, tz: -0.015, uvRect: skinUv },
+      { geo: new THREE.CylinderGeometry(0.004, 0.003, 0.095, 5), tx: 0.008, ty: -0.185, tz: -0.015, uvRect: skinUv },
+      // Palm
+      { geo: palmGeo, ty: -0.246, tz: 0.002, uvRect: skinUv },
+      // Opposable 2-segment thumb
+      { geo: new THREE.CylinderGeometry(0.0075, 0.0065, 0.032, 6), tx: -0.030, ty: -0.242, tz: 0.012, rz: 0.55, rx: -0.30, uvRect: skinUv },
+      { geo: new THREE.CylinderGeometry(0.0062, 0.0048, 0.026, 6), tx: -0.042, ty: -0.264, tz: 0.022, rz: 0.30, rx: -0.65, uvRect: boneGoreUv }
+    ];
+    for (let f = 0; f < fingerSpecs.length; f++) {
+      const fs = fingerSpecs[f];
+      const proxLen = fs.len * 0.58;
+      const distLen = fs.len * 0.45;
+      // Proximal phalanx
+      handParts.push({
+        geo: new THREE.CylinderGeometry(fs.r, fs.r * 0.86, proxLen, 6),
+        tx: fs.x, ty: -0.278 - proxLen * 0.45, tz: 0.008,
+        rx: fs.curl, rz: (f - 1.5) * -0.04,
+        uvRect: skinUv
       });
-      clawFingers.push({
-        geo: new THREE.ConeGeometry(0.006, 0.038, 5),
-        tx: fx, ty: -0.345, tz: 0.028, rx: 2.35, uvRect: boneGoreUv
+      // Naturally curled distal phalanx
+      handParts.push({
+        geo: new THREE.CylinderGeometry(fs.r * 0.84, fs.r * 0.55, distLen, 6),
+        tx: fs.x, ty: -0.278 - proxLen * 0.92 - distLen * 0.34, tz: 0.016 - fs.curl * 0.022,
+        rx: fs.curl - 0.52, rz: (f - 1.5) * -0.04,
+        uvRect: boneGoreUv
       });
     }
-    const forearmGeo = mergePartGeometries([
-      { geo: new THREE.CylinderGeometry(0.039, 0.028, 0.23, 10), ty: -0.115, uvRect: skinUv },
-      { geo: scaleGeo(new THREE.BoxGeometry(0.064, 0.068, 0.036), 1.0, 1.0, 1.0), ty: -0.255, tz: 0.005, uvRect: boneGoreUv },
-      { geo: new THREE.CylinderGeometry(0.008, 0.005, 0.045, 5), tx: -0.036, ty: -0.265, tz: 0.022, rz: 0.45, rx: -0.3, uvRect: boneGoreUv },
-      ...clawFingers
-    ]);
+    const forearmGeo = mergePartGeometries(handParts);
 
-    // 5. Articulated Thigh (Hip at (0,0,0) -> Knee at (0, -0.365, 0))
+    // 5. Articulated Thigh (Hip (0,0,0) -> Knee (0, -0.375, 0), trouser fold contour)
+    const thighLathe = makeLathe([
+      [0.015, 0.035],
+      [0.074, 0.005],
+      [0.076, -0.065],
+      [0.068, -0.175],
+      [0.058, -0.295],
+      [0.052, -0.365],
+      [0.015, -0.382]
+    ], 12, 0.98, 1.0, 1.04);
     const thighGeo = mergePartGeometries([
-      { geo: new THREE.SphereGeometry(0.072, 10, 8), ty: -0.02, uvRect: pantsUv },
-      { geo: new THREE.CylinderGeometry(0.072, 0.054, 0.34, 10), ty: -0.185, uvRect: pantsUv },
-      { geo: new THREE.SphereGeometry(0.050, 8, 6), ty: -0.365, tz: 0.010, uvRect: skinUv }
+      { geo: thighLathe, ty: 0.0, uvRect: pantsUv },
+      { geo: new THREE.SphereGeometry(0.050, 10, 8), ty: -0.372, tz: 0.008, uvRect: pantsUv }
     ]);
 
-    // 6. Articulated Calf & Work Boot (Knee at (0,0,0) -> Foot Sole at (0, -0.425, 0))
-    const calfLathe = makeLathe([
-      [0.048, -0.17],
-      [0.034, -0.10],
-      [0.056, 0.03],
-      [0.054, 0.11],
-      [0.046, 0.17]
-    ], 10, 0.94, 1.0, 1.04);
+    // 6. Articulated Calf & Weathered Laced Shoe/Boot (Knee (0,0,0) -> Sole (0, -0.415, 0))
+    const calfTrouserLathe = makeLathe([
+      [0.048, -0.265], // Trouser hem cuff overlap
+      [0.056, -0.258],
+      [0.058, -0.180], // Calf swelling inside trouser leg
+      [0.062, -0.095],
+      [0.056, -0.020],
+      [0.048, 0.015]
+    ], 12, 0.94, 1.0, 1.08);
+    const ankleShinLathe = makeLathe([
+      [0.036, -0.345],
+      [0.034, -0.305],
+      [0.040, -0.260]
+    ], 10, 0.92, 1.0, 1.0);
+    const bootUpper = sculptGeo(
+      new THREE.BoxGeometry(0.088, 0.064, 0.215, 3, 2, 4),
+      (x, y, z) => {
+        let nx = x, ny = y, nz = z;
+        // Taper toe box downward and round front
+        if (nz > 0.02) {
+          const tf = (nz - 0.02) / 0.088;
+          nx *= 1.0 - tf * 0.22;
+          if (ny > 0) ny *= 1.0 - tf * 0.42;
+        }
+        return [nx, ny, nz];
+      }
+    );
     const calfGeo = mergePartGeometries([
-      { geo: calfLathe, ty: -0.18, uvRect: pantsUv },
-      { geo: scaleGeo(new THREE.BoxGeometry(0.094, 0.075, 0.21), 1.0, 1.0, 1.0), ty: -0.388, tz: 0.042, uvRect: pantsUv },
-      { geo: scaleGeo(new THREE.CylinderGeometry(0.045, 0.048, 0.085, 8), 1.0, 1.0, 1.0), ty: -0.365, tz: -0.01, uvRect: pantsUv }
+      { geo: calfTrouserLathe, ty: 0.0, uvRect: pantsUv },
+      { geo: ankleShinLathe, ty: 0.0, uvRect: skinUv },
+      // Boot collar / ankle shaft
+      { geo: new THREE.CylinderGeometry(0.046, 0.048, 0.085, 10), ty: -0.345, tz: -0.008, uvRect: tacticalUv },
+      // Boot upper + sole + heel block
+      { geo: bootUpper, ty: -0.376, tz: 0.044, uvRect: tacticalUv },
+      { geo: new THREE.BoxGeometry(0.092, 0.018, 0.222), ty: -0.406, tz: 0.044, uvRect: tacticalUv },
+      // Instep lace tongue ridge
+      { geo: new THREE.BoxGeometry(0.042, 0.020, 0.075), ty: -0.346, tz: 0.046, rx: 0.28, uvRect: pantsUv }
     ]);
 
-    // 7a. Brute Tactical Riot Armor Vest & Shoulder Pauldrons (Brute ONLY!)
+    // 7a. Brute: Indonesian Mobile Brigade / LRT Tactical Riot Vest (ballistic plates, pouches, neck guard, pauldrons)
     const bruteArmorGeo = mergePartGeometries([
-      { geo: scaleGeo(new THREE.BoxGeometry(0.39, 0.42, 0.26), 1.0, 1.0, 1.0), ty: 0.05, uvRect: pantsUv },
-      { geo: scaleGeo(new THREE.BoxGeometry(0.32, 0.14, 0.28), 1.0, 1.0, 1.0), ty: -0.18, tz: 0.02, uvRect: shirtUv },
-      { geo: scaleGeo(new THREE.CylinderGeometry(0.115, 0.125, 0.11, 10), 1.12, 1.0, 0.95), ty: 0.28, rx: 0.08, uvRect: pantsUv },
-      { geo: scaleGeo(new THREE.CylinderGeometry(0.085, 0.105, 0.14, 8), 1.0, 1.0, 1.15), tx: -0.26, ty: 0.21, rz: 0.42, uvRect: pantsUv },
-      { geo: scaleGeo(new THREE.CylinderGeometry(0.085, 0.105, 0.14, 8), 1.0, 1.0, 1.15), tx: 0.26, ty: 0.21, rz: -0.42, uvRect: pantsUv }
+      // Front & back angled ballistic chest/back plates
+      { geo: new THREE.BoxGeometry(0.35, 0.34, 0.24), ty: 0.07, uvRect: tacticalUv },
+      { geo: new THREE.BoxGeometry(0.28, 0.28, 0.27), ty: 0.09, tz: 0.005, uvRect: tacticalUv },
+      // Padded tactical neck gorget guard
+      { geo: new THREE.CylinderGeometry(0.112, 0.128, 0.095, 12, 1, false, 0.65, Math.PI * 1.60), ty: 0.27, rx: 0.06, uvRect: tacticalUv },
+      // Shoulder harness straps
+      { geo: new THREE.BoxGeometry(0.065, 0.04, 0.22), tx: -0.115, ty: 0.265, rz: 0.12, uvRect: tacticalUv },
+      { geo: new THREE.BoxGeometry(0.065, 0.04, 0.22), tx: 0.115, ty: 0.265, rz: -0.12, uvRect: tacticalUv },
+      // 3 front rifle/SMG magazine pouches + utility belt
+      { geo: new THREE.BoxGeometry(0.37, 0.09, 0.26), ty: -0.11, uvRect: tacticalUv },
+      { geo: new THREE.BoxGeometry(0.065, 0.115, 0.055), tx: -0.095, ty: -0.085, tz: 0.145, uvRect: tacticalUv },
+      { geo: new THREE.BoxGeometry(0.065, 0.115, 0.055), tx: 0.0, ty: -0.085, tz: 0.145, uvRect: tacticalUv },
+      { geo: new THREE.BoxGeometry(0.065, 0.115, 0.055), tx: 0.095, ty: -0.085, tz: 0.145, uvRect: tacticalUv },
+      // Left collarbone tactical radio pouch + antenna
+      { geo: new THREE.BoxGeometry(0.055, 0.085, 0.045), tx: -0.115, ty: 0.16, tz: 0.140, uvRect: tacticalUv },
+      { geo: new THREE.CylinderGeometry(0.005, 0.005, 0.12, 5), tx: -0.125, ty: 0.25, tz: 0.142, uvRect: tacticalUv },
+      // Pelvic groin armor flap
+      { geo: new THREE.BoxGeometry(0.18, 0.13, 0.045), ty: -0.21, tz: 0.115, rx: -0.12, uvRect: tacticalUv },
+      // Articulated shoulder pauldrons
+      { geo: new THREE.CylinderGeometry(0.075, 0.098, 0.15, 10, 1, false, -0.5, Math.PI + 1.0), tx: -0.245, ty: 0.20, rz: 0.48, ry: -Math.PI * 0.5, uvRect: tacticalUv },
+      { geo: new THREE.CylinderGeometry(0.075, 0.098, 0.15, 10, 1, false, -0.5, Math.PI + 1.0), tx: 0.245, ty: 0.20, rz: -0.48, ry: Math.PI * 0.5, uvRect: tacticalUv }
     ]);
 
-    // 7b. Brute Riot Helmet + Polycarbonate Face Visor (Brute head overlay!)
+    // 7b. Brute: Full Riot Helmet + Dark Smoked Polycarbonate Visor & Hinge Bolts
     const bruteHelmetGeo = mergePartGeometries([
-      { geo: scaleGeo(new THREE.SphereGeometry(0.115, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), 0.96, 1.02, 1.08), ty: 0.04, uvRect: pantsUv },
-      { geo: scaleGeo(new THREE.CylinderGeometry(0.104, 0.106, 0.085, 10, 1, false, -0.95, 1.9), 0.98, 1.0, 1.10), ty: 0.02, tz: 0.015, uvRect: eyeUv }
+      // Main ballistic shell + rear nape skirt
+      { geo: scaleGeo(new THREE.SphereGeometry(0.118, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.60), 0.94, 1.02, 1.08), ty: 0.044, uvRect: tacticalUv },
+      { geo: new THREE.CylinderGeometry(0.110, 0.118, 0.095, 12, 1, false, 1.15, Math.PI * 1.25), ty: -0.005, tz: -0.015, uvRect: tacticalUv },
+      // Ear protection pods & brow reinforcement visor frame
+      { geo: new THREE.CylinderGeometry(0.036, 0.036, 0.024, 10), tx: -0.110, ty: 0.025, tz: -0.005, rz: Math.PI * 0.5, uvRect: tacticalUv },
+      { geo: new THREE.CylinderGeometry(0.036, 0.036, 0.024, 10), tx: 0.110, ty: 0.025, tz: -0.005, rz: Math.PI * 0.5, uvRect: tacticalUv },
+      { geo: new THREE.TorusGeometry(0.104, 0.012, 6, 14, Math.PI * 1.05), ty: 0.068, tz: 0.014, rx: Math.PI * 0.5, rz: -Math.PI * 0.025, uvRect: tacticalUv },
+      // Dark smoked polycarbonate face shield visor
+      { geo: scaleGeo(new THREE.CylinderGeometry(0.106, 0.102, 0.115, 14, 1, true, -1.05, 2.10), 0.96, 1.0, 1.08), ty: 0.010, tz: 0.016, rx: -0.06, uvRect: visorUv }
     ]);
 
-    // 7c. Spitter Biohazard Cyst Clusters + Cracked Pressurized Spore Cylinder (Spitter ONLY!)
+    // 7c. Spitter: Pulsating Bioluminescent Neck/Chest/Back Vomit Blisters & Sores (bioMat)
     const spitterBioGeo = mergePartGeometries([
-      { geo: new THREE.CylinderGeometry(0.068, 0.068, 0.34, 12), tx: 0.055, ty: 0.08, tz: -0.145, rz: -0.22, uvRect: eyeUv },
-      { geo: new THREE.SphereGeometry(0.068, 10, 8), tx: 0.095, ty: 0.24, tz: -0.145, uvRect: eyeUv },
-      { geo: new THREE.SphereGeometry(0.095, 10, 8), tx: -0.105, ty: 0.18, tz: -0.095, uvRect: eyeUv },
-      { geo: new THREE.SphereGeometry(0.072, 8, 6), tx: -0.155, ty: 0.28, tz: -0.035, uvRect: eyeUv },
-      { geo: new THREE.SphereGeometry(0.064, 8, 6), tx: 0.015, ty: -0.04, tz: -0.140, uvRect: eyeUv },
-      { geo: new THREE.SphereGeometry(0.055, 8, 6), tx: -0.085, ty: 0.04, tz: 0.115, uvRect: eyeUv }
+      { geo: new THREE.SphereGeometry(0.044, 9, 7), tx: -0.095, ty: 0.19, tz: 0.108, uvRect: eyeUv },
+      { geo: new THREE.SphereGeometry(0.054, 9, 7), tx: 0.088, ty: 0.14, tz: 0.112, uvRect: eyeUv },
+      { geo: new THREE.SphereGeometry(0.038, 8, 6), tx: -0.025, ty: 0.25, tz: 0.088, uvRect: eyeUv },
+      { geo: new THREE.SphereGeometry(0.046, 8, 6), tx: 0.135, ty: 0.23, tz: 0.018, uvRect: eyeUv },
+      { geo: new THREE.SphereGeometry(0.068, 10, 8), tx: -0.105, ty: 0.16, tz: -0.112, uvRect: eyeUv },
+      { geo: new THREE.SphereGeometry(0.052, 8, 6), tx: 0.018, ty: -0.03, tz: -0.132, uvRect: eyeUv },
+      { geo: new THREE.SphereGeometry(0.048, 8, 6), tx: 0.095, ty: 0.22, tz: -0.138, uvRect: eyeUv }
     ]);
 
-    // 7d. Commuter Walker/Runner Torn Cloth Strips & Exposed Ribcage Gore Overlay
+    // 7c-2. Spitter: Ruptured Torn Hazmat Collar/Straps + Pressurized Cracked Canister & Hose on Back
+    const spitterGearGeo = mergePartGeometries([
+      // Torn hazmat hood collar & chest zipper flaps
+      { geo: new THREE.CylinderGeometry(0.085, 0.135, 0.085, 12, 1, true), ty: 0.285, tz: -0.01, uvRect: shirtUv },
+      { geo: new THREE.BoxGeometry(0.055, 0.24, 0.018), tx: -0.068, ty: 0.12, tz: 0.118, rz: 0.16, ry: -0.18, uvRect: shirtUv },
+      { geo: new THREE.BoxGeometry(0.055, 0.22, 0.018), tx: 0.068, ty: 0.11, tz: 0.116, rz: -0.18, ry: 0.18, uvRect: shirtUv },
+      // Shoulder harness straps
+      { geo: new THREE.BoxGeometry(0.042, 0.032, 0.23), tx: -0.115, ty: 0.262, uvRect: tacticalUv },
+      { geo: new THREE.BoxGeometry(0.042, 0.032, 0.23), tx: 0.115, ty: 0.262, uvRect: tacticalUv },
+      // Ruptured pressurized chemical canister on back + valve cap + breather hose
+      { geo: new THREE.CylinderGeometry(0.064, 0.064, 0.31, 12), tx: 0.048, ty: 0.085, tz: -0.155, rz: -0.18, uvRect: tacticalUv },
+      { geo: new THREE.CylinderGeometry(0.032, 0.048, 0.045, 10), tx: 0.076, ty: 0.255, tz: -0.155, rz: -0.18, uvRect: tacticalUv },
+      { geo: new THREE.TorusGeometry(0.072, 0.013, 6, 12, Math.PI * 1.15), tx: 0.04, ty: 0.25, tz: -0.04, ry: Math.PI * 0.5, rx: 0.25, uvRect: tacticalUv }
+    ]);
+
+    // 7c-3. Spitter: Swollen Split Respirator / Gas-Mask Housing Hanging Off Jaw
+    const spitterMaskGeo = mergePartGeometries([
+      // Hanging rubber respirator cup pulled down off chin/jaw
+      { geo: scaleGeo(new THREE.CylinderGeometry(0.048, 0.036, 0.070, 10), 1.0, 1.0, 0.85), tx: 0.012, ty: -0.082, tz: 0.068, rx: 0.65, rz: -0.22, uvRect: tacticalUv },
+      // Dual filter cartridges (left cracked/dangling, right intact)
+      { geo: new THREE.CylinderGeometry(0.025, 0.025, 0.032, 8), tx: -0.038, ty: -0.095, tz: 0.064, rz: 1.15, rx: 0.45, uvRect: tacticalUv },
+      { geo: new THREE.CylinderGeometry(0.025, 0.025, 0.032, 8), tx: 0.056, ty: -0.078, tz: 0.074, rz: -1.10, rx: 0.45, uvRect: tacticalUv },
+      // Torn mask cheek straps
+      { geo: new THREE.BoxGeometry(0.014, 0.075, 0.012), tx: -0.066, ty: -0.025, tz: 0.038, rx: 0.4, uvRect: tacticalUv },
+      { geo: new THREE.BoxGeometry(0.014, 0.075, 0.012), tx: 0.068, ty: -0.020, tz: 0.038, rx: 0.4, uvRect: tacticalUv }
+    ]);
+
+    // 7d. Screamer: Emaciated Arched Ribcage & Sharp Dorsal Spine Ridges
+    const screamerRibParts = [];
+    for (let r = 0; r < 5; r++) {
+      const ry = -0.02 + r * 0.046;
+      const rad = 0.115 + (r === 2 || r === 3 ? 0.016 : 0);
+      screamerRibParts.push({
+        geo: new THREE.TorusGeometry(rad, 0.0085, 5, 12, Math.PI * 0.88),
+        tx: 0, ty: ry, tz: 0.028,
+        rx: Math.PI * 0.54, rz: -Math.PI * 0.44,
+        uvRect: teethUv
+      });
+    }
+    for (let sIdx = 0; sIdx < 5; sIdx++) {
+      screamerRibParts.push({
+        geo: new THREE.ConeGeometry(0.014, 0.042, 5),
+        tx: 0, ty: -0.08 + sIdx * 0.075, tz: -0.118,
+        rx: -Math.PI * 0.48,
+        uvRect: teethUv
+      });
+    }
+    const screamerRibGeo = mergePartGeometries(screamerRibParts);
+
+    // 7d-2. Screamer: Elongated Split-Open Howling Jaw
+    const screamerJawGeo = mergePartGeometries([
+      { geo: scaleGeo(new THREE.TorusGeometry(0.048, 0.014, 6, 12, Math.PI), 0.88, 1.0, 1.45), ty: -0.075, tz: 0.020, rx: Math.PI * 0.5 + 0.72, uvRect: skinUv },
+      { geo: new THREE.BoxGeometry(0.040, 0.046, 0.024), ty: -0.118, tz: 0.056, rx: 0.72, uvRect: boneGoreUv },
+      { geo: new THREE.CylinderGeometry(0.034, 0.028, 0.018, 8, 1, true, -0.85, 1.7), ty: -0.092, tz: 0.038, rx: 0.72, uvRect: teethUv }
+    ]);
+
+    // 7d-3. Screamer: Ruptured Vocal Throat Cysts (bioMat)
+    const screamerCystGeo = mergePartGeometries([
+      { geo: new THREE.SphereGeometry(0.046, 9, 7), tx: -0.038, ty: 0.255, tz: 0.078, uvRect: eyeUv },
+      { geo: new THREE.SphereGeometry(0.052, 9, 7), tx: 0.034, ty: 0.240, tz: 0.084, uvRect: eyeUv },
+      { geo: new THREE.SphereGeometry(0.036, 8, 6), tx: 0.002, ty: 0.205, tz: 0.102, uvRect: eyeUv },
+      { geo: new THREE.SphereGeometry(0.042, 8, 6), tx: -0.068, ty: 0.180, tz: 0.092, uvRect: eyeUv }
+    ]);
+
+    // 7e. Commuter Walker/Runner: Tailored Tattered Collar Lapels, Tie/Lanyard Silhouette & Contoured Coat Hem Flaps
     const ragGeo = mergePartGeometries([
-      { geo: scaleGeo(new THREE.BoxGeometry(0.065, 0.24, 0.025), 1.0, 1.0, 1.0), tx: 0.02, ty: 0.14, tz: 0.125, rz: 0.26, rx: -0.12, uvRect: shirtUv },
-      { geo: scaleGeo(new THREE.BoxGeometry(0.09, 0.16, 0.02), 1.0, 1.0, 1.0), tx: -0.11, ty: -0.23, tz: 0.095, rz: -0.18, uvRect: shirtUv },
-      { geo: scaleGeo(new THREE.BoxGeometry(0.08, 0.14, 0.02), 1.0, 1.0, 1.0), tx: 0.10, ty: -0.21, tz: -0.095, rz: 0.22, uvRect: shirtUv },
-      { geo: scaleGeo(new THREE.BoxGeometry(0.14, 0.12, 0.025), 1.0, 1.0, 1.0), tx: 0.01, ty: 0.09, tz: 0.112, uvRect: boneGoreUv }
+      // Torn shirt lapels around neck
+      { geo: new THREE.BoxGeometry(0.046, 0.095, 0.014), tx: -0.058, ty: 0.268, tz: 0.088, rz: 0.42, rx: -0.35, uvRect: shirtUv },
+      { geo: new THREE.BoxGeometry(0.046, 0.095, 0.014), tx: 0.058, ty: 0.268, tz: 0.088, rz: -0.42, rx: -0.35, uvRect: shirtUv },
+      // Shredded commuter tie / LRT lanyard draping down chest
+      { geo: new THREE.BoxGeometry(0.026, 0.21, 0.010), tx: 0.012, ty: 0.165, tz: 0.114, rz: 0.14, rx: -0.08, uvRect: tacticalUv },
+      { geo: new THREE.BoxGeometry(0.034, 0.052, 0.010), tx: -0.004, ty: 0.045, tz: 0.118, rz: 0.18, uvRect: shirtUv },
+      // Contoured tattered jacket/shirt tail flaps hugging hips (curved cylinders, NOT flat boxes!)
+      { geo: new THREE.CylinderGeometry(0.146, 0.168, 0.135, 10, 1, true, -0.75, 1.10), tx: 0, ty: -0.265, tz: 0, uvRect: shirtUv },
+      { geo: new THREE.CylinderGeometry(0.146, 0.166, 0.125, 10, 1, true, 1.85, 1.35), tx: 0, ty: -0.260, tz: 0, uvRect: shirtUv }
     ]);
 
-    const zombieTex = createZombieTexture();
+    const textures = createZombieTextures();
+    const zombieTex = textures.map;
+    const zombieBump = textures.bumpMap;
+    const zombieRough = textures.roughnessMap;
+
     const bodyMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       map: zombieTex,
-      roughness: 0.72,
-      metalness: 0.06,
-      envMapIntensity: 1.35
+      bumpMap: zombieBump,
+      bumpScale: 0.018,
+      roughnessMap: zombieRough,
+      roughness: 1.0,
+      metalness: 0.04,
+      envMapIntensity: 0.75,
+      side: THREE.DoubleSide
     });
     const headMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       map: zombieTex,
-      roughness: 0.64,
-      metalness: 0.06,
-      envMapIntensity: 1.40
+      bumpMap: zombieBump,
+      bumpScale: 0.016,
+      roughnessMap: zombieRough,
+      roughness: 1.0,
+      metalness: 0.04,
+      envMapIntensity: 0.75
     });
     headMat.customProgramCacheKey = () => 'lrt_zombie_head_eyes_v2';
     headMat.onBeforeCompile = (shader) => {
@@ -518,17 +1015,24 @@
     const armorMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       map: zombieTex,
-      roughness: 0.40,
-      metalness: 0.42,
-      envMapIntensity: 1.45
+      bumpMap: zombieBump,
+      bumpScale: 0.022,
+      roughnessMap: zombieRough,
+      roughness: 0.90,
+      metalness: 0.34,
+      envMapIntensity: 0.78,
+      side: THREE.DoubleSide
     });
 
     const bioMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      emissive: new THREE.Color(0x222222),
-      emissiveIntensity: 0.8,
+      emissive: new THREE.Color(0x28340c),
+      emissiveIntensity: 0.85,
+      bumpMap: zombieBump,
+      bumpScale: 0.015,
       roughness: 0.28,
-      metalness: 0.08
+      metalness: 0.05,
+      envMapIntensity: 0.75
     });
 
     function makePartMesh(geo, mat, castShadow) {
@@ -558,15 +1062,16 @@
     _thighRMesh = makePartMesh(thighGeo, bodyMat, true);
     _calfLMesh = makePartMesh(calfGeo, bodyMat, true);
     _calfRMesh = makePartMesh(calfGeo, bodyMat, true);
+
     _bruteArmorMesh = makePartMesh(bruteArmorGeo, armorMat, false);
     _bruteHelmetMesh = makePartMesh(bruteHelmetGeo, armorMat, false);
     _spitterBioMesh = makePartMesh(spitterBioGeo, bioMat, false);
+    _spitterGearMesh = makePartMesh(spitterGearGeo, bodyMat, false);
+    _spitterMaskMesh = makePartMesh(spitterMaskGeo, armorMat, false);
+    _screamerRibMesh = makePartMesh(screamerRibGeo, bodyMat, false);
+    _screamerJawMesh = makePartMesh(screamerJawGeo, bodyMat, false);
+    _screamerCystMesh = makePartMesh(screamerCystGeo, bioMat, false);
     _ragMesh = makePartMesh(ragGeo, bodyMat, false);
-
-    _bruteArmorMesh.visible = false;
-    _bruteHelmetMesh.visible = false;
-    _spitterBioMesh.visible = false;
-    _ragMesh.visible = false;
 
     _corePartMeshes = [
       _headMesh, _torsoMesh, _upperArmLMesh, _upperArmRMesh,
@@ -574,8 +1079,14 @@
       _calfLMesh, _calfRMesh
     ];
     _overlayPartMeshes = [
-      _bruteArmorMesh, _bruteHelmetMesh, _spitterBioMesh, _ragMesh
+      _bruteArmorMesh, _bruteHelmetMesh,
+      _spitterBioMesh, _spitterGearMesh, _spitterMaskMesh,
+      _screamerRibMesh, _screamerJawMesh, _screamerCystMesh,
+      _ragMesh
     ];
+    for (let i = 0; i < _overlayPartMeshes.length; i++) {
+      _overlayPartMeshes[i].visible = false;
+    }
     _allPartMeshes = _corePartMeshes.concat(_overlayPartMeshes);
 
     const createVomitPuddleTex = () => {
@@ -792,6 +1303,7 @@
         attackCooldown: 1.35,
         attackTimer: 0,
         spitTimer: 1.5,
+        spitAnimTimer: 0,
         staggerTimer: 0,
         hitFlashTimer: 0,
         deathTimer: 0,
@@ -804,6 +1316,9 @@
         hitSide: 0,
         hornVulnTimer: 0,
         animPhase: Math.random() * 6.28,
+        moveBlend: 0,
+        smoothSteerX: 0,
+        smoothSteerZ: 0,
         seed: Math.random() * 100,
         limbBias: Math.random() > 0.5 ? 1 : -1,
         steerCommit: 0,
@@ -972,7 +1487,30 @@
     _bruteArmorMesh.setColorAt(idx, _color);
     _bruteHelmetMesh.setColorAt(idx, _color);
     _spitterBioMesh.setColorAt(idx, z.gearColor);
-    _ragMesh.setColorAt(idx, z.gearColor);
+    if (_spitterGearMesh) {
+      _color.copy(z.shirtColor);
+      if (isHit) _color.setRGB(_color.r * rTint, _color.g * gbTint, _color.b * gbTint);
+      _spitterGearMesh.setColorAt(idx, _color);
+    }
+    if (_spitterMaskMesh) {
+      _color.setHex(0x454c40);
+      if (isHit) _color.setRGB(_color.r * rTint, _color.g * gbTint, _color.b * gbTint);
+      _spitterMaskMesh.setColorAt(idx, _color);
+    }
+    if (_screamerRibMesh) {
+      _color.setHex(0xd8d0c6);
+      if (isHit) _color.setRGB(_color.r * rTint, _color.g * gbTint, _color.b * gbTint);
+      _screamerRibMesh.setColorAt(idx, _color);
+    }
+    if (_screamerJawMesh) {
+      _color.copy(z.skinColor);
+      if (isHit) _color.setRGB(_color.r * rTint, _color.g * gbTint, _color.b * gbTint);
+      _screamerJawMesh.setColorAt(idx, _color);
+    }
+    if (_screamerCystMesh) _screamerCystMesh.setColorAt(idx, z.gearColor);
+    _color.copy(z.shirtColor);
+    if (isHit) _color.setRGB(_color.r * rTint, _color.g * gbTint, _color.b * gbTint);
+    _ragMesh.setColorAt(idx, _color);
 
     if (_headEyeAttr) {
       let er = 0, eg = 0, eb = 0;
@@ -1047,6 +1585,10 @@
       E.zombies[i].coarseDt = 0;
       E.zombies[i].matrixInit = false;
       E.zombies[i].groundedOnce = false;
+      E.zombies[i].moveBlend = 0;
+      E.zombies[i].smoothSteerX = 0;
+      E.zombies[i].smoothSteerZ = 0;
+      E.zombies[i].spitAnimTimer = 0;
       zeroZombieMatrices(i);
     }
     for (let i = 0; i < MAX_BILE; i++) {
@@ -1210,6 +1752,8 @@
     }
     if (!slot) return;
 
+    z.spitAnimTimer = 0.50;
+
     const sc = z.scale || 1.0;
     const fwdX = Math.sin(z.yaw || 0);
     const fwdZ = Math.cos(z.yaw || 0);
@@ -1227,28 +1771,42 @@
     const dy = ty - slot.pos.y;
     let dz = playerPos.z - slot.pos.z;
     let horizDist = Math.sqrt(dx * dx + dz * dz);
-    if (horizDist > 14.0) {
-      const clampScale = 14.0 / horizDist;
+    if (horizDist > 6.8) {
+      const clampScale = 6.8 / horizDist;
       dx *= clampScale;
       dz *= clampScale;
-      horizDist = 14.0;
+      horizDist = 6.8;
     }
-    const flightTime = Math.max(0.26, Math.min(1.40, horizDist / BILE_HORIZ_SPEED));
+    const flightTime = Math.max(0.36, Math.min(0.88, horizDist / BILE_HORIZ_SPEED));
+    let vy = (dy / flightTime) + 0.5 * BILE_GRAVITY * flightTime;
+    if (vy < 0.65 && Math.abs(dy) < 1.2) {
+      vy = 0.65;
+    }
 
     slot.vel.set(
       dx / flightTime,
-      (dy / flightTime) + 0.5 * BILE_GRAVITY * flightTime,
+      vy,
       dz / flightTime
     );
 
-    // Mouth spit droplets right at launch
-    for (let k = 0; k < 3; k++) {
+    // 8-droplet forward vomit spray cone on launch
+    for (let k = 0; k < 8; k++) {
+      const coneSpread = (k - 3.5) * 0.14 + (Math.random() - 0.5) * 0.12;
+      const cosC = Math.cos(coneSpread);
+      const sinC = Math.sin(coneSpread);
+      const svx = slot.vel.x * cosC - slot.vel.z * sinC;
+      const svz = slot.vel.x * sinC + slot.vel.z * cosC;
+      const spdScale = 0.42 + Math.random() * 0.42;
       spawnBileDrop(
-        slot.pos.x, slot.pos.y, slot.pos.z,
-        slot.vel.x * 0.35 + (Math.random() - 0.5) * 1.6,
-        slot.vel.y * 0.30 - 0.4 + Math.random() * 0.8,
-        slot.vel.z * 0.35 + (Math.random() - 0.5) * 1.6,
-        0.85, 0.45, slot.groundY
+        slot.pos.x + (Math.random() - 0.5) * 0.08,
+        slot.pos.y + (Math.random() - 0.5) * 0.06,
+        slot.pos.z + (Math.random() - 0.5) * 0.08,
+        svx * spdScale + (Math.random() - 0.5) * 0.45,
+        slot.vel.y * (0.45 + Math.random() * 0.35) + (Math.random() - 0.5) * 0.6,
+        svz * spdScale + (Math.random() - 0.5) * 0.45,
+        0.72 + Math.random() * 0.45,
+        0.38 + Math.random() * 0.24,
+        slot.groundY
       );
     }
 
@@ -1520,12 +2078,27 @@
     }
   }
 
-  function updateOverlayVisibilityAndCounts(highWater, hasBruteArmor, hasBio, hasRag, needsMatFlush) {
+  function updateOverlayVisibilityAndCounts(highWater, hasBruteArmor, hasBio, hasRag, needsMatFlush, hasSpitterOpt, hasScreamerOpt) {
     E.activeHighWater = highWater;
 
     for (let m = 0; m < _corePartMeshes.length; m++) {
       if (_corePartMeshes[m]) {
         _corePartMeshes[m].count = E.activeHighWater;
+      }
+    }
+
+    let hasSpitter = hasSpitterOpt;
+    let hasScreamer = hasScreamerOpt;
+    if (hasSpitter === undefined || hasScreamer === undefined) {
+      hasSpitter = false;
+      hasScreamer = false;
+      if (hasBio) {
+        for (let i = 0; i < highWater; i++) {
+          const z = E.zombies[i];
+          if (!z || (!z.active && !z.dead) || z.dead) continue;
+          if (z.variant === 'spitter') hasSpitter = true;
+          else if (z.variant === 'screamer') hasScreamer = true;
+        }
       }
     }
 
@@ -1538,8 +2111,28 @@
       _bruteHelmetMesh.count = E.activeHighWater;
     }
     if (_spitterBioMesh) {
-      _spitterBioMesh.visible = E.warmupActive || hasBio;
+      _spitterBioMesh.visible = E.warmupActive || hasSpitter;
       _spitterBioMesh.count = E.activeHighWater;
+    }
+    if (_spitterGearMesh) {
+      _spitterGearMesh.visible = E.warmupActive || hasSpitter;
+      _spitterGearMesh.count = E.activeHighWater;
+    }
+    if (_spitterMaskMesh) {
+      _spitterMaskMesh.visible = E.warmupActive || hasSpitter;
+      _spitterMaskMesh.count = E.activeHighWater;
+    }
+    if (_screamerRibMesh) {
+      _screamerRibMesh.visible = E.warmupActive || hasScreamer;
+      _screamerRibMesh.count = E.activeHighWater;
+    }
+    if (_screamerJawMesh) {
+      _screamerJawMesh.visible = E.warmupActive || hasScreamer;
+      _screamerJawMesh.count = E.activeHighWater;
+    }
+    if (_screamerCystMesh) {
+      _screamerCystMesh.visible = E.warmupActive || hasScreamer;
+      _screamerCystMesh.count = E.activeHighWater;
     }
     if (_ragMesh) {
       _ragMesh.visible = E.warmupActive || hasRag;
@@ -1556,7 +2149,7 @@
     const idx = z.id;
 
     const sc = z.scale;
-    const widthMult = z.variant === 'brute' ? 1.24 : (z.variant === 'runner' ? 0.90 : 0.98);
+    const widthMult = z.variant === 'brute' ? 1.24 : (z.variant === 'runner' ? 0.90 : (z.variant === 'screamer' ? 0.92 : 0.98));
     let sinkY = 0;
     const scaleDecay = 1.0;
     let deadStage1 = 0;
@@ -1578,37 +2171,71 @@
     const sw = s * widthMult;
     const phase = z.animPhase;
     const limp = z.limbBias;
+    const mb = z.dead ? 0 : Math.max(0, Math.min(1, z.moveBlend !== undefined ? z.moveBlend : 0));
+    const idleBreath = z.dead ? 0 : Math.sin(timeSec * 2.1 + z.seed);
+
+    // Spitter vomit heave animation (0.50s retch & expel arc)
+    let spitHeave = 0;
+    if (!z.dead && z.spitAnimTimer > 0) {
+      const spitT = 1.0 - Math.max(0, Math.min(1, z.spitAnimTimer / 0.50));
+      spitHeave = spitT < 0.35
+        ? -Math.sin((spitT / 0.35) * Math.PI) * 0.26
+        : Math.sin(((spitT - 0.35) / 0.65) * Math.PI) * 0.38;
+    }
 
     // Asymmetric horror posture & organic gait
     let torsoPitch = z.dead
       ? z.fallAngle
-      : (z.variant === 'runner' ? 0.56 : z.variant === 'spitter' ? 0.24 : z.variant === 'brute' ? (z.chargeTimer > 0 ? 0.44 : 0.16) : z.variant === 'screamer' ? 0.38 : 0.28);
+      : (z.variant === 'runner'
+        ? (0.34 + 0.22 * mb)
+        : z.variant === 'spitter'
+          ? (0.28 + idleBreath * 0.04 + spitHeave)
+          : z.variant === 'brute'
+            ? (z.chargeTimer > 0 ? 0.44 : (0.14 + 0.04 * mb))
+            : z.variant === 'screamer'
+              ? (0.24 + 0.16 * mb + Math.sin(timeSec * 6.0 + z.seed) * 0.03)
+              : (0.22 + 0.08 * mb + idleBreath * 0.025));
+
     if (z.staggerTimer > 0 && !z.dead) {
       const stagT = Math.min(1.0, z.staggerTimer / 0.35);
-      torsoPitch -= (z.hitZone === 'legs' ? -0.18 : 0.10) * stagT;
+      torsoPitch -= (z.hitZone === 'legs' ? -0.18 : 0.12) * stagT;
     }
     if (z.chargeWindup > 0 && !z.dead) torsoPitch += 0.24;
-    if (z.shriekTimer > 0 && !z.dead) torsoPitch = -0.16;
+    if (z.shriekTimer > 0 && !z.dead) torsoPitch = -0.26;
+
+    // Biomechanical torso/pelvis counter-twist & lateral weight shift
+    const hipYaw = z.dead ? 0 : Math.sin(phase) * 0.13 * mb;
+    let chestYaw = z.dead ? 0 : -Math.sin(phase) * 0.16 * mb;
+    if (!z.dead && z.variant === 'brute' && z.chargeTimer > 0) chestYaw += limp * 0.30;
+    const hipRoll = z.dead ? 0 : Math.cos(phase) * 0.055 * mb;
 
     let torsoRoll = z.dead
       ? (deadDir * 0.08 * deadStage2 * z.fallSign)
-      : (z.variant === 'walker' ? (Math.sin(phase) * 0.12 + limp * 0.08)
-        : z.variant === 'spitter' ? (Math.sin(timeSec * 4.5 + z.seed) * 0.08 + limp * 0.10)
-        : Math.sin(phase) * 0.06);
+      : (z.variant === 'walker'
+        ? (Math.sin(phase) * 0.10 * mb + limp * 0.07)
+        : z.variant === 'spitter'
+          ? (Math.sin(timeSec * 4.5 + z.seed) * 0.06 + limp * 0.08)
+          : (-hipRoll * 0.8 + Math.sin(phase) * 0.04 * mb));
     if (!z.dead && z.legCrippled) torsoRoll += limp * 0.16;
     if (!z.dead && z.staggerTimer > 0 && z.hitSide) torsoRoll += z.hitSide * 0.14 * Math.min(1.0, z.staggerTimer / 0.35);
 
-    const walkBob = z.dead ? 0 : Math.abs(Math.sin(phase)) * (z.variant === 'runner' ? 0.065 : 0.04) * s;
+    // Pelvis height anchored cleanly around hip level independently of torsoPitch (prevents runner feet floating!)
+    const walkBob = z.dead ? 0 : (Math.abs(Math.sin(phase)) * (z.variant === 'runner' ? 0.048 : (z.variant === 'brute' ? 0.036 : 0.026)) - 0.012) * mb * s;
+    const variantHipBase = z.variant === 'runner' ? (0.768 - 0.048 * mb) : (z.variant === 'screamer' ? 0.752 : 0.778);
     const crippleDrop = (!z.dead && z.legCrippled) ? 0.14 * s : 0;
     const stagLegDrop = (!z.dead && z.staggerTimer > 0 && z.hitZone === 'legs') ? 0.12 * s * Math.min(1.0, z.staggerTimer / 0.42) : 0;
     const hipHeight = z.dead
-      ? (0.77 * s * (1.0 - 0.46 * deadStage1) * (1.0 - deadStage2) + 0.15 * s * deadStage2)
-      : (0.77 * s - (z.variant === 'runner' ? 0.05 * s : 0) - crippleDrop - stagLegDrop + walkBob);
+      ? (0.778 * s * (1.0 - 0.46 * deadStage1) * (1.0 - deadStage2) + 0.15 * s * deadStage2)
+      : (variantHipBase * s - crippleDrop - stagLegDrop + walkBob);
 
-    // 1. Torso
-    _e1.set(torsoPitch, z.yaw, torsoRoll, 'YXZ');
+    _pelvisPos.set(z.x, z.y + hipHeight + sinkY, z.z);
+    _e1.set(z.dead ? z.fallAngle : 0, z.yaw + hipYaw, z.dead ? (deadDir * 0.08 * deadStage2 * z.fallSign) : hipRoll, 'YXZ');
+    _qHip.setFromEuler(_e1);
+
+    // 1. Torso pivoted cleanly from pelvis lumbar joint
+    _e1.set(torsoPitch, z.yaw + chestYaw, torsoRoll, 'YXZ');
     _qTorso.setFromEuler(_e1);
-    _pos.set(z.x, z.y + hipHeight + 0.27 * s + sinkY, z.z);
+    _pos.set(0, 0.265 * s, 0).applyQuaternion(_qTorso).add(_pelvisPos);
     _scale.set(sw, s, sw);
     _m4.compose(_pos, _qTorso, _scale);
     _torsoMesh.setMatrixAt(idx, _m4);
@@ -1616,56 +2243,112 @@
     const attachTorso = (lx, ly, lz, outVec) => {
       outVec.set(lx * sw, ly * s, lz * sw).applyQuaternion(_qTorso).add(_pos);
     };
+    const attachPelvis = (lx, ly, lz, outVec) => {
+      outVec.set(lx * sw, ly * s, lz * sw).applyQuaternion(_qHip).add(_pelvisPos);
+    };
 
-    // 2. Head (twitching cocked neck)
-    attachTorso(0, 0.42, (z.variant === 'runner' || z.variant === 'screamer') ? 0.12 : 0.05, _v1);
-    const headTwitchY = z.dead ? 0 : Math.sin(timeSec * 2.6 + z.seed) * 0.18;
-    const headCockZ = z.dead ? 0 : limp * (0.16 + Math.sin(timeSec * 1.9 + z.seed) * 0.08);
-    let headPitch = torsoPitch * 0.55 + 0.08;
-    if (z.shriekTimer > 0 && !z.dead) headPitch = -0.58;
-    _e1.set(headPitch, z.yaw + headTwitchY, torsoRoll + headCockZ, 'YXZ');
-    _q1.setFromEuler(_e1);
+    // 2. Head (variant-tailored bob, twitch, heave & shriek)
+    const headFwdLean = (z.variant === 'runner' || z.variant === 'screamer') ? 0.08 : 0.03;
+    attachTorso(0, 0.435, headFwdLean, _vHeadPos);
+    const headTwitchY = z.dead ? 0
+      : (z.variant === 'screamer'
+        ? (Math.sin(timeSec * 8.5 + z.seed) * 0.16 + Math.cos(timeSec * 13.0 + z.seed) * 0.08)
+        : Math.sin(timeSec * 2.2 + z.seed) * (z.variant === 'walker' ? 0.16 : 0.08));
+    const headCockZ = z.dead ? 0 : limp * (0.13 + Math.sin(timeSec * 1.9 + z.seed) * 0.06);
+    let headPitch = torsoPitch * 0.45 + 0.06 + (spitHeave * 0.85);
+    if (!z.dead && z.variant === 'walker') headPitch += Math.sin(phase) * 0.08 * mb;
+    if (z.shriekTimer > 0 && !z.dead) headPitch = -0.72;
+    _e1.set(headPitch, z.yaw + chestYaw * 0.5 + headTwitchY, torsoRoll * 0.6 + headCockZ, 'YXZ');
+    _qHead.setFromEuler(_e1);
     _scale.set(s, s, s);
-    _m4.compose(_v1, _q1, _scale);
+    _m4.compose(_vHeadPos, _qHead, _scale);
     _headMesh.setMatrixAt(idx, _m4);
 
-    // 2b. Brute Armored Helmet anchored on head
+    // 2b. Variant Head Overlays (Brute Helmet, Spitter Hanging Gas Mask, Screamer Split-Open Howling Jaw)
     if (z.variant === 'brute' && z.hasArmor && !z.dead) {
-      _scale.set(s * 1.05, s * 1.05, s * 1.05);
-      _m4.compose(_v1, _q1, _scale);
+      _scale.set(s * 1.03, s * 1.03, s * 1.03);
+      _m4.compose(_vHeadPos, _qHead, _scale);
       _bruteHelmetMesh.setMatrixAt(idx, _m4);
     } else {
       _bruteHelmetMesh.setMatrixAt(idx, _zeroMat);
     }
 
-    // 3. Variant-exclusive torso overlays
+    if (_spitterMaskMesh) {
+      if (z.variant === 'spitter' && !z.dead) {
+        const maskJolt = spitHeave > 0 ? spitHeave * 0.35 : 0;
+        _e1.set(headPitch + maskJolt, z.yaw + chestYaw * 0.5 + headTwitchY, torsoRoll * 0.6 + headCockZ, 'YXZ');
+        _q1.setFromEuler(_e1);
+        _scale.set(s, s, s);
+        _m4.compose(_vHeadPos, _q1, _scale);
+        _spitterMaskMesh.setMatrixAt(idx, _m4);
+      } else {
+        _spitterMaskMesh.setMatrixAt(idx, _zeroMat);
+      }
+    }
+
+    if (_screamerJawMesh) {
+      if (z.variant === 'screamer' && !z.dead) {
+        const howlOpen = z.shriekTimer > 0 ? 0.28 : (0.06 * Math.abs(Math.sin(timeSec * 5.0 + z.seed)));
+        _e1.set(headPitch + howlOpen, z.yaw + chestYaw * 0.5 + headTwitchY, torsoRoll * 0.6 + headCockZ, 'YXZ');
+        _q1.setFromEuler(_e1);
+        _scale.set(s, s, s);
+        _m4.compose(_vHeadPos, _q1, _scale);
+        _screamerJawMesh.setMatrixAt(idx, _m4);
+      } else {
+        _screamerJawMesh.setMatrixAt(idx, _zeroMat);
+      }
+    }
+
+    // 3. Variant-exclusive Torso Overlays
     _scale.set(sw, s, sw);
     if (z.variant === 'brute' && z.hasArmor && !z.dead) {
       _m4.compose(_pos, _qTorso, _scale);
       _bruteArmorMesh.setMatrixAt(idx, _m4);
       _spitterBioMesh.setMatrixAt(idx, _zeroMat);
+      if (_spitterGearMesh) _spitterGearMesh.setMatrixAt(idx, _zeroMat);
+      if (_screamerRibMesh) _screamerRibMesh.setMatrixAt(idx, _zeroMat);
+      if (_screamerCystMesh) _screamerCystMesh.setMatrixAt(idx, _zeroMat);
       _ragMesh.setMatrixAt(idx, _zeroMat);
-    } else if ((z.variant === 'spitter' || z.variant === 'screamer') && !z.dead) {
-      const pulseRate = z.variant === 'screamer' ? 7.2 : 5.2;
-      const pulseAmp = z.variant === 'screamer' ? 0.12 : 0.08;
-      const pulse = 1.0 + Math.sin(timeSec * pulseRate + z.seed) * pulseAmp;
+    } else if (z.variant === 'spitter' && !z.dead) {
+      const pulse = 1.0 + Math.sin(timeSec * 5.2 + z.seed) * 0.09 + (z.spitAnimTimer > 0 ? 0.14 : 0);
+      _m4.compose(_pos, _qTorso, _scale);
+      if (_spitterGearMesh) _spitterGearMesh.setMatrixAt(idx, _m4);
       _scale.set(sw * pulse, s * pulse, sw * pulse);
       _m4.compose(_pos, _qTorso, _scale);
       _spitterBioMesh.setMatrixAt(idx, _m4);
       _bruteArmorMesh.setMatrixAt(idx, _zeroMat);
+      if (_screamerRibMesh) _screamerRibMesh.setMatrixAt(idx, _zeroMat);
+      if (_screamerCystMesh) _screamerCystMesh.setMatrixAt(idx, _zeroMat);
+      _ragMesh.setMatrixAt(idx, _zeroMat);
+    } else if (z.variant === 'screamer' && !z.dead) {
+      const pulse = 1.0 + Math.sin(timeSec * 7.6 + z.seed) * 0.13 + (z.shriekTimer > 0 ? 0.18 : 0);
+      _m4.compose(_pos, _qTorso, _scale);
+      if (_screamerRibMesh) _screamerRibMesh.setMatrixAt(idx, _m4);
+      _scale.set(sw * pulse, s * pulse, sw * pulse);
+      _m4.compose(_pos, _qTorso, _scale);
+      if (_screamerCystMesh) _screamerCystMesh.setMatrixAt(idx, _m4);
+      _bruteArmorMesh.setMatrixAt(idx, _zeroMat);
+      _spitterBioMesh.setMatrixAt(idx, _zeroMat);
+      if (_spitterGearMesh) _spitterGearMesh.setMatrixAt(idx, _zeroMat);
       _ragMesh.setMatrixAt(idx, _zeroMat);
     } else if ((z.variant === 'walker' || z.variant === 'runner') && !z.dead) {
       _m4.compose(_pos, _qTorso, _scale);
       _ragMesh.setMatrixAt(idx, _m4);
       _bruteArmorMesh.setMatrixAt(idx, _zeroMat);
       _spitterBioMesh.setMatrixAt(idx, _zeroMat);
+      if (_spitterGearMesh) _spitterGearMesh.setMatrixAt(idx, _zeroMat);
+      if (_screamerRibMesh) _screamerRibMesh.setMatrixAt(idx, _zeroMat);
+      if (_screamerCystMesh) _screamerCystMesh.setMatrixAt(idx, _zeroMat);
     } else {
       _bruteArmorMesh.setMatrixAt(idx, _zeroMat);
       _spitterBioMesh.setMatrixAt(idx, _zeroMat);
+      if (_spitterGearMesh) _spitterGearMesh.setMatrixAt(idx, _zeroMat);
+      if (_screamerRibMesh) _screamerRibMesh.setMatrixAt(idx, _zeroMat);
+      if (_screamerCystMesh) _screamerCystMesh.setMatrixAt(idx, _zeroMat);
       _ragMesh.setMatrixAt(idx, _zeroMat);
     }
 
-    // 4. Articulated Two-Segment Arms (Left & Right shoulders -> exact Elbows -> Forearm Claws)
+    // 4. Hierarchical Two-Segment Arms (Torso -> Shoulder -> Upper Arm -> Elbow -> Forearm & Hand)
     const attackSwing = (!z.dead && z.attackTimer > z.attackCooldown - 0.30)
       ? Math.sin(((z.attackCooldown - z.attackTimer) / 0.30) * Math.PI) * -0.95
       : 0;
@@ -1676,60 +2359,76 @@
       const uaMesh = side < 0 ? _upperArmLMesh : _upperArmRMesh;
       const faMesh = side < 0 ? _forearmLMesh : _forearmRMesh;
 
-      let uaPitch, elbowFlex, uaRoll;
+      let uaPitchRel, uaYawRel = 0, uaRollRel, elbowFlex;
       if (z.shriekTimer > 0 && !z.dead) {
-        uaPitch = -1.25;
-        elbowFlex = 0.82;
-        uaRoll = side * -0.62 + Math.sin(timeSec * 32.0) * 0.08;
+        uaPitchRel = -0.95;
+        uaYawRel = side * 0.25;
+        uaRollRel = side * -0.68 + Math.sin(timeSec * 32.0) * 0.08;
+        elbowFlex = 0.72;
       } else if (z.dead) {
-        uaPitch = (deadDir > 0 ? (0.45 + 0.95 * deadStage2) : (-0.35 - 1.15 * deadStage2)) + side * 0.24 * deadStage2;
-        elbowFlex = 0.38 - 0.22 * deadStage2;
-        uaRoll = side * (-0.28 - 0.62 * deadStage2);
+        uaPitchRel = -0.22 - 0.16 * deadStage2 + side * 0.18 * deadStage2;
+        uaRollRel = side * (-0.24 - 0.56 * deadStage2);
+        elbowFlex = 0.35 - 0.18 * deadStage2;
       } else if (z.variant === 'runner') {
         const sgn = side < 0 ? 1 : -1;
-        uaPitch = -0.85 + Math.sin(phase) * 0.72 * sgn + attackSwing;
-        elbowFlex = 0.78 + Math.cos(phase * sgn) * 0.25;
-        uaRoll = side * -0.14;
+        uaPitchRel = -1.08 + Math.sin(phase) * 0.70 * sgn * mb + idleBreath * 0.05 + attackSwing;
+        elbowFlex = 1.06 + Math.cos(phase * sgn) * 0.24 * mb;
+        uaRollRel = side * -0.12;
       } else if (z.variant === 'screamer') {
         const sgn = side < 0 ? 1 : -1;
-        uaPitch = -0.92 + Math.sin(phase) * 0.48 * sgn + attackSwing;
-        elbowFlex = 0.65;
-        uaRoll = side * -0.22;
+        uaPitchRel = -1.12 + Math.sin(phase) * 0.46 * sgn * mb + Math.sin(timeSec * 9.0 + z.seed + side) * 0.07 + attackSwing;
+        elbowFlex = 0.68 + Math.sin(timeSec * 7.0 + z.seed) * 0.08;
+        uaRollRel = side * -0.20;
       } else if (z.variant === 'brute') {
-        uaPitch = -0.68 + Math.sin(phase + (side < 0 ? 0 : Math.PI)) * 0.32 + attackSwing * 0.9;
-        elbowFlex = 0.55;
-        uaRoll = side * -0.18;
-      } else {
-        // Walker / Spitter asymmetric zombie shamble: reaching claw vs hung twitching arm!
-        if (isStrongSide) {
-          uaPitch = -1.18 + Math.sin(phase) * 0.22 + attackSwing;
-          elbowFlex = 0.42 + Math.sin(phase * 1.3) * 0.14;
-          uaRoll = side * -0.08;
+        if (z.chargeTimer > 0 && isStrongSide) {
+          uaPitchRel = -1.42;
+          uaYawRel = side * -0.22;
+          uaRollRel = side * -0.06;
+          elbowFlex = 1.18;
         } else {
-          uaPitch = -0.32 + Math.sin(phase + 1.2) * 0.16 + attackSwing * 0.55;
-          elbowFlex = 0.68 + Math.cos(phase) * 0.15;
-          uaRoll = side * -0.16;
+          uaPitchRel = -0.80 + Math.sin(phase + (side < 0 ? 0 : Math.PI)) * 0.34 * mb + idleBreath * 0.04 + attackSwing * 0.9;
+          elbowFlex = 0.56 + Math.cos(phase) * 0.10 * mb;
+          uaRollRel = side * -0.16;
+        }
+      } else if (z.variant === 'spitter') {
+        uaPitchRel = -0.78 + Math.sin(phase + (side < 0 ? 0 : Math.PI)) * 0.16 * mb + idleBreath * 0.06 + (spitHeave * 0.65) + attackSwing * 0.6;
+        elbowFlex = 0.74 + (spitHeave < 0 ? 0.22 : 0);
+        uaRollRel = side * (-0.16 - Math.max(0, spitHeave) * 0.45);
+      } else {
+        // Walker asymmetric zombie shamble: reaching arm vs hung twitching arm (no frantic marching when stationary)
+        if (isStrongSide) {
+          uaPitchRel = -1.32 + Math.sin(phase) * 0.18 * mb + idleBreath * 0.06 + attackSwing;
+          elbowFlex = 0.42 + Math.sin(phase * 1.3) * 0.12 * mb;
+          uaRollRel = side * -0.08;
+        } else {
+          uaPitchRel = -0.48 + Math.sin(phase + 1.2) * 0.14 * mb + Math.sin(timeSec * 2.2 + z.seed) * 0.05 + attackSwing * 0.55;
+          elbowFlex = 0.64 + Math.cos(phase) * 0.12 * mb;
+          uaRollRel = side * -0.15;
         }
       }
 
-      attachTorso(side * 0.245, 0.23, 0.02, _v1);
-      _e1.set(uaPitch, z.yaw, uaRoll, 'YXZ');
-      _q1.setFromEuler(_e1);
+      attachTorso(side * 0.242, 0.225, 0.015, _v1);
+      _e1.set(uaPitchRel, uaYawRel, uaRollRel, 'YXZ');
+      _qLocal.setFromEuler(_e1);
+      _qUpper.copy(_qTorso).multiply(_qLocal);
       _scale.set(sw, s, sw);
-      _m4.compose(_v1, _q1, _scale);
+      _m4.compose(_v1, _qUpper, _scale);
       uaMesh.setMatrixAt(idx, _m4);
 
-      // Compute exact elbow joint position at tip (0, -0.255 * s, 0) of upper arm
-      _vJointLocal.set(0, -0.255 * s, 0).applyQuaternion(_q1).add(_v1);
-      _e1.set(uaPitch - elbowFlex, z.yaw, uaRoll * 0.7, 'YXZ');
-      _q1.setFromEuler(_e1);
+      // Compose forearm orientation cleanly on top of upper-arm quaternion
+      _vJointLocal.set(0, -0.255 * s, 0).applyQuaternion(_qUpper).add(_v1);
+      _e1.set(-elbowFlex, 0, side * 0.08, 'YXZ');
+      _qLocal.setFromEuler(_e1);
+      _q1.copy(_qUpper).multiply(_qLocal);
       _m4.compose(_vJointLocal, _q1, _scale);
       faMesh.setMatrixAt(idx, _m4);
     }
 
-    // 5. Articulated Two-Segment Legs (Hip -> Exact Knee -> Backward-Bending Calf & Boot!)
-    const thighSwingAmp = z.dead ? 0.12 : (z.variant === 'runner' ? 0.85 : (z.variant === 'screamer' ? 0.72 : (z.variant === 'brute' ? 0.44 : 0.50)));
-    const kneeAmp = z.dead ? 0.10 : (z.variant === 'runner' ? 0.95 : (z.variant === 'screamer' ? 0.82 : 0.62));
+    // 5. Articulated Two-Segment Legs (Pelvis -> Hip -> Knee -> Heel-Strike/Stance/Toe-Off Calf & Boot)
+    const thighSwingAmp = z.dead ? 0.12 : (z.variant === 'runner' ? 0.86 : (z.variant === 'screamer' ? 0.70 : (z.variant === 'brute' ? 0.46 : 0.50)));
+    const kneeAmp = z.dead ? 0.10 : (z.variant === 'runner' ? 1.02 : (z.variant === 'screamer' ? 0.80 : 0.64));
+    const baseThighCrouch = z.dead ? 0 : (z.variant === 'runner' ? (-0.12 - 0.14 * mb) : (z.variant === 'screamer' ? -0.10 : -0.04));
+    const baseKneeCrouch = z.dead ? 0 : (z.variant === 'runner' ? (0.28 + 0.14 * mb) : (z.variant === 'screamer' ? 0.22 : 0.12));
 
     for (let sIdx = 0; sIdx < 2; sIdx++) {
       const side = sIdx === 0 ? -1 : 1;
@@ -1739,24 +2438,29 @@
 
       // Asymmetric walker drag on injured leg (exaggerated when legCrippled)
       const isCrippledLeg = !z.dead && z.legCrippled && side !== limp;
-      const dragMult = isCrippledLeg ? 0.32 : ((!z.dead && z.variant === 'walker' && side !== limp) ? 0.62 : 1.0);
+      const dragMult = isCrippledLeg ? 0.34 : ((!z.dead && z.variant === 'walker' && side !== limp) ? 0.58 : 1.0);
+      const idleStanceOffset = (!z.dead && mb < 0.99) ? ((side * limp * 0.08) * (1.0 - mb)) : 0;
+
       const thighPitch = z.dead
         ? (deadDir * (Math.PI * 0.46) * deadStage2 - 0.65 * deadStage1 * (1.0 - deadStage2) + side * 0.12 * deadStage2)
-        : (Math.sin(legPhase) * thighSwingAmp * dragMult - (z.variant === 'runner' ? 0.15 : 0) - (isCrippledLeg ? 0.22 : 0));
-      // Positive X rotation bends lower leg BACKWARD cleanly at the knee
+        : (baseThighCrouch + idleStanceOffset + Math.sin(legPhase) * thighSwingAmp * dragMult * mb - (isCrippledLeg ? 0.20 : 0));
+
+      // Natural heel-strike -> stance -> toe-off knee flexion (positive X bends lower leg backward)
+      const swingLift = Math.max(0, Math.sin(legPhase + 1.35));
       const kneeFlex = z.dead
         ? (1.35 * deadStage1 * (1.0 - deadStage2) + 0.14 * deadStage2)
-        : Math.max(0.06, Math.sin(legPhase + 1.15) * kneeAmp + (z.variant === 'runner' ? 0.24 : 0.12) + (isCrippledLeg ? 0.45 : 0));
+        : (baseKneeCrouch + swingLift * kneeAmp * dragMult * mb + (isCrippledLeg ? 0.42 : 0));
 
-      attachTorso(side * 0.105, -0.25, 0, _v1);
-      _e1.set(thighPitch, z.yaw, side * -0.04, 'YXZ');
+      const hipSpread = z.variant === 'brute' ? 0.122 : 0.104;
+      attachPelvis(side * hipSpread, 0, 0, _v1);
+      _e1.set(thighPitch, z.yaw + hipYaw, (z.dead ? 0 : hipRoll * 0.5) + side * -0.04, 'YXZ');
       _q1.setFromEuler(_e1);
       _scale.set(sw, s, sw);
       _m4.compose(_v1, _q1, _scale);
       thighMesh.setMatrixAt(idx, _m4);
 
-      _vKnee.set(0, -0.365 * s, 0).applyQuaternion(_q1).add(_v1);
-      _e1.set(thighPitch + kneeFlex, z.yaw, side * -0.02, 'YXZ');
+      _vKnee.set(0, -0.375 * s, 0).applyQuaternion(_q1).add(_v1);
+      _e1.set(thighPitch + kneeFlex, z.yaw + hipYaw, side * -0.02, 'YXZ');
       _q1.setFromEuler(_e1);
       _m4.compose(_vKnee, _q1, _scale);
       calfMesh.setMatrixAt(idx, _m4);
