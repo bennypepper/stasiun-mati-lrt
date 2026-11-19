@@ -107,9 +107,13 @@
     trainCallTrickleStage: 0
   };
 
-  const _spawnEyePos = new THREE.Vector3();
-  const _spawnCamFwd = new THREE.Vector3();
-  const _spawnCandDir = new THREE.Vector3();
+  const triggerObjectiveSurgeWave = (...args) => CORE.triggerObjectiveSurgeWave(...args);
+  const triggerTrainCallSiegeWave = (...args) => CORE.triggerTrainCallSiegeWave(...args);
+  const triggerTrainCallReinforcementTrickle = (...args) => CORE.triggerTrainCallReinforcementTrickle(...args);
+  const spawnStationRoamers = (...args) => CORE.spawnStationRoamers(...args);
+  const spawnCurrentWave = (...args) => CORE.spawnCurrentWave(...args);
+  const writeSave = (...args) => CORE.writeSave(...args);
+  const tickAutosave = (...args) => CORE.tickAutosave(...args);
 
   function resetCampaignState() {
     campaignState.stationUsedIds.clear();
@@ -278,313 +282,7 @@
     }
   }
 
-  function pickDifficultyVariant(diffKey, allowScreamer) {
-    const tier = (C.DIFFICULTY_TIERS && C.DIFFICULTY_TIERS[diffKey]) || (C.DIFFICULTY_TIERS && C.DIFFICULTY_TIERS.medium);
-    const mix = (tier && tier.variantMix) || { walker: 0.54, runner: 0.26, spitter: 0.10, brute: 0.06, screamer: 0.04 };
-    const r = Math.random();
-    let acc = mix.walker || 0.5;
-    if (r < acc) return 'walker';
-    acc += mix.runner || 0.25;
-    if (r < acc) return 'runner';
-    acc += mix.spitter || 0.10;
-    if (r < acc) return 'spitter';
-    acc += mix.brute || 0.06;
-    if (r < acc) return 'brute';
-    return allowScreamer ? 'screamer' : 'runner';
-  }
-
-  const TRAIN_CALL_CONCEALED_ZONES = [
-    'concealed_station', 'stairwell_pocket', 'concourse',
-    'platform_south', 'platform_north', 'jpo', 'depot', 'garden',
-    'island_far', 'plat2', 'balcony', 'island2'
-  ];
-
-  function gatherClusterSpawnNodes(preferredZones, opts) {
-    const allNodes = [];
-    if (LRT.Station && typeof LRT.Station.getSpawnNodes === 'function') {
-      const sn = LRT.Station.getSpawnNodes();
-      if (Array.isArray(sn)) {
-        for (let i = 0; i < sn.length; i++) allNodes.push(sn[i]);
-      }
-    }
-    if (LRT.Station && typeof LRT.Station.getNavGraph === 'function') {
-      const ng = LRT.Station.getNavGraph();
-      if (ng && Array.isArray(ng.nodes)) {
-        for (let i = 0; i < ng.nodes.length; i++) allNodes.push(ng.nodes[i]);
-      }
-    }
-
-    const pState = (LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function') ? LRT.PlayerUI.getState() : null;
-    const pPos = pState ? pState.pos : null;
-    const zoneSet = Array.isArray(preferredZones) && preferredZones.length ? new Set(preferredZones) : null;
-    const o = opts || {};
-    const useHiddenClose = !!(o.requireHidden || o.preferClose);
-    const minDist = o.minDist !== undefined ? o.minDist : (useHiddenClose ? 12.0 : 7.0);
-    const maxDist = o.maxDist !== undefined ? o.maxDist : 34.0;
-
-    let hasCam = false;
-    if (useHiddenClose && pPos) {
-      const cam = (LRT.PlayerUI && typeof LRT.PlayerUI.getCamera === 'function') ? LRT.PlayerUI.getCamera() : null;
-      if (cam) {
-        cam.getWorldPosition(_spawnEyePos);
-        if (typeof cam.getWorldDirection === 'function') {
-          cam.getWorldDirection(_spawnCamFwd);
-        } else {
-          _spawnCamFwd.setFromMatrixColumn(cam.matrixWorld, 2).multiplyScalar(-1).normalize();
-        }
-        hasCam = _spawnCamFwd.lengthSq() > 1e-6;
-      } else {
-        _spawnEyePos.set(pPos.x, (pPos.y || 0) + 1.6, pPos.z);
-        const yaw = typeof pState.yaw === 'number' ? pState.yaw : 0;
-        _spawnCamFwd.set(-Math.sin(yaw), 0, -Math.cos(yaw)).normalize();
-        hasCam = true;
-      }
-    }
-
-    const checkTrainInside = LRT.Train && typeof LRT.Train.isPlayerInside === 'function';
-    const hasStationRay = LRT.Station && typeof LRT.Station.raycastWorld === 'function';
-    const hasTrainRay = LRT.Train && typeof LRT.Train.raycastTrain === 'function';
-
-    const tier1 = []; // preferred zone + 12..34m + out-of-sight/occluded
-    const tier2 = []; // non-crossing station + 12..34m + out-of-sight/occluded
-    const tier3 = []; // preferred zone + relaxed range (9..44m) + occluded or edge FOV
-    const preferred = [];
-    const fallback = [];
-
-    for (let i = 0; i < allNodes.length; i++) {
-      const n = allNodes[i];
-      if (!n || typeof n.x !== 'number' || typeof n.z !== 'number') continue;
-      const ny = n.y !== undefined ? n.y : 0.0;
-      if (checkTrainInside && LRT.Train.isPlayerInside({ x: n.x, y: ny + 0.8, z: n.z })) continue;
-
-      const dh = pPos ? Math.hypot(n.x - pPos.x, n.z - pPos.z) : 20.0;
-      if (dh < (useHiddenClose ? 9.0 : minDist)) continue;
-
-      const tag = String(n.zone || n.tag || '').toLowerCase();
-      const inPref = !!(zoneSet && zoneSet.has(tag));
-      const isCrossing = tag.indexOf('crossing') === 0 || tag.indexOf('street') === 0;
-
-      if (useHiddenClose && pPos && hasCam) {
-        _spawnCandDir.set(n.x - _spawnEyePos.x, (ny + 1.35) - _spawnEyePos.y, n.z - _spawnEyePos.z);
-        const d3 = _spawnCandDir.length();
-        let dot = -1.0;
-        let losOccluded = false;
-        if (d3 > 0.2) {
-          _spawnCandDir.divideScalar(d3);
-          dot = _spawnCandDir.dot(_spawnCamFwd);
-          if (hasStationRay && d3 > 0.6) {
-            if (LRT.Station.raycastWorld(_spawnEyePos, _spawnCandDir, d3 - 0.45)) losOccluded = true;
-          }
-          if (!losOccluded && hasTrainRay && d3 > 0.6) {
-            if (LRT.Train.raycastTrain(_spawnEyePos, _spawnCandDir, d3 - 0.45)) losOccluded = true;
-          }
-        }
-        const inViewCone = dot > 0.36;
-        const isHidden = !inViewCone || losOccluded;
-        const score = Math.abs(dh - 20.0) + (tag === 'concealed_station' || tag === 'stairwell_pocket' ? -4.0 : 0.0);
-
-        if (dh >= minDist && dh <= maxDist && isHidden) {
-          if (inPref) {
-            tier1.push({ node: n, score });
-            continue;
-          }
-          if (!isCrossing) {
-            tier2.push({ node: n, score });
-            continue;
-          }
-        }
-        if (dh <= maxDist + 10.0 && (losOccluded || dot <= 0.55) && inPref) {
-          tier3.push({ node: n, score });
-          continue;
-        }
-      }
-
-      if (inPref) preferred.push(n);
-      else fallback.push(n);
-    }
-
-    if (useHiddenClose) {
-      const chosen = tier1.length > 0 ? tier1 : (tier2.length > 0 ? tier2 : (tier3.length > 0 ? tier3 : null));
-      if (chosen) {
-        chosen.sort((a, b) => a.score - b.score);
-        return chosen.map((c) => c.node);
-      }
-    }
-    if (preferred.length > 0) return preferred;
-    if (fallback.length > 0) return fallback;
-    return [
-      { x: 3.4, y: 0.0, z: -26.0 },
-      { x: 3.4, y: 0.0, z: 26.0 },
-      { x: 14.0, y: 0.0, z: -22.0 },
-      { x: 14.0, y: 0.0, z: 22.0 }
-    ];
-  }
-
-  function spawnExtraInfectedCluster(variants, preferredZones, opts) {
-    if (!LRT.Enemies || typeof LRT.Enemies.spawnOneZombie !== 'function') return 0;
-    const nodes = gatherClusterSpawnNodes(preferredZones, opts);
-    const spreadCount = (opts && opts.preferClose) ? Math.min(nodes.length, Math.max(variants.length, 6)) : nodes.length;
-    const grid = (LRT.Station && typeof LRT.Station.getSpatialGrid === 'function') ? LRT.Station.getSpatialGrid() : null;
-    let spawned = 0;
-    for (let i = 0; i < variants.length; i++) {
-      const n = nodes[i % spreadCount];
-      const ny = n.y !== undefined ? n.y : 0.0;
-      const jitterRange = (opts && opts.preferClose) ? 0.7 : 1.4;
-      let px = n.x + (Math.random() - 0.5) * jitterRange;
-      let pz = n.z + (Math.random() - 0.5) * jitterRange;
-      if (grid && typeof grid.queryPoint === 'function') {
-        const near = grid.queryPoint(px, pz, 0.5);
-        for (let k = 0; k < near.length; k++) {
-          const b = near[k];
-          if (!b || b.broken || b.disabled || b.blocksWalk === false || b.isFloor || b.isRamp || b.isTrigger) continue;
-          if (b.maxY <= ny + 0.1 || b.minY >= ny + 1.8) continue;
-          if (px + 0.4 > b.minX && px - 0.4 < b.maxX && pz + 0.4 > b.minZ && pz - 0.4 < b.maxZ) {
-            px = n.x;
-            pz = n.z;
-            break;
-          }
-        }
-      }
-      if (LRT.Enemies.spawnOneZombie(variants[i], { x: px, y: ny, z: pz }, { isRoamer: false, aggroState: 'CHASE', diffKey: CORE.difficultyKey })) {
-        spawned++;
-      }
-    }
-    return spawned;
-  }
-
-  function triggerObjectiveSurgeWave(stationIdx) {
-    if (CORE.tutorialActive) return 0;
-    if (CORE.gameMode !== MODES.SURVIVAL) return 0;
-    if (CORE.difficultyKey !== 'hard' && CORE.difficultyKey !== 'nightmare') return 0;
-    if (campaignState.triggeredSurgeStations.has(stationIdx)) return 0;
-    campaignState.triggeredSurgeStations.add(stationIdx);
-
-    const w = Math.max(1, CORE.currentWave);
-    const s = Math.max(0, stationIdx);
-    const nBase = w === 1 ? 6 : (w === 2 ? 9 + (s >= 1 ? 1 : 0) + (s >= 2 ? 1 : 0) : (w === 3 ? 14 : Math.min(34, 10 + 3 * w + s)));
-    const tier = (C.DIFFICULTY_TIERS && C.DIFFICULTY_TIERS[CORE.difficultyKey]) || { waveCountMult: 1.35 };
-    const nWave = Math.max(4, Math.round(nBase * (tier.waveCountMult || 1.0)));
-    const surgeCount = Math.max(3, Math.round(0.55 * nWave));
-
-    const variants = [];
-    for (let i = 0; i < surgeCount; i++) {
-      variants.push(pickDifficultyVariant(CORE.difficultyKey, s >= 1 || CORE.difficultyKey === 'nightmare'));
-    }
-    if (variants.length >= 2 && !variants.includes('runner')) variants[0] = 'runner';
-    if (variants.length >= 4 && s >= 1 && !variants.includes('brute')) variants[1] = 'brute';
-
-    const spawned = spawnExtraInfectedCluster(variants, ['platform_south', 'platform_north', 'crossing_south', 'crossing_north']);
-    if (spawned > 0) {
-      if (LRT.Audio) LRT.Audio.play('zombie_groan_1', { gain: 0.75 });
-      if (LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
-        LRT.PlayerUI.setNotice('OBJECTIVE SURGE — INFECTED INCOMING!', '#f97316');
-      }
-    }
-    return spawned;
-  }
-
-  function buildTrainCallSiegeVariants(diffKey, stationIdx, isReinforcement) {
-    const s = Math.max(0, stationIdx);
-    const dk = diffKey || CORE.difficultyKey || 'medium';
-    const variants = [];
-    if (isReinforcement) {
-      let count = 2;
-      if (dk === 'easy') count = 2;
-      else if (dk === 'medium') count = 3;
-      else if (dk === 'hard') count = 3 + (s >= 2 ? 1 : 0);
-      else count = 4 + (s >= 2 ? 1 : 0);
-
-      if (dk !== 'easy') variants.push('runner');
-      if (dk === 'nightmare' && s >= 1) variants.push('screamer');
-      while (variants.length < count) {
-        variants.push(pickDifficultyVariant(dk, dk === 'hard' || dk === 'nightmare' || s >= 1));
-      }
-      return variants;
-    }
-
-    let count = 5;
-    if (dk === 'easy') {
-      count = 3 + Math.min(2, Math.floor(s / 2));
-      if (s >= 1) variants.push('runner');
-      if (s >= 3) variants.push('spitter');
-    } else if (dk === 'medium') {
-      count = 5 + Math.min(3, Math.floor((s + 1) / 2));
-      variants.push('runner');
-      if (s >= 1) variants.push('runner');
-      if (s >= 2) variants.push('spitter');
-    } else if (dk === 'hard') {
-      count = 6 + s;
-      variants.push('runner', 'runner');
-      if (s >= 1) variants.push('screamer', 'brute');
-      else variants.push('spitter');
-    } else {
-      count = 8 + s;
-      variants.push('runner', 'runner', 'screamer');
-      if (s >= 1) variants.push('brute');
-      else variants.push('spitter');
-    }
-    while (variants.length < count) {
-      variants.push(pickDifficultyVariant(dk, s >= 1 || dk === 'hard' || dk === 'nightmare'));
-    }
-    return variants;
-  }
-
-  function triggerTrainCallSiegeWave(stationIdx) {
-    if (CORE.tutorialActive) return 0;
-    if (CORE.gameMode !== MODES.SURVIVAL) return 0;
-    const variants = buildTrainCallSiegeVariants(CORE.difficultyKey, stationIdx, false);
-    const spawned = spawnExtraInfectedCluster(variants, TRAIN_CALL_CONCEALED_ZONES, {
-      minDist: 12.0,
-      maxDist: 34.0,
-      requireHidden: true,
-      preferClose: true
-    });
-    if (spawned > 0) {
-      if (LRT.Audio) LRT.Audio.play('zombie_groan_2', { gain: 0.82 });
-      if (LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
-        LRT.PlayerUI.setNotice('TAHAN PERON — GEROMBOLAN INFECTED MENDEKAT!', '#f97316');
-      }
-    }
-    return spawned;
-  }
-
-  function triggerTrainCallReinforcementTrickle(stationIdx, stage) {
-    if (CORE.tutorialActive) return 0;
-    if (CORE.gameMode !== MODES.SURVIVAL) return 0;
-    const variants = buildTrainCallSiegeVariants(CORE.difficultyKey, stationIdx, true);
-    if (stage >= 2 && variants.length > 2) variants.length = 2;
-    const spawned = spawnExtraInfectedCluster(variants, TRAIN_CALL_CONCEALED_ZONES, {
-      minDist: 12.0,
-      maxDist: 34.0,
-      requireHidden: true,
-      preferClose: true
-    });
-    if (spawned > 0) {
-      if (LRT.Audio) LRT.Audio.play('zombie_groan_1', { gain: 0.78 });
-      if (stage === 1 && LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
-        LRT.PlayerUI.setNotice('GELOMBANG SUSULAN MUNCUL — PERTAHANKAN PERON!', '#f97316');
-      }
-    }
-    return spawned;
-  }
-
-  function spawnStationRoamers(stationIdx) {
-    if (CORE.tutorialActive) return 0;
-    if (CORE.gameMode !== MODES.SURVIVAL || CORE.gameState === STATES.MENU) return 0;
-    if (campaignState.clearedStations.has(stationIdx)) return 0;
-    if (!LRT.Enemies) return 0;
-    if (typeof LRT.Enemies.setDifficulty === 'function') {
-      LRT.Enemies.setDifficulty(CORE.difficultyKey);
-    }
-    if (typeof LRT.Enemies.setAtmosphereMode === 'function') {
-      LRT.Enemies.setAtmosphereMode(CORE.atmosphereMode);
-    }
-    if (typeof LRT.Enemies.spawnRoamers === 'function') {
-      const navGraph = (LRT.Station && typeof LRT.Station.getNavGraph === 'function') ? LRT.Station.getNavGraph() : null;
-      return LRT.Enemies.spawnRoamers(stationIdx, CORE.difficultyKey, navGraph);
-    }
-    return 0;
-  }
+  // Wave/cluster/surge/roamer spawning moved to src/core/wave_spawner.js.
 
   function onStationBuilt(idx, offsetZ) {
     if (LRT.Enemies && typeof LRT.Enemies.setDifficulty === 'function') {
@@ -830,15 +528,7 @@
     return { x: 3.4, y: 0.05, z: 14.0, yaw: Math.PI * 0.5 };
   }
 
-  function spawnCurrentWave() {
-    if (CORE.tutorialActive) return;
-    if (CORE.gameMode !== MODES.SURVIVAL) return;
-    if (!LRT.Enemies || !LRT.Enemies.spawnWave) return;
-    const nodes = LRT.Station && LRT.Station.getSpawnNodes ? LRT.Station.getSpawnNodes() : [];
-    LRT.Enemies.spawnWave(CORE.currentWave, CORE.stationIndex, nodes, CORE.difficultyKey);
-    if (LRT.Audio) LRT.Audio.play('zombie_groan_1', { gain: 0.7 });
-    LRT.PlayerUI.setNotice(`WAVE ${CORE.currentWave}`, '#ef4444');
-  }
+  // spawnCurrentWave moved to src/core/wave_spawner.js.
 
   function summonTrain(dirOverride, isDirectDebugCall) {
     if (CORE.gameState !== STATES.STATION_ACTIVE) return;
@@ -1858,122 +1548,8 @@
   // =========================================================
   // CHECKPOINT SAVE / CONTINUE (localStorage, survival only)
   // =========================================================
-  const SAVE_KEY = 'lrt_campaign_save_v1';
-  const SAVE_VERSION = 1;
-  const AUTOSAVE_INTERVAL = 8.0;
-  let _autosaveTimer = 0;
-
-  function buildSaveData() {
-    const p = (LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function') ? LRT.PlayerUI.getState() : null;
-    saveCurrentStationUsedIds();
-    const usedObj = {};
-    campaignState.stationUsedIds.forEach((set, idx) => { usedObj[idx] = Array.from(set); });
-    return {
-      v: SAVE_VERSION,
-      savedAt: Date.now(),
-      difficultyKey: CORE.difficultyKey,
-      atmosphereMode: getAtmosphereMode(),
-      stationIndex: CORE.stationIndex | 0,
-      currentWave: CORE.currentWave | 0,
-      stationsCleared: CORE.stationsCleared | 0,
-      totalKills: CORE.totalKills | 0,
-      health: p ? Math.round(p.health) : 100,
-      armor: p ? Math.round(p.armor || 0) : 0,
-      maxArmor: p ? (p.maxArmor || 100) : 100,
-      weapons: (LRT.Weapons && typeof LRT.Weapons.getSaveState === 'function') ? LRT.Weapons.getSaveState() : null,
-      campaign: {
-        clearedStations: Array.from(campaignState.clearedStations),
-        visitedStations: Array.from(campaignState.visitedStations),
-        triggeredSurgeStations: Array.from(campaignState.triggeredSurgeStations),
-        stationObjectives: JSON.parse(JSON.stringify(campaignState.stationObjectives)),
-        voTriggered: Array.from(campaignState.voTriggered),
-        collectedLogs: campaignState.collectedLogs.slice(),
-        firstBarrelExploded: !!campaignState.firstBarrelExploded,
-        stationUsedIds: usedObj
-      }
-    };
-  }
-
-  function writeSave() {
-    if (CORE.gameMode !== MODES.SURVIVAL || campaignState.campaignVictory) return false;
-    try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(buildSaveData()));
-      return true;
-    } catch (_) { return false; }
-  }
-
-  function readSave() {
-    try {
-      const raw = localStorage.getItem(SAVE_KEY);
-      if (!raw) return null;
-      const d = JSON.parse(raw);
-      if (!d || d.v !== SAVE_VERSION || typeof d.stationIndex !== 'number' || !d.campaign) return null;
-      return d;
-    } catch (_) { return null; }
-  }
-
-  function clearSave() {
-    try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
-  }
-
-  function getSaveSummary() {
-    const d = readSave();
-    if (!d) return null;
-    const archs = C.ARCHETYPES || [];
-    const arch = archs.length ? archs[d.stationIndex % archs.length] : null;
-    return {
-      stationIndex: d.stationIndex,
-      stationName: (arch && arch.name) || ('Stasiun ' + (d.stationIndex + 1)),
-      difficultyKey: d.difficultyKey,
-      atmosphereMode: d.atmosphereMode,
-      stationsCleared: d.stationsCleared,
-      savedAt: d.savedAt
-    };
-  }
-
-  // Restores campaignState + CORE counters from a save. Called by startGame(resume) after resetCampaignState().
-  function applySaveData(d) {
-    if (!d || !d.campaign) return false;
-    const c = d.campaign;
-    campaignState.clearedStations = new Set(c.clearedStations || []);
-    campaignState.visitedStations = new Set(c.visitedStations || [0]);
-    campaignState.triggeredSurgeStations = new Set(c.triggeredSurgeStations || []);
-    if (c.stationObjectives) campaignState.stationObjectives = c.stationObjectives;
-    campaignState.voTriggered = new Set(c.voTriggered || []);
-    campaignState.collectedLogs.length = 0;
-    (c.collectedLogs || []).forEach((l) => campaignState.collectedLogs.push(l));
-    campaignState.firstBarrelExploded = !!c.firstBarrelExploded;
-    campaignState.stationUsedIds.clear();
-    Object.keys(c.stationUsedIds || {}).forEach((k) => {
-      campaignState.stationUsedIds.set(parseInt(k, 10), new Set(c.stationUsedIds[k]));
-    });
-    CORE.stationIndex = d.stationIndex | 0;
-    CORE.currentWave = Math.max(1, d.currentWave | 0);
-    CORE.stationsCleared = d.stationsCleared | 0;
-    CORE.totalKills = d.totalKills | 0;
-    return true;
-  }
-
-  function tickAutosave(dt) {
-    if (CORE.gameMode !== MODES.SURVIVAL) return;
-    if (campaignState.campaignVictory) { clearSave(); return; }
-    // Checkpoint only while standing in a station (never mid-ride / game over).
-    if (CORE.gameState !== STATES.STATION_ACTIVE) { _autosaveTimer = 0; return; }
-    _autosaveTimer += dt;
-    if (_autosaveTimer >= AUTOSAVE_INTERVAL) {
-      _autosaveTimer = 0;
-      writeSave();
-    }
-  }
-
-  CORE.buildSaveData = buildSaveData;
-  CORE.writeSave = writeSave;
-  CORE.readSave = readSave;
-  CORE.clearSave = clearSave;
-  CORE.hasSave = () => !!readSave();
-  CORE.getSaveSummary = getSaveSummary;
-  CORE.applySaveData = applySaveData;
-  CORE.tickAutosave = tickAutosave;
+  // SAVE / LOAD SYSTEM moved to src/core/save_system.js.
+  // =========================================================
 
   CORE.CAMPAIGN_MOODS = CAMPAIGN_MOODS;
   CORE.CAMPAIGN_MOODS_DAYLIGHT = (C.CAMPAIGN_MOODS_DAYLIGHT || FALLBACK_CAMPAIGN_MOODS_DAYLIGHT);
@@ -1989,7 +1565,6 @@
   CORE.handleInteractResult = handleInteractResult;
   CORE.isStationPrimaryObjectiveComplete = isStationPrimaryObjectiveComplete;
   CORE.pickPlayerSpawnPos = pickPlayerSpawnPos;
-  CORE.spawnCurrentWave = spawnCurrentWave;
   function jumpToStation(idx) {
     const total = (C.ARCHETYPES && C.ARCHETYPES.length) ? C.ARCHETYPES.length : 6;
     const targetIdx = Math.max(0, Math.min(total - 1, idx | 0));
@@ -2038,7 +1613,6 @@
   CORE.buildObjectiveInfo = buildObjectiveInfo;
   CORE.getActiveObjectiveTargetIds = getActiveObjectiveTargetIds;
   CORE.onStationBuilt = onStationBuilt;
-  CORE.spawnStationRoamers = spawnStationRoamers;
   CORE.updateTrainCampaign = updateTrainCampaign;
   CORE.updateSurvivalAndVoChecks = updateSurvivalAndVoChecks;
 

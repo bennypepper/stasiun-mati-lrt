@@ -1255,6 +1255,10 @@
   CORE.setLightingMode = setLightingMode;
   CORE.cycleLightingMode = cycleLightingMode;
   CORE.getLightingMode = getLightingMode;
+  CORE.getScene = () => CORE.scene;
+  CORE.getCamera = () => CORE.camera;
+  CORE.getRenderer = () => CORE.renderer;
+  CORE.getQualityKey = () => CORE.qualityKey;
   CORE.updateMenuCamera = updateMenuCamera;
   LRT.Core = CORE;
 })(window.LRT = window.LRT || {});

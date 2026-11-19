@@ -1082,6 +1082,14 @@
       return this._cachedAllBVH;
     },
 
+    getRootGroup: function () {
+      return this.rootGroup;
+    },
+
+    getColliders: function () {
+      return this._isBuilding ? _emptyArr : this.colliders;
+    },
+
     _buildObjectiveBeacons: function () {
       if (!this.rootGroup) return;
       this._objectiveMarkersCache = [];

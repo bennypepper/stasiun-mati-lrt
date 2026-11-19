@@ -846,6 +846,10 @@
       return this._isBuilding ? null : (this.bvhMeshes[0] || null);
     },
 
+    getRootGroup: function () {
+      return this.rootGroup;
+    },
+
     getColliders: function () {
       return this._isBuilding ? _emptyArr : this.colliders;
     },
