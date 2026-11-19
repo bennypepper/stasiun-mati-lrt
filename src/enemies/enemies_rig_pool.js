@@ -427,6 +427,7 @@
     let runnerEyes = null;
     let riotArmorGroup = null;
     let riotHelmetGroup = null;
+    let riotLimbGuards = null;
     let riotVisorNode = cloned.visorMesh || null;
 
     if (!E._st._runnerEyeMat) {
@@ -536,32 +537,59 @@
         return m;
       };
 
+      // Shared rounded geometry cache (unit shapes scaled per piece) so 48 rigs reuse the same buffers
+      const RG = (E._st._riotGeo = E._st._riotGeo || {});
+      if (!RG.sphere) {
+        RG.sphere = new THREE.SphereGeometry(1, 14, 10);
+        RG.cyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 18, 1, false);
+        RG.shin = new THREE.CylinderGeometry(0.075, 0.062, 0.27, 16, 1, true, -1.75, 3.5);
+        RG.collar = new THREE.TorusGeometry(0.072, 0.024, 8, 18);
+        RG.ring = new THREE.TorusGeometry(0.050, 0.008, 6, 14);
+      }
+      if (!E._st._riotShellMat) {
+        E._st._riotShellMat = E._st._riotPlateMat.clone();
+        E._st._riotShellMat.side = THREE.DoubleSide;
+      }
+      const addShape = (parentGrp, invS, mat, geo, x, y, z, sx, sy, sz, rx, ry, rz) => {
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(x * invS, y * invS, z * invS);
+        if (rx || ry || rz) m.rotation.set(rx || 0, ry || 0, rz || 0);
+        m.scale.set(sx * invS, sy * invS, sz * invS);
+        m.castShadow = false;
+        m.receiveShadow = false;
+        parentGrp.add(m);
+        return m;
+      };
+
       // 1. PASGT Riot Police Helmet + "POLISI" front patch + cracked polycarbonate riot visor on Head bone
       // (Leaves zombie face & snarling jaw visible beneath the visor; collapses automatically on decapitation!)
       if (bones.head) {
         bones.head.getWorldScale(_v1);
         const hInvS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
         riotHelmetGroup = new THREE.Group();
-        // Upper helmet dome crown + brow rim (above eye line y = 0.095 so face is never covered by a spacesuit hood)
-        const domeGeo = new THREE.SphereGeometry(0.128, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.56);
-        const dome = new THREE.Mesh(domeGeo, E._st._riotPlateMat);
+        const domeGeo = new THREE.SphereGeometry(0.128, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.56);
+        const dome = new THREE.Mesh(domeGeo, E._st._riotShellMat);
         dome.position.set(0, 0.092 * hInvS, -0.008 * hInvS);
         dome.scale.set(0.96 * hInvS, 1.02 * hInvS, 1.08 * hInvS);
         dome.castShadow = false;
         riotHelmetGroup.add(dome);
-        // Side ear covers & rear ballistic nape guard
-        addArmorBox(riotHelmetGroup, hInvS, E._st._riotArmorMat, 0.026, 0.095, 0.120, -0.112, 0.068, -0.015, 0, 0, 0.10);
-        addArmorBox(riotHelmetGroup, hInvS, E._st._riotArmorMat, 0.026, 0.095, 0.120,  0.112, 0.068, -0.015, 0, 0, -0.10);
-        addArmorBox(riotHelmetGroup, hInvS, E._st._riotArmorMat, 0.195, 0.075, 0.028,  0.0,   0.045, -0.118, 0.18, 0, 0);
-        // Front brow mount + POLISI stencil plate
-        addArmorBox(riotHelmetGroup, hInvS, E._st._riotPlateMat, 0.150, 0.032, 0.024,  0.0,   0.138,  0.118, -0.12, 0, 0);
-        addArmorBox(riotHelmetGroup, hInvS, E._st._riotBadgeMat, 0.088, 0.036, 0.008,  0.0,   0.162,  0.118, -0.18, 0, 0);
+        // Helmet brim ridge, rounded ear covers and flared rear nape guard
+        addShape(riotHelmetGroup, hInvS, E._st._riotArmorMat, RG.cyl, 0, 0.098, -0.006, 0.250, 0.016, 0.268);
+        addShape(riotHelmetGroup, hInvS, E._st._riotArmorMat, RG.sphere, -0.110, 0.066, -0.012, 0.020, 0.052, 0.062, 0, 0, 0.12);
+        addShape(riotHelmetGroup, hInvS, E._st._riotArmorMat, RG.sphere, 0.110, 0.066, -0.012, 0.020, 0.052, 0.062, 0, 0, -0.12);
+        addShape(riotHelmetGroup, hInvS, E._st._riotArmorMat, RG.sphere, 0, 0.050, -0.114, 0.098, 0.050, 0.020, 0.20, 0, 0);
+        // Front brow plate + POLISI patch
+        addShape(riotHelmetGroup, hInvS, E._st._riotPlateMat, RG.sphere, 0, 0.136, 0.112, 0.074, 0.022, 0.016, -0.12, 0, 0);
+        addArmorBox(riotHelmetGroup, hInvS, E._st._riotBadgeMat, 0.088, 0.036, 0.006, 0.0, 0.160, 0.122, -0.18, 0, 0);
 
-        // Detachable transparent Riot Visor across upper face (shatters off when armor breaks!)
+        // Detachable curved Riot Visor across upper face (shatters off when armor breaks!)
         const vGrp = new THREE.Group();
-        addArmorBox(vGrp, hInvS, E._st._riotVisorMat, 0.215, 0.082, 0.014, 0.0, 0.084, 0.136, 0.06, 0, 0);
-        addArmorBox(vGrp, hInvS, E._st._riotVisorMat, 0.014, 0.080, 0.085, -0.106, 0.084, 0.092, 0, -0.18, 0);
-        addArmorBox(vGrp, hInvS, E._st._riotVisorMat, 0.014, 0.080, 0.085,  0.106, 0.084, 0.092, 0,  0.18, 0);
+        const visorGeo = new THREE.CylinderGeometry(0.118, 0.112, 0.082, 18, 1, true, -1.25, 2.5);
+        const visor = new THREE.Mesh(visorGeo, E._st._riotVisorMat);
+        visor.material = E._st._riotVisorMat;
+        visor.position.set(0, 0.086 * hInvS, 0.010 * hInvS);
+        visor.scale.set(hInvS, hInvS, hInvS);
+        vGrp.add(visor);
         riotHelmetGroup.add(vGrp);
         riotVisorNode = vGrp;
         bones.head.add(riotHelmetGroup);
@@ -572,26 +600,27 @@
         bones.spine2.getWorldScale(_v1);
         const sInvS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
         riotArmorGroup = new THREE.Group();
-        // Front & back ballistic vest carrier + side cummerbunds
-        addArmorBox(riotArmorGroup, sInvS, E._st._riotArmorMat, 0.340, 0.340, 0.255, 0, 0.045, 0.005);
-        addArmorBox(riotArmorGroup, sInvS, E._st._riotPlateMat, 0.275, 0.280, 0.036, 0, 0.055, 0.128, -0.05, 0, 0);
-        addArmorBox(riotArmorGroup, sInvS, E._st._riotPlateMat, 0.270, 0.285, 0.034, 0, 0.055, -0.122, 0.04, 0, 0);
-        // High-contrast "POLISI / BRIMOB" chest & back identification patch
-        addArmorBox(riotArmorGroup, sInvS, E._st._riotBadgeMat, 0.185, 0.088, 0.010, 0, 0.125, 0.146, -0.05, 0, 0);
-        addArmorBox(riotArmorGroup, sInvS, E._st._riotBadgeMat, 0.200, 0.094, 0.010, 0, 0.120, -0.138, 0.04, Math.PI, 0);
-        // Padded shoulder straps + ballistic throat collar guard
-        addArmorBox(riotArmorGroup, sInvS, E._st._riotPlateMat, 0.075, 0.042, 0.220, -0.118, 0.215, 0.005);
-        addArmorBox(riotArmorGroup, sInvS, E._st._riotPlateMat, 0.075, 0.042, 0.220,  0.118, 0.215, 0.005);
-        // 3 Front tactical rifle mag pouches + left shoulder HT police radio & whip antenna
+        // Torso-hugging oval carrier + contoured front/back ceramic plates
+        addShape(riotArmorGroup, sInvS, E._st._riotArmorMat, RG.cyl, 0, 0.045, 0.004, 0.350, 0.340, 0.262);
+        addShape(riotArmorGroup, sInvS, E._st._riotPlateMat, RG.sphere, 0, 0.058, 0.108, 0.120, 0.135, 0.040, -0.04, 0, 0);
+        addShape(riotArmorGroup, sInvS, E._st._riotPlateMat, RG.sphere, 0, 0.058, -0.104, 0.118, 0.135, 0.038, 0.04, 0, 0);
+        // "POLISI / BRIMOB" identification patches
+        addArmorBox(riotArmorGroup, sInvS, E._st._riotBadgeMat, 0.170, 0.082, 0.006, 0, 0.118, 0.145, -0.05, 0, 0);
+        addArmorBox(riotArmorGroup, sInvS, E._st._riotBadgeMat, 0.190, 0.090, 0.006, 0, 0.116, -0.138, 0.04, Math.PI, 0);
+        // Padded shoulder straps + throat collar
+        addShape(riotArmorGroup, sInvS, E._st._riotPlateMat, RG.sphere, -0.112, 0.208, 0.004, 0.044, 0.030, 0.118, 0, 0, 0.22);
+        addShape(riotArmorGroup, sInvS, E._st._riotPlateMat, RG.sphere, 0.112, 0.208, 0.004, 0.044, 0.030, 0.118, 0, 0, -0.22);
+        addShape(riotArmorGroup, sInvS, E._st._riotArmorMat, RG.collar, 0, 0.232, 0.0, 1.0, 1.0, 1.0, Math.PI * 0.5, 0, 0);
+        // 3 mag pouches + HT radio + whip antenna
         for (let p = -1; p <= 1; p++) {
-          addArmorBox(riotArmorGroup, sInvS, E._st._riotArmorMat, 0.068, 0.112, 0.044, p * 0.082, -0.018, 0.152);
+          addShape(riotArmorGroup, sInvS, E._st._riotArmorMat, RG.cyl, p * 0.080, -0.026, 0.150, 0.068, 0.108, 0.040);
         }
-        addArmorBox(riotArmorGroup, sInvS, E._st._riotPlateMat, 0.048, 0.088, 0.038, -0.118, 0.175, 0.128, 0, 0, 0.15);
-        addArmorBox(riotArmorGroup, sInvS, E._st._riotArmorMat, 0.008, 0.145, 0.008, -0.132, 0.265, 0.128);
-        // Zombie gore decoration on vest: coagulated blood clots & torn ballistic trauma wound
+        addShape(riotArmorGroup, sInvS, E._st._riotPlateMat, RG.sphere, -0.118, 0.172, 0.126, 0.026, 0.050, 0.020);
+        addShape(riotArmorGroup, sInvS, E._st._riotArmorMat, RG.cyl, -0.130, 0.262, 0.126, 0.007, 0.150, 0.007);
+        // Zombie gore: coagulated blood clots & ballistic trauma
         for (let c = 0; c < 3; c++) {
           const cl = new THREE.Mesh(E._st._cystGeo, E._st._neckStumpMat);
-          cl.position.set((-0.06 + c * 0.055) * sInvS, (0.04 + (c & 1) * 0.05) * sInvS, 0.148 * sInvS);
+          cl.position.set((-0.06 + c * 0.055) * sInvS, (0.04 + (c & 1) * 0.05) * sInvS, 0.150 * sInvS);
           cl.scale.set(0.045 * sInvS, 0.038 * sInvS, 0.016 * sInvS);
           cl.castShadow = false;
           riotArmorGroup.add(cl);
@@ -599,30 +628,51 @@
         bones.spine2.add(riotArmorGroup);
       }
 
-      // 3. Riot Shoulder Pauldrons (on LeftArm / RightArm), Forearm Bracers (on LeftForeArm / RightForeArm — sever with arms!),
-      //    and Knee/Shin Guards (on LeftLeg / RightLeg — sever with legs!)
-      const attachLimbGuard = (bone, w, h, d, lx, ly, lz) => {
+      // 3. Rounded pauldrons, forearm bracers and shin/knee guards on bones (sever together with limbs;
+      //    they also shatter off with the vest when the Brute's armor breaks)
+      riotLimbGuards = [];
+      const attachGuard = (bone, build) => {
         if (!bone) return;
         bone.getWorldScale(_v1);
         const bInvS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
         const g = new THREE.Group();
-        addArmorBox(g, bInvS, E._st._riotPlateMat, w, h, d, lx, ly, lz);
+        build(g, bInvS);
         bone.add(g);
+        riotLimbGuards.push(g);
       };
-      attachLimbGuard(bones.leftArm,      0.115, 0.145, 0.125,  0.022, 0.085, 0.0);
-      attachLimbGuard(bones.rightArm,     0.115, 0.145, 0.125, -0.022, 0.085, 0.0);
-      attachLimbGuard(bones.leftForeArm,  0.092, 0.185, 0.096,  0.0,   0.115, 0.0);
-      attachLimbGuard(bones.rightForeArm, 0.092, 0.185, 0.096,  0.0,   0.115, 0.0);
-      attachLimbGuard(bones.leftLeg,      0.122, 0.275, 0.130,  0.0,   0.175, 0.018);
-      attachLimbGuard(bones.rightLeg,     0.122, 0.275, 0.130,  0.0,   0.175, 0.018);
-      // Tactical utility belt & drop-leg holster on Hips
+      const pauldron = (g, k) => {
+        addShape(g, k, E._st._riotPlateMat, RG.sphere, 0, 0.070, 0, 0.074, 0.098, 0.076);
+        addShape(g, k, E._st._riotArmorMat, RG.ring, 0, 0.150, 0, 1.0, 1.0, 1.0, Math.PI * 0.5, 0, 0);
+      };
+      const bracer = (g, k) => {
+        addShape(g, k, E._st._riotPlateMat, RG.cyl, 0, 0.115, 0, 0.100, 0.175, 0.098);
+        addShape(g, k, E._st._riotArmorMat, RG.ring, 0, 0.032, 0, 1.0, 1.0, 1.0, Math.PI * 0.5, 0, 0);
+        addShape(g, k, E._st._riotArmorMat, RG.ring, 0, 0.198, 0, 0.92, 0.92, 0.92, Math.PI * 0.5, 0, 0);
+      };
+      const shinGuard = (g, k) => {
+        const shell = new THREE.Mesh(RG.shin, E._st._riotShellMat);
+        shell.position.set(0, 0.180 * k, 0.012 * k);
+        shell.scale.set(k, k, k);
+        shell.castShadow = false;
+        g.add(shell);
+        addShape(g, k, E._st._riotPlateMat, RG.sphere, 0, 0.016, 0.042, 0.074, 0.058, 0.060);
+        addShape(g, k, E._st._riotArmorMat, RG.ring, 0, 0.300, 0, 1.30, 1.30, 1.30, Math.PI * 0.5, 0, 0);
+      };
+      attachGuard(bones.leftArm, pauldron);
+      attachGuard(bones.rightArm, pauldron);
+      attachGuard(bones.leftForeArm, bracer);
+      attachGuard(bones.rightForeArm, bracer);
+      attachGuard(bones.leftLeg, shinGuard);
+      attachGuard(bones.rightLeg, shinGuard);
+
+      // Tactical duty belt, drop-leg holster & utility pouch on Hips
       if (bones.hips) {
         bones.hips.getWorldScale(_v1);
         const pInvS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
         const beltGrp = new THREE.Group();
-        addArmorBox(beltGrp, pInvS, E._st._riotArmorMat, 0.365, 0.065, 0.265, 0, 0.025, 0.005);
-        addArmorBox(beltGrp, pInvS, E._st._riotPlateMat, 0.062, 0.135, 0.088, -0.195, -0.045, 0.020);
-        addArmorBox(beltGrp, pInvS, E._st._riotPlateMat, 0.058, 0.095, 0.075,  0.192,  0.015, 0.025);
+        addShape(beltGrp, pInvS, E._st._riotArmorMat, RG.cyl, 0, 0.025, 0.004, 0.365, 0.062, 0.268);
+        addShape(beltGrp, pInvS, E._st._riotPlateMat, RG.sphere, -0.190, -0.050, 0.022, 0.032, 0.072, 0.044);
+        addShape(beltGrp, pInvS, E._st._riotPlateMat, RG.sphere, 0.186, 0.014, 0.026, 0.030, 0.046, 0.038);
         bones.hips.add(beltGrp);
       }
     } else {
@@ -690,6 +740,7 @@
       visorMesh: riotVisorNode,
       riotArmorGroup,
       riotHelmetGroup,
+      riotLimbGuards,
       neckStumpNode,
       armStumpL,
       armStumpR,

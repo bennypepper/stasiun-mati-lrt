@@ -1128,127 +1128,190 @@
     ret.renderOrder = 4;
   }
 
-  // Shared helper: continuous anatomically connected limb (wrist cuff -> tapered oval forearm -> upper sleeve)
-  const _armUp = new THREE.Vector3(0, 1, 0);
-  const _armDir = new THREE.Vector3();
-  const _armQuat = new THREE.Quaternion();
-  const _armEuler = new THREE.Euler();
+  // ===========================================================================
+  // Anatomical first-person hands & forearms (rounded limb segments, per-weapon grips)
+  // All coordinates are in the weapon group's local space (metres, barrel along -Z).
+  // ===========================================================================
+  const _hUp = new THREE.Vector3(0, 1, 0);
+  const _hA = new THREE.Vector3();
+  const _hB = new THREE.Vector3();
+  const _hD = new THREE.Vector3();
+  const _hQ = new THREE.Quaternion();
 
-  function addConnectedForearm(target, mats, wx, wy, wz, ex, ey, ez) {
-    _armDir.set(ex - wx, ey - wy, ez - wz);
-    const len = _armDir.length();
-    if (len < 0.02) return;
-    _armDir.divideScalar(len);
-    _armQuat.setFromUnitVectors(_armUp, _armDir);
-    _armEuler.setFromQuaternion(_armQuat);
-
-    // 1. Overlapping glove gauntlet / wrist cuff bridge embedded inside the rear of the palm (zero gap!)
-    const cuffLen = 0.068;
-    const cuffT = 0.018;
-    const cuffGeo = new THREE.CylinderGeometry(0.0235, 0.0215, cuffLen, 12);
-    cuffGeo.scale(0.86, 1.0, 1.04);
-    addPart(
-      target, cuffGeo, mats.gloveDark,
-      wx + _armDir.x * cuffT, wy + _armDir.y * cuffT, wz + _armDir.z * cuffT,
-      _armEuler.x, _armEuler.y, _armEuler.z
-    );
-
-    // Subtle tactical watch / Velcro wrist strap band
-    const strapT = 0.036;
-    const strapGeo = new THREE.CylinderGeometry(0.0245, 0.0242, 0.018, 12);
-    strapGeo.scale(0.88, 1.0, 1.05);
-    addPart(
-      target, strapGeo, mats.gloveKnuckle,
-      wx + _armDir.x * strapT, wy + _armDir.y * strapT, wz + _armDir.z * strapT,
-      _armEuler.x, _armEuler.y, _armEuler.z
-    );
-
-    // 2. Continuous anatomical oval forearm sleeve extending from inside the wrist cuff to off-screen shoulder
-    const armStart = 0.032;
-    const armLen = Math.max(0.18, len - armStart);
-    const armMid = armStart + armLen * 0.5;
-    const armGeo = new THREE.CylinderGeometry(0.034, 0.024, armLen, 14);
-    armGeo.scale(0.86, 1.0, 1.06);
-    addPart(
-      target, armGeo, mats.sleeveTactical,
-      wx + _armDir.x * armMid, wy + _armDir.y * armMid, wz + _armDir.z * armMid,
-      _armEuler.x, _armEuler.y, _armEuler.z
-    );
-
-    // 3. Rolled BDU sleeve cuff fold along mid-forearm for realistic fabric silhouette
-    const foldT = armStart + 0.048;
-    const foldGeo = new THREE.CylinderGeometry(0.0285, 0.0265, 0.034, 12);
-    foldGeo.scale(0.88, 1.0, 1.07);
-    addPart(
-      target, foldGeo, mats.gloveKnuckle,
-      wx + _armDir.x * foldT, wy + _armDir.y * foldT, wz + _armDir.z * foldT,
-      _armEuler.x, _armEuler.y, _armEuler.z
-    );
+  function handMesh(parent, geo, mat) {
+    geo.computeBoundingSphere();
+    const m = new THREE.Mesh(geo, mat);
+    m.castShadow = false;
+    m.receiveShadow = false;
+    m.frustumCulled = false;
+    parent.add(m);
+    return m;
   }
 
-  // Shared helper: ergonomic dark tactical gloved hands & continuous forearm sleeves (skipped on world pickups!)
+  // Rounded tapered limb segment between two points (optional ball joints at either end)
+  function addSeg(parent, mat, a, b, r0, r1, capA, capB, oval) {
+    _hA.set(a[0], a[1], a[2]);
+    _hB.set(b[0], b[1], b[2]);
+    _hD.subVectors(_hB, _hA);
+    const len = _hD.length();
+    if (len < 1e-4) return;
+    _hD.divideScalar(len);
+    _hQ.setFromUnitVectors(_hUp, _hD);
+    const geo = new THREE.CylinderGeometry(r1, r0, len, 10, 1, false);
+    if (oval) geo.scale(oval, 1.0, 1.05);
+    const m = handMesh(parent, geo, mat);
+    m.quaternion.copy(_hQ);
+    m.position.set((a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5, (a[2] + b[2]) * 0.5);
+    if (capA) {
+      const s = handMesh(parent, new THREE.SphereGeometry(r0, 10, 8), mat);
+      s.position.set(a[0], a[1], a[2]);
+    }
+    if (capB) {
+      const s = handMesh(parent, new THREE.SphereGeometry(r1, 10, 8), mat);
+      s.position.set(b[0], b[1], b[2]);
+    }
+  }
+
+  function addBlob(parent, mat, x, y, z, rx, ry, rz) {
+    const geo = new THREE.SphereGeometry(1, 12, 9);
+    geo.scale(rx, ry, rz);
+    const m = handMesh(parent, geo, mat);
+    m.position.set(x, y, z);
+    return m;
+  }
+
+  // Finger / thumb chain: polyline of joint points with matching radii, ball joints between phalanges
+  function addDigit(parent, mat, knuckleMat, pts, radii) {
+    for (let i = 0; i < pts.length - 1; i++) {
+      addSeg(parent, mat, pts[i], pts[i + 1], radii[i], radii[i + 1], i > 0, i === pts.length - 2);
+    }
+    if (knuckleMat) addBlob(parent, knuckleMat, pts[0][0], pts[0][1], pts[0][2], radii[0] * 1.08, radii[0] * 1.05, radii[0] * 1.08);
+  }
+
+  function rotXv(v, t) {
+    const c = Math.cos(t), s = Math.sin(t);
+    return [v[0], v[1] * c - v[2] * s, v[1] * s + v[2] * c];
+  }
+
+  // Glove gauntlet -> wrist cuff -> tapering oval BDU sleeve running off the bottom of the screen
+  function addForearm(parent, mats, w, dirVec) {
+    const len = Math.hypot(dirVec[0], dirVec[1], dirVec[2]) || 1;
+    const d = [dirVec[0] / len, dirVec[1] / len, dirVec[2] / len];
+    const at = (t) => [w[0] + d[0] * t, w[1] + d[1] * t, w[2] + d[2] * t];
+    addSeg(parent, mats.gloveDark, at(-0.012), at(0.052), 0.026, 0.0295, true, false, 0.92);
+    addSeg(parent, mats.gloveKnuckle, at(0.046), at(0.066), 0.0315, 0.0315, false, false, 0.92); // velcro cuff
+    addSeg(parent, mats.sleeveTactical, at(0.060), at(0.200), 0.0325, 0.043, false, false, 0.90);
+    addSeg(parent, mats.sleeveTactical, at(0.198), at(0.420), 0.043, 0.052, false, true, 0.90);
+    addSeg(parent, mats.gloveKnuckle, at(0.150), at(0.162), 0.0445, 0.0445, false, false, 0.90); // rolled sleeve fold
+  }
+
+  // Pistol-grip style hand (trigger hand, pistol support hand, foregrip, stock wrist)
+  // g: { cx, cy, cz, tilt, w, d, trig:[ty,tz]|null, arm:[x,y,z], support, thumbDy }
+  function addGripHand(parent, mats, g, side) {
+    const sx = side;
+    const hw = g.w * 0.5;
+    const hd = g.d * 0.5;
+    const grp = new THREE.Group();
+    grp.position.set(g.cx, g.cy, g.cz);
+    grp.rotation.x = g.tilt || 0;
+    parent.add(grp);
+
+    const glove = mats.gloveDark;
+    const knuck = mats.gloveKnuckle;
+    const X = (x) => sx * x;
+    const zOff = g.support ? -0.009 : 0.0;
+
+    // Palm on the side face, backstrap heel, thumb web, padded back-of-hand
+    addBlob(grp, glove, X(hw + 0.011), 0.004, 0.008, 0.012, 0.040, 0.029);
+    addBlob(grp, glove, X(0.003), 0.0, hd + 0.011, 0.020, 0.040, 0.011);
+    addBlob(grp, glove, X(0.002), 0.040, hd + 0.004, 0.019, 0.014, 0.014);
+    addBlob(grp, knuck, X(hw + 0.025), 0.006, 0.010, 0.0075, 0.034, 0.023);
+
+    // Fingers wrap around the front of the grip
+    const rows = g.trig ? (g.support ? [0.012, -0.004, -0.020, -0.036] : [0.008, -0.009, -0.026])
+                        : [0.026, 0.008, -0.010, -0.028];
+    for (let i = 0; i < rows.length; i++) {
+      const y = rows[i];
+      const fz = -hd + zOff;
+      addDigit(grp, glove, knuck, [
+        [X(hw + 0.010), y, fz + 0.004],
+        [X(hw + 0.002), y, fz - 0.009],
+        [X(-0.003), y, fz - 0.011],
+        [X(-hw + 0.001), y, fz - 0.005]
+      ], [0.0095, 0.0090, 0.0085, 0.0078]);
+    }
+
+    // Trigger finger extended along the frame and resting on the trigger
+    if (g.trig && !g.support) {
+      const ty = g.trig[0];
+      const tz = g.trig[1];
+      addDigit(grp, glove, knuck, [
+        [X(hw + 0.010), ty + 0.004, -hd + 0.004],
+        [X(hw + 0.004), ty + 0.004, tz + 0.022],
+        [X(0.004), ty + 0.002, tz + 0.008],
+        [X(0.0), ty - 0.001, tz + 0.001]
+      ], [0.0090, 0.0085, 0.0078, 0.0070]);
+    }
+
+    // Thumb lies forward along the left face of the frame
+    const tdy = g.thumbDy || 0;
+    const tx = (v) => -v; // always the weapon's left face (world -X)
+    addDigit(grp, glove, null, [
+      [X(0.012), 0.038 + tdy, hd + 0.010],
+      [tx(hw + 0.002 + (g.support ? 0.006 : 0)), 0.042 + tdy, hd - 0.002],
+      [tx(hw + 0.005 + (g.support ? 0.006 : 0)), 0.046 + tdy, -0.012],
+      [tx(hw + 0.006 + (g.support ? 0.006 : 0)), 0.048 + tdy, -0.034]
+    ], [0.0105, 0.0095, 0.0088, 0.0078]);
+
+    // Forearm leaves from the wrist behind the palm (computed in parent space)
+    const wLocal = [X(hw + 0.008), -0.010, hd + 0.030];
+    const wr = rotXv(wLocal, g.tilt || 0);
+    const w = [g.cx + wr[0], g.cy + wr[1], g.cz + wr[2]];
+    addForearm(parent, mats, w, g.arm || [sx * 0.10, -0.14, 0.38]);
+  }
+
+  // Support hand cradling a handguard / pump / break-action forend from below
+  // f: { cx, cy, cz, hx, hy, arm:[x,y,z] }
+  function addForendHand(target, mats, f) {
+    const glove = mats.gloveDark;
+    const knuck = mats.gloveKnuckle;
+    const cx = f.cx, cy = f.cy, cz = f.cz;
+    const hx = f.hx, hy = f.hy;
+    const by = cy - (hy + 0.012);
+
+    addBlob(target, glove, cx - 0.002, by, cz + 0.014, 0.027, 0.011, 0.036);
+    addBlob(target, glove, cx - 0.012, cy - (hy + 0.004), cz + 0.046, 0.024, 0.020, 0.020);
+    addBlob(target, knuck, cx - hx - 0.012, cy - hy * 0.55, cz + 0.014, 0.008, 0.026, 0.030);
+
+    for (let i = 0; i < 4; i++) {
+      const z = cz - 0.020 + i * 0.0145;
+      const r = 0.0095 - (i === 3 ? 0.0012 : 0);
+      addDigit(target, glove, knuck, [
+        [cx - 0.014, by, z],
+        [cx + 0.006, cy - (hy + 0.015), z],
+        [cx + hx + 0.011, cy - (hy + 0.004), z],
+        [cx + hx + 0.012, cy + 0.004, z]
+      ], [r, r - 0.0005, r - 0.001, r - 0.0017]);
+    }
+
+    addDigit(target, glove, null, [
+      [cx - hx - 0.010, cy - hy * 0.4, cz + 0.036],
+      [cx - hx - 0.011, cy + 0.002, cz + 0.014],
+      [cx - hx - 0.004, cy + hy * 0.5, cz - 0.010],
+      [cx - hx + 0.002, cy + hy * 0.8, cz - 0.026]
+    ], [0.0105, 0.0095, 0.0088, 0.0078]);
+
+    addForearm(target, mats, [cx - 0.010, cy - (hy + 0.010), cz + 0.062], f.arm || [-0.11, -0.17, 0.36]);
+  }
+
+  // Entry point: cfg.right = trigger hand grip, cfg.left = { grip } | { forend, parent } support hand
   function addTacticalHands(parent, mats, cfg) {
     if (!cfg || !mats.gloveDark) return;
-    // Right (trigger) hand + continuous forearm sleeve
-    if (cfg.right) {
-      const r = cfg.right;
-      const rh = new THREE.Group();
-      rh.position.set(r.x, r.y, r.z);
-      if (r.rx || r.ry || r.rz) rh.rotation.set(r.rx || 0, r.ry || 0, r.rz || 0);
-      // Contoured palm & dorsal backhand wrap around pistol grip
-      addPart(rh, new THREE.BoxGeometry(0.038, 0.056, 0.052), mats.gloveDark, 0.005, -0.004, 0.006);
-      addPart(rh, new THREE.BoxGeometry(0.014, 0.050, 0.044), mats.gloveKnuckle, 0.021, -0.002, 0.008, 0, 0, -0.14);
-      // 4 articulated curled fingers (index on trigger + 3 stacked grip fingers)
-      addPart(rh, new THREE.BoxGeometry(0.032, 0.011, 0.030), mats.gloveDark, 0.003, 0.020, -0.024, 0.08, -0.10, 0);
-      for (let f = 0; f < 3; f++) {
-        const fy = 0.004 - f * 0.013;
-        const fz = -0.018 + f * 0.002;
-        addPart(rh, new THREE.BoxGeometry(0.036, 0.0115, 0.024), mats.gloveDark, 0.002, fy, fz, 0.12, 0, 0);
-        addPart(rh, new THREE.BoxGeometry(0.012, 0.011, 0.020), mats.gloveKnuckle, -0.015, fy, fz - 0.004, 0, 0.25, 0);
-      }
-      // Articulated opposable thumb wrapping high around left backstrap
-      addPart(rh, new THREE.BoxGeometry(0.014, 0.015, 0.034), mats.gloveDark, -0.016, 0.018, 0.008, 0.28, 0.24, -0.18);
-      addPart(rh, new THREE.BoxGeometry(0.012, 0.013, 0.024), mats.gloveKnuckle, -0.019, 0.022, -0.016, 0.12, 0.08, -0.10);
-      // Continuous connected wrist & forearm extending to lower-right camera shoulder
-      addConnectedForearm(rh, mats, 0.010, -0.018, 0.022, 0.135, -0.145, 0.360);
-      parent.add(rh);
-    }
-    // Left (support) hand + continuous forearm sleeve (optionally parented to moving pump/forend group!)
+    if (cfg.right) addGripHand(parent, mats, cfg.right, 1);
     if (cfg.left) {
-      const l = cfg.left;
-      const target = l.parent || parent;
-      const lh = new THREE.Group();
-      lh.position.set(l.x, l.y, l.z);
-      if (l.rx || l.ry || l.rz) lh.rotation.set(l.rx || 0, l.ry || 0, l.rz || 0);
-      if (l.twoHandPistol) {
-        // Two-handed thumbs-forward support wrap on pistol grip
-        addPart(lh, new THREE.BoxGeometry(0.036, 0.054, 0.048), mats.gloveDark, -0.010, -0.006, 0.002);
-        addPart(lh, new THREE.BoxGeometry(0.014, 0.048, 0.042), mats.gloveKnuckle, -0.024, -0.004, -0.002, 0, 0, 0.14);
-        for (let f = 0; f < 4; f++) {
-          const fy = 0.012 - f * 0.0125;
-          addPart(lh, new THREE.BoxGeometry(0.034, 0.011, 0.024), mats.gloveDark, -0.004, fy, -0.024, 0.10, 0, 0);
-        }
-        // Support thumb pointing forward along frame dust cover
-        addPart(lh, new THREE.BoxGeometry(0.013, 0.014, 0.046), mats.gloveDark, -0.020, 0.022, -0.022, 0.08, -0.08, 0.12);
-        addConnectedForearm(lh, mats, -0.016, -0.020, 0.018, -0.175, -0.155, 0.350);
-      } else {
-        // C-clamp / forend support hand cupping cleanly under handguard/pump (NO sphere, NO disconnected cylinder!)
-        // Contoured palm cradle beneath handguard + angled outer backhand plate
-        addPart(lh, new THREE.BoxGeometry(0.042, 0.018, 0.064), mats.gloveDark, -0.004, -0.020, 0.002, 0, 0, 0.18);
-        addPart(lh, new THREE.BoxGeometry(0.015, 0.034, 0.060), mats.gloveKnuckle, -0.024, -0.006, 0.002, 0, 0, 0.26);
-        // 4 individual articulated fingers wrapping underneath & up the right side of the forend
-        for (let f = 0; f < 4; f++) {
-          const fz = -0.022 + f * 0.0145;
-          addPart(lh, new THREE.BoxGeometry(0.028, 0.011, 0.0125), mats.gloveDark, 0.006, -0.021, fz, 0, 0, -0.12);
-          addPart(lh, new THREE.BoxGeometry(0.011, 0.024, 0.0120), mats.gloveKnuckle, 0.021, -0.009, fz, 0, 0, -0.22);
-        }
-        // Opposable thumb wrapping naturally along the left side of the handguard (below sight line)
-        addPart(lh, new THREE.BoxGeometry(0.014, 0.015, 0.036), mats.gloveDark, -0.023, 0.010, -0.008, 0.22, -0.14, -0.35);
-        addPart(lh, new THREE.BoxGeometry(0.012, 0.012, 0.024), mats.gloveKnuckle, -0.019, 0.016, -0.028, 0.08, 0.15, -0.52);
-        // Continuous connected wrist & forearm extending from inside the palm to lower-left off-screen elbow
-        addConnectedForearm(lh, mats, -0.016, -0.018, 0.022, -0.210, -0.195, 0.420);
-      }
-      target.add(lh);
+      const target = cfg.left.parent || parent;
+      if (cfg.left.grip) addGripHand(target, mats, cfg.left.grip, -1);
+      else if (cfg.left.forend) addForendHand(target, mats, cfg.left.forend);
     }
   }
 
@@ -1380,8 +1443,8 @@
 
     if (!isWorld) {
       addTacticalHands(g, mats, {
-        right: { x: 0.004, y: -0.052, z: 0.052, rx: 0.08 },
-        left: { x: -0.006, y: -0.056, z: 0.046, rx: 0.06, twoHandPistol: true }
+        right: { cx: 0, cy: -0.06, cz: 0.04, tilt: 0.24, w: 0.029, d: 0.044, trig: [0.034, -0.05], support: false, thumbDy: 0, arm: [0.1, -0.13, 0.38] },
+        left: { grip: { cx: 0, cy: -0.06, cz: 0.04, tilt: 0.24, w: 0.029, d: 0.044, trig: [0.034, -0.05], support: true, thumbDy: -0.012, arm: [-0.1, -0.13, 0.36] } }
       });
     }
 
@@ -1405,7 +1468,7 @@
       muzzleAnchor,
       ejectAnchor,
       parts: { slide, mag },
-      hipPos: new THREE.Vector3(0.18, -0.155, -0.34),
+      hipPos: new THREE.Vector3(0.17, -0.128, -0.37),
       adsPos: new THREE.Vector3(0.0, -0.048, -0.24),
       hipRot: new THREE.Euler(0.02, -0.04, 0),
       adsRot: new THREE.Euler(0, 0, 0),
@@ -1475,8 +1538,8 @@
 
     if (!isWorld) {
       addTacticalHands(g, mats, {
-        right: { x: 0.004, y: -0.056, z: 0.066, rx: 0.10 },
-        left: { x: -0.006, y: -0.060, z: 0.058, rx: 0.08, twoHandPistol: true }
+        right: { cx: 0, cy: -0.062, cz: 0.056, tilt: 0.36, w: 0.025, d: 0.036, trig: [0.04, -0.052], support: false, thumbDy: 0, arm: [0.1, -0.13, 0.38] },
+        left: { grip: { cx: 0, cy: -0.062, cz: 0.056, tilt: 0.36, w: 0.025, d: 0.036, trig: [0.04, -0.052], support: true, thumbDy: -0.012, arm: [-0.1, -0.13, 0.36] } }
       });
     }
 
@@ -1500,7 +1563,7 @@
       muzzleAnchor,
       ejectAnchor,
       parts: { cylinder, hammer },
-      hipPos: new THREE.Vector3(0.18, -0.155, -0.33),
+      hipPos: new THREE.Vector3(0.17, -0.128, -0.36),
       adsPos: new THREE.Vector3(0.0, -0.049, -0.23),
       hipRot: new THREE.Euler(0.02, -0.04, 0),
       adsRot: new THREE.Euler(0, 0, 0),
@@ -1572,8 +1635,8 @@
 
     if (!isWorld) {
       addTacticalHands(g, mats, {
-        right: { x: 0.006, y: -0.058, z: 0.080, rx: 0.12 },
-        left: { x: -0.006, y: -0.014, z: -0.220, rx: 0.04 }
+        right: { cx: 0, cy: -0.064, cz: 0.072, tilt: 0.28, w: 0.031, d: 0.042, trig: [0.032, -0.046], support: false, thumbDy: 0, arm: [0.1, -0.14, 0.38] },
+        left: { forend: { cx: 0, cy: 0.008, cz: -0.22, hx: 0.022, hy: 0.024 } }
       });
     }
 
@@ -1663,8 +1726,8 @@
 
     if (!isWorld) {
       addTacticalHands(g, mats, {
-        right: { x: 0.006, y: -0.058, z: 0.080, rx: 0.12 },
-        left: { x: -0.006, y: -0.036, z: -0.245, rx: 0.08 }
+        right: { cx: 0, cy: -0.064, cz: 0.072, tilt: 0.28, w: 0.031, d: 0.042, trig: [0.032, -0.046], support: false, thumbDy: 0, arm: [0.1, -0.14, 0.38] },
+        left: { grip: { cx: 0, cy: -0.046, cz: -0.245, tilt: 0.18, w: 0.026, d: 0.032, trig: null, support: false, thumbDy: 0, arm: [-0.1, -0.15, 0.38] } }
       });
     }
 
@@ -1761,8 +1824,8 @@
 
     if (!isWorld) {
       addTacticalHands(g, mats, {
-        right: { x: 0.006, y: -0.058, z: 0.080, rx: 0.14 },
-        left: { x: -0.006, y: -0.010, z: -0.205, rx: 0.04 }
+        right: { cx: 0, cy: -0.062, cz: 0.072, tilt: 0.3, w: 0.03, d: 0.04, trig: [0.03, -0.044], support: false, thumbDy: 0, arm: [0.1, -0.14, 0.38] },
+        left: { forend: { cx: 0, cy: 0.01, cz: -0.2, hx: 0.021, hy: 0.022 } }
       });
     }
 
@@ -1851,8 +1914,8 @@
 
     if (!isWorld) {
       addTacticalHands(g, mats, {
-        right: { x: 0.006, y: -0.054, z: 0.105, rx: 0.16 },
-        left: { parent: pump, x: -0.004, y: -0.016, z: -0.275, rx: 0.04 }
+        right: { cx: 0, cy: -0.05, cz: 0.1, tilt: 0.22, w: 0.032, d: 0.044, trig: [0.024, -0.056], support: false, thumbDy: 0, arm: [0.1, -0.14, 0.38] },
+        left: { parent: pump, forend: { cx: 0, cy: -0.005, cz: -0.275, hx: 0.024, hy: 0.024 } }
       });
     }
 
@@ -1933,8 +1996,8 @@
 
     if (!isWorld) {
       addTacticalHands(g, mats, {
-        right: { x: 0.006, y: -0.044, z: 0.095, rx: 0.18 },
-        left: { parent: breakBarrel, x: -0.004, y: -0.010, z: -0.115, rx: 0.04 }
+        right: { cx: 0, cy: -0.042, cz: 0.078, tilt: 0.3, w: 0.03, d: 0.042, trig: [0.018, -0.052], support: false, thumbDy: 0, arm: [0.1, -0.14, 0.38] },
+        left: { parent: breakBarrel, forend: { cx: 0, cy: 0.004, cz: -0.115, hx: 0.022, hy: 0.018 } }
       });
     }
 
@@ -2023,8 +2086,8 @@
 
     if (!isWorld) {
       addTacticalHands(g, mats, {
-        right: { x: 0.006, y: -0.068, z: -0.210, rx: 0.10 },
-        left: { x: -0.006, y: -0.060, z: -0.045, rx: 0.08 }
+        right: { cx: 0, cy: -0.068, cz: -0.22, tilt: 0.18, w: 0.028, d: 0.038, trig: [0.02, -0.034], support: false, thumbDy: 0, arm: [0.16, -0.12, 0.38] },
+        left: { grip: { cx: 0, cy: -0.06, cz: -0.04, tilt: 0.1, w: 0.026, d: 0.032, trig: null, support: false, thumbDy: 0, arm: [-0.1, -0.15, 0.38] } }
       });
     }
 

@@ -176,6 +176,9 @@
     if (rig.riotArmorGroup) {
       rig.riotArmorGroup.visible = !!(z.hasArmor);
     }
+    if (rig.riotLimbGuards) {
+      for (let gi = 0; gi < rig.riotLimbGuards.length; gi++) rig.riotLimbGuards[gi].visible = !!(z.hasArmor);
+    }
     if (rig.runnerEyes) {
       rig.runnerEyes.visible = !z.dead && (z.variant === 'runner' || z.variant === 'screamer' || z.variant === 'brute');
     }
