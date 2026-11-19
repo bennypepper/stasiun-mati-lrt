@@ -2,7 +2,9 @@
 .env
 .env.*
 
-# Non-runtime / development directories
+# Non-runtime / development directories & local agent instructions
+AGENTS.md
+agents.md
 docs/
 tests/
 research/
