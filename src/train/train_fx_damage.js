@@ -104,230 +104,100 @@
     ];
   }
 
-  // Build recycled 60m at-grade ground-level Jakarta urban rail corridor chunks
+  // Build recycled 40m continuous Jakarta LRT concrete transit tunnel bore chunks
+  // (Eliminates popping outdoor buildings/trees, stray handoff slabs, and misaligned rail blocks!)
   function buildViaductCruiseChunks(mats) {
     const dims = C.STATION_DIMS || {};
     const railTopY = typeof dims.railTopY === 'number' ? dims.railTopY : -1.00;
     const trackBedY = typeof dims.trackBedY === 'number' ? dims.trackBedY : -1.18;
-    const streetY = typeof dims.streetGroundY === 'number' ? dims.streetGroundY : -1.00;
-    const sidewalkY = typeof dims.sidewalkY === 'number' ? dims.sidewalkY : -0.82;
 
     T.viaductGroup = new THREE.Group();
+    T.viaductGroup.name = 'LRT_TransitTunnelGroup';
     T.viaductGroup.visible = false;
     viaductChunks.length = 0;
 
-    // Continuous track bed & running rails directly under train during station handoff (z = -34..+34, never hits station buildings)
-    const handoffB = T.createMeshBuilder(false);
-    handoffB.addBox(0, (trackBedY - 0.12 + (railTopY - 0.06)) * 0.5, 0, 5.4, (railTopY - 0.06) - (trackBedY - 0.12), 68.0, [0, 0, 1.2, 14], 15);
-    const handoffMesh = new THREE.Mesh(handoffB.toGeometry(false), mats.concreteRough);
-    handoffMesh.receiveShadow = true;
-    T.viaductGroup.add(handoffMesh);
+    // Shared dark concrete tunnel liner material (matte, low-reflection, never glints)
+    const tunnelWallMat = new THREE.MeshStandardMaterial({
+      color: 0x16191f,
+      roughness: 0.94,
+      metalness: 0.04
+    });
+    const tunnelRibMat = new THREE.MeshStandardMaterial({
+      color: 0x222730,
+      roughness: 0.88,
+      metalness: 0.08
+    });
+    const tunnelStripMat = new THREE.MeshBasicMaterial({
+      color: 0xffb347
+    });
 
-    const handoffRailB = T.createMeshBuilder(false);
-    handoffRailB.addBox(-TD.trackGauge * 0.5, railTopY - 0.045, 0, 0.075, 0.09, 68.0, [0, 0, 1, 12], 20);
-    handoffRailB.addBox(TD.trackGauge * 0.5, railTopY - 0.045, 0, 0.075, 0.09, 68.0, [0, 0, 1, 12], 20);
-    const handoffRailMesh = new THREE.Mesh(handoffRailB.toGeometry(false), mats.steelDarkMat);
-    T.viaductGroup.add(handoffRailMesh);
+    const boreHalfW = 2.04;
+    const boreBotY = -1.32;
+    const boreTopY = 4.66;
+    const boreH = boreTopY - boreBotY;
+    const boreMidY = (boreBotY + boreTopY) * 0.5;
 
     for (let c = 0; c < CHUNK_COUNT; c++) {
       const chunk = new THREE.Group();
       const ballastB = T.createMeshBuilder(false);
-      const sidewalkB = T.createMeshBuilder(false);
+      const wallB = T.createMeshBuilder(false);
+      const ribB = T.createMeshBuilder(false);
       const railSteelB = T.createMeshBuilder(false);
       const tieB = T.createMeshBuilder(false);
-      const beaconB = T.createMeshBuilder(false);
-      const roadMarkB = T.createMeshBuilder(false);
+      const lightStripB = T.createMeshBuilder(false);
 
-      const facadeModernGeoms = [];
-      const facadePlasterGeoms = [];
-      const brickGeoms = [];
-      const glassBldgGeoms = [];
-      const roofTerraGeoms = [];
-      const roofOchreGeoms = [];
-      const treeGeoms = [];
-
-      const hasCrossing = (c % 2 === 0);
-
-      // 1. At-grade Ballasted Track Bed (-1.18..-1.06) + Sleepers + Steel Rails (top = -1.00)
-      ballastB.addBox(-2.35, (trackBedY - 0.12 + (railTopY - 0.06)) * 0.5, 0, 9.6, (railTopY - 0.06) - (trackBedY - 0.12), CHUNK_LEN, [0, 0, 2, 12], 15);
-      // Low concrete corridor curb dividers bordering the track bed
-      ballastB.addBox(-7.22, streetY + 0.08, 0, 0.24, 0.36, CHUNK_LEN, [0, 0, 1, 12], 15);
-      ballastB.addBox(2.52, streetY + 0.08, 0, 0.24, 0.36, CHUNK_LEN, [0, 0, 1, 12], 15);
-
-      for (const tx of [0.0, -4.70]) {
-        // Running steel rails (top flush at railTopY = -1.00)
-        railSteelB.addBox(tx - TD.trackGauge * 0.5, railTopY - 0.045, 0, 0.075, 0.09, CHUNK_LEN, [0, 0, 1, 10], 20);
-        railSteelB.addBox(tx + TD.trackGauge * 0.5, railTopY - 0.045, 0, 0.075, 0.09, CHUNK_LEN, [0, 0, 1, 10], 20);
-        // 750V DC third rail coverboard (breaks at level crossing!)
-        if (hasCrossing) {
-          ballastB.addBox(tx - 1.15, railTopY + 0.06, -17.5, 0.22, 0.14, 25.0, [0, 0, 1, 5], 15);
-          ballastB.addBox(tx - 1.15, railTopY + 0.06, 17.5, 0.22, 0.14, 25.0, [0, 0, 1, 5], 15);
-        } else {
-          ballastB.addBox(tx - 1.15, railTopY + 0.06, 0, 0.22, 0.14, CHUNK_LEN, [0, 0, 1, 12], 20);
-        }
-        // Sleepers (ties) along track
-        for (let tz = -CHUNK_LEN * 0.5 + 0.6; tz < CHUNK_LEN * 0.5; tz += 1.0) {
-          if (hasCrossing && Math.abs(tz) < 4.5) continue;
-          tieB.addBox(tx, railTopY - 0.09, tz, 2.15, 0.08, 0.24, [0, 0, 1, 1], 3);
-        }
+      // 1. Clean ballasted trackbed (-1.28..-1.06), sleepers, steel rails (top flush at railTopY = -1.00), & 750V third-rail coverboard
+      ballastB.addBox(0.0, (trackBedY - 0.14 + (railTopY - 0.06)) * 0.5, 0, boreHalfW * 2.0 + 0.30, (railTopY - 0.06) - (trackBedY - 0.14), CHUNK_LEN, [0, 0, 1.4, 8], 12);
+      railSteelB.addBox(-TD.trackGauge * 0.5, railTopY - 0.045, 0, 0.075, 0.09, CHUNK_LEN, [0, 0, 1, 8], 16);
+      railSteelB.addBox(TD.trackGauge * 0.5, railTopY - 0.045, 0, 0.075, 0.09, CHUNK_LEN, [0, 0, 1, 8], 16);
+      // 750V DC third rail coverboard cleanly beside track (clears train bogies)
+      ballastB.addBox(-1.18, railTopY + 0.05, 0, 0.20, 0.12, CHUNK_LEN, [0, 0, 1, 8], 12);
+      // Sleepers (ties) along track at 1.25m pitch
+      for (let tz = -CHUNK_LEN * 0.5 + 0.625; tz < CHUNK_LEN * 0.5; tz += 1.25) {
+        tieB.addBox(0.0, railTopY - 0.09, tz, 2.15, 0.08, 0.24, [0, 0, 1, 1], 3);
       }
 
-      // 2. Flanking Raised Sidewalks (top at sidewalkY = -0.82) & Jakarta Asphalt Avenues (y = -1.00)
-      const curbH = sidewalkY - (streetY - 0.16);
-      const curbMidY = (sidewalkY + (streetY - 0.16)) * 0.5;
-      // Inner sidewalks bordering the rail bed
-      sidewalkB.addBox(-9.05, curbMidY, 0, 3.6, curbH, CHUNK_LEN, [0, 0, 1.5, 16], 15);
-      sidewalkB.addBox(4.35, curbMidY, 0, 3.6, curbH, CHUNK_LEN, [0, 0, 1.5, 16], 15);
-      // Outer sidewalks flanking the avenues
-      sidewalkB.addBox(-21.2, curbMidY, 0, 4.0, curbH, CHUNK_LEN, [0, 0, 1.6, 16], 15);
-      sidewalkB.addBox(16.5, curbMidY, 0, 4.0, curbH, CHUNK_LEN, [0, 0, 1.6, 16], 15);
+      // 2. Continuous concrete tunnel bore walls, upper haunches, ceiling slab & emergency maintenance walkway curbs
+      wallB.addBox(-boreHalfW - 0.14, boreMidY, 0, 0.28, boreH + 0.24, CHUNK_LEN, [0, 0, 1, 4], 12);
+      wallB.addBox(boreHalfW + 0.14, boreMidY, 0, 0.28, boreH + 0.24, CHUNK_LEN, [0, 0, 1, 4], 12);
+      wallB.addBox(0.0, boreTopY + 0.14, 0, boreHalfW * 2.0 + 0.56, 0.28, CHUNK_LEN, [0, 0, 1, 4], 12);
+      // Chamfered corner haunches & low emergency walkway ledge along both bore walls (clear of 1.37m train hull)
+      ribB.addBox(-boreHalfW + 0.22, boreTopY - 0.24, 0, 0.44, 0.48, CHUNK_LEN, [0, 0, 1, 4], 10);
+      ribB.addBox(boreHalfW - 0.22, boreTopY - 0.24, 0, 0.44, 0.48, CHUNK_LEN, [0, 0, 1, 4], 10);
+      ribB.addBox(-boreHalfW + 0.20, railTopY + 0.22, 0, 0.40, 0.44, CHUNK_LEN, [0, 0, 1, 4], 10);
+      ribB.addBox(boreHalfW - 0.20, railTopY + 0.22, 0, 0.40, 0.44, CHUNK_LEN, [0, 0, 1, 4], 10);
 
-      // Asphalt avenue roadbeds at streetY = -1.00
-      const westRoadGeo = new THREE.PlaneGeometry(8.6, CHUNK_LEN);
-      westRoadGeo.rotateX(-Math.PI * 0.5);
-      const wuv = westRoadGeo.attributes.uv;
-      for (let i = 0; i < wuv.count; i++) wuv.setXY(i, wuv.getX(i) * 1.4, wuv.getY(i) * 8.0);
-      const westRoadMesh = new THREE.Mesh(westRoadGeo, mats.asphaltRoad);
-      westRoadMesh.position.set(-15.0, streetY, 0);
-      westRoadMesh.receiveShadow = true;
-      chunk.add(westRoadMesh);
-
-      const eastRoadGeo = westRoadGeo.clone();
-      const eastRoadMesh = new THREE.Mesh(eastRoadGeo, mats.asphaltRoad);
-      eastRoadMesh.position.set(10.3, streetY, 0);
-      eastRoadMesh.receiveShadow = true;
-      chunk.add(eastRoadMesh);
-
-      // Dashed white lane dividers & center lines along both avenues
-      for (let dz = -27; dz <= 27; dz += 6.0) {
-        roadMarkB.addBox(-15.0, streetY + 0.012, dz, 0.14, 0.01, 2.8, [0, 0, 1, 1], 4);
-        roadMarkB.addBox(10.3, streetY + 0.012, dz, 0.14, 0.01, 2.8, [0, 0, 1, 1], 4);
+      // 3. Structural concrete tunnel ribs (every 4m) + longitudinal power/signal conduits + overhead catenary rail
+      for (let rz = -CHUNK_LEN * 0.5 + 2.0; rz < CHUNK_LEN * 0.5; rz += 4.0) {
+        ribB.addBox(-boreHalfW + 0.08, boreMidY, rz, 0.18, boreH - 0.06, 0.36, [0, 0, 1, 1], 4);
+        ribB.addBox(boreHalfW - 0.08, boreMidY, rz, 0.18, boreH - 0.06, 0.36, [0, 0, 1, 1], 4);
+        ribB.addBox(0.0, boreTopY - 0.09, rz, boreHalfW * 2.0, 0.20, 0.36, [0, 0, 1, 1], 4);
       }
+      railSteelB.addBox(-boreHalfW + 0.06, 1.55, 0, 0.08, 0.16, CHUNK_LEN, [0, 0, 1, 6], 10);
+      railSteelB.addBox(boreHalfW - 0.06, 1.55, 0, 0.08, 0.16, CHUNK_LEN, [0, 0, 1, 6], 10);
+      railSteelB.addBox(0.0, 4.34, 0, 0.06, 0.08, CHUNK_LEN, [0, 0, 1, 6], 10);
 
-      // 3. Level Crossing across tracks (flush at streetY = -1.00)
-      if (hasCrossing) {
-        // Rubberized concrete crossing pad across track bed
-        ballastB.addBox(-2.35, streetY - 0.03, 0, 9.8, 0.06, 8.6, [0, 0, 2, 2], 6);
-        // Crosswalk stripes on crossing & avenues
-        for (let sx = -18.5; sx <= 13.8; sx += 1.2) {
-          roadMarkB.addBox(sx, streetY + 0.014, -3.2, 0.52, 0.01, 1.8, [0, 0, 1, 1], 2);
-          roadMarkB.addBox(sx, streetY + 0.014, 3.2, 0.52, 0.01, 1.8, [0, 0, 1, 1], 2);
-        }
-        // Crossing warning gate posts & beacons
-        for (const cx of [-7.4, 2.7]) {
-          for (const cz of [-4.6, 4.6]) {
-            railSteelB.addBox(cx, sidewalkY + 1.4, cz, 0.18, 2.8, 0.18, [0, 0, 1, 1], 4);
-            beaconB.addBox(cx, sidewalkY + 2.85, cz, 0.28, 0.28, 0.28, [0, 0, 1, 1], 2);
-          }
-        }
-      }
-
-      // 4. Streetlamps & Tropical Trees rooted on Sidewalks (y = -0.82)
-      for (const sz of [-20, 0, 20]) {
-        for (const lamp of [{ x: -8.1, dir: -1 }, { x: 3.4, dir: 1 }, { x: -19.8, dir: 1 }, { x: 15.1, dir: -1 }]) {
-          railSteelB.addBox(lamp.x, sidewalkY + 2.9, sz, 0.14, 5.8, 0.14, [0, 0, 1, 1], 5);
-          railSteelB.addBox(lamp.x + lamp.dir * 0.9, sidewalkY + 5.75, sz, 1.9, 0.11, 0.11, [0, 0, 1, 1], 4);
-          beaconB.addBox(lamp.x + lamp.dir * 1.65, sidewalkY + 5.66, sz, 0.45, 0.10, 0.24, [0, 0, 1, 1], 2);
-        }
-      }
-
-      for (let ti = 0; ti < 8; ti++) {
-        const tSide = ti % 2 === 0 ? -1 : 1;
-        const tx = tSide < 0 ? (-9.7 - (ti % 2) * 10.6) : (4.8 + (ti % 2) * 10.6);
-        const tz = -24 + ti * 6.8;
-        if (hasCrossing && Math.abs(tz) < 6.0) continue;
-        tieB.addBox(tx, sidewalkY + 1.4, tz, 0.28, 2.8, 0.28, [0, 0, 1, 1], 4);
-        T.pushMatGeom(treeGeoms, new THREE.IcosahedronGeometry(1.75, 1), tx, sidewalkY + 3.4, tz, 0, ti * 0.9, 0, 'YXZ');
-        T.pushMatGeom(treeGeoms, new THREE.IcosahedronGeometry(1.25, 1), tx + 0.7, sidewalkY + 2.9, tz + 0.5, 0, ti * 0.4, 0, 'YXZ');
-      }
-
-      // 5. Non-Square Stepped & Chamfered ExtrudeGeometry Buildings flanking Avenues (y = -0.82)
-      const seedBase = c * 19 + 7;
-      for (let bi = 0; bi < 6; bi++) {
-        const side = bi % 2 === 0 ? -1 : 1;
-        const variant = (bi + c) % 3;
-        const w = 11 + ((seedBase + bi * 7) % 8);
-        const d = 11 + ((seedBase + bi * 11) % 7);
-        const h = 16 + ((seedBase * (bi + 2) * 13) % 38);
-        const bx = side < 0 ? -(29.5 + (bi % 2) * 7.5) : (24.5 + (bi % 2) * 7.5);
-        const bz = -20.0 + Math.floor(bi / 2) * 20.0;
-
-        const podH = Math.max(4.5, h * 0.26);
-        const shaftH = h * 0.58;
-        const crownH = h * 0.16;
-
-        const podShape = makeBuildingFootprint(variant, w, d);
-        const shaftShape = makeBuildingFootprint((variant + 1) % 3, w * 0.80, d * 0.80);
-        const crownShape = makeBuildingFootprint(1, w * 0.56, d * 0.56);
-
-        // Tier 1: Ground-level Shophouse / Retail Podium (alternating plaster, brick, modern concrete)
-        const podBucket = (bi + c) % 3 === 0
-          ? facadePlasterGeoms
-          : ((bi + c) % 3 === 1 ? brickGeoms : facadeModernGeoms);
-        pushExtrudedToBucket(podBucket, podShape, podH, sidewalkY, bx, bz, true, 0.18);
-
-        // Tier 2: Curtain-wall glass or facade upper shaft
-        if (h > 26) {
-          pushExtrudedToBucket(glassBldgGeoms, shaftShape, shaftH, sidewalkY + podH, bx, bz, false, 0.14);
-          pushExtrudedToBucket(facadeModernGeoms, crownShape, crownH, sidewalkY + podH + shaftH, bx, bz, true, 0.18);
-          railSteelB.addBox(bx, sidewalkY + h + 1.8, bz, 0.20, 3.6, 0.20, [0, 0, 1, 1], 4);
-          beaconB.addBox(bx, sidewalkY + h + 3.7, bz, 0.42, 0.42, 0.42, [0, 0, 1, 1], 2);
-        } else {
-          // 2-3 story Indonesian ruko with corrugated terracotta / ochre stepped roof!
-          pushExtrudedToBucket(facadePlasterGeoms, shaftShape, shaftH * 0.6, sidewalkY + podH, bx, bz, false, 0.18);
-          const roofBucket = (bi % 2 === 0) ? roofTerraGeoms : roofOchreGeoms;
-          pushExtrudedToBucket(roofBucket, crownShape, 1.4, sidewalkY + podH + shaftH * 0.6, bx, bz, true, 0.22);
-        }
+      // 4. Recessed warm-amber tunnel work-light strips every 10m (streaks smoothly past train windows at cruise speed!)
+      for (let lz = -CHUNK_LEN * 0.5 + 5.0; lz < CHUNK_LEN * 0.5; lz += 10.0) {
+        railSteelB.addBox(-boreHalfW + 0.07, 2.55, lz, 0.09, 0.14, 1.45, [0, 0, 1, 1], 3);
+        railSteelB.addBox(boreHalfW - 0.07, 2.55, lz, 0.09, 0.14, 1.45, [0, 0, 1, 1], 3);
+        lightStripB.addBox(-boreHalfW + 0.12, 2.55, lz, 0.03, 0.08, 1.25, [0, 0, 1, 1], 2);
+        lightStripB.addBox(boreHalfW - 0.12, 2.55, lz, 0.03, 0.08, 1.25, [0, 0, 1, 1], 2);
       }
 
       const ballastMesh = new THREE.Mesh(ballastB.toGeometry(false), mats.concreteRough);
-      ballastMesh.receiveShadow = true;
-      const sidewalkMesh = new THREE.Mesh(sidewalkB.toGeometry(false), mats.sidewalkPaver);
-      sidewalkMesh.receiveShadow = true;
-      const railPoleMesh = new THREE.Mesh(railSteelB.toGeometry(false), mats.steelDarkMat);
+      ballastMesh.receiveShadow = false;
+      const wallMesh = new THREE.Mesh(wallB.toGeometry(false), tunnelWallMat);
+      const ribMesh = new THREE.Mesh(ribB.toGeometry(false), tunnelRibMat);
+      const railMesh = new THREE.Mesh(railSteelB.toGeometry(false), mats.steelDarkMat);
       const tieMesh = new THREE.Mesh(tieB.toGeometry(false), mats.darkWood);
-      const roadMarkMesh = new THREE.Mesh(roadMarkB.toGeometry(false), mats.skylineLit);
-      const lightsMesh = new THREE.Mesh(beaconB.toGeometry(false), mats.amberBeacon);
-      const treeMesh = new THREE.Mesh(T.mergeStaticGeoms(treeGeoms), mats.foliageTree);
+      const lightsMesh = new THREE.Mesh(lightStripB.toGeometry(false), tunnelStripMat);
 
-      chunk.add(ballastMesh, sidewalkMesh, railPoleMesh, tieMesh, roadMarkMesh, lightsMesh, treeMesh);
-
-      if (facadeModernGeoms.length) {
-        const m = new THREE.Mesh(T.mergeStaticGeoms(facadeModernGeoms), mats.facadeModern);
-        m.castShadow = true;
-        m.receiveShadow = true;
-        chunk.add(m);
-      }
-      if (facadePlasterGeoms.length) {
-        const m = new THREE.Mesh(T.mergeStaticGeoms(facadePlasterGeoms), mats.facadePlaster);
-        m.castShadow = true;
-        m.receiveShadow = true;
-        chunk.add(m);
-      }
-      if (brickGeoms.length) {
-        const m = new THREE.Mesh(T.mergeStaticGeoms(brickGeoms), mats.brickWall);
-        m.castShadow = true;
-        m.receiveShadow = true;
-        chunk.add(m);
-      }
-      if (glassBldgGeoms.length) {
-        const m = new THREE.Mesh(T.mergeStaticGeoms(glassBldgGeoms), mats.glassBuilding);
-        m.castShadow = true;
-        m.receiveShadow = true;
-        chunk.add(m);
-      }
-      if (roofTerraGeoms.length) {
-        chunk.add(new THREE.Mesh(T.mergeStaticGeoms(roofTerraGeoms), mats.roofTerracotta));
-      }
-      if (roofOchreGeoms.length) {
-        chunk.add(new THREE.Mesh(T.mergeStaticGeoms(roofOchreGeoms), mats.roofOchre));
-      }
-
+      chunk.add(ballastMesh, wallMesh, ribMesh, railMesh, tieMesh, lightsMesh);
       chunk.userData = {
         girderMesh: ballastMesh,
-        railPoleMesh,
-        roadMesh: westRoadMesh,
-        treeMesh
+        railPoleMesh: railMesh,
+        wallMesh
       };
       chunk.position.set(0, 0, (c - (CHUNK_COUNT * 0.5 - 0.5)) * CHUNK_LEN);
       T.viaductGroup.add(chunk);
@@ -468,7 +338,8 @@
     const active = T.warmupActive || (T.state !== 'AWAY' && T.trainGroup && T.trainGroup.visible);
     if (T.headlightLight) {
       const headOn = !T._tierDisableLights && active && T.headlightIntensityTarget > 0.001;
-      T.headlightLight.visible = headOn;
+      // NEVER toggle light.visible on active/intensity changes (causes Three.js NUM_POINT_LIGHTS shader recompile!)
+      T.headlightLight.visible = !T._tierDisableLights;
       T.headlightLight.position.set(T.localXToWorld(0), 1.05, T.localZToWorld(27.2));
       T.headlightLight.intensity = headOn ? T.headlightIntensityTarget : 0.0;
     }
@@ -690,6 +561,8 @@
     T.viaductGroup.position.set(T.activeTrackX, 0, 0);
     const scroll = T.travelDir * T.speed * dt;
     const halfSpan = CHUNK_LEN * CHUNK_COUNT * 0.5;
+    // Hide transit tunnel chunks where they would overlap the open-air station (portal at +-133.5m + half-chunk 20m = 153.5m)
+    const hideHalfSpan = 133.5 + CHUNK_LEN * 0.5 + 1.0;
     for (let i = 0; i < viaductChunks.length; i++) {
       const ch = viaductChunks[i];
       if (T.state === 'DEPARTING' || T.state === 'CRUISE' || T.state === 'ARRIVING') {
@@ -700,11 +573,11 @@
           ch.position.z -= CHUNK_LEN * CHUNK_COUNT;
         }
       }
-      // Hide corridor chunk anywhere it could touch station + city district (district +-118m + chunk +-30m = 148m)
       const dz = stationZ !== null ? Math.abs(ch.position.z - stationZ) : 999;
-      const hideDeck = !T.warmupActive && dz < 149.0;
-      ch.visible = !hideDeck;
+      ch.visible = T.warmupActive || dz >= hideHalfSpan;
     }
+    // Critical with scene.matrixWorldAutoUpdate = false: refresh chunk matrices every cruise frame so tunnel scrolls!
+    T.viaductGroup.updateMatrixWorld(true);
   }
 
   // Fast local-space analytic raycast against unbroken glass, LCDs, doors, hull & interior colliders

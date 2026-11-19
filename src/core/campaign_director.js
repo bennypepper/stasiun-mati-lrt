@@ -1355,6 +1355,11 @@
         }
       }
 
+      if (typeof CORE.setTransitTunnelBlend === 'function' && typeof LRT.Train.getTunnelBlend === 'function') {
+        const isRiding = (trState === 'DEPARTING' || trState === 'CRUISE' || trState === 'ARRIVING');
+        CORE.setTransitTunnelBlend(isRiding ? LRT.Train.getTunnelBlend() : 0.0);
+      }
+
       if ((trState === 'DEPARTING' || trState === 'CRUISE' || trState === 'ARRIVING') &&
           CORE.gameMode === MODES.SURVIVAL && !CORE.lightingLockedByUser &&
           CORE._rideFromMoodKey && CORE._rideToMoodKey &&
@@ -1414,8 +1419,11 @@
     const plFlags = I.player && I.player.flags ? I.player.flags : null;
     if ((pState && (pState.docViewerOpen || pState.fastTravelOpen)) || (plFlags && plFlags.paused)) return;
     if (!CORE.tutorialActive) tickAutosave(dt);
-    // Survival wave logic (plus animate/update any manually spawned zombies in exploration mode)
-    const hasCustomZombies = LRT.Enemies && typeof LRT.Enemies.getAliveCount === 'function' && LRT.Enemies.getAliveCount() > 0;
+    // Survival wave logic (plus animate/update any manually spawned or dying zombies in exploration mode)
+    const hasCustomZombies = LRT.Enemies && (
+      (typeof LRT.Enemies.getTotalCount === 'function' && LRT.Enemies.getTotalCount() > 0) ||
+      (typeof LRT.Enemies.getAliveCount === 'function' && LRT.Enemies.getAliveCount() > 0)
+    );
     if ((CORE.gameMode === MODES.SURVIVAL || hasCustomZombies) && (CORE.gameState === STATES.STATION_ACTIVE || CORE.gameState === STATES.TRAIN_APPROACHING || CORE.gameState === STATES.TRAIN_BOARDING)) {
       if (LRT.Enemies && LRT.Enemies.update) {
         const beforeAlive = LRT.Enemies.getAliveCount();

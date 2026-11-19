@@ -103,6 +103,8 @@
   const _bvhFaceNorm = new THREE.Vector3();
 
   function initFlashlight(camera) {
+    // Keep visible = true ALWAYS (intensity = 0 when off) so toggling F never changes NUM_SPOT_LIGHTS / NUM_POINT_LIGHTS
+    // and never triggers WebGL shader program recompilation stalls!
     const fl = new THREE.SpotLight(0xfff4dc, 0.0, 62, Math.PI / 5.4, 0.50, 1.05);
     fl.castShadow = false;
     fl.position.set(0.10, -0.08, -0.15);
@@ -111,11 +113,11 @@
     camera.add(fl);
     camera.add(flTarget);
     fl.target = flTarget;
-    fl.visible = false;
+    fl.visible = true;
     const flBounce = new THREE.PointLight(0xffead0, 0.0, 8.5, 1.35);
     flBounce.castShadow = false;
     flBounce.position.set(0.08, -0.06, -0.35);
-    flBounce.visible = false;
+    flBounce.visible = true;
     camera.add(flBounce);
 
     refs.flashlight = fl;
@@ -126,12 +128,10 @@
   function toggleFlashlight() {
     state.flashlightOn = !state.flashlightOn;
     if (refs.flashlight) {
-      refs.flashlight.visible = !!state.flashlightOn;
-      refs.flashlight.intensity = state.flashlightOn ? 42.0 : 0;
+      refs.flashlight.intensity = state.flashlightOn ? 42.0 : 0.0;
     }
     if (refs.flashlightBounce) {
-      refs.flashlightBounce.visible = !!state.flashlightOn;
-      refs.flashlightBounce.intensity = state.flashlightOn ? 2.2 : 0;
+      refs.flashlightBounce.intensity = state.flashlightOn ? 2.2 : 0.0;
     }
     const dom = PL.dom;
     if (dom && dom['pill-flashlight']) {

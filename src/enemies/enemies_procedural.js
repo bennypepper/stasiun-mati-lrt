@@ -1561,13 +1561,13 @@
     const dy = ty - slot.pos.y;
     let dz = playerPos.z - slot.pos.z;
     let horizDist = Math.sqrt(dx * dx + dz * dz);
-    if (horizDist > 6.8) {
-      const clampScale = 6.8 / horizDist;
+    if (horizDist > BILE_MAX_RANGE) {
+      const clampScale = BILE_MAX_RANGE / horizDist;
       dx *= clampScale;
       dz *= clampScale;
-      horizDist = 6.8;
+      horizDist = BILE_MAX_RANGE;
     }
-    const flightTime = Math.max(0.36, Math.min(0.88, horizDist / BILE_HORIZ_SPEED));
+    const flightTime = Math.max(0.24, Math.min(0.54, horizDist / BILE_HORIZ_SPEED));
     let vy = (dy / flightTime) + 0.5 * BILE_GRAVITY * flightTime;
     if (vy < 0.65 && Math.abs(dy) < 1.2) {
       vy = 0.65;

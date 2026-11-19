@@ -36,8 +36,8 @@
   const WHEEL_RADIUS = 0.39;
   const CRUISE_SPEED = 26.0;
   const MAX_DENT = 0.18;
-  const CHUNK_LEN = 60.0;
-  const CHUNK_COUNT = 6;
+  const CHUNK_LEN = 40.0;
+  const CHUNK_COUNT = 8;
 
   // UV region helpers for textures_shaders.js atlases (bottom-up V)
   const LIVERY_UV = {

@@ -42,6 +42,7 @@
   CORE.lastDrawCalls = 0;
   CORE.isSoftwareRenderer = false;
   CORE.interiorOccluded = false;
+  CORE.transitTunnelBlend = 0.0;
   CORE._pausedRenderDirty = false;
 
   function requestPausedRender() {
@@ -49,6 +50,7 @@
   }
 
   const _brightFogTarget = new THREE.Color(0x526378);
+  const _tunnelFogColor = new THREE.Color(0x070a0f);
   const _lerpFogA = new THREE.Color();
   const _lerpFogB = new THREE.Color();
   const _lerpHemiSkyA = new THREE.Color();
@@ -502,6 +504,10 @@
     if (enemyRoot) enemyRoot.updateMatrixWorld(false);
     const trainRoot = LRT.Train && (LRT.Train.trainGroup || LRT.Train.rootGroup);
     if (trainRoot) trainRoot.updateMatrixWorld(false);
+    const viaductRoot = LRT.Train && LRT.Train.viaductGroup;
+    if (viaductRoot && viaductRoot.visible) viaductRoot.updateMatrixWorld(false);
+    const trainLightsRoot = LRT.Train && LRT.Train.trainLightsGroup;
+    if (trainLightsRoot) trainLightsRoot.updateMatrixWorld(false);
     const vfxRoot = (LRT.Weapons && LRT.Weapons.vfxRoot) || CORE.scene.getObjectByName('LRT_WeaponsVFX');
     if (vfxRoot) vfxRoot.updateMatrixWorld(false);
     if (CORE.sky) CORE.sky.updateMatrixWorld(false);
@@ -636,7 +642,8 @@
         if (l && l.isLight) {
           const mult = (entry && typeof entry.baseIntensity === 'number') ? entry.baseIntensity : 1.0;
           l.intensity = factor * mult;
-          l.visible = !l.userData._tierDisabled && l.intensity > 0.001;
+          // NEVER toggle light.visible on intensity == 0 (causes Three.js NUM_POINT_LIGHTS shader recompile stutter!)
+          l.visible = !(l.userData && l.userData._tierDisabled) && !l._tierDisabled;
         }
       }
     };
@@ -730,14 +737,18 @@
     const lightScale = lsNight + (lsDay - lsNight) * dayMix;
 
     syncMenuLights();
+    const tb = Math.max(0.0, Math.min(1.0, CORE.transitTunnelBlend || 0.0));
 
     if (CORE.hemiLight) {
       const baseHemi = baseMood.hemiIntensity * lightScale + over * (0.25 + (0.65 - 0.25) * dayMix);
-      CORE.hemiLight.intensity = baseHemi + (isMenu ? 0.08 * nightMix : 0);
+      CORE.hemiLight.intensity = (baseHemi + (isMenu ? 0.08 * nightMix : 0)) * (1.0 - 0.72 * tb);
     }
     if (CORE.sunLight) {
       const baseSun = baseMood.sunIntensity * lightScale + over * (0.35 + (0.95 - 0.35) * dayMix);
-      CORE.sunLight.intensity = baseSun + (isMenu ? 0.14 * nightMix : 0);
+      CORE.sunLight.intensity = (baseSun + (isMenu ? 0.14 * nightMix : 0)) * (1.0 - 0.90 * tb);
+    }
+    if (CORE.sky) {
+      CORE.sky.visible = (dayMix > 0.02) && (tb < 0.72);
     }
     if (CORE.renderer) {
       const baseExp = baseMood.exposure || 1.05;
@@ -754,23 +765,29 @@
           ? Math.max(0.004, baseMood.envIntensity * Math.pow(b, 1.9))
           : Math.min(0.45, baseMood.envIntensity + over * 0.22);
         const envVal = envNight + (envDay - envNight) * dayMix;
-        CORE.scene.environmentIntensity = envVal + (isMenu ? 0.06 * nightMix : 0);
+        CORE.scene.environmentIntensity = (envVal + (isMenu ? 0.06 * nightMix : 0)) * (1.0 - 0.75 * tb);
       }
       if (CORE.scene.fog) {
         const fogLift = over > 0 ? Math.min(0.42, (over / 0.8) * 0.42) * nightMix : 0;
         CORE.scene.fog.color.copy(baseMood.fogColor).lerp(_brightFogTarget, fogLift);
+        if (tb > 0.001) {
+          CORE.scene.fog.color.lerp(_tunnelFogColor, tb);
+        }
         if (CORE.scene.background && CORE.scene.background.isColor) {
           CORE.scene.background.copy(CORE.scene.fog.color);
         }
         if (LRT.Materials) {
           LRT.Materials.uGlobals.uFogHazeColor.value.copy(CORE.scene.fog.color);
-          LRT.Materials.uGlobals.uFogHazeDensity.value = 0.52 + (0.16 - 0.52) * dayMix;
+          const baseHaze = 0.52 + (0.16 - 0.52) * dayMix;
+          LRT.Materials.uGlobals.uFogHazeDensity.value = baseHaze + (0.95 - baseHaze) * tb;
         }
         if (CORE.scene.fog.isFogExp2) {
           const fogFactor = b <= 1.0
             ? 1.0 + (1.0 - b) * 0.14
             : Math.max(0.55, 1.0 - over * 0.45);
-          CORE.scene.fog.density = baseMood.fogDensity * fogFactor;
+          const baseDens = baseMood.fogDensity * fogFactor;
+          // Dense atmospheric tunnel curtain (~45m visibility) seamlessly hides station disposal & incremental build!
+          CORE.scene.fog.density = baseDens + (0.046 - baseDens) * tb;
         }
       }
     }
@@ -1147,14 +1164,17 @@
 
       CORE.scene.add(warmupGroup);
 
-      // Snapshot & force all scene groups/meshes temporarily visible & unculled so every hidden Group (viaduct/train/chunks) & GLTF shader compiles at boot
+      // Snapshot & force all scene groups/meshes temporarily visible & unculled so every hidden Group (viaduct/train/chunks)
+      // and every empty InstancedMesh VFX pool (count===0) compiles its WebGL shaders at boot with zero combat stutter!
       const restoredVis = [];
       CORE.scene.traverse((obj) => {
         if (!obj || obj === CORE.scene || obj.isLight || obj.isCamera || obj.userData?.isShadowProxy) return;
-        if (obj.isMesh || !obj.visible) {
-          restoredVis.push({ obj, vis: obj.visible, fc: obj.frustumCulled });
+        const needCountBump = !!(obj.isInstancedMesh && obj.count === 0);
+        if (obj.isMesh || !obj.visible || needCountBump) {
+          restoredVis.push({ obj, vis: obj.visible, fc: obj.frustumCulled, count: obj.isInstancedMesh ? obj.count : -1 });
           obj.visible = true;
           if (obj.isMesh) obj.frustumCulled = false;
+          if (needCountBump) obj.count = 1;
         }
       });
       try {
@@ -1171,6 +1191,7 @@
           const rec = restoredVis[i];
           rec.obj.visible = rec.vis;
           rec.obj.frustumCulled = rec.fc;
+          if (rec.count >= 0 && rec.obj.isInstancedMesh) rec.obj.count = rec.count;
         }
       }
     } finally {
@@ -1262,7 +1283,15 @@
   CORE.warmupAllVariants = warmupAllVariants;
   CORE.syncMenuLights = syncMenuLights;
   CORE.updateSunTracking = updateSunTracking;
+  function setTransitTunnelBlend(val) {
+    const next = Math.max(0.0, Math.min(1.0, Number(val) || 0.0));
+    if (Math.abs(next - (CORE.transitTunnelBlend || 0.0)) < 0.002) return;
+    CORE.transitTunnelBlend = next;
+    applyBrightness();
+  }
+
   CORE.applyBrightness = applyBrightness;
+  CORE.setTransitTunnelBlend = setTransitTunnelBlend;
   CORE.setBrightness = setBrightness;
   CORE.getBrightness = getBrightness;
   CORE.applyMoodLighting = applyMoodLighting;

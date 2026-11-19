@@ -990,8 +990,14 @@
       const fwdDot = hitDir.x * fwdX + hitDir.z * fwdZ;
       const isLegFall = z.hitZone === 'legs' || z.hitZone === 'leftLeg' || z.hitZone === 'rightLeg';
       z.fallPitchSign = (isLegFall || fwdDot > 0.15) ? 1 : -1;
-      z.vx += hitDir.x * 2.8;
-      z.vz += hitDir.z * 2.8;
+      z.vx += hitDir.x * 2.2;
+      z.vz += hitDir.z * 2.2;
+      const deadSpd = Math.hypot(z.vx, z.vz);
+      if (deadSpd > 6.8) {
+        const sc = 6.8 / deadSpd;
+        z.vx *= sc;
+        z.vz *= sc;
+      }
     } else {
       z.fallPitchSign = Math.random() > 0.5 ? -1 : 1;
     }
@@ -1192,10 +1198,17 @@
       }
     }
 
-    const kb = (knockbackForce || 1.5) / (z.variant === 'brute' ? 2.6 : 1.0);
-    if (hitDir) {
+    const kb = Math.min(7.5, (knockbackForce || 1.5) / (z.variant === 'brute' ? 2.6 : 1.0));
+    if (hitDir && Number.isFinite(hitDir.x) && Number.isFinite(hitDir.z)) {
       z.vx += hitDir.x * kb;
       z.vz += hitDir.z * kb;
+      const totSpd = Math.hypot(z.vx, z.vz);
+      const maxKbSpd = z.variant === 'brute' ? 5.2 : 7.8;
+      if (totSpd > maxKbSpd) {
+        const sc = maxKbSpd / totSpd;
+        z.vx *= sc;
+        z.vz *= sc;
+      }
     }
     let minStagger = Math.min(0.45, 0.12 + kb * 0.05);
     if (isHead) minStagger = Math.max(minStagger, 0.32);
@@ -1639,16 +1652,26 @@
     z.actualSpeed = 0;
     z.actualSpeedSmooth = 0;
     z.moveBlend = 0;
-    z.x += z.vx * step;
-    z.z += z.vz * step;
-    const damp = Math.max(0, 1 - step * 6.0);
+    if (!Number.isFinite(z.vx)) z.vx = 0;
+    if (!Number.isFinite(z.vz)) z.vz = 0;
+    let dxStep = z.vx * step;
+    let dzStep = z.vz * step;
+    const stepLen = Math.hypot(dxStep, dzStep);
+    if (stepLen > 0.38) {
+      const cl = 0.38 / stepLen;
+      dxStep *= cl;
+      dzStep *= cl;
+    }
+    z.x += dxStep;
+    z.z += dzStep;
+    const damp = Math.max(0, 1 - step * 6.5);
     z.vx *= damp;
     z.vz *= damp;
 
-    if (z.deathTimer < 0.45 && (spatialGrid || tc)
+    if ((z.deathTimer < 0.65 || stepLen > 0.01) && (spatialGrid || tc)
       && typeof E.gatherNearbyColliders === 'function'
       && typeof E.resolveCollisions === 'function') {
-      E.gatherNearbyColliders(z.x, z.z, 1.5, spatialGrid, tc);
+      E.gatherNearbyColliders(z.x, z.z, 1.8, spatialGrid, tc);
       E.resolveCollisions(z, 0.35 * z.scale, step);
     }
 
@@ -2347,9 +2370,9 @@
           if (z.chargeTimer > 0) moveSpd = z.speed * tier.bruteChargeMult * (isDaylightOutbreak() ? (getDaylightMods().speedMult || 1.22) : 1.0);
           if (z.shriekTimer > 0 || z.chargeWindup > 0) moveSpd = 0;
 
-          // 4. Spitter active backpedaling when player pushes inside 2.4m
+          // 4. Spitter active backpedaling when player pushes inside 1.55m
           let isBackpedaling = false;
-          if (z.variant === 'spitter' && !z.hasNavWp && !isDoorCrossing && !isInsideCabin && dist3D < 2.4 && Math.abs(pdy) <= 0.85 && z.staggerTimer <= 0 && playerPos) {
+          if (z.variant === 'spitter' && !z.hasNavWp && !isDoorCrossing && !isInsideCabin && dist3D < 1.55 && Math.abs(pdy) <= 0.85 && z.staggerTimer <= 0 && playerPos) {
             _v1.set(z.x, z.y + 1.45 * z.scale, z.z);
             _v2.set(playerPos.x - _v1.x, ((playerPos.y || 0) + 1.2) - _v1.y, playerPos.z - _v1.z).normalize();
             let losBlocked = false;
@@ -2376,9 +2399,9 @@
             }
           }
 
-          const meleeRange = z.variant === 'spitter' ? 1.75 : z.attackRange;
-          const stopDist = (z.variant === 'spitter' && !z.hasNavWp && !isDoorCrossing && !isInsideCabin && Math.abs(pdy) <= 1.2 && !z.spitBlocked && distHoriz <= 6.8)
-            ? 4.8
+          const meleeRange = z.variant === 'spitter' ? 1.55 : z.attackRange;
+          const stopDist = (z.variant === 'spitter' && !z.hasNavWp && !isDoorCrossing && !isInsideCabin && Math.abs(pdy) <= 1.2 && !z.spitBlocked && distHoriz <= 3.5)
+            ? 2.55
             : (meleeRange * 0.82);
 
           const isEnteringDoor = doorAssign >= 0;
@@ -2476,7 +2499,7 @@
             }
           }
 
-          if (z.variant === 'spitter' && playerPos && distHoriz >= 1.6 && distHoriz <= 6.5 && dist3D <= 7.0 && Math.abs(pdy) <= 4.5 && z.spitTimer <= 0 && z.staggerTimer <= 0 && z.alertDelay <= 0) {
+          if (z.variant === 'spitter' && playerPos && distHoriz >= 1.15 && distHoriz <= 3.5 && dist3D <= 3.9 && Math.abs(pdy) <= 2.5 && z.spitTimer <= 0 && z.staggerTimer <= 0 && z.alertDelay <= 0) {
             const mouthY = z.y + 1.46 * z.scale;
             const targetY = (playerPos.y || 0) + 1.05;
             _v1.set(z.x, mouthY, z.z);

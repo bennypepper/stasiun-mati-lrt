@@ -588,6 +588,7 @@
           lp.y + _tmpWorldOffset.y,
           lp.z + _tmpWorldOffset.z
         );
+        sl.light.updateMatrixWorld(false);
         sl.flicker = !!lp.flicker;
         if (suppressLights) {
           sl._distScale = 0.0;

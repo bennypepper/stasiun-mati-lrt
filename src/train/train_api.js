@@ -524,7 +524,8 @@
     T.oldDisposed = false;
     T.nextSpawned = false;
     T.nextBuildInProgress = false;
-    T.incomingStationZ = 220.0;
+    T.incomingStationZ = 235.0;
+    T.tunnelBlend = 0.0;
     T.activeOldRootGroup = null;
 
     if (T.trainGroup) {
@@ -559,8 +560,9 @@
     T.headlightIntensityTarget = on ? (intensity !== undefined ? intensity : 2.8) : 0.0;
     if (T.headlightLight) {
       const active = !T._tierDisableLights && (T.warmupActive || (T.state !== 'AWAY' && T.trainGroup && T.trainGroup.visible));
-      T.headlightLight.visible = !!on && active;
-      T.headlightLight.intensity = active
+      // Keep visible = !T._tierDisableLights ALWAYS so headlight changes never trigger NUM_POINT_LIGHTS shader recompile!
+      T.headlightLight.visible = !T._tierDisableLights;
+      T.headlightLight.intensity = (on && active)
         ? T.headlightIntensityTarget
         : 0.0;
     }
@@ -717,7 +719,8 @@
     T.oldDisposed = false;
     T.nextSpawned = false;
     T.nextBuildInProgress = false;
-    T.incomingStationZ = 215.0 * T.travelDir;
+    T.incomingStationZ = 235.0 * T.travelDir;
+    T.tunnelBlend = 0.0;
     T.activeOldRootGroup = (stationRef && stationRef.rootGroup) ? stationRef.rootGroup : null;
 
     setHeadlights(true, 2.2);
@@ -727,6 +730,7 @@
       for (let c = 0; c < CHUNK_COUNT; c++) {
         viaductChunks[c].position.set(0, 0, (c - (CHUNK_COUNT * 0.5 - 0.5)) * CHUNK_LEN);
       }
+      T.viaductGroup.updateMatrixWorld(true);
     }
     if (LRT.Audio && typeof LRT.Audio.startLoop === 'function') {
       LRT.Audio.startLoop('train_ride_loop', 0.25, 0.6, 0.85);
@@ -735,14 +739,19 @@
 
   function getRideProgress() {
     if (T.state !== 'DEPARTING' && T.state !== 'CRUISE' && T.state !== 'ARRIVING') return 0.0;
-    const totalDist = 375.0; // 160m departure scroll + 215m incoming station approach
+    const totalDist = 417.0; // 182m departure scroll + 235m incoming station approach
     if (!T.oldDisposed) {
-      return Math.max(0.0, Math.min(160.0 / totalDist, T.rideDist / totalDist));
+      return Math.max(0.0, Math.min(182.0 / totalDist, T.rideDist / totalDist));
     }
-    if (!T.nextSpawned) return 160.0 / totalDist;
-    const rem = Math.max(0.0, Math.min(215.0, T.incomingStationZ * T.travelDir));
-    const done = 160.0 + (215.0 - rem);
+    if (!T.nextSpawned) return 182.0 / totalDist;
+    const rem = Math.max(0.0, Math.min(235.0, T.incomingStationZ * T.travelDir));
+    const done = 182.0 + (235.0 - rem);
     return Math.max(0.0, Math.min(1.0, done / totalDist));
+  }
+
+  function smoothstep01(edge0, edge1, x) {
+    const t = Math.max(0.0, Math.min(1.0, (x - edge0) / Math.max(1e-4, edge1 - edge0)));
+    return t * t * (3.0 - 2.0 * t);
   }
 
   function setTrackX(nextTrackX) {
@@ -850,18 +859,21 @@
         LRT.Audio.setLoopVolume('train_ride_loop', 0.15 + 0.72 * ratio, 0.1, 0.78 + 0.34 * ratio);
       }
 
-      // Scroll Old Station opposite to travelDir until 160m behind, then dispose & spawn destination station ahead
+      // Scroll Old Station opposite to travelDir until 182m behind (deep inside tunnel fog), then dispose & spawn destination station ahead
       if (!T.oldDisposed && stationRef && stationRef.rootGroup) {
         const nextOldZ = stationRef.rootGroup.position.z - T.travelDir * stepZ;
         syncStationOffsetZ(stationRef, nextOldZ);
         stationWorldZ = stationRef.rootGroup.position.z;
-        if (stationWorldZ * T.travelDir <= -160.0) {
+        T.tunnelBlend = smoothstep01(92.0, 134.0, Math.abs(stationWorldZ));
+        if (stationWorldZ * T.travelDir <= -182.0) {
           T.oldDisposed = true;
+          T.tunnelBlend = 1.0;
           if (typeof onDisposeOld === 'function') onDisposeOld();
         }
       } else if (T.oldDisposed && !T.nextSpawned) {
         T.nextSpawned = true;
-        T.incomingStationZ = 215.0 * T.travelDir;
+        T.tunnelBlend = 1.0;
+        T.incomingStationZ = 235.0 * T.travelDir;
         const spawned = typeof onSpawnNext === 'function' ? onSpawnNext(T.incomingStationZ) : null;
         const targetRef = spawned || stationRef;
         T.nextBuildInProgress = !!(targetRef && typeof targetRef.isIncrementalBuilding === 'function' && targetRef.isIncrementalBuilding());
@@ -885,14 +897,16 @@
           }
         }
         T.incomingStationZ -= T.travelDir * stepZ;
-        if (T.nextBuildInProgress && (T.incomingStationZ * T.travelDir) < 116.0) {
-          T.incomingStationZ = 116.0 * T.travelDir;
+        // Hold incoming station deep inside tunnel fog (>= 180m ahead) until incremental build is 100% done (zero pop-in!)
+        if (T.nextBuildInProgress && (T.incomingStationZ * T.travelDir) < 180.0) {
+          T.incomingStationZ = 180.0 * T.travelDir;
         }
         const remDist = T.incomingStationZ * T.travelDir;
         if (stationRef && stationRef.rootGroup && stationRef.rootGroup !== T.activeOldRootGroup) {
           syncStationOffsetZ(stationRef, T.incomingStationZ);
           stationWorldZ = T.incomingStationZ;
         }
+        T.tunnelBlend = T.nextBuildInProgress ? 1.0 : smoothstep01(92.0, 134.0, Math.abs(T.incomingStationZ));
         if (T.state === 'CRUISE' && !T.nextBuildInProgress && remDist <= 114.0) {
           T.state = 'ARRIVING';
           T.brakeSoundPlayed = false;
@@ -903,12 +917,13 @@
         }
         if (remDist <= 0.02) {
           T.incomingStationZ = 0.0;
+          T.tunnelBlend = 0.0;
           syncStationOffsetZ(stationRef, 0);
           stationWorldZ = 0.0;
           T.speed = 0.0;
           T.accel = 0.0;
           T.state = 'BOARDED_WAIT';
-        T._psdSyncDirty = true;
+          T._psdSyncDirty = true;
           setHeadlights(true, 1.15);
           if (T.viaductGroup) T.viaductGroup.visible = false;
           if (LRT.Audio && typeof LRT.Audio.stopLoop === 'function') {
@@ -1163,6 +1178,9 @@
     getVisualRoot: () => T.trainVisualRoot,
     getRoot: () => T.trainGroup,
     get trainGroup() { return T.trainGroup; },
+    get viaductGroup() { return T.viaductGroup; },
+    get trainLightsGroup() { return T.trainLightsGroup; },
+    getTunnelBlend: () => T.tunnelBlend || 0.0,
     setWarmupMode,
     setNextStationName: (name, dir) => {
       T.currentStationName = name || 'Cawang';
@@ -1189,7 +1207,7 @@
       const disableLights = typeof t.maxPointLights === 'number' && t.maxPointLights <= 3;
       T._tierDisableLights = disableLights;
       if (T.headlightLight) {
-        T.headlightLight.visible = !disableLights && T.headlightIntensityTarget > 0.001 && T.headlightLight.intensity > 0.001;
+        T.headlightLight.visible = !disableLights;
         if (disableLights) T.headlightLight.intensity = 0;
       }
       for (let i = 0; i < cabinLights.length; i++) {

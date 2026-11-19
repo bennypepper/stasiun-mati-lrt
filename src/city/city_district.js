@@ -324,18 +324,18 @@
 
     // Extended outer urban terrain skirt & perimeter bounds spanning continuous full X width (zero sky-void holes!)
     const OUTER_SKIRT = 90.0;
-    const RAIL_EXT_Z = 145.0;
+    const RAIL_EXT_Z = 162.0;
     addAsphaltSlab(DIST_X_MIN - OUTER_SKIRT, DIST_Z_MIN - OUTER_SKIRT, DIST_X_MIN, DIST_Z_MAX + OUTER_SKIRT, true);
     addAsphaltSlab(DIST_X_MAX, DIST_Z_MIN - OUTER_SKIRT, DIST_X_MAX + OUTER_SKIRT, DIST_Z_MAX + OUTER_SKIRT, true);
     addAsphaltSlab(DIST_X_MIN, DIST_Z_MIN - OUTER_SKIRT, cMinX - 0.02, DIST_Z_MIN, true);
     addAsphaltSlab(cMaxX + 0.02, DIST_Z_MIN - OUTER_SKIRT, DIST_X_MAX, DIST_Z_MIN, true);
     addAsphaltSlab(DIST_X_MIN, DIST_Z_MAX, cMinX - 0.02, DIST_Z_MAX + OUTER_SKIRT, true);
     addAsphaltSlab(cMaxX + 0.02, DIST_Z_MAX, DIST_X_MAX, DIST_Z_MAX + OUTER_SKIRT, true);
-    // Seal rail corridor sub-base continuously across [cMinX - 0.02 .. cMaxX + 0.02] (sits cleanly beneath -1.20..-1.12 ballast)
-    addAsphaltSlab(cMinX - 0.02, DIST_Z_MIN - OUTER_SKIRT, cMaxX + 0.02, -RAIL_EXT_Z, false);
+    // Seal rail corridor sub-base continuously across [cMinX - 0.02 .. cMaxX + 0.02] STRICTLY beneath -1.20..-1.12 ballast (never protrudes on rail!)
+    addAsphaltSlab(cMinX - 0.02, DIST_Z_MIN - OUTER_SKIRT, cMaxX + 0.02, -RAIL_EXT_Z, false, STREET_GROUND_Y - 0.24);
     addAsphaltSlab(cMinX - 0.02, -RAIL_EXT_Z, cMaxX + 0.02, southCrossZ0, false, STREET_GROUND_Y - 0.20);
     addAsphaltSlab(cMinX - 0.02, northCrossZ1, cMaxX + 0.02, RAIL_EXT_Z, false, STREET_GROUND_Y - 0.20);
-    addAsphaltSlab(cMinX - 0.02, RAIL_EXT_Z, cMaxX + 0.02, DIST_Z_MAX + OUTER_SKIRT, false);
+    addAsphaltSlab(cMinX - 0.02, RAIL_EXT_Z, cMaxX + 0.02, DIST_Z_MAX + OUTER_SKIRT, false, STREET_GROUND_Y - 0.24);
     // Physical Quarantine Roadblocks along outer edges (z = ±116.5 & outer collector/cross exits)
     // (Replaces invisible walls with concrete road barriers, covered car blockades, chainlink fences & amber warning beacons)
     city._addCollider(DIST_X_MIN, STREET_GROUND_Y, -117.2, cMinX - 0.2, STREET_GROUND_Y + 3.0, -115.8, 'concrete', { blocksBullets: false });
@@ -1607,11 +1607,11 @@
         addBox(bTunnelSignalRed, 0.22, 0.22, 0.08, tx - 1.25, 5.28, sigZ - dir * 0.12);
         addBox(bTunnelSignalRed, 0.16, 0.16, 0.08, tx - 1.25, 5.02, sigZ - dir * 0.12);
 
-        // Pitch-black interior tunnel bore liner walls (visual-only, zero colliders/BVH)
-        addBox(bTunnelDark, 0.16, boreH + 0.10, 10.8, bL - 0.08, boreMidY, dir * 140.2);
-        addBox(bTunnelDark, 0.16, boreH + 0.10, 10.8, bR + 0.08, boreMidY, dir * 140.2);
-        // Interior concrete tunnel ribs at 3m spacing
-        for (const ribAbsZ of [137.0, 140.0, 143.0]) {
+        // Pitch-black open-ended interior tunnel bore liner walls extending seamlessly to ±162m (ZERO transverse rail block!)
+        addBox(bTunnelDark, 0.16, boreH + 0.10, 28.0, bL - 0.08, boreMidY, dir * 148.5);
+        addBox(bTunnelDark, 0.16, boreH + 0.10, 28.0, bR + 0.08, boreMidY, dir * 148.5);
+        // Interior concrete tunnel ribs at 4m spacing along open bore
+        for (const ribAbsZ of [137.0, 141.0, 145.0, 149.0, 153.0, 157.0, 161.0]) {
           const ribZ = dir * ribAbsZ;
           addBox(bInfraConcrete, 0.20, boreH - 0.10, 0.42, bL + 0.10, boreMidY - 0.05, ribZ);
           addBox(bInfraConcrete, 0.20, boreH - 0.10, 0.42, bR - 0.10, boreMidY - 0.05, ribZ);
@@ -1643,11 +1643,10 @@
         addBox(bTunnelSignalRed, 0.18, 0.18, 0.08, sx, 3.08, msZ - dir * 0.12);
         addBox(bTunnelSignalRed, 0.18, 0.18, 0.08, sx, 2.78, msZ - dir * 0.12);
       }
-      // Pitch-black interior chamber ceiling, outer walls & far blackout plate (visual-only, NO collider/BVH)
-      addBox(bTunnelDark, pSpanX, 0.26, 11.2, pMidX, boreTopY + 0.13, dir * 140.4);
-      addBox(bTunnelDark, 0.30, boreH + 0.30, 11.2, pMinX + 0.15, boreMidY + 0.05, dir * 140.4);
-      addBox(bTunnelDark, 0.30, boreH + 0.30, 11.2, pMaxX - 0.15, boreMidY + 0.05, dir * 140.4);
-      addBox(bTunnelDark, pSpanX, boreH + 0.40, 0.40, pMidX, boreMidY + 0.10, dir * 145.6);
+      // Pitch-black open-ended interior chamber ceiling & outer flank walls (NO transverse blackout plate blocking the rails!)
+      addBox(bTunnelDark, pSpanX, 0.26, 28.0, pMidX, boreTopY + 0.13, dir * 148.5);
+      addBox(bTunnelDark, 0.30, boreH + 0.30, 28.0, pMinX + 0.15, boreMidY + 0.05, dir * 148.5);
+      addBox(bTunnelDark, 0.30, boreH + 0.30, 28.0, pMaxX - 0.15, boreMidY + 0.05, dir * 148.5);
 
       // Overhead steel catenary gantries along outer track approach (z = ±120.5m & ±127.0m)
       const gantrySpan = cMaxX - cMinX;

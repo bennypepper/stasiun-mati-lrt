@@ -1539,6 +1539,7 @@
         const sl = this.stationLights[i];
         if (sl && sl.light && sl.homeZ !== undefined) {
           sl.light.position.z = sl.homeZ + nextZ;
+          sl.light.updateMatrixWorld(false);
         }
       }
       if (LRT.Enemies && typeof LRT.Enemies.setOffsetZ === 'function') {

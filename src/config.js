@@ -813,7 +813,7 @@
       hp: 105,
       speed: 2.05,
       damage: 14,
-      attackRange: 6.5,
+      attackRange: 3.5,
       attackCooldown: 2.40,
       scale: 1.04,
       armorMult: 1.0,

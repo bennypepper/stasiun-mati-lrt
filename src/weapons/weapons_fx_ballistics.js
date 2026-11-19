@@ -850,6 +850,7 @@
   function triggerFlashLight(pos, colorHex, intensity, distance, duration) {
     if (!_allowFlashLights || !W._flashLight || !pos) return;
     W._flashLight.position.copy(pos);
+    W._flashLight.updateMatrixWorld(false);
     W._flashLight.color.setHex(colorHex);
     W._flashLight.intensity = intensity;
     W._flashLight.distance = distance;
@@ -1291,7 +1292,9 @@
         if (h.isHeadshot) anyHeadshot = true;
         W._totalHits++;
         const dmg = Math.round((wCfg.damage || 25) * dmgScale * (h.isHeadshot ? (wCfg.headMult || 2.0) : 1.0));
-        const effectiveKb = (wCfg.knockback || 2.0) * (dismemberMult > 1.25 ? Math.min(1.6, 0.85 + dismemberMult * 0.25) : 1.0);
+        const rawKb = (wCfg.knockback || 2.0) * (dismemberMult > 1.25 ? Math.min(1.45, 0.85 + dismemberMult * 0.22) : 1.0);
+        // Scale per-pellet impulse on multi-pellet shotguns so 12-pellet Coach Gun doesn't launch enemies at 190 m/s through walls!
+        const effectiveKb = pellets > 1 ? (rawKb / Math.pow(pellets, 0.78)) : rawKb;
         const hitZone = h.hitZone || (h.isHeadshot ? 'head' : 'torso');
         let hitInfo = null;
         if (LRT.Enemies && typeof LRT.Enemies.hitZombie === 'function') {
@@ -1590,6 +1593,7 @@
       W._rocketLight.visible = _allowFlashLights;
       if (_allowFlashLights && activeRocketRef) {
         W._rocketLight.position.copy(activeRocketRef.pos);
+        W._rocketLight.updateMatrixWorld(false);
         W._rocketLight.intensity = 26.0 + Math.sin(W._traumaTime * 42.0) * 4.0;
       } else {
         W._rocketLight.intensity = 0;
