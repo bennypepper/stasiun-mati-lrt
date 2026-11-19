@@ -15,6 +15,7 @@
   let fpsFrames = 0;
   let currentFps = 60;
   let loopPaused = false;
+  let _wasPausedRendered = false;
   let rafId = 0;
   let _bootPromise = null;
   let _lastActiveObjKey = null;
@@ -104,6 +105,9 @@
 
   function finishBuildStation(idx, offsetZ, st) {
     _lastActiveObjKey = null;
+    if (typeof CORE.syncQualityToSubsystems === 'function') {
+      CORE.syncQualityToSubsystems();
+    }
     const pState = LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function' ? LRT.PlayerUI.getState() : null;
     updateCityVisibility(pState);
     if (typeof CORE.onStationBuilt === 'function') {
@@ -112,6 +116,7 @@
     if (!offsetZ && !CORE.tutorialActive && CORE.gameMode === MODES.SURVIVAL && CORE.gameState !== STATES.MENU && typeof CORE.writeSave === 'function') {
       CORE.writeSave();
     }
+    if (typeof CORE.syncSceneMatrices === 'function') CORE.syncSceneMatrices();
     return st;
   }
 
@@ -232,6 +237,8 @@
     }
 
     updateCityVisibility(LRT.PlayerUI.getState());
+    _wasPausedRendered = false;
+    CORE._pausedRenderDirty = false;
     LRT.PlayerUI.setPaused(false, true);
     LRT.PlayerUI.showScreen('play');
     LRT.PlayerUI.requestLock();
@@ -401,7 +408,10 @@
       fpsFrames = 0;
     }
 
+    let shouldRender = true;
     if (CORE.gameState === STATES.MENU && CORE.camera) {
+      _wasPausedRendered = false;
+      CORE._pausedRenderDirty = false;
       simTime += dt;
       if (LRT.Materials) LRT.Materials.update(simTime);
       if (LRT.Station && LRT.Station.update) LRT.Station.update(dt);
@@ -416,11 +426,21 @@
       const ftVisible = (dom['fast-travel-modal'] && !dom['fast-travel-modal'].classList.contains('hidden')) || !!(pState && pState.fastTravelOpen);
       const isSimPaused = pauseVisible || tutCompleteVisible || docVisible || ftVisible || !!(plFlags && plFlags.paused);
       if (!isSimPaused) {
+        _wasPausedRendered = false;
+        CORE._pausedRenderDirty = false;
         stepSimulation(dt);
+      } else if (!_wasPausedRendered || CORE._pausedRenderDirty) {
+        shouldRender = true;
+        _wasPausedRendered = true;
+        CORE._pausedRenderDirty = false;
+      } else {
+        shouldRender = false;
       }
     }
 
-    CORE.renderFrame();
+    if (shouldRender) {
+      CORE.renderFrame();
+    }
     if (!loopPaused) {
       rafId = requestAnimationFrame(animate);
     }
@@ -638,6 +658,8 @@
 
   function resume() {
     if (CORE.gameState === STATES.MENU || CORE.gameState === STATES.GAME_OVER) return;
+    _wasPausedRendered = false;
+    CORE._pausedRenderDirty = false;
     if (LRT.Audio && typeof LRT.Audio.setGameplayPaused === 'function') LRT.Audio.setGameplayPaused(false);
     if (LRT.Audio) LRT.Audio.unlock();
     LRT.PlayerUI.showScreen('play');
@@ -757,6 +779,7 @@
 
       // Pre-build Station 0 & apply startup Daylight preset
       buildStation(0);
+      if (typeof CORE.syncQualityToSubsystems === 'function') CORE.syncQualityToSubsystems();
       CORE.setLightingMode(CORE.currentLightingKey);
       CORE.lightingLockedByUser = false;
       CORE.updateMenuCamera(simTime);
@@ -774,6 +797,7 @@
         } else {
           renderer.compile(scene, camera);
         }
+        if (typeof CORE.syncSceneMatrices === 'function') CORE.syncSceneMatrices();
         CORE.renderFrame();
       } catch (warmErr) {
         console.warn('[main] Shader warmup fallback:', warmErr);
@@ -807,6 +831,9 @@
             CORE.composer.setPixelRatio(CORE.renderer.getPixelRatio());
             CORE.composer.setSize(rw, rh);
           }
+        }
+        if (typeof CORE.requestPausedRender === 'function') {
+          CORE.requestPausedRender();
         }
       });
 
@@ -940,6 +967,9 @@
           LRT.PlayerUI.reset(sp, CORE.gameMode === MODES.EXPLORATION, CORE.gameMode);
           updateCityVisibility(LRT.PlayerUI.getState());
           CORE.updateSunTracking(sp.x, sp.z);
+          if (typeof CORE.syncSceneMatrices === 'function') CORE.syncSceneMatrices();
+          _wasPausedRendered = false;
+          CORE._pausedRenderDirty = false;
           CORE.renderFrame();
           return st;
         },

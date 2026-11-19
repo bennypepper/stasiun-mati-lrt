@@ -500,19 +500,32 @@
         _stationNormCache.set(normKey, norm);
       }
 
-      const parts = [];
+      const partsByMat = new Map();
       for (let i = 0; i < selected.length; i++) {
         const node = selected[i];
         const g = node.geometry.clone();
         g.applyMatrix4(node.matrixWorld);
         g.translate(-norm.ctrX, -norm.minY, -norm.ctrZ);
         if (norm.scale !== 1.0) g.scale(norm.scale, norm.scale, norm.scale);
+        const normGeo = prepGeo(g, false);
         const mat = Array.isArray(node.material) ? node.material[0] : node.material;
         if (mat && 'envMapIntensity' in mat && (!mat.envMapIntensity || mat.envMapIntensity < 0.8)) {
           mat.envMapIntensity = 1.0;
         }
-        parts.push({ geo: g, mat });
+        if (!partsByMat.has(mat)) partsByMat.set(mat, []);
+        partsByMat.get(mat).push(normGeo);
       }
+
+      const parts = [];
+      for (const [mat, geos] of partsByMat.entries()) {
+        const merged = geos.length === 1 ? geos[0] : THREE_UTILS.mergeGeometries(geos, false);
+        if (geos.length > 1) {
+          for (let j = 0; j < geos.length; j++) geos[j].dispose();
+        }
+        if (!merged) continue;
+        parts.push({ geo: merged, mat });
+      }
+      if (parts.length === 0) return null;
 
       proto = {
         parts,
@@ -530,7 +543,11 @@
     const p1 = _extractStationProto(key, targetHeight, filterFn, protoCacheKey, 1);
     const p2 = _extractStationProto(key, targetHeight, filterFn, protoCacheKey, 2);
 
-    const shouldCast = !NO_SHADOW_STATION_PROPS.has(key);
+    const tierCfg = (LRT.Config && LRT.Config.QUALITY_TIERS && LRT.Core && LRT.Core.qualityKey)
+      ? LRT.Config.QUALITY_TIERS[LRT.Core.qualityKey]
+      : null;
+    const allowPropShadow = tierCfg && tierCfg.propCastShadow !== undefined ? !!tierCfg.propCastShadow : false;
+    const shouldCast = allowPropShadow && !NO_SHADOW_STATION_PROPS.has(key);
     const buildLevelGroup = (pr, cast) => {
       const g = new THREE.Group();
       for (let i = 0; i < pr.parts.length; i++) {
@@ -538,6 +555,7 @@
         const m = new THREE.Mesh(part.geo, part.mat);
         m.castShadow = cast;
         m.receiveShadow = true;
+        m.userData._isStationProp = !NO_SHADOW_STATION_PROPS.has(key);
         g.add(m);
       }
       return g;

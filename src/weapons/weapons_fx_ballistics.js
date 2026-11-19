@@ -33,6 +33,11 @@
   const _attachedScorches = W._attachedScorches;
 
   // Pre-allocated InstancedMesh VFX pools
+  let _vfxScale = 1.0;
+  let _allowFlashLights = true;
+  function scaleBurstCount(n, minN) {
+    return Math.max(minN || 1, Math.round(n * _vfxScale));
+  }
   const TRACER_CAP = 32;
   const ROCKET_CAP = 4;
   const SMOKE_CAP = 160;
@@ -218,6 +223,8 @@
       m.frustumCulled = false;
       m.castShadow = !!castShadow;
       m.receiveShadow = false;
+      m.visible = false;
+      m.count = 0;
       const white = new THREE.Color(0xffffff);
       for (let i = 0; i < cap; i++) {
         m.setMatrixAt(i, _zeroMat);
@@ -419,7 +426,11 @@
         arr[i].active = false;
         if (mesh) mesh.setMatrixAt(i, _zeroMat);
       }
-      if (mesh) mesh.instanceMatrix.needsUpdate = true;
+      if (mesh) {
+        mesh.count = 0;
+        mesh.visible = false;
+        mesh.instanceMatrix.needsUpdate = true;
+      }
     };
     clearList(_tracers, _tracerMesh);
     clearList(_rockets, _rocketMesh);
@@ -508,7 +519,7 @@
 
   function spawnSparks(pos, count, normalOrDir, inheritVel) {
     if (!_sparkMesh || !pos) return;
-    const n = count || 12;
+    const n = scaleBurstCount(count || 12, 2);
     const baseDir = normalOrDir || _upVec;
     for (let i = 0; i < n; i++) {
       const s = _sparks[_sparkCursor];
@@ -536,7 +547,7 @@
 
   function spawnBlood(pos, dir, count) {
     if (!_bloodMesh || !pos) return;
-    const n = count || 10;
+    const n = scaleBurstCount(count || 10, 2);
     const d = dir || _fwdVec;
     for (let i = 0; i < n; i++) {
       const b = _bloods[_bloodCursor];
@@ -561,7 +572,7 @@
     if (!_rubbleMesh) return;
     const d = dir || _upVec;
     const chunkColors = [0x5a0609, 0x3a0204, 0x7a0b10];
-    const chunkCount = 9;
+    const chunkCount = scaleBurstCount(9, 3);
     for (let i = 0; i < chunkCount; i++) {
       const r = _rubbles[_rubbleCursor];
       _rubbleCursor = (_rubbleCursor + 1) % RUBBLE_CAP;
@@ -587,7 +598,7 @@
 
   function spawnGlassShards(pos, count, inheritVel) {
     if (!_glassMesh || !pos) return;
-    const n = count || 18;
+    const n = scaleBurstCount(count || 18, 2);
     for (let i = 0; i < n; i++) {
       const g = _glasses[_glassCursor];
       _glassCursor = (_glassCursor + 1) % GLASS_CAP;
@@ -621,7 +632,7 @@
 
   function spawnRubble(pos, count, impulseDir) {
     if (!_rubbleMesh || !pos) return;
-    const n = count || 12;
+    const n = scaleBurstCount(count || 12, 2);
     const d = impulseDir || _upVec;
     for (let i = 0; i < n; i++) {
       const r = _rubbles[_rubbleCursor];
@@ -749,6 +760,8 @@
     _scaleV.set(decalSize, decalSize, 1);
     _m4.compose(_v2, _q1, _scaleV);
     _scorchMesh.setMatrixAt(idx, _m4);
+    _scorchMesh.visible = true;
+    if (_scorchMesh.count <= idx) _scorchMesh.count = idx + 1;
     _scorchMesh.instanceMatrix.needsUpdate = true;
   }
 
@@ -829,11 +842,13 @@
     _scaleV.set(d.startScale, d.startScale * d.aspect, 1);
     _m4.compose(d.pos, d.quat, _scaleV);
     _bloodDecalMesh.setMatrixAt(idx, _m4);
+    _bloodDecalMesh.visible = true;
+    if (_bloodDecalMesh.count <= idx) _bloodDecalMesh.count = idx + 1;
     _bloodDecalMesh.instanceMatrix.needsUpdate = true;
   }
 
   function triggerFlashLight(pos, colorHex, intensity, distance, duration) {
-    if (!W._flashLight || !pos) return;
+    if (!_allowFlashLights || !W._flashLight || !pos) return;
     W._flashLight.position.copy(pos);
     W._flashLight.color.setHex(colorHex);
     W._flashLight.intensity = intensity;
@@ -1504,6 +1519,7 @@
 
   function updateRockets(dt) {
     let dirty = false;
+    let highWater = 0;
     let activeRocketRef = null;
     for (let i = 0; i < ROCKET_CAP; i++) {
       const r = _rockets[i];
@@ -1553,23 +1569,29 @@
       _scaleV.set(1, 1, 1);
       _m4.compose(r.pos, _q1, _scaleV);
       _rocketMesh.setMatrixAt(i, _m4);
+      highWater = i + 1;
     }
     if (W._rocketLight) {
-      W._rocketLight.visible = true;
-      if (activeRocketRef) {
+      W._rocketLight.visible = _allowFlashLights;
+      if (_allowFlashLights && activeRocketRef) {
         W._rocketLight.position.copy(activeRocketRef.pos);
         W._rocketLight.intensity = 26.0 + Math.sin(W._traumaTime * 42.0) * 4.0;
       } else {
         W._rocketLight.intensity = 0;
       }
     }
-    if (dirty && _rocketMesh) _rocketMesh.instanceMatrix.needsUpdate = true;
+    if (_rocketMesh) {
+      _rocketMesh.count = highWater;
+      _rocketMesh.visible = highWater > 0;
+      if (dirty) _rocketMesh.instanceMatrix.needsUpdate = true;
+    }
   }
 
   function updateVfxPools(dt) {
     // 1. Tracers
     if (_tracerMesh) {
       let dirty = false;
+      let hw = 0;
       for (let i = 0; i < TRACER_CAP; i++) {
         const t = _tracers[i];
         if (!t.active) continue;
@@ -1580,6 +1602,7 @@
           _tracerMesh.setMatrixAt(i, _zeroMat);
           continue;
         }
+        hw = i + 1;
         const frac = 1.0 - t.life / t.maxLife;
         _v1.subVectors(t.p1, t.p0);
         const len = Math.max(0.05, _v1.length());
@@ -1590,12 +1613,15 @@
         _m4.compose(_v2, _q1, _scaleV);
         _tracerMesh.setMatrixAt(i, _m4);
       }
+      _tracerMesh.count = hw;
+      _tracerMesh.visible = hw > 0;
       if (dirty) _tracerMesh.instanceMatrix.needsUpdate = true;
     }
 
     // 2. Smoke
     if (_smokeMesh) {
       let dirty = false;
+      let hw = 0;
       for (let i = 0; i < SMOKE_CAP; i++) {
         const s = _smokes[i];
         if (!s.active) continue;
@@ -1606,6 +1632,7 @@
           _smokeMesh.setMatrixAt(i, _zeroMat);
           continue;
         }
+        hw = i + 1;
         const t = s.life / s.maxLife;
         s.vel.multiplyScalar(Math.max(0, 1 - dt * 2.2));
         s.vel.y += 1.4 * dt;
@@ -1617,6 +1644,8 @@
         _smokeMesh.setMatrixAt(i, _m4);
         _smokeMesh.setColorAt(i, s.color);
       }
+      _smokeMesh.count = hw;
+      _smokeMesh.visible = hw > 0;
       if (dirty) {
         _smokeMesh.instanceMatrix.needsUpdate = true;
         if (_smokeMesh.instanceColor) _smokeMesh.instanceColor.needsUpdate = true;
@@ -1626,6 +1655,7 @@
     // 3. Fireballs
     if (_fireballMesh) {
       let dirty = false;
+      let hw = 0;
       for (let i = 0; i < FIREBALL_CAP; i++) {
         const f = _fireballs[i];
         if (!f.active) continue;
@@ -1636,6 +1666,7 @@
           _fireballMesh.setMatrixAt(i, _zeroMat);
           continue;
         }
+        hw = i + 1;
         const t = f.life / f.maxLife;
         f.pos.addScaledVector(f.vel, dt);
         f.vel.multiplyScalar(Math.max(0, 1 - dt * 4.0));
@@ -1647,6 +1678,8 @@
         _color1.lerpColors(f.cStart, f.cEnd, t);
         _fireballMesh.setColorAt(i, _color1);
       }
+      _fireballMesh.count = hw;
+      _fireballMesh.visible = hw > 0;
       if (dirty) {
         _fireballMesh.instanceMatrix.needsUpdate = true;
         if (_fireballMesh.instanceColor) _fireballMesh.instanceColor.needsUpdate = true;
@@ -1656,6 +1689,7 @@
     // 4. Shockwave rings
     if (_ringMesh) {
       let dirty = false;
+      let hw = 0;
       for (let i = 0; i < RING_CAP; i++) {
         const r = _rings[i];
         if (!r.active) continue;
@@ -1666,6 +1700,7 @@
           _ringMesh.setMatrixAt(i, _zeroMat);
           continue;
         }
+        hw = i + 1;
         const t = r.life / r.maxLife;
         const sc = 0.4 + r.maxRadius * Math.pow(t, 0.55);
         _q1.identity();
@@ -1675,6 +1710,8 @@
         _color1.copy(r.color).multiplyScalar(1 - t);
         _ringMesh.setColorAt(i, _color1);
       }
+      _ringMesh.count = hw;
+      _ringMesh.visible = hw > 0;
       if (dirty) {
         _ringMesh.instanceMatrix.needsUpdate = true;
         if (_ringMesh.instanceColor) _ringMesh.instanceColor.needsUpdate = true;
@@ -1684,6 +1721,7 @@
     // 5. Sparks
     if (_sparkMesh) {
       let dirty = false;
+      let hw = 0;
       for (let i = 0; i < SPARK_CAP; i++) {
         const s = _sparks[i];
         if (!s.active) continue;
@@ -1694,6 +1732,7 @@
           _sparkMesh.setMatrixAt(i, _zeroMat);
           continue;
         }
+        hw = i + 1;
         s.vel.y -= 14.0 * dt;
         s.pos.addScaledVector(s.vel, dt);
         if ((s.pos.y < 0.02 && s.pos.y > -0.35 && Math.abs(s.pos.x) < 12) || (s.pos.y < -0.98 && s.pos.y > -1.30)) {
@@ -1712,6 +1751,8 @@
         _sparkMesh.setMatrixAt(i, _m4);
         _sparkMesh.setColorAt(i, s.color);
       }
+      _sparkMesh.count = hw;
+      _sparkMesh.visible = hw > 0;
       if (dirty) {
         _sparkMesh.instanceMatrix.needsUpdate = true;
         if (_sparkMesh.instanceColor) _sparkMesh.instanceColor.needsUpdate = true;
@@ -1721,6 +1762,7 @@
     // 6. Blood
     if (_bloodMesh) {
       let dirty = false;
+      let hw = 0;
       for (let i = 0; i < BLOOD_CAP; i++) {
         const b = _bloods[i];
         if (!b.active) continue;
@@ -1731,6 +1773,7 @@
           _bloodMesh.setMatrixAt(i, _zeroMat);
           continue;
         }
+        hw = i + 1;
         b.vel.y -= 16.0 * dt;
         b.pos.addScaledVector(b.vel, dt);
         const spd = b.vel.length();
@@ -1743,6 +1786,8 @@
         _bloodMesh.setMatrixAt(i, _m4);
         _bloodMesh.setColorAt(i, b.color);
       }
+      _bloodMesh.count = hw;
+      _bloodMesh.visible = hw > 0;
       if (dirty) {
         _bloodMesh.instanceMatrix.needsUpdate = true;
         if (_bloodMesh.instanceColor) _bloodMesh.instanceColor.needsUpdate = true;
@@ -1752,6 +1797,7 @@
     // 7. Glass shards
     if (_glassMesh) {
       let dirty = false;
+      let hw = 0;
       for (let i = 0; i < GLASS_CAP; i++) {
         const g = _glasses[i];
         if (!g.active) continue;
@@ -1762,6 +1808,7 @@
           _glassMesh.setMatrixAt(i, _zeroMat);
           continue;
         }
+        hw = i + 1;
         g.vel.y -= 17.5 * dt;
         g.pos.addScaledVector(g.vel, dt);
         if ((g.pos.y < 0.04 && g.pos.y > -0.35 && Math.abs(g.pos.x) < 12) || (g.pos.y < -0.96 && g.pos.y > -1.30)) {
@@ -1781,6 +1828,8 @@
         _glassMesh.setMatrixAt(i, _m4);
         _glassMesh.setColorAt(i, g.color);
       }
+      _glassMesh.count = hw;
+      _glassMesh.visible = hw > 0;
       if (dirty) {
         _glassMesh.instanceMatrix.needsUpdate = true;
         if (_glassMesh.instanceColor) _glassMesh.instanceColor.needsUpdate = true;
@@ -1790,6 +1839,7 @@
     // 8. Rubble chunks
     if (_rubbleMesh) {
       let dirty = false;
+      let hw = 0;
       for (let i = 0; i < RUBBLE_CAP; i++) {
         const r = _rubbles[i];
         if (!r.active) continue;
@@ -1800,6 +1850,7 @@
           _rubbleMesh.setMatrixAt(i, _zeroMat);
           continue;
         }
+        hw = i + 1;
         r.vel.y -= 19.0 * dt;
         r.pos.addScaledVector(r.vel, dt);
         if ((r.pos.y < 0.07 && r.pos.y > -0.32 && Math.abs(r.pos.x) < 12) || (r.pos.y < -0.93 && r.pos.y > -1.30)) {
@@ -1819,6 +1870,8 @@
         _rubbleMesh.setMatrixAt(i, _m4);
         _rubbleMesh.setColorAt(i, r.color);
       }
+      _rubbleMesh.count = hw;
+      _rubbleMesh.visible = hw > 0;
       if (dirty) {
         _rubbleMesh.instanceMatrix.needsUpdate = true;
         if (_rubbleMesh.instanceColor) _rubbleMesh.instanceColor.needsUpdate = true;
@@ -1828,6 +1881,7 @@
     // 9. Ejected shell casings
     if (_casingMesh) {
       let dirty = false;
+      let hw = 0;
       for (let i = 0; i < CASING_CAP; i++) {
         const c = _casings[i];
         if (!c.active) continue;
@@ -1838,6 +1892,7 @@
           _casingMesh.setMatrixAt(i, _zeroMat);
           continue;
         }
+        hw = i + 1;
         c.vel.y -= 11.5 * dt;
         c.pos.addScaledVector(c.vel, dt);
         const floorY = c.groundY + 0.014;
@@ -1866,6 +1921,8 @@
         _casingMesh.setMatrixAt(i, _m4);
         _casingMesh.setColorAt(i, c.color);
       }
+      _casingMesh.count = hw;
+      _casingMesh.visible = hw > 0;
       if (dirty) {
         _casingMesh.instanceMatrix.needsUpdate = true;
         if (_casingMesh.instanceColor) _casingMesh.instanceColor.needsUpdate = true;
@@ -1926,7 +1983,7 @@
     }
 
     // Pooled PointLight decay (NEVER toggle .visible — keep visible=true, intensity=0 when off!)
-    if (W._flashLight && W._flashLightTimer > 0) {
+    if (_allowFlashLights && W._flashLight && W._flashLightTimer > 0) {
       W._flashLightTimer -= step;
       if (W._flashLightTimer <= 0) {
         W._flashLight.intensity = 0;
@@ -2494,9 +2551,63 @@
     return true;
   }
 
+  function clearStationDecals() {
+    for (let i = 0; i < SCORCH_CAP; i++) {
+      _scorches[i].active = false;
+      if (_scorchMesh) _scorchMesh.setMatrixAt(i, _zeroMat);
+    }
+    _scorchCursor = 0;
+    if (_scorchMesh) {
+      _scorchMesh.count = 0;
+      _scorchMesh.visible = false;
+      _scorchMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    for (let i = 0; i < BLOOD_DECAL_CAP; i++) {
+      _bloodDecals[i].active = false;
+      if (_bloodDecalMesh) _bloodDecalMesh.setMatrixAt(i, _zeroMat);
+    }
+    _bloodDecalCursor = 0;
+    if (_bloodDecalMesh) {
+      _bloodDecalMesh.count = 0;
+      _bloodDecalMesh.visible = false;
+      _bloodDecalMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    for (let i = 0; i < _attachedScorches.length; i++) {
+      const m = _attachedScorches[i];
+      if (m) {
+        m.visible = false;
+        if (m.parent) m.parent.remove(m);
+      }
+    }
+    _attachedScorchCursor = 0;
+  }
+
+  function applyQualityTier(tier) {
+    const t = tier || (LRT.Config && LRT.Config.QUALITY_TIERS && LRT.Core && LRT.Config.QUALITY_TIERS[LRT.Core.qualityKey]) || {};
+    _vfxScale = typeof t.vfxScale === 'number' ? Math.max(0.2, Math.min(1.0, t.vfxScale)) : 1.0;
+    _allowFlashLights = t.maxPointLights === undefined ? true : (t.maxPointLights > 3);
+    if (W._flashLight) {
+      W._flashLight.visible = _allowFlashLights;
+      if (!_allowFlashLights) {
+        W._flashLight.intensity = 0;
+        W._flashLightTimer = 0;
+      }
+    }
+    if (W._rocketLight) {
+      W._rocketLight.visible = _allowFlashLights;
+      if (!_allowFlashLights) {
+        W._rocketLight.intensity = 0;
+      }
+    }
+  }
+
   const Weapons = {
     init,
     reset,
+    applyQualityTier,
+    clearStationDecals,
     getSaveState,
     loadSaveState,
     setVisible: W.setVisible,

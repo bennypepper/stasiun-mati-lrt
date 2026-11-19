@@ -395,7 +395,6 @@ html, body {
   background: linear-gradient(90deg, transparent, rgba(6, 8, 13, 0.78) 18%, rgba(6, 8, 13, 0.78) 82%, transparent);
   border: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(4px);
   color: rgba(232, 228, 218, 0.94);
   padding: 5px 26px;
   font-size: 11.5px;
@@ -1805,8 +1804,7 @@ html, body {
   transform: translateX(-50%);
   width: min(460px, 84vw);
   padding: 10px 18px 9px;
-  background: rgba(6, 8, 13, 0.76);
-  backdrop-filter: blur(8px);
+  background: rgba(6, 8, 13, 0.84);
   border: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.10);
   border-left: 2px solid #e0b422;
@@ -2130,7 +2128,7 @@ html, body {
 }
 
 /* =========================================================
-   GTA V-STYLE FAST TRAVEL & STATION INSPECTOR MODAL ([Tab])
+   RE-STYLE FAST TRAVEL & STATION INSPECTOR ([Tab])
    ========================================================= */
 .fast-travel-modal {
   position: fixed;
@@ -2139,39 +2137,44 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(14px, 2.5vw, 32px);
+  padding: clamp(16px, 3vw, 40px);
   background: radial-gradient(
     ellipse at center,
-    rgba(6, 8, 13, 0.78) 0%,
-    rgba(3, 4, 8, 0.92) 100%
+    rgba(6, 8, 13, 0.84) 0%,
+    rgba(3, 4, 8, 0.95) 100%
   );
   backdrop-filter: blur(8px);
   pointer-events: auto;
 }
 
+.fast-travel-modal button:focus,
+.fast-travel-modal button:focus-visible {
+  outline: none;
+}
+
 .ft-shell {
-  width: min(1140px, 94vw);
-  max-height: min(92vh, 780px);
+  width: min(1040px, 92vw);
+  max-height: min(88vh, 760px);
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: clamp(16px, 2.2vw, 26px);
-  background: rgba(6, 8, 13, 0.88);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  gap: 18px;
+  padding: clamp(16px, 2.2vw, 26px) 0;
+  background: transparent;
+  backdrop-filter: none;
+  border: none;
   border-radius: 0;
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.85);
+  box-shadow: none;
   overflow: hidden;
 }
 
 .ft-topbar {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px 20px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  gap: 12px 24px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   flex-shrink: 0;
 }
 
@@ -2186,7 +2189,7 @@ html, body {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.24em;
-  color: var(--amber-muted);
+  color: #e0b422;
   text-transform: uppercase;
 }
 
@@ -2196,32 +2199,32 @@ html, body {
   font-size: clamp(20px, 2.1vw, 28px);
   font-weight: 300;
   letter-spacing: 0.18em;
-  color: var(--bone);
+  color: #e8e4da;
   text-transform: uppercase;
 }
 
 .ft-meta {
   font-family: var(--font-mono);
   font-size: 11px;
-  letter-spacing: 0.08em;
-  color: rgba(212, 208, 198, 0.68);
+  letter-spacing: 0.12em;
+  color: #8b929a;
 }
 
 .ft-topbar-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px 18px;
+  gap: 14px 22px;
 }
 
 .ft-atmos-group {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 4px;
-  padding: 3px 6px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  gap: 2px;
+  padding: 0;
+  background: transparent;
+  border: none;
   border-radius: 0;
 }
 
@@ -2229,9 +2232,9 @@ html, body {
   font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   color: #8b929a;
-  margin-right: 4px;
+  margin-right: 6px;
 }
 
 .ft-atmos-btn {
@@ -2243,7 +2246,7 @@ html, body {
   color: #8b929a;
   font-family: var(--font-mono);
   font-size: 10.5px;
-  letter-spacing: 0.10em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   cursor: pointer;
   transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
@@ -2257,30 +2260,34 @@ html, body {
 }
 
 .ft-atmos-btn.active {
-  background: linear-gradient(90deg, rgba(224, 180, 34, 0.18), transparent);
+  background: linear-gradient(90deg, rgba(224, 180, 34, 0.14), transparent);
   border-bottom-color: #e0b422;
   color: #e0b422;
 }
 
 .ft-close-btn {
-  padding: 6px 14px;
+  padding: 6px 12px;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-left: 2px solid transparent;
   border-radius: 0;
   color: #e8e4da;
   font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .ft-close-btn:hover,
 .ft-close-btn:focus-visible {
   outline: none;
-  background: linear-gradient(90deg, rgba(220, 38, 38, 0.22), transparent);
-  border-color: rgba(220, 38, 38, 0.65);
+  background: linear-gradient(90deg, rgba(220, 38, 38, 0.18), transparent);
+  border-left-color: #dc2626;
+  border-bottom-color: rgba(220, 38, 38, 0.55);
   color: #ffffff;
 }
 
@@ -2288,15 +2295,15 @@ html, body {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(290px, 0.90fr) minmax(340px, 1.30fr);
-  gap: 24px;
+  grid-template-columns: minmax(290px, 0.92fr) minmax(340px, 1.25fr);
+  gap: 32px;
 }
 
 .ft-col {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .ft-col-head {
@@ -2304,8 +2311,8 @@ html, body {
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  padding-bottom: 5px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
   flex-shrink: 0;
 }
 
@@ -2330,7 +2337,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding-right: 4px;
+  padding-right: 6px;
   scrollbar-width: thin;
   scrollbar-color: rgba(232, 228, 218, 0.18) transparent;
 }
@@ -2340,7 +2347,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 8px 12px;
+  padding: 9px 12px;
   background: transparent;
   border: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -2375,7 +2382,7 @@ html, body {
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   color: #e0b422;
 }
 
@@ -2383,8 +2390,8 @@ html, body {
   font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  padding: 1px 6px;
+  letter-spacing: 0.12em;
+  padding: 1px 0;
   border-radius: 0;
   background: transparent;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
@@ -2414,17 +2421,18 @@ html, body {
 .ft-zone-grid {
   flex: 1 1 auto;
   min-height: 0;
+  max-height: 54vh;
   overflow-y: auto;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px 18px;
-  align-content: start;
-  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-right: 6px;
   scrollbar-width: thin;
   scrollbar-color: rgba(232, 228, 218, 0.18) transparent;
 }
 
 .ft-zone-card {
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -2459,37 +2467,35 @@ html, body {
   font-size: 10px;
   font-weight: 700;
   color: #38bdf8;
-  letter-spacing: 0.10em;
+  letter-spacing: 0.14em;
 }
 
 .ft-zone-tag {
   font-family: var(--font-mono);
   font-size: 9px;
-  letter-spacing: 0.08em;
-  color: var(--ash);
+  letter-spacing: 0.12em;
+  color: #8b929a;
   text-transform: uppercase;
 }
 
 .ft-zone-name {
   font-size: 13px;
   font-weight: 500;
-  color: var(--bone);
+  color: #e8e4da;
   line-height: 1.3;
 }
 
 .ft-zone-coords {
   font-family: var(--font-mono);
   font-size: 9.5px;
-  color: var(--ash-dim);
+  letter-spacing: 0.10em;
+  color: #8b929a;
 }
 
 @media (max-width: 900px) {
   .ft-columns {
     grid-template-columns: 1fr;
     overflow-y: auto;
-  }
-  .ft-zone-grid {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -2516,10 +2522,10 @@ html, body {
   text-align: center;
   gap: 20px;
   padding: clamp(24px, 4vh, 44px) clamp(24px, 4vw, 48px);
-  background: rgba(8, 11, 17, 0.78);
-  border: 1px solid rgba(225, 222, 214, 0.14);
-  border-radius: 4px;
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.85);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .tut-complete-col .zenith-header,
@@ -2547,10 +2553,11 @@ html, body {
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.14em;
-  color: #86efac;
-  background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(52, 211, 153, 0.35);
-  border-radius: 3px;
+  color: #22c55e;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(34, 197, 94, 0.45);
+  border-radius: 0;
 }
 
 .tut-complete-primary {

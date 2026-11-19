@@ -236,12 +236,18 @@
       for (let i = 0; i < this.streetLights.length; i++) {
         const sl = this.streetLights[i];
         if (sl && sl.light) {
-          sl.light.visible = true; // NEVER toggle light.visible!
           sl.light.intensity = 0;
         }
       }
-      if (this.rootGroup && this.rootGroup.parent) {
-        this.rootGroup.parent.remove(this.rootGroup);
+      if (this.rootGroup) {
+        this.rootGroup.traverse((obj) => {
+          if (obj && obj.isInstancedMesh && typeof obj.dispose === 'function') {
+            obj.dispose();
+          }
+        });
+        if (this.rootGroup.parent) {
+          this.rootGroup.parent.remove(this.rootGroup);
+        }
       }
       for (let i = 0; i < this.disposableGeometries.length; i++) {
         const g = this.disposableGeometries[i];
@@ -399,6 +405,7 @@
       if (done) {
         this._buildRunner = null;
         this._isBuilding = false;
+        if (this.rootGroup) this.rootGroup.updateMatrixWorld(true);
         return _cityStepDone;
       }
       return _cityStepInProgress;
@@ -419,6 +426,11 @@
       this._lightingFactor = Number.isFinite(num) ? Math.max(0, num) : 1.0;
       for (let i = 0; i < this.streetLights.length; i++) {
         const sl = this.streetLights[i];
+        if (sl.light._tierDisabled) {
+          sl.light.visible = false;
+          sl.light.intensity = 0;
+          continue;
+        }
         const distScale = sl._distScale !== undefined ? sl._distScale : 1.0;
         sl.light.visible = true;
         if (sl.kind === 'traffic') {
@@ -533,6 +545,11 @@
       let lampSlot = 0;
       for (let i = 0; i < this.streetLights.length; i++) {
         const sl = this.streetLights[i];
+        if (sl.light._tierDisabled) {
+          sl.light.visible = false;
+          sl.light.intensity = 0;
+          continue;
+        }
         sl.light.visible = true; // NEVER toggle visible!
 
         if (sl.kind === 'traffic') {
@@ -638,6 +655,11 @@
       }
       for (let i = 0; i < this.streetLights.length; i++) {
         const sl = this.streetLights[i];
+        if (sl.light._tierDisabled) {
+          sl.light.visible = false;
+          sl.light.intensity = 0;
+          continue;
+        }
         const distScale = sl._distScale !== undefined ? sl._distScale : 1.0;
         if (sl.kind === 'traffic') {
           sl._blinkScale = evalTrafficBlink(sl._worldX, sl._worldZ, this._timeAccum);
@@ -659,6 +681,7 @@
         const tg = this.trackGates[i];
         if (tg.gateMesh) {
           tg.gateMesh.position.y = this._trackGatesOpen ? (RAIL_TOP_Y + 6.8) : (RAIL_TOP_Y + 1.4);
+          tg.gateMesh.updateMatrixWorld(true);
         }
         if (tg.collider) {
           tg.collider.disabled = this._trackGatesOpen;
@@ -674,6 +697,30 @@
       }
     },
 
+    applyQualityTier: function (tier) {
+      const t = tier || {};
+      const maxLights = typeof t.maxPointLights === 'number' ? t.maxPointLights : 12;
+      const allowCityLights = maxLights > 3;
+      if (this.streetLights && this.streetLights.length > 0) {
+        for (let i = 0; i < this.streetLights.length; i++) {
+          const sl = this.streetLights[i];
+          if (sl && sl.light) {
+            sl.light._tierDisabled = !allowCityLights;
+            sl.light.visible = allowCityLights;
+            if (!allowCityLights) sl.light.intensity = 0;
+          }
+        }
+      }
+      const propShadow = !!t.propCastShadow;
+      if (this.rootGroup) {
+        this.rootGroup.traverse((obj) => {
+          if (obj && obj.isMesh && obj.userData && obj.userData._origCastShadow) {
+            obj.castShadow = propShadow;
+          }
+        });
+      }
+    },
+
     updateVisibility: function (camPos, qualityKey, frustum, playerContext) {
       if (!this.rootGroup || this._isBuilding) return;
 
@@ -685,10 +732,15 @@
       const worldOffset = this._syncWorldBounds();
       const qKey = qualityKey || 'balanced';
       const isPotato = qKey === 'potato';
-      const isBalanced = qKey === 'balanced';
+      const isBalanced = qKey === 'balanced' || qKey === 'low';
+      const tierCfg = (LRT.Config && LRT.Config.QUALITY_TIERS && LRT.Config.QUALITY_TIERS[qKey]) || null;
 
-      let bldgMaxDist = isPotato ? 95 : (isBalanced ? 105 : 160);
-      const clutterMaxDist = isPotato ? 36 : (isBalanced ? 54 : 84);
+      let bldgMaxDist = (tierCfg && typeof tierCfg.bldgMaxDist === 'number')
+        ? tierCfg.bldgMaxDist
+        : (isPotato ? 75 : (isBalanced ? 115 : 165));
+      const clutterMaxDist = (tierCfg && typeof tierCfg.clutterMaxDist === 'number')
+        ? tierCfg.clutterMaxDist
+        : (isPotato ? 34 : (isBalanced ? 56 : 86));
 
       const ctx = playerContext || null;
       const trainCruising = !!(ctx && ctx.trainCruising);
@@ -768,6 +820,13 @@
           cm.visible = false;
           continue;
         }
+        if (isPotato && !isStruct && camPos && wBox) {
+          wBox.getCenter(_tmpLocalCam);
+          if (_tmpLocalCam.distanceTo(camPos) > clutterMaxDist + 28) {
+            cm.visible = false;
+            continue;
+          }
+        }
         if (ud._lodTier !== undefined) {
           const d1 = ud._lod1Dist || 22;
           const d2 = ud._lod2Dist || 46;
@@ -807,11 +866,25 @@
       return this.interactables || [];
     },
 
+    _crateLookupMap: new Map(),
+
+    _syncCrateLookup: function () {
+      const m = this._crateLookupMap;
+      m.clear();
+      if (!this.interactables) return m;
+      for (let i = 0; i < this.interactables.length; i++) {
+        const it = this.interactables[i];
+        if (it && it.type === 'lootbox') m.set(it.id, it);
+      }
+      return m;
+    },
+
     _findCrosshairHoveredId: function (pos, lookDir, maxDist) {
       if (this._isBuilding || !this.interactables || !pos || !lookDir) return null;
       const limit = maxDist !== undefined ? maxDist : 8.0;
       const oz = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
       const pz = pos.z - oz;
+      const crateMap = this._syncCrateLookup();
       let bestId = null;
       let bestPerp = 999;
 
@@ -819,7 +892,7 @@
         const it = this.interactables[i];
         if (!it || it.type === 'bench' || it.used) continue;
         if (it.isLootSlot) {
-          const parentCrate = this.interactables.find((c) => c.id === it.crateId);
+          const parentCrate = crateMap.get(it.crateId);
           if (!parentCrate || !parentCrate.opened || parentCrate.used || it.taken) continue;
         } else if (it.type === 'lootbox' && it.opened) {
           continue;
@@ -846,13 +919,14 @@
       if (this._isBuilding || !this.interactables || !pos) return null;
       const oz = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
       const pz = pos.z - oz;
+      const crateMap = this._syncCrateLookup();
       let best = null;
       let bestScore = -999;
       for (let i = 0; i < this.interactables.length; i++) {
         const it = this.interactables[i];
         if (!it) continue;
         if (it.isLootSlot) {
-          const parentCrate = this.interactables.find((c) => c.id === it.crateId);
+          const parentCrate = crateMap.get(it.crateId);
           if (!parentCrate || !parentCrate.opened || parentCrate.used || it.taken) continue;
         } else if (it.type === 'lootbox' && it.opened && !it.used) {
           continue;

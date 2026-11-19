@@ -836,12 +836,73 @@
   };
 
   const QUALITY_TIERS = {
-    // Perf notes: bloom/AO force the HalfFloat EffectComposer path (many full-screen passes), so Balanced renders
-    // straight to the backbuffer (no composer). High keeps bloom + cheap half-res AO at a capped pixel ratio.
-    high: { label: 'High', resScale: 'native', dprCap: 1.25, shadows: true, shadowSize: 1024, bloom: true, ao: 'off', maxAniso: 8 },
-    balanced: { label: 'Balanced', resScale: 'floor_720', dprCap: 1.0, shadows: true, shadowSize: 512, bloom: false, ao: 'off', maxAniso: 2 },
-    potato: { label: 'Potato', resScale: 'floor_720', dprCap: 1.0, shadows: false, shadowSize: 512, bloom: false, ao: 'off', maxAniso: 1 }
+    // Perf notes: bloom/AO force the HalfFloat EffectComposer path (many full-screen passes), so Balanced & Potato
+    // render straight to the backbuffer (no composer). High keeps bloom at native/1.5x DPR cap.
+    high: {
+      label: 'High',
+      resScale: 'native',
+      maxHeight: 0,
+      dprCap: 1.5,
+      shadows: true,
+      shadowSize: 1024,
+      bloom: true,
+      ao: 'off',
+      maxAniso: 8,
+      maxPointLights: 12,
+      maxEnemies: 32,
+      enemyCastShadow: true,
+      propCastShadow: true,
+      enableSubtleHalos: true,
+      vfxScale: 1.0,
+      bldgMaxDist: 165,
+      clutterMaxDist: 86,
+      animThrottleDist: 30
+    },
+    balanced: {
+      label: 'Balanced',
+      resScale: 'floor_720',
+      maxHeight: 900,
+      dprCap: 1.25,
+      shadows: true,
+      shadowSize: 512,
+      bloom: false,
+      ao: 'off',
+      maxAniso: 4,
+      maxPointLights: 8,
+      maxEnemies: 24,
+      enemyCastShadow: true,
+      propCastShadow: false,
+      enableSubtleHalos: true,
+      vfxScale: 0.75,
+      bldgMaxDist: 115,
+      clutterMaxDist: 56,
+      animThrottleDist: 22
+    },
+    potato: {
+      label: 'Potato',
+      resScale: 'floor_720',
+      maxHeight: 720,
+      dprCap: 1.0,
+      shadows: false,
+      shadowSize: 512,
+      bloom: false,
+      ao: 'off',
+      maxAniso: 1,
+      maxPointLights: 3,
+      maxEnemies: 14,
+      enemyCastShadow: false,
+      propCastShadow: false,
+      enableSubtleHalos: false,
+      vfxScale: 0.4,
+      bldgMaxDist: 75,
+      clutterMaxDist: 34,
+      animThrottleDist: 14
+    }
   };
+
+  function getQualityTier(key) {
+    return QUALITY_TIERS[key] || QUALITY_TIERS.balanced;
+  }
 
   const RES_SCALE_MODES = {
     floor_720: { id: 'floor_720', label: '720P FLOOR', mult: 1.0, useDpr: false, dprCap: 1.0, minHeight: 720 },
@@ -1252,6 +1313,7 @@
     WEAPON_VARIANTS,
     ENEMY_TYPES,
     QUALITY_TIERS,
+    getQualityTier,
     RES_SCALE_MODES,
     DIFFICULTY_TIERS,
     LOOTBOX_RARITIES,

@@ -1811,6 +1811,10 @@
     if (!visuals || visuals.length === 0) return;
     const diff = String(difficultyKey || 'medium').toLowerCase();
     const offZ = worldOffsetZ || 0;
+    const qTier = (window.LRT && window.LRT.Config && window.LRT.Config.QUALITY_TIERS && window.LRT.Core && window.LRT.Core.qualityKey)
+      ? window.LRT.Config.QUALITY_TIERS[window.LRT.Core.qualityKey]
+      : null;
+    const allowSubtle = !qTier || qTier.enableSubtleHalos !== false;
 
     for (let i = 0; i < visuals.length; i++) {
       const v = visuals[i];
@@ -1821,6 +1825,7 @@
       if (v.lidPivot && Math.abs(v.lidPivot.rotation.x - targetRot) > 0.005) {
         const step = Math.min(1, (dt || 0.016) * 9.5);
         v.lidPivot.rotation.x += (targetRot - v.lidPivot.rotation.x) * step;
+        v.lidPivot.updateMatrixWorld(true);
       }
 
       let inRange = true;
@@ -1849,7 +1854,7 @@
         } else if (hoveredId && hoveredId === v.id) {
           v.halo.setMode('hover');
         } else {
-          v.halo.setMode('subtle');
+          v.halo.setMode(allowSubtle ? 'subtle' : 'off');
         }
         v.halo.update(timeAccum);
       }
@@ -1865,7 +1870,7 @@
             } else if (hoveredId && hoveredId === sl.id) {
               sl.halo.setMode('hover');
             } else {
-              sl.halo.setMode('subtle');
+              sl.halo.setMode(allowSubtle ? 'subtle' : 'off');
             }
             sl.halo.update(timeAccum);
           }
@@ -1981,11 +1986,16 @@
     }
 
     const hasPerInstanceColor = placements[0] && placements[0].color !== undefined;
+    const qTier = (window.LRT && window.LRT.Config && window.LRT.Config.QUALITY_TIERS && window.LRT.Core && window.LRT.Core.qualityKey)
+      ? window.LRT.Config.QUALITY_TIERS[window.LRT.Core.qualityKey]
+      : null;
+    const allowPropShadow = qTier && qTier.propCastShadow !== undefined ? !!qTier.propCastShadow : true;
 
     for (let p = 0; p < proto.parts.length; p++) {
       const part = proto.parts[p];
       const inst = new THREE.InstancedMesh(part.geo, part.mat, placements.length);
-      inst.castShadow = !!castShadow;
+      inst.userData._origCastShadow = !!castShadow;
+      inst.castShadow = !!castShadow && allowPropShadow;
       inst.receiveShadow = !!receiveShadow;
       inst.name = (namePrefix || 'CityProp') + '_' + p;
       for (let i = 0; i < placements.length; i++) {
@@ -2013,8 +2023,11 @@
       const targetGroup = customGroup || city.rootGroup;
       targetGroup.add(inst);
 
+      const isStructuralProp = /^(StreetLamp|PowerPole|TrafficSignal|WeldedWireFence)/.test(namePrefix || '');
+      const isVehicleOrProp = /^(StreetBench|JakartaSedan|JakartaMpvAjar|JakartaAngkot|TransJakartaBus|OjolMotorbike|GerobakKakiLima|CornerAmbulance|CornerMilitaryTruck|CornerCargoPallet)/.test(namePrefix || '');
       const isClutter = /^(ManholeCover|TrashBag|TrashCan|Fern|Calathea|PowerBox|Shrub|Pachira|PlanterBox|AirconUnit|FireEscape|RoadBarrier|FireHydrant|MonoblocChair|OutdoorTableSet|Chalkboard|PlasticCrate|MilitaryCrate|Jerrycan|FuelBarrel|OldTyre|CardboardBox|BermudaGrass|HandTruck)/.test(namePrefix);
-      if (isClutter) {
+      if (isStructuralProp) inst.userData._alwaysStructural = true;
+      if (isClutter || isStructuralProp || isVehicleOrProp) {
         city.clutterMeshes.push(inst);
         const qMatch = namePrefix.match(/_(NW|NE|SW|SE)/);
         const qKey = qMatch ? qMatch[1] : null;

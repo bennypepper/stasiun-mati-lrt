@@ -155,6 +155,28 @@
     const bankGroup = new THREE.Group();
     bankGroup.name = 'AccessByKaiTurnstileBank';
     root.add(bankGroup);
+    const bankBatcher = createPartBatcher(station, bankGroup);
+    const _tbParentM = new THREE.Matrix4();
+    const _tbLocalM = new THREE.Matrix4();
+    const _tbFinalM = new THREE.Matrix4();
+    const _tbPos = new THREE.Vector3();
+    const _tbEuler = new THREE.Euler();
+    const _tbQuat = new THREE.Quaternion();
+    const _tbScale = new THREE.Vector3(1, 1, 1);
+    const addBankStatic = (geo, mat, px, py, pz, pry, lx, ly, lz, lrz) => {
+      const g = S.prepGeo(geo.clone(), false);
+      _tbPos.set(px, py, pz);
+      _tbEuler.set(0, pry, 0);
+      _tbQuat.setFromEuler(_tbEuler);
+      _tbParentM.compose(_tbPos, _tbQuat, _tbScale);
+      _tbPos.set(lx || 0, ly || 0, lz || 0);
+      _tbEuler.set(0, 0, lrz || 0);
+      _tbQuat.setFromEuler(_tbEuler);
+      _tbLocalM.compose(_tbPos, _tbQuat, _tbScale);
+      _tbFinalM.multiplyMatrices(_tbParentM, _tbLocalM);
+      g.applyMatrix4(_tbFinalM);
+      bankBatcher.add(g, mat, 0, 0, 0);
+    };
 
     const yaw = isIsland ? Math.PI * 0.5 : 0;
     const step = 1.05;
@@ -175,35 +197,14 @@
       cab.rotation.y = yaw;
       bankGroup.add(cab);
 
-      const plinth = new THREE.Mesh(plinthGeo, stainlessMat);
-      plinth.position.y = 0.0275;
-      plinth.receiveShadow = true;
-      cab.add(plinth);
-
-      const body = new THREE.Mesh(cabBodyGeo, kaiBodyMat);
-      body.castShadow = true;
-      body.receiveShadow = true;
-      cab.add(body);
-
-      const topDeck = new THREE.Mesh(topBezelGeo, stainlessMat);
-      topDeck.position.y = 0.965;
-      cab.add(topDeck);
+      addBankStatic(plinthGeo, stainlessMat, gx, 0, tz, yaw, 0, 0.0275, 0);
+      addBankStatic(cabBodyGeo, kaiBodyMat, gx, 0, tz, yaw, 0, 0, 0);
+      addBankStatic(topBezelGeo, stainlessMat, gx, 0, tz, yaw, 0, 0.965, 0);
 
       for (const sgn of [-1, 1]) {
-        const slopeTrim = new THREE.Mesh(sideTrimGeo, stainlessMat);
-        slopeTrim.position.set(sgn * 0.54, 0.865, 0);
-        slopeTrim.rotation.z = -sgn * Math.PI * 0.25;
-        cab.add(slopeTrim);
-
-        const rBezel = new THREE.Mesh(readerBezelGeo, darkTrimMat);
-        rBezel.position.set(sgn * 0.535, 0.882, 0);
-        rBezel.rotation.z = -sgn * Math.PI * 0.25;
-        cab.add(rBezel);
-
-        const rGlass = new THREE.Mesh(readerGlassGeo, readerGlassMat);
-        rGlass.position.set(sgn * 0.542, 0.889, 0);
-        rGlass.rotation.z = -sgn * Math.PI * 0.25;
-        cab.add(rGlass);
+        addBankStatic(sideTrimGeo, stainlessMat, gx, 0, tz, yaw, sgn * 0.54, 0.865, 0, -sgn * Math.PI * 0.25);
+        addBankStatic(readerBezelGeo, darkTrimMat, gx, 0, tz, yaw, sgn * 0.535, 0.882, 0, -sgn * Math.PI * 0.25);
+        addBankStatic(readerGlassGeo, readerGlassMat, gx, 0, tz, yaw, sgn * 0.542, 0.889, 0, -sgn * Math.PI * 0.25);
       }
 
       if (g < numGates - 1) {
@@ -222,9 +223,7 @@
         station.disposableMaterials.push(ledMat);
 
         for (const sgn of [-1, 1]) {
-          const panelBack = new THREE.Mesh(ledFaceGeo, darkTrimMat);
-          panelBack.position.set(sgn * 0.635, 0.63, 0);
-          cab.add(panelBack);
+          addBankStatic(ledFaceGeo, darkTrimMat, gx, 0, tz, yaw, sgn * 0.635, 0.63, 0);
 
           // Glowing status chevron arrow + reader strip
           const barA = new THREE.Mesh(ledArrowBarGeo, ledMat);
@@ -244,9 +243,7 @@
         }
 
         // Side mounting flange & tilted 3-arm chrome tripod rotor (+Z lane side)
-        const boss = new THREE.Mesh(bossGeo, stainlessMat);
-        boss.position.set(0, 0.75, 0.125);
-        cab.add(boss);
+        addBankStatic(bossGeo, stainlessMat, gx, 0, tz, yaw, 0, 0.75, 0.125);
 
         const rotorPivot = new THREE.Group();
         rotorPivot.position.set(0, 0.75, 0.155);
@@ -317,26 +314,13 @@
       const rz = isIsland ? baseTZ : baseTZ + off;
       if (isInStairExclusion && isInStairExclusion(rx, rz, 0.5, 0.5)) return;
 
-      const railGrp = new THREE.Group();
-      railGrp.position.set(rx, 0, rz);
-      // Align railing length along the bank line (Z for !isIsland, X for isIsland)
-      railGrp.rotation.y = isIsland ? 0 : Math.PI * 0.5;
-      bankGroup.add(railGrp);
-
+      const railRy = isIsland ? 0 : Math.PI * 0.5;
       for (const px of [-0.58, 0.58]) {
-        const post = new THREE.Mesh(railPostGeo, stainlessMat);
-        post.position.set(px, 0.48, 0);
-        railGrp.add(post);
+        addBankStatic(railPostGeo, stainlessMat, rx, 0, rz, railRy, px, 0.48, 0);
       }
-      const topRail = new THREE.Mesh(railBarGeo, stainlessMat);
-      topRail.position.set(0, 0.95, 0);
-      railGrp.add(topRail);
-      const botRail = new THREE.Mesh(railBarGeo, stainlessMat);
-      botRail.position.set(0, 0.16, 0);
-      railGrp.add(botRail);
-      const glassPane = new THREE.Mesh(railGlassGeo, guardGlassMat);
-      glassPane.position.set(0, 0.55, 0);
-      railGrp.add(glassPane);
+      addBankStatic(railBarGeo, stainlessMat, rx, 0, rz, railRy, 0, 0.95, 0);
+      addBankStatic(railBarGeo, stainlessMat, rx, 0, rz, railRy, 0, 0.16, 0);
+      addBankStatic(railGlassGeo, guardGlassMat, rx, 0, rz, railRy, 0, 0.55, 0);
 
       station._addCollider(
         rx - (isIsland ? 0.62 : 0.10), 0, rz - (isIsland ? 0.10 : 0.62),
@@ -345,6 +329,7 @@
     };
     addEndGuardrail(-1);
     addEndGuardrail(1);
+    bankBatcher.flush(false, true, 'KaiTurnstileStatic');
 
     return turnstileList;
   }
@@ -444,7 +429,52 @@
     return tex;
   }
 
+  const _batchMat4 = new THREE.Matrix4();
+  const _batchEuler = new THREE.Euler();
+  const _batchQuat = new THREE.Quaternion();
+  const _batchPos = new THREE.Vector3();
+  const _batchScale = new THREE.Vector3(1, 1, 1);
+
+  function createPartBatcher(station, parent) {
+    const buckets = new Map();
+    return {
+      add: function (geo, mat, x, y, z, rx, ry, rz) {
+        const g = S.prepGeo(geo, false);
+        if (g !== geo && typeof geo.dispose === 'function') geo.dispose();
+        _batchPos.set(x || 0, y || 0, z || 0);
+        _batchEuler.set(rx || 0, ry || 0, rz || 0);
+        _batchQuat.setFromEuler(_batchEuler);
+        _batchMat4.compose(_batchPos, _batchQuat, _batchScale);
+        g.applyMatrix4(_batchMat4);
+        let arr = buckets.get(mat);
+        if (!arr) { arr = []; buckets.set(mat, arr); }
+        arr.push(g);
+      },
+      flush: function (castShadow, receiveShadow, namePrefix) {
+        let idx = 0;
+        for (const [mat, geos] of buckets.entries()) {
+          const merged = geos.length === 1 ? geos[0] : THREE_UTILS.mergeGeometries(geos, false);
+          if (geos.length > 1) {
+            for (let i = 0; i < geos.length; i++) geos[i].dispose();
+          }
+          if (!merged) continue;
+          station.disposableGeometries.push(merged);
+          const m = new THREE.Mesh(merged, mat);
+          m.castShadow = !!castShadow;
+          m.receiveShadow = receiveShadow !== false;
+          m.name = (namePrefix || 'BatchedProp') + '_' + (idx++);
+          parent.add(m);
+        }
+        buckets.clear();
+      }
+    };
+  }
+
   function addPbrPart(station, parent, geo, mat, x, y, z, rx, ry, rz) {
+    if (parent && parent.userData && parent.userData._partBatcher) {
+      parent.userData._partBatcher.add(geo, mat, x, y, z, rx, ry, rz);
+      return null;
+    }
     station.disposableGeometries.push(geo);
     const m = new THREE.Mesh(geo, mat);
     m.position.set(x || 0, y || 0, z || 0);
@@ -555,6 +585,7 @@
     grp.name = 'IndomaretPointWalkIn';
     grp.position.set(indoX, 0, indoZ);
     grp.rotation.y = indoYaw;
+    grp.userData._partBatcher = createPartBatcher(station, grp);
     root.add(grp);
 
     // Rich PBR materials & procedural CanvasTextures
@@ -871,6 +902,10 @@
       });
     }
 
+    if (grp.userData._partBatcher) {
+      grp.userData._partBatcher.flush(false, true, 'IndomaretStatic');
+      delete grp.userData._partBatcher;
+    }
     const walkIn = inW(-0.35, 0.55);
     const frontDoor = inW(0, 2.55);
     const warmCtr = inW(0, 0.1);
@@ -886,6 +921,7 @@
     grp.name = 'JakLingkoKiosk3D';
     grp.position.set(x, 0, z);
     grp.rotation.y = yaw;
+    grp.userData._partBatcher = createPartBatcher(station, grp);
     root.add(grp);
 
     const headerMap = makeCanvasTex(station, 256, 128, (c, w, h) => {
@@ -955,6 +991,10 @@
     addPbrPart(station, grp, new THREE.BoxGeometry(0.24, 0.10, 0.06), darkMat, 0.18, 0.84, 0.26);
     addPbrPart(station, grp, new THREE.BoxGeometry(0.52, 0.22, 0.06), darkMat, 0, 0.52, 0.26);
 
+    if (grp.userData._partBatcher) {
+      grp.userData._partBatcher.flush(false, true, 'JaklingkoKiosk');
+      delete grp.userData._partBatcher;
+    }
     station._addCollider(x - 0.48, 0, z - 0.44, x + 0.48, 2.10, z + 0.44, 'metal');
     return grp;
   }
@@ -964,6 +1004,7 @@
     grp.name = 'CowayStation3D';
     grp.position.set(x, 0, z);
     grp.rotation.y = yaw;
+    grp.userData._partBatcher = createPartBatcher(station, grp);
     root.add(grp);
 
     const headerMap = makeCanvasTex(station, 256, 128, (c, w, h) => {
@@ -1017,6 +1058,10 @@
     addPbrPart(station, grp, new THREE.BoxGeometry(0.92, 0.68, 0.10), whiteMat, 0, 0.40, 0.22);
     addPbrPart(station, grp, new THREE.BoxGeometry(0.14, 0.03, 0.03), steelMat, 0, 0.62, 0.28);
 
+    if (grp.userData._partBatcher) {
+      grp.userData._partBatcher.flush(false, true, 'CowayStation');
+      delete grp.userData._partBatcher;
+    }
     station._addCollider(x - 0.60, 0, z - 0.36, x + 0.60, 1.98, z + 0.36, 'metal');
     return grp;
   }
@@ -1027,6 +1072,7 @@
     grp.name = isPrev ? 'CallTrainPedestalP2' : 'CallTrainPedestalP1';
     grp.position.set(x, 0, z);
     grp.rotation.y = isPrev ? -Math.PI * 0.5 : Math.PI * 0.5;
+    grp.userData._partBatcher = createPartBatcher(station, grp);
     root.add(grp);
 
     const accentHex = isPrev ? 0xf59e0b : 0x10b981;
@@ -1133,6 +1179,10 @@
       addPbrPart(station, grp, new THREE.BoxGeometry(0.16, 0.014, 0.015), steelMat, 0, 0.84 + gy * 0.032, 0.156);
     }
 
+    if (grp.userData._partBatcher) {
+      grp.userData._partBatcher.flush(false, true, grp.name);
+      delete grp.userData._partBatcher;
+    }
     station._addCollider(x - 0.28, 0, z - 0.28, x + 0.28, 1.56, z + 0.28, 'metal');
     return grp;
   }
@@ -1141,6 +1191,7 @@
     const { root, getCanopyArchY, isCawang, jpoNearZ, jpoFarZ } = ctx;
     const grp = new THREE.Group();
     grp.name = isPrev ? 'CallTrainPidsBoardP2' : 'CallTrainPidsBoardP1';
+    grp.userData._partBatcher = createPartBatcher(station, grp);
     root.add(grp);
 
     const frameMat = new THREE.MeshStandardMaterial({ color: 0x1e2530, roughness: 0.42, metalness: 0.72 });
@@ -1207,6 +1258,10 @@
     for (const rx of [-0.85, 0.85]) {
       addPbrPart(station, grp, new THREE.BoxGeometry(0.04, rodLen, 0.04), frameMat, x + rx, signY + signH * 0.5 + rodLen * 0.5, z);
     }
+    if (grp.userData._partBatcher) {
+      grp.userData._partBatcher.flush(false, true, grp.name);
+      delete grp.userData._partBatcher;
+    }
   }
 
   function buildJpo2SkybridgeLounge(station, ctx) {
@@ -1232,6 +1287,7 @@
 
     const grp = new THREE.Group();
     grp.name = 'JPO2SkybridgeLounge';
+    grp.userData._partBatcher = createPartBatcher(station, grp);
     root.add(grp);
 
     const frameMat = new THREE.MeshStandardMaterial({ color: 0x222933, roughness: 0.38, metalness: 0.72 });
@@ -1423,6 +1479,10 @@
       addPbrPart(station, grp, new THREE.BoxGeometry(0.025, 0.025, 0.025), cctvLedMat, loungeCX + cxOff + 0.08, cctvY - 0.04, jpo2Z + czOff);
     }
 
+    if (grp.userData._partBatcher) {
+      grp.userData._partBatcher.flush(false, true, 'Jpo2Lounge');
+      delete grp.userData._partBatcher;
+    }
     return {
       loungeCX: loungeCX,
       loungePos: { x: loungeCX, y: UPPER_FLOOR_Y + 0.05, z: jpo2Z, yaw: benchPlayerYaw }
@@ -2894,70 +2954,48 @@
       const bcGroup = new THREE.Group();
       bcGroup.position.set(bcX, bcY, bcZ);
       bcGroup.visible = !cleared;
+      const bcBatcher = createPartBatcher(station, bcGroup);
+      const addBcPart = (geo, mat, x, y, z, rx, ry, rz) => bcBatcher.add(geo.clone(), mat, x, y, z, rx, ry, rz);
 
       // 1) Full-width 5-block lower concrete Jersey barricade wall (10.5m span) + stacked upper central bunker blocks
       for (const dx of [-4.4, -2.2, 0.0, 2.2, 4.4]) {
-        const blk = new THREE.Mesh(bcConcGeo, bcConcMat);
-        blk.position.set(dx, 0.56, 0);
-        blk.castShadow = true;
-        blk.receiveShadow = true;
-        bcGroup.add(blk);
+        addBcPart(bcConcGeo, bcConcMat, dx, 0.56, 0);
       }
       for (const dx of [-2.2, 0.0, 2.2]) {
-        const topBlk = new THREE.Mesh(bcTopConcGeo, bcConcMat);
-        topBlk.position.set(dx, 1.50, 0);
-        bcGroup.add(topBlk);
+        addBcPart(bcTopConcGeo, bcConcMat, dx, 1.50, 0);
       }
       // 2) Twin sandbag defensive wings in front of barricade flanks
       for (const sx of [-3.6, -2.6, 2.6, 3.6]) {
         for (const layer of [0, 1, 2]) {
-          const sb = new THREE.Mesh(bcSandGeo, bcSandMat);
-          sb.position.set(sx + (layer % 2 ? 0.12 : -0.12), 0.17 + layer * 0.30, 0.66 - layer * 0.06);
-          sb.rotation.y = (layer - 1) * 0.08;
-          bcGroup.add(sb);
+          addBcPart(bcSandGeo, bcSandMat, sx + (layer % 2 ? 0.12 : -0.12), 0.17 + layer * 0.30, 0.66 - layer * 0.06, 0, (layer - 1) * 0.08, 0);
         }
       }
       // 3) Heavy steel Czech Hedgehog anti-vehicle spikes flanking approaches
       for (const hx of [-4.2, -1.5, 1.5, 4.2]) {
         for (const rotZ of [0.68, -0.68, 0.0]) {
-          const beam = new THREE.Mesh(bcHedgeGeo, bcSteelMat);
-          beam.position.set(hx, 0.72, 1.18);
-          beam.rotation.set(rotZ === 0 ? 0.72 : 0.25, 0.4, rotZ);
-          bcGroup.add(beam);
+          addBcPart(bcHedgeGeo, bcSteelMat, hx, 0.72, 1.18, rotZ === 0 ? 0.72 : 0.25, 0.4, rotZ);
         }
       }
       // 4) Overhead steel quarantine gantry portal + illuminated Quarantine Banner + twin strobes
       for (const px of [-4.7, 4.7]) {
-        const post = new THREE.Mesh(bcPostGeo, bcSteelMat);
-        post.position.set(px, 1.67, 0);
-        bcGroup.add(post);
-        const beacon = new THREE.Mesh(bcGlowGeo, bcGlowMat);
-        beacon.position.set(px, 3.38, 0);
-        bcGroup.add(beacon);
+        addBcPart(bcPostGeo, bcSteelMat, px, 1.67, 0);
+        addBcPart(bcGlowGeo, bcGlowMat, px, 3.38, 0);
       }
-      const rail1 = new THREE.Mesh(bcBeamGeo, bcHazMat); rail1.position.set(0, 2.15, 0); bcGroup.add(rail1);
-      const qSign = new THREE.Mesh(bcSignGeo, bcSignMat); qSign.position.set(0, 2.86, 0); bcGroup.add(qSign);
+      addBcPart(bcBeamGeo, bcHazMat, 0, 2.15, 0);
+      addBcPart(bcSignGeo, bcSignMat, 0, 2.86, 0);
 
       // 5) Volatile payload cluster at center weak point: 5 fuel drums, 2 pressurized tanks, ordnance crates & C4 flasher
       for (const [dx, dz] of [[-1.05, 0.72], [-0.45, 0.92], [0.0, 0.68], [0.48, 0.92], [1.05, 0.72]]) {
-        const dr = new THREE.Mesh(bcDrumGeo, bcHazMat);
-        dr.position.set(dx, 0.46, dz);
-        bcGroup.add(dr);
+        addBcPart(bcDrumGeo, bcHazMat, dx, 0.46, dz);
       }
       for (const tx of [-0.24, 0.24]) {
-        const tk = new THREE.Mesh(bcTankGeo, bcGlowMat);
-        tk.position.set(tx, 1.24, 0.64);
-        bcGroup.add(tk);
+        addBcPart(bcTankGeo, bcGlowMat, tx, 1.24, 0.64);
       }
       for (const cx of [-0.72, 0.72]) {
-        const cr = new THREE.Mesh(bcCrateGeo, bcCrateMat);
-        cr.position.set(cx, 0.26, 1.38);
-        cr.rotation.y = cx * 0.22;
-        bcGroup.add(cr);
+        addBcPart(bcCrateGeo, bcCrateMat, cx, 0.26, 1.38, 0, cx * 0.22, 0);
       }
-      const c4Beacon = new THREE.Mesh(bcGlowGeo, bcGlowMat);
-      c4Beacon.position.set(0, 1.10, 0.44);
-      bcGroup.add(c4Beacon);
+      addBcPart(bcGlowGeo, bcGlowMat, 0, 1.10, 0.44);
+      bcBatcher.flush(false, true, 'QuarantineBarricade');
       root.add(bcGroup);
 
       // Charred scorched blast aftermath (hidden until breached, leaves central highway completely clear!)

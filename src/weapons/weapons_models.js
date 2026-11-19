@@ -2011,7 +2011,7 @@
 
     raw.traverse((obj) => {
       if (obj && obj.isMesh) {
-        obj.castShadow = true;
+        obj.castShadow = false;
         obj.receiveShadow = false;
         obj.frustumCulled = true;
       }
@@ -2320,10 +2320,22 @@
         wState.reserve = Math.min(maxReserve, Math.max(wState.reserve, 0) + grant);
       }
     } else if (changedVariant) {
-      wState.mag = Math.min(effMag, Math.max(wState.mag, effMag));
+      if (wState.mag > effMag) {
+        if (!effCfg.infiniteReserve) {
+          const maxReserve = Math.max(baseCfg.startReserve * 2, effMag * 6);
+          wState.reserve = Math.min(maxReserve, Math.max(wState.reserve, 0) + (wState.mag - effMag));
+        }
+        wState.mag = effMag;
+      }
     }
 
     if (changedVariant && idx === W._activeIdx) {
+      const prevVm = _vmModels[idx];
+      if (prevVm && prevVm.parts) {
+        if (prevVm.parts.mag) prevVm.parts.mag.position.set(0, 0, 0);
+        if (prevVm.parts.cylinder) prevVm.parts.cylinder.position.x = 0;
+        if (prevVm.parts.breakBarrel) prevVm.parts.breakBarrel.rotation.x = 0;
+      }
       W._isReloading = false;
       W._reloadTimer = 0;
       W._pumpTimer = -1;
@@ -2763,6 +2775,12 @@
 
     if (idx === W._activeIdx) return false;
 
+    const prevVm = _vmModels[W._activeIdx];
+    if (prevVm && prevVm.parts) {
+      if (prevVm.parts.mag) prevVm.parts.mag.position.set(0, 0, 0);
+      if (prevVm.parts.cylinder) prevVm.parts.cylinder.position.x = 0;
+      if (prevVm.parts.breakBarrel) prevVm.parts.breakBarrel.rotation.x = 0;
+    }
     W._isReloading = false;
     W._reloadTimer = 0;
     W._pumpTimer = -1;

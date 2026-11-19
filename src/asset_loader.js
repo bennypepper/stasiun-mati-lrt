@@ -184,17 +184,26 @@
           run: async () => {
             const gltf = await gltfLoader.loadAsync(entry.gltf);
             if (gltf && gltf.scene) {
+              const normalizeMat = (mat) => {
+                if (!mat) return;
+                applyTextureAnisotropy(mat);
+                if (mat.transmission && mat.transmission > 0) {
+                  mat.transmission = 0;
+                  mat.thickness = 0;
+                  mat.transparent = true;
+                  mat.opacity = Math.min(mat.opacity !== undefined ? mat.opacity : 1.0, 0.42);
+                  mat.depthWrite = false;
+                  mat.needsUpdate = true;
+                }
+              };
               gltf.scene.traverse((child) => {
                 if (child.isMesh) {
                   child.castShadow = true;
                   child.receiveShadow = true;
-                  if (child.isSkinnedMesh) {
-                    child.frustumCulled = false;
-                  }
                   if (Array.isArray(child.material)) {
-                    child.material.forEach(applyTextureAnisotropy);
+                    child.material.forEach(normalizeMat);
                   } else {
-                    applyTextureAnisotropy(child.material);
+                    normalizeMat(child.material);
                   }
                 }
               });

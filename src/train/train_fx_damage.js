@@ -467,9 +467,10 @@
   function syncTrainLights() {
     const active = T.warmupActive || (T.state !== 'AWAY' && T.trainGroup && T.trainGroup.visible);
     if (T.headlightLight) {
-      T.headlightLight.visible = true;
+      const headOn = !T._tierDisableLights && active && T.headlightIntensityTarget > 0.001;
+      T.headlightLight.visible = headOn;
       T.headlightLight.position.set(T.localXToWorld(0), 1.05, T.localZToWorld(27.2));
-      T.headlightLight.intensity = active ? T.headlightIntensityTarget : 0.0;
+      T.headlightLight.intensity = headOn ? T.headlightIntensityTarget : 0.0;
     }
     const atm = LRT.Station && typeof LRT.Station.getAtmosphere === 'function' ? LRT.Station.getAtmosphere() : null;
     const mBlend = (LRT.Main && typeof LRT.Main.getMoodBlendState === 'function') ? LRT.Main.getMoodBlendState() : null;
@@ -496,7 +497,11 @@
 
     for (let i = 0; i < cabinLights.length; i++) {
       const cl = cabinLights[i];
-      cl.visible = true;
+      cl.visible = !T._tierDisableLights;
+      if (T._tierDisableLights) {
+        cl.intensity = 0.0;
+        continue;
+      }
       if (cl.distance < 20.0) cl.distance = 20.0;
       const anchorZ = cabinLights.length === 1 ? focusZ : CABIN_LIGHT_Z[i];
       cl.position.set(T.localXToWorld(0), 1.86, T.localZToWorld(anchorZ));
@@ -639,8 +644,14 @@
     }
 
     if (!T.strapInst) return;
+    if (isMoving || Math.abs(T.accel) >= 0.01) {
+      T._strapsSettled = false;
+    }
+    if (T._strapsSettled) return;
+
     const inertialX = Math.max(-0.22, Math.min(0.22, -T.accel * 0.025));
     const swayZ = isMoving ? Math.sin(T.animTime * 2.3) * 0.055 * (T.speed / CRUISE_SPEED) : 0;
+    let allSettled = !isMoving && Math.abs(T.accel) < 0.01;
 
     for (let i = 0; i < handStraps.length; i++) {
       const st = handStraps[i];
@@ -659,12 +670,19 @@
       st.angX = Math.max(-1.25, Math.min(1.25, st.angX));
       st.angZ = Math.max(-1.25, Math.min(1.25, st.angZ));
 
+      if (allSettled) {
+        if (Math.abs(st.angX - targetX) > 0.001 || Math.abs(st.angZ - targetZ) > 0.001 || Math.abs(st.velX) > 0.002 || Math.abs(st.velZ) > 0.002) {
+          allSettled = false;
+        }
+      }
+
       _e1.set(st.angX, 0, st.angZ);
       _q1.setFromEuler(_e1);
       _m4.compose(st.basePos, _q1, _s1.set(1, 1, 1));
       T.strapInst.setMatrixAt(i, _m4);
     }
     T.strapInst.instanceMatrix.needsUpdate = true;
+    if (allSettled) T._strapsSettled = true;
   }
 
   function updateViaductChunks(dt, stationZ) {

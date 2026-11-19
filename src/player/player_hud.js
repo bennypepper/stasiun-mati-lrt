@@ -30,6 +30,13 @@
   const _wpProjVec = new THREE.Vector3();
   const _wpCamForward = new THREE.Vector3();
   const _wpCamPos = new THREE.Vector3();
+  const _wpLabelCache = new Map();
+  let _cachedVw = window.innerWidth || 1280;
+  let _cachedVh = window.innerHeight || 720;
+  window.addEventListener('resize', () => {
+    _cachedVw = window.innerWidth || 1280;
+    _cachedVh = window.innerHeight || 720;
+  });
 
   const SKIN_LABELS = {
     tni_digital_forest: 'TNI FOREST',
@@ -849,7 +856,9 @@
     if (core && typeof core.updateSunTracking === 'function') {
       core.updateSunTracking(safe.x, safe.z);
     }
-    if (core && typeof core.renderFrame === 'function') {
+    if (core && typeof core.requestPausedRender === 'function') {
+      core.requestPausedRender();
+    } else if (core && typeof core.renderFrame === 'function') {
       core.renderFrame();
     }
     setNotice(`FAST TRAVEL: ${String(zone.name).toUpperCase()}`, '#38bdf8');
@@ -971,12 +980,13 @@
     if (PL.state && PL.state.fastTravelOpen) return true;
 
     if (PL.closeCheatConsole) PL.closeCheatConsole(false);
+    const wasPausedByDoc = pausedByDocViewer;
     if (PL.state && PL.state.docViewerOpen) closeDocViewer(false, true);
 
     const pauseOpen = !!(o.fromPause || (dom['pause-overlay'] && !dom['pause-overlay'].classList.contains('hidden')));
     fastTravelFromPause = pauseOpen;
     if (!fastTravelFromPause) {
-      pausedByFastTravel = !PL.flags.paused;
+      pausedByFastTravel = !PL.flags.paused || wasPausedByDoc;
       if (PL.suppressPauseAfterUnlock) PL.suppressPauseAfterUnlock(900);
       LRT.PlayerUI.setPaused(true, false);
       if (PL.callbacks && PL.callbacks.onWeaponShootUp) PL.callbacks.onWeaponShootUp();
@@ -1476,7 +1486,9 @@
         } else if (I.core && typeof I.core.setLightingMode === 'function') {
           I.core.setLightingMode(moodKey);
         }
-        if (I.core && typeof I.core.renderFrame === 'function') {
+        if (I.core && typeof I.core.requestPausedRender === 'function') {
+          I.core.requestPausedRender();
+        } else if (I.core && typeof I.core.renderFrame === 'function') {
           I.core.renderFrame();
         }
         syncFastTravelAtmosphereUi(moodKey);
@@ -1633,8 +1645,8 @@
       for (const k of Object.keys(markers)) pushMarker(markers[k]);
     }
 
-    const vw = window.innerWidth || 1280;
-    const vh = window.innerHeight || 720;
+    const vw = _cachedVw;
+    const vh = _cachedVh;
     const marginX = 48;
     const marginY = 84;
     const halfW = vw * 0.5;
@@ -1717,9 +1729,14 @@
         slot.lastOffscreen = offscreen;
       }
 
-      const rawLabel = String(m.label || m.title || m.text || 'WAYPOINT');
-      const cleanLabel = rawLabel.replace(/^\[E\]\s*/i, '').replace(/\s*\([^)]*\)/g, '').trim();
-      const labelText = cleanLabel.length > 26 ? `${cleanLabel.slice(0, 24)}…` : (cleanLabel || 'WAYPOINT');
+      const rawLabel = m.label || m.title || m.text || 'WAYPOINT';
+      let labelText = _wpLabelCache.get(rawLabel);
+      if (labelText === undefined) {
+        const cleanLabel = String(rawLabel).replace(/^\[E\]\s*/i, '').replace(/\s*\([^)]*\)/g, '').trim();
+        labelText = cleanLabel.length > 26 ? `${cleanLabel.slice(0, 24)}…` : (cleanLabel || 'WAYPOINT');
+        if (_wpLabelCache.size > 128) _wpLabelCache.clear();
+        _wpLabelCache.set(rawLabel, labelText);
+      }
       if (slot.lastLabel !== labelText) {
         slot.labelEl.textContent = labelText;
         slot.lastLabel = labelText;
@@ -1948,12 +1965,11 @@
           if (dom.hitmarker) dom.hitmarker.classList.toggle('crit', hmCrit);
         }
 
-        const chPx = Math.round(28 + Math.min(28, (wh.spread || 0) * 320));
-        if (_hudCache.chPx !== chPx) {
-          _hudCache.chPx = chPx;
+        const chScale = Math.round(((28 + Math.min(28, (wh.spread || 0) * 320)) / 24) * 100) / 100;
+        if (_hudCache.chPx !== chScale) {
+          _hudCache.chPx = chScale;
           if (dom.crosshair) {
-            dom.crosshair.style.width = `${chPx}px`;
-            dom.crosshair.style.height = `${chPx}px`;
+            dom.crosshair.style.transform = `translate(-50%, -50%) scale(${chScale})`;
           }
         }
 

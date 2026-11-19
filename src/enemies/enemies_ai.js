@@ -183,6 +183,19 @@
 
   let _difficultyKey = 'medium';
   let _atmosphereMode = 'night_horror';
+  let _qualityTier = null;
+
+  function getQualityTier() {
+    if (_qualityTier) return _qualityTier;
+    return (LRT.Config && LRT.Config.QUALITY_TIERS && LRT.Core && LRT.Config.QUALITY_TIERS[LRT.Core.qualityKey]) || {};
+  }
+
+  function applyQualityTier(tier) {
+    _qualityTier = tier || null;
+    if (typeof E.applyQualityTier === 'function') {
+      E.applyQualityTier(getQualityTier());
+    }
+  }
   const FALLBACK_DAYLIGHT_MODS = {
     speedMult: 1.22,
     sightRangeMult: 1.40,
@@ -692,7 +705,8 @@
       list[j] = tmp;
     }
 
-    const cap = Math.min(MAX_ENEMIES, tier.poolCap || MAX_ENEMIES);
+    const qTier = getQualityTier();
+    const cap = Math.min(MAX_ENEMIES, tier.poolCap || MAX_ENEMIES, qTier.maxEnemies || MAX_ENEMIES);
     let activeNow = 0;
     for (let i = 0; i < MAX_ENEMIES; i++) {
       if (E.zombies[i].active) activeNow++;
@@ -903,7 +917,8 @@
       }
     }
 
-    const totalRoamers = Math.min(MAX_ENEMIES, tier.roamCountBase || 10);
+    const qTier = getQualityTier();
+    const totalRoamers = Math.min(MAX_ENEMIES, tier.roamCountBase || 10, qTier.maxEnemies || MAX_ENEMIES);
     const weights = ROAM_ZONE_WEIGHTS[tier.key] || ROAM_ZONE_WEIGHTS.medium;
     const zoneCounts = allocateCountsByWeights(totalRoamers, weights);
 
@@ -1744,7 +1759,9 @@
       isDaylight = LRT.Config.MOODS[moodKey].isDaylight !== false;
     }
 
-    const cap = Math.min(MAX_ENEMIES, tier.poolCap || MAX_ENEMIES);
+    const qTier = getQualityTier();
+    const animThrottleDist = qTier.animThrottleDist || 28.0;
+    const cap = Math.min(MAX_ENEMIES, tier.poolCap || MAX_ENEMIES, qTier.maxEnemies || MAX_ENEMIES);
     if (E.pendingQueue.length > 0) {
       let activeCount = 0;
       for (let i = 0; i < MAX_ENEMIES; i++) {
@@ -1963,12 +1980,15 @@
       }
 
       if (z.dead) {
+        const prevTimer = z.deathTimer;
         if (stepDeadZombie(z, step, spatialGrid, tc)) {
           deactivationDirty = true;
           continue;
         }
-        E.updateZombieMatrices(z, _elapsed, step);
-        anyMatrixUpdated = true;
+        if (z.deathTimer < 0.52 || z.deathTimer >= 10.8 || prevTimer < 0.52) {
+          E.updateZombieMatrices(z, _elapsed, step);
+          anyMatrixUpdated = true;
+        }
         continue;
       }
 
@@ -1998,10 +2018,10 @@
       if (hasCamForward && camDist > 0.05) {
         camDot = (cdx * E.camForward.x + cdy * E.camForward.y + cdz * E.camForward.z) / camDist;
       }
-      const offFov = hasCamForward && (camDot < -0.25 && camDist > 12.0);
-      const isThrottledAI = (camDist > 28.0) || offFov;
+      const offFov = hasCamForward && (camDot < 0.25 && camDist > 10.0);
+      const isThrottledAI = (camDist > animThrottleDist) || offFov;
       const isTickFrame = !isThrottledAI || (((i + frameMod) & 3) === 0);
-      const isFarOffFov = (camDist > 40.0) && offFov;
+      const isFarOffFov = (camDist > animThrottleDist * 1.4) && offFov;
       const isVeryFarOffFov = (camDist > 68.0) && offFov;
 
       if (z.isRoamer && z.aggroState === 'CHASE' && z.lureTimer <= 0) {
@@ -2148,7 +2168,7 @@
           const reachedWp = z.hasNavWp && Math.hypot(z.wpX - z.x, z.wpZ - z.z) < 1.25 && Math.abs(z.wpY - z.y) < 0.85;
           if ((reachedWp || z.navTimer <= 0) && isTickFrame) {
             z.navTimer = 0.45 + (i % 5) * 0.05;
-            E.solveNavWaypoint(z, targetX, targetY, targetZ, spatialGrid);
+            E.solveNavWaypoint(z, targetX, targetY, targetZ, spatialGrid, tc);
           }
           const goalX = z.hasNavWp ? z.wpX : targetX;
           const goalZ = z.hasNavWp ? z.wpZ : targetZ;
@@ -2502,8 +2522,11 @@
         }
       }
 
-      if (!isFarOffFov || !z.matrixInit) {
-        E.updateZombieMatrices(z, _elapsed, moveStep);
+      z._animDtAccum = (z._animDtAccum || 0) + moveStep;
+      const shouldUpdateAnim = (!isFarOffFov && (!isThrottledAI || isTickFrame)) || !z.matrixInit;
+      if (shouldUpdateAnim) {
+        E.updateZombieMatrices(z, _elapsed, z._animDtAccum);
+        z._animDtAccum = 0;
         z.matrixInit = true;
         anyMatrixUpdated = true;
       }
@@ -2853,8 +2876,10 @@
   }
 
   const Enemies = {
+    get enemyRoot() { return E.enemyRoot; },
     init,
     reset,
+    applyQualityTier,
     isUsingSkinnedRigs: () => (typeof E.isUsingSkinnedRigs === 'function' ? E.isUsingSkinnedRigs() : false),
     setOffsetZ: E.setOffsetZ,
     updateDepartingIdle,

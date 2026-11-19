@@ -106,11 +106,11 @@
     camera.add(fl);
     camera.add(flTarget);
     fl.target = flTarget;
-    fl.visible = true;
+    fl.visible = false;
     const flBounce = new THREE.PointLight(0xffead0, 0.0, 8.5, 1.35);
     flBounce.castShadow = false;
     flBounce.position.set(0.08, -0.06, -0.35);
-    flBounce.visible = true;
+    flBounce.visible = false;
     camera.add(flBounce);
 
     refs.flashlight = fl;
@@ -121,11 +121,11 @@
   function toggleFlashlight() {
     state.flashlightOn = !state.flashlightOn;
     if (refs.flashlight) {
-      refs.flashlight.visible = true;
+      refs.flashlight.visible = !!state.flashlightOn;
       refs.flashlight.intensity = state.flashlightOn ? 42.0 : 0;
     }
     if (refs.flashlightBounce) {
-      refs.flashlightBounce.visible = true;
+      refs.flashlightBounce.visible = !!state.flashlightOn;
       refs.flashlightBounce.intensity = state.flashlightOn ? 2.2 : 0;
     }
     const dom = PL.dom;
@@ -766,18 +766,27 @@
     return true;
   }
 
+  const _bvhMeshSet = new Set();
+  const _horizResult = { x: 0, z: 0 };
+  const _bvhHorizResult = { x: 0, z: 0 };
+  const _bvhSupResult = { groundY: -999, ceilY: 999 };
+  const _supResult = { groundY: -999, ceilY: 999, groundTag: 'concrete' };
+
   function gatherBVHMeshes(worldCtx) {
     _bvhMeshes.length = 0;
+    _bvhMeshSet.clear();
     const pushSource = (src) => {
       if (!src) return;
       if (Array.isArray(src)) {
         for (let i = 0; i < src.length; i++) {
           const m = src[i];
-          if (m && m.geometry && m.geometry.boundsTree && _bvhMeshes.indexOf(m) === -1 && isObjectVisibleInHierarchy(m)) {
+          if (m && m.geometry && m.geometry.boundsTree && !_bvhMeshSet.has(m) && isObjectVisibleInHierarchy(m)) {
+            _bvhMeshSet.add(m);
             _bvhMeshes.push(m);
           }
         }
-      } else if (src.geometry && src.geometry.boundsTree && _bvhMeshes.indexOf(src) === -1 && isObjectVisibleInHierarchy(src)) {
+      } else if (src.geometry && src.geometry.boundsTree && !_bvhMeshSet.has(src) && isObjectVisibleInHierarchy(src)) {
+        _bvhMeshSet.add(src);
         _bvhMeshes.push(src);
       }
     };
@@ -872,7 +881,9 @@
         }
       }
     }
-    return { x: px, z: pz };
+    _horizResult.x = px;
+    _horizResult.z = pz;
+    return _horizResult;
   }
 
   function getBVHWorldBox(mesh) {
@@ -892,7 +903,11 @@
   }
 
   function resolveBVHHorizontal(nx, nz, feetY, height, radius, bvhMeshes) {
-    if (!bvhMeshes || bvhMeshes.length === 0) return { x: nx, z: nz };
+    if (!bvhMeshes || bvhMeshes.length === 0) {
+      _bvhHorizResult.x = nx;
+      _bvhHorizResult.z = nz;
+      return _bvhHorizResult;
+    }
     let px = nx;
     let pz = nz;
     const stepTop = feetY + P.stepHeight;
@@ -967,11 +982,17 @@
         });
       }
     }
-    return { x: px, z: pz };
+    _bvhHorizResult.x = px;
+    _bvhHorizResult.z = pz;
+    return _bvhHorizResult;
   }
 
   function findBVHGroundAndCeiling(px, pz, feetY, height, bvhMeshes, groundY, ceilY) {
-    if (!bvhMeshes || bvhMeshes.length === 0) return { groundY, ceilY };
+    if (!bvhMeshes || bvhMeshes.length === 0) {
+      _bvhSupResult.groundY = groundY;
+      _bvhSupResult.ceilY = ceilY;
+      return _bvhSupResult;
+    }
     const stepTop = feetY + P.stepHeight + 0.08;
     const r = P.radius;
 
@@ -1031,7 +1052,9 @@
       }
     }
 
-    return { groundY, ceilY };
+    _bvhSupResult.groundY = groundY;
+    _bvhSupResult.ceilY = ceilY;
+    return _bvhSupResult;
   }
 
   function findSupportAndCeiling(px, pz, feetY, height, radius, colliders) {
@@ -1073,7 +1096,10 @@
         ceilY = b.minY;
       }
     }
-    return { groundY, ceilY, groundTag };
+    _supResult.groundY = groundY;
+    _supResult.ceilY = ceilY;
+    _supResult.groundTag = groundTag;
+    return _supResult;
   }
 
   function updatePhysics(dt, worldCtx) {

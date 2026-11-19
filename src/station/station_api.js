@@ -213,7 +213,6 @@
       for (let i = 0; i < this.stationLights.length; i++) {
         const sl = this.stationLights[i];
         if (sl && sl.light) {
-          sl.light.visible = true; // NEVER toggle light.visible!
           sl.light.intensity = 0;
         }
       }
@@ -224,6 +223,11 @@
         LRT.Audio.stopLoop('generator_loop', 0.15);
       }
       if (this.rootGroup) {
+        this.rootGroup.traverse((obj) => {
+          if (obj && obj.isInstancedMesh && typeof obj.dispose === 'function') {
+            obj.dispose();
+          }
+        });
         const parent = scene || this.rootGroup.parent;
         if (parent) parent.remove(this.rootGroup);
         this.rootGroup = null;
@@ -617,7 +621,7 @@
       for (let i = 0; i < this.stationLights.length; i++) {
         const sl = this.stationLights[i];
         if (sl && sl.light) {
-          sl.light.visible = true;
+          sl.light.visible = !sl.light._tierDisabled;
           sl.light.position.set(
             sl.homeX !== undefined ? sl.homeX : sl.light.position.x,
             sl.homeY !== undefined ? sl.homeY : sl.light.position.y,
@@ -799,6 +803,7 @@
           const targetRot = (v.opened || v.used) ? -1.72 : 0.0;
           if (Math.abs(v.lidPivot.rotation.x - targetRot) > 0.005) {
             v.lidPivot.rotation.x += (targetRot - v.lidPivot.rotation.x) * lidStep;
+            v.lidPivot.updateMatrixWorld(true);
           }
         }
       }
@@ -820,6 +825,11 @@
       if (this.stationLights && this.stationLights.length > 0) {
         for (let i = 0; i < this.stationLights.length; i++) {
           const sl = this.stationLights[i];
+          if (sl.light._tierDisabled) {
+            sl.light.visible = false;
+            sl.light.intensity = 0;
+            continue;
+          }
           sl.light.visible = true; // NEVER toggle light.visible!
           let tubeAliveFactor = 1.0;
 
@@ -991,6 +1001,7 @@
               tg.baseAngle = tg.targetAngle;
               tg.animating = false;
             }
+            tg.rotorSpinGroup.updateMatrixWorld(true);
           }
           if (tg.ledTimer > 0 && tg.ledMat) {
             tg.ledTimer = Math.max(0, tg.ledTimer - dt);
@@ -1016,6 +1027,7 @@
           pu.age += dt;
           pu.mesh.rotation.y += dt * 2.3;
           pu.mesh.position.y = 0.34 + Math.sin(this._timeAccum * 4.0 + i) * 0.08;
+          pu.mesh.updateMatrixWorld(true);
           if (pRef && pu.age >= 0.25) {
             const dx = px - pu.x;
             const dz = pz - pu.z;
@@ -1167,6 +1179,36 @@
       this._syncPerimeterHalos();
     },
 
+    applyQualityTier: function (tier) {
+      const t = tier || {};
+      const maxLights = typeof t.maxPointLights === 'number' ? t.maxPointLights : 12;
+      if (this.stationLights && this.stationLights.length > 0) {
+        for (let i = 0; i < this.stationLights.length; i++) {
+          const sl = this.stationLights[i];
+          if (sl && sl.light) {
+            const disabled = !(i < maxLights);
+            sl.light._tierDisabled = disabled;
+            sl.light.visible = !disabled;
+            if (disabled) sl.light.intensity = 0;
+          }
+        }
+      }
+      if (this.rootGroup) {
+        const propShadow = !!t.propCastShadow;
+        this.rootGroup.traverse((obj) => {
+          if (obj && obj.isMesh && obj.userData && obj.userData._isStationProp) {
+            obj.castShadow = propShadow;
+          }
+        });
+      }
+    },
+
+    _haloReusableTypes: new Set(['call_train', 'call_train_prev', 'turnstile', 'bench', 'info']),
+    _haloItemById: new Map(),
+    _lastHaloLoSId: null,
+    _lastHaloLoSTime: -999,
+    _lastHaloLoSOccluded: false,
+
     _syncPerimeterHalos: function (playerPos, camForward, difficultyKey) {
       if (!this.rootGroup) return;
       const offsetZ = this.rootGroup.position.z || 0;
@@ -1196,12 +1238,13 @@
         }
       }
 
-      const itemById = new Map();
+      const itemById = this._haloItemById;
+      itemById.clear();
       for (let i = 0; i < this.interactables.length; i++) {
         itemById.set(this.interactables[i].id, this.interactables[i]);
       }
 
-      const REUSABLE_TYPES = new Set(['call_train', 'call_train_prev', 'turnstile', 'bench', 'info']);
+      const REUSABLE_TYPES = this._haloReusableTypes;
       let bestId = null;
       let bestScore = 1e9;
       let bestProj = 8.0;
@@ -1255,19 +1298,34 @@
         }
 
         if (bestId && bestProj > 1.8) {
-          _tmpRayOrigin.set(eyeX, eyeY, eyeZ + offsetZ);
-          _tmpRayDir.set(dx, dy, dz);
-          const occ = this.raycastWorld(_tmpRayOrigin, _tmpRayDir, bestProj - 0.35);
-          if (occ && !occ.isGlass && occ.dist < bestProj - 0.45) {
-            const hitGap = Math.hypot(occ.point.x - bestCx, occ.point.y - bestCy, (occ.point.z - offsetZ) - bestCz);
-            if (hitGap > 1.25) bestId = null;
+          const needLoS = (bestId !== this._lastHaloLoSId) || ((this._timeAccum - this._lastHaloLoSTime) > 0.10);
+          if (needLoS) {
+            this._lastHaloLoSId = bestId;
+            this._lastHaloLoSTime = this._timeAccum;
+            _tmpRayOrigin.set(eyeX, eyeY, eyeZ + offsetZ);
+            _tmpRayDir.set(dx, dy, dz);
+            const occ = this.raycastWorld(_tmpRayOrigin, _tmpRayDir, bestProj - 0.35);
+            let occluded = false;
+            if (occ && !occ.isGlass && occ.dist < bestProj - 0.45) {
+              const hitGap = Math.hypot(occ.point.x - bestCx, occ.point.y - bestCy, (occ.point.z - offsetZ) - bestCz);
+              if (hitGap > 1.25) occluded = true;
+            }
+            this._lastHaloLoSOccluded = occluded;
           }
+          if (this._lastHaloLoSOccluded) bestId = null;
+        } else {
+          this._lastHaloLoSId = bestId;
+          this._lastHaloLoSOccluded = false;
         }
       }
       this._hoveredInteractableId = bestId;
 
       const diff = String(difficultyKey || 'medium').toLowerCase();
       const subtleDist = diff === 'easy' ? 28.0 : (diff === 'medium' ? 14.0 : (diff === 'hard' ? 6.0 : 2.8));
+      const qTier = (LRT.Config && LRT.Config.QUALITY_TIERS && LRT.Core && LRT.Core.qualityKey)
+        ? LRT.Config.QUALITY_TIERS[LRT.Core.qualityKey]
+        : null;
+      const allowSubtle = !qTier || qTier.enableSubtleHalos !== false;
 
       if (this._perimeterHalos) {
         for (let i = 0; i < this._perimeterHalos.length; i++) {
@@ -1282,7 +1340,7 @@
               mode = 'hover';
             } else if (isObj) {
               mode = 'objective';
-            } else if (rec.category === 'lootbox' || rec.category === 'lootbox_item' || rec.category === 'pickup') {
+            } else if (allowSubtle && (rec.category === 'lootbox' || rec.category === 'lootbox_item' || rec.category === 'pickup')) {
               const dist = eyeX !== null ? Math.hypot(rec.x - eyeX, rec.y - eyeY, rec.z - eyeZ) : 0;
               if (dist <= subtleDist) mode = 'subtle';
             }
@@ -1300,7 +1358,7 @@
           if (!b.exploded) {
             if (bestId === ('barrel_' + b.id)) bMode = 'hover';
             else if (this._barrelCueActive && b === this._nearestCueBarrel) bMode = 'objective';
-            else {
+            else if (allowSubtle) {
               const dist = eyeX !== null ? Math.hypot(b.x - eyeX, (b.y + 0.5) - eyeY, b.z - eyeZ) : 0;
               if (dist <= subtleDist) bMode = 'subtle';
             }
@@ -1322,7 +1380,7 @@
               continue;
             }
             const dist = eyeX !== null ? Math.hypot(pu.x - eyeX, pu.y - eyeY, pu.z - eyeZ) : 0;
-            const pMode = (bestId === ('pickup_' + i)) ? 'hover' : (dist <= subtleDist ? 'subtle' : 'off');
+            const pMode = (bestId === ('pickup_' + i)) ? 'hover' : (allowSubtle && dist <= subtleDist ? 'subtle' : 'off');
             h.setMode(pMode);
             h.update(this._timeAccum);
           }

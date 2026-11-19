@@ -41,6 +41,11 @@
   CORE.lastDrawCalls = 0;
   CORE.isSoftwareRenderer = false;
   CORE.interiorOccluded = false;
+  CORE._pausedRenderDirty = false;
+
+  function requestPausedRender() {
+    CORE._pausedRenderDirty = true;
+  }
 
   const _brightFogTarget = new THREE.Color(0x526378);
   const _lerpFogA = new THREE.Color();
@@ -182,10 +187,8 @@
   function markShadowDirty() {
     if (CORE.renderer && CORE.renderer.shadowMap) {
       CORE.renderer.shadowMap.autoUpdate = false;
-      const needsInit = !!(CORE.sunLight && !CORE.sunLight.shadow.map);
-      if (CORE.shadowsEnabled || needsInit) {
-        CORE.renderer.shadowMap.needsUpdate = true;
-      }
+      const shadowsActive = !!(CORE.renderer.shadowMap.enabled && CORE.shadowsEnabled);
+      CORE.renderer.shadowMap.needsUpdate = shadowsActive;
     }
   }
 
@@ -243,14 +246,19 @@
     const cssH = Math.max(2, optH || window.innerHeight || 720);
     const dpr = Math.max(1, window.devicePixelRatio || 1);
     const modeCfg = (C.RES_SCALE_MODES && C.RES_SCALE_MODES[CORE.resScaleMode]) || { mult: 1.0, useDpr: false, dprCap: 1.0 };
-    const tier = (C.QUALITY_TIERS && C.QUALITY_TIERS[CORE.qualityKey]) || C.QUALITY_TIERS.balanced || { dprCap: 1.0 };
+    const tier = (typeof C.getQualityTier === 'function')
+      ? C.getQualityTier(CORE.qualityKey)
+      : ((C.QUALITY_TIERS && C.QUALITY_TIERS[CORE.qualityKey]) || C.QUALITY_TIERS.balanced || { dprCap: 1.0 });
 
-    const dprCap = CORE.isSoftwareRenderer ? 1.0 : (modeCfg.dprCap || tier.dprCap || 1.5);
+    const dprCap = CORE.isSoftwareRenderer ? 1.0 : (tier.dprCap || modeCfg.dprCap || 1.5);
     const mult = CORE.isSoftwareRenderer ? 1.0 : (modeCfg.mult || 1.0);
-    const baseScale = modeCfg.useDpr ? (Math.min(dpr, dprCap) * mult) : mult;
+    let effectivePixelRatio = modeCfg.useDpr ? (Math.min(dpr, dprCap) * mult) : mult;
 
-    const minFloorRatio = 720 / Math.max(1, cssH);
-    const effectivePixelRatio = Math.max(minFloorRatio, baseScale);
+    // On floor_720 mode (potato/balanced), downscale when cssH exceeds tier.maxHeight (720p / 900p)
+    const maxHeight = typeof tier.maxHeight === 'number' ? tier.maxHeight : 0;
+    if (CORE.resScaleMode === 'floor_720' && maxHeight > 0 && cssH > maxHeight) {
+      effectivePixelRatio = Math.min(effectivePixelRatio, maxHeight / cssH);
+    }
 
     const glMaxTex = (CORE.renderer.capabilities && CORE.renderer.capabilities.maxTextureSize)
       ? Math.min(4096, CORE.renderer.capabilities.maxTextureSize)
@@ -258,7 +266,8 @@
     const maxDim = CORE.isSoftwareRenderer ? Math.min(2048, glMaxTex) : glMaxTex;
     const maxBackbufferH = 2160;
     const maxRatio = Math.min(maxDim / Math.max(cssW, cssH), maxBackbufferH / cssH);
-    const cappedRatio = Math.min(effectivePixelRatio, Math.max(minFloorRatio, maxRatio));
+    const minRatio = Math.min(1.0, 360 / Math.max(1, cssH));
+    const cappedRatio = Math.max(minRatio, Math.min(effectivePixelRatio, maxRatio));
 
     CORE.renderer.setPixelRatio(cappedRatio);
     CORE.renderer.setSize(cssW, cssH, false);
@@ -270,16 +279,22 @@
   }
 
   function applyShadowsState(targetShadowSize) {
+    const shadowsActive = !!CORE.shadowsEnabled;
+    let shadowModeChanged = false;
     if (CORE.renderer && CORE.renderer.shadowMap) {
-      // Never toggle shadowMap.enabled or castShadow so Three.js never recompiles shaders.
-      CORE.renderer.shadowMap.enabled = true;
+      const prevEnabled = !!CORE.renderer.shadowMap.enabled;
+      CORE.renderer.shadowMap.enabled = shadowsActive;
       CORE.renderer.shadowMap.autoUpdate = false;
+      shadowModeChanged = (prevEnabled !== shadowsActive);
+      if (!shadowsActive) {
+        CORE.renderer.shadowMap.needsUpdate = false;
+      }
     }
     if (CORE.sunLight) {
-      CORE.sunLight.castShadow = true;
-      CORE.sunLight.shadow.intensity = CORE.shadowsEnabled ? 1.0 : 0;
+      CORE.sunLight.castShadow = shadowsActive;
+      CORE.sunLight.shadow.intensity = shadowsActive ? 1.0 : 0;
       if (typeof targetShadowSize === 'number' && targetShadowSize > 0) {
-        const clampedSize = CORE.shadowsEnabled ? targetShadowSize : Math.min(512, targetShadowSize);
+        const clampedSize = shadowsActive ? targetShadowSize : Math.min(512, targetShadowSize);
         if (CORE.sunLight.shadow.mapSize.width !== clampedSize) {
           CORE.sunLight.shadow.mapSize.set(clampedSize, clampedSize);
           if (CORE.sunLight.shadow.map) {
@@ -287,6 +302,21 @@
           }
         }
       }
+    }
+    if (shadowModeChanged && CORE.scene) {
+      // One-time material shader recompile on shadow toggle so potato strips USE_SHADOWMAP cleanly.
+      const seenMats = new Set();
+      CORE.scene.traverse((obj) => {
+        if (!obj || !obj.isMesh || !obj.material) return;
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (let i = 0; i < mats.length; i++) {
+          const mat = mats[i];
+          if (mat && !seenMats.has(mat)) {
+            seenMats.add(mat);
+            mat.needsUpdate = true;
+          }
+        }
+      });
     }
     _hasShadowTarget = false;
     markShadowDirty();
@@ -324,6 +354,8 @@
     const validMode = (mode && C.RES_SCALE_MODES && (mode in C.RES_SCALE_MODES)) ? mode : 'floor_720';
     CORE.resScaleMode = validMode;
     applyRenderResolution();
+    syncSceneMatrices();
+    requestPausedRender();
     saveSettings();
     syncSettingsUi();
     return CORE.resScaleMode;
@@ -332,6 +364,8 @@
   function setShadowsEnabled(flag) {
     CORE.shadowsEnabled = !!flag;
     applyShadowsState();
+    syncSceneMatrices();
+    requestPausedRender();
     saveSettings();
     syncSettingsUi();
     return CORE.shadowsEnabled;
@@ -340,6 +374,8 @@
   function setBloomEnabled(flag) {
     CORE.bloomEnabled = !!flag;
     applyBloomState();
+    syncSceneMatrices();
+    requestPausedRender();
     saveSettings();
     syncSettingsUi();
     return CORE.bloomEnabled;
@@ -349,6 +385,8 @@
     const validMode = (mode === 'off' || mode === 'half' || mode === 'full') ? mode : 'off';
     CORE.aoMode = validMode;
     applyAoState();
+    syncSceneMatrices();
+    requestPausedRender();
     saveSettings();
     syncSettingsUi();
     return CORE.aoMode;
@@ -435,8 +473,27 @@
     applyBloomState();
   }
 
+  function syncSceneMatrices() {
+    if (CORE.scene) {
+      CORE.scene.updateMatrixWorld(true);
+    }
+  }
+
   function renderFrame() {
     if (!CORE.renderer || !CORE.scene || !CORE.camera) return;
+    CORE.scene.matrixWorldAutoUpdate = false;
+    CORE.camera.updateMatrixWorld(false);
+    const enemyRoot = (LRT.Enemies && LRT.Enemies.enemyRoot) || CORE.scene.getObjectByName('LRT_Enemies');
+    if (enemyRoot) enemyRoot.updateMatrixWorld(false);
+    const trainRoot = LRT.Train && (LRT.Train.trainGroup || LRT.Train.rootGroup);
+    if (trainRoot) trainRoot.updateMatrixWorld(false);
+    const vfxRoot = (LRT.Weapons && LRT.Weapons.vfxRoot) || CORE.scene.getObjectByName('LRT_WeaponsVFX');
+    if (vfxRoot) vfxRoot.updateMatrixWorld(false);
+    if (CORE.sky) CORE.sky.updateMatrixWorld(false);
+    if (CORE.sunLight) {
+      CORE.sunLight.updateMatrixWorld(false);
+      if (CORE.sunLight.target) CORE.sunLight.target.updateMatrixWorld(false);
+    }
     updateFrustum();
     CORE.renderer.info.autoReset = false;
     CORE.renderer.info.reset();
@@ -450,13 +507,37 @@
     CORE.renderer.info.autoReset = true;
   }
 
+  function syncQualityToSubsystems(tierArg) {
+    const tier = tierArg || (typeof C.getQualityTier === 'function'
+      ? C.getQualityTier(CORE.qualityKey)
+      : ((C.QUALITY_TIERS && C.QUALITY_TIERS[CORE.qualityKey]) || C.QUALITY_TIERS.balanced));
+    if (LRT.Station && typeof LRT.Station.applyQualityTier === 'function') {
+      LRT.Station.applyQualityTier(tier, CORE.qualityKey);
+    }
+    if (LRT.City && typeof LRT.City.applyQualityTier === 'function') {
+      LRT.City.applyQualityTier(tier, CORE.qualityKey);
+    }
+    if (LRT.Enemies && typeof LRT.Enemies.applyQualityTier === 'function') {
+      LRT.Enemies.applyQualityTier(tier, CORE.qualityKey);
+    }
+    if (LRT.Weapons && typeof LRT.Weapons.applyQualityTier === 'function') {
+      LRT.Weapons.applyQualityTier(tier, CORE.qualityKey);
+    }
+    if (LRT.Train && typeof LRT.Train.applyQualityTier === 'function') {
+      LRT.Train.applyQualityTier(tier, CORE.qualityKey);
+    }
+  }
+
   function applyQuality(tierKey) {
     const validKey = (tierKey && C.QUALITY_TIERS && (tierKey in C.QUALITY_TIERS))
       ? tierKey
       : ((CORE.qualityKey && C.QUALITY_TIERS && (CORE.qualityKey in C.QUALITY_TIERS)) ? CORE.qualityKey : 'balanced');
     const tier = C.QUALITY_TIERS[validKey] || C.QUALITY_TIERS.balanced;
     CORE.qualityKey = validKey;
-    CORE.resScaleMode = tier.resScale || (validKey === 'high' ? 'native' : 'floor_720');
+    const rawResScale = tier.resScale;
+    CORE.resScaleMode = (typeof rawResScale === 'string' && C.RES_SCALE_MODES && (rawResScale in C.RES_SCALE_MODES))
+      ? rawResScale
+      : (validKey === 'high' ? 'native' : 'floor_720');
     CORE.shadowsEnabled = !!tier.shadows;
     CORE.bloomEnabled = tier.bloom !== undefined ? !!tier.bloom : (validKey !== 'potato');
     CORE.aoMode = tier.ao || (validKey === 'high' ? 'half' : 'off');
@@ -466,7 +547,7 @@
     applyAoState();
     applyBloomState();
 
-    const aniso = tier.maxAniso || (CORE.qualityKey === 'potato' ? 1 : (CORE.qualityKey === 'balanced' ? 2 : 8));
+    const aniso = tier.maxAniso || (CORE.qualityKey === 'potato' ? 1 : (CORE.qualityKey === 'balanced' ? 4 : 8));
     if (LRT.AssetLoader && typeof LRT.AssetLoader.setAnisotropy === 'function') {
       LRT.AssetLoader.setAnisotropy(aniso);
     }
@@ -477,6 +558,7 @@
         const tex = maps[i];
         if (tex && tex.isTexture && tex.anisotropy !== aniso) {
           tex.anisotropy = aniso;
+          tex.needsUpdate = true;
         }
       }
     };
@@ -497,11 +579,24 @@
       });
     }
 
-    if (LRT.City && typeof LRT.City.updateVisibility === 'function' && CORE.camera) {
+    syncQualityToSubsystems(tier);
+
+    const pState = LRT.PlayerUI && typeof LRT.PlayerUI.getState === 'function' ? LRT.PlayerUI.getState() : null;
+    if (typeof CORE.updateCityVisibility === 'function') {
+      CORE.updateCityVisibility(pState);
+    } else if (LRT.City && typeof LRT.City.updateVisibility === 'function' && CORE.camera) {
       updateFrustum();
-      LRT.City.updateVisibility(CORE.camera.position, CORE.qualityKey, _frustum, isInteriorOccluded());
+      LRT.City.updateVisibility(CORE.camera.position, CORE.qualityKey, _frustum, {
+        insideConcourse: false,
+        insideTrain: !!(pState && pState.isInsideTrain),
+        trainCruising: CORE.gameState === STATES.TRAIN_CRUISE
+          || CORE.gameState === STATES.TRAIN_DEPARTING
+          || CORE.gameState === STATES.TRAIN_ARRIVING
+      });
     }
 
+    syncSceneMatrices();
+    requestPausedRender();
     saveSettings();
     syncSettingsUi();
   }
@@ -524,9 +619,9 @@
         const entry = list[i];
         const l = entry && entry.light ? entry.light : entry;
         if (l && l.isLight) {
-          l.visible = true;
           const mult = (entry && typeof entry.baseIntensity === 'number') ? entry.baseIntensity : 1.0;
           l.intensity = factor * mult;
+          l.visible = !l.userData._tierDisabled && l.intensity > 0.001;
         }
       }
     };
@@ -602,7 +697,9 @@
     CORE.sunLight.target.position.copy(_nextSunTarget);
     CORE.sunLight.position.copy(_nextSunTarget).addScaledVector(_sunDir, 62);
     CORE.sunLight.target.updateMatrixWorld();
-    markShadowDirty();
+    if (CORE.renderer && CORE.renderer.shadowMap && CORE.renderer.shadowMap.enabled && CORE.shadowsEnabled) {
+      markShadowDirty();
+    }
   }
 
   function applyBrightness() {
@@ -688,6 +785,7 @@
     if (LRT.Train && typeof LRT.Train.syncLights === 'function') {
       LRT.Train.syncLights();
     }
+    requestPausedRender();
   }
 
   function setBrightness(val) {
@@ -1124,6 +1222,9 @@
 
   CORE.initPostProcessing = initPostProcessing;
   CORE.renderFrame = renderFrame;
+  CORE.syncSceneMatrices = syncSceneMatrices;
+  CORE.requestPausedRender = requestPausedRender;
+  CORE.syncQualityToSubsystems = syncQualityToSubsystems;
   CORE.applyQuality = applyQuality;
   CORE.applyRenderResolution = applyRenderResolution;
   CORE.setRenderScale = setRenderScale;
@@ -1155,4 +1256,5 @@
   CORE.cycleLightingMode = cycleLightingMode;
   CORE.getLightingMode = getLightingMode;
   CORE.updateMenuCamera = updateMenuCamera;
+  LRT.Core = CORE;
 })(window.LRT = window.LRT || {});

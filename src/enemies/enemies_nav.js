@@ -257,7 +257,7 @@
     const dist = Math.hypot(x1 - x0, z1 - z0);
     if (dist < 0.45) return true;
     if (dist > 28.0) return false;
-    const steps = Math.max(2, Math.ceil(dist / 0.45));
+    const steps = Math.max(2, Math.ceil(dist / 0.85));
     for (let s = 1; s < steps; s++) {
       const t = s / steps;
       const px = x0 + (x1 - x0) * t;

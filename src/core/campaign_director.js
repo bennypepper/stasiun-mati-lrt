@@ -1535,6 +1535,7 @@
           // Dispose old Station N mid-cruise once out of fog
           saveCurrentStationUsedIds();
           if (LRT.Enemies && LRT.Enemies.reset) LRT.Enemies.reset();
+          if (LRT.Weapons && typeof LRT.Weapons.clearStationDecals === 'function') LRT.Weapons.clearStationDecals();
           if (LRT.Station && LRT.Station.dispose) LRT.Station.dispose(CORE.scene);
         },
         (incomingZ) => {
@@ -1999,6 +2000,7 @@
       saveCurrentStationUsedIds();
       if (LRT.Station && LRT.Station.dispose) LRT.Station.dispose(CORE.scene);
       if (LRT.Enemies && LRT.Enemies.reset) LRT.Enemies.reset();
+      if (LRT.Weapons && typeof LRT.Weapons.clearStationDecals === 'function') LRT.Weapons.clearStationDecals();
       if (LRT.Enemies && typeof LRT.Enemies.setDifficulty === 'function') LRT.Enemies.setDifficulty(CORE.difficultyKey);
       if (LRT.Enemies && typeof LRT.Enemies.setAtmosphereMode === 'function') LRT.Enemies.setAtmosphereMode(getAtmosphereMode());
       if (LRT.Train && LRT.Train.reset) LRT.Train.reset(CORE.gameMode);

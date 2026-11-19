@@ -101,6 +101,9 @@
 
   // Real rigged THREE.SkinnedMesh + AnimationMixer pool (loaded from zombie_infected.glb, zombie_commuter.glb & zombie_soldier.glb)
   let _useSkinnedRigs = false;
+  let _enemyCastShadow = true;
+  let _enemyReceiveShadow = true;
+  let _potatoMode = false;
   const _rigPool = [];
   const _axisX = new THREE.Vector3(1, 0, 0);
   const _axisY = new THREE.Vector3(0, 1, 0);
@@ -1352,9 +1355,17 @@
       const sm = srcToDst.get(srcSm);
       if (!sm || !sm.isSkinnedMesh) continue;
 
-      sm.frustumCulled = false;
-      sm.castShadow = true;
-      sm.receiveShadow = true;
+      if (sm.geometry) {
+        if (!sm.geometry.boundingSphere) {
+          sm.geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.9, 0), 3.2);
+        } else if (sm.geometry.boundingSphere.radius < 3.2) {
+          sm.geometry.boundingSphere.center.set(0, 0.9, 0);
+          sm.geometry.boundingSphere.radius = 3.2;
+        }
+      }
+      sm.frustumCulled = true;
+      sm.castShadow = _enemyCastShadow;
+      sm.receiveShadow = _enemyReceiveShadow;
       if (isSoldier && (sm.name || '').toLowerCase().includes('visor')) {
         visorMesh = sm;
       }
@@ -1763,11 +1774,11 @@
     }
 
     cloned.root.visible = false;
-    E.enemyRoot.add(cloned.root);
 
     return {
       kind,
       root: cloned.root,
+      skinnedMeshes: cloned.skinnedMeshes,
       mixer,
       actions,
       bones,
@@ -2176,6 +2187,9 @@
   function resetRigAttachments(rig) {
     if (!rig || !rig.root) return;
     rig.root.visible = false;
+    if (E.enemyRoot && rig.root.parent === E.enemyRoot) {
+      E.enemyRoot.remove(rig.root);
+    }
     if (rig.neckStumpNode) rig.neckStumpNode.visible = false;
     if (rig.armStumpL) rig.armStumpL.visible = false;
     if (rig.armStumpR) rig.armStumpR.visible = false;
@@ -2235,9 +2249,17 @@
         for (let r = 0; r < rigs.length; r++) {
           const rig = rigs[r];
           if (!rig || !rig.root) continue;
-          rig.root.visible = E.warmupActive || (activeRig === rig);
+          const shouldShow = E.warmupActive || (activeRig === rig);
+          rig.root.visible = shouldShow;
+          if (E.enemyRoot) {
+            if (shouldShow && rig.root.parent !== E.enemyRoot) E.enemyRoot.add(rig.root);
+            else if (!shouldShow && rig.root.parent === E.enemyRoot) E.enemyRoot.remove(rig.root);
+          }
           if (E.warmupActive && (!z0 || !z0.active)) {
             rig.root.position.set(0, -100, 0);
+          }
+          if (shouldShow) {
+            rig.root.updateMatrixWorld(true);
           }
           if (rig.runnerEyes) {
             rig.runnerEyes.visible = E.warmupActive || (activeRig === rig && !z0.dead && (z0.variant === 'runner' || z0.variant === 'screamer'));
@@ -2871,7 +2893,7 @@
     _qBoneChar.premultiply(_qDelta);
     _qParentCharInv.copy(_qParentChar).invert();
     bone.quaternion.copy(_qParentCharInv).multiply(_qBoneChar);
-    bone.updateMatrixWorld(true);
+    bone.updateMatrixWorld(false);
   }
 
   function aimBoneInCharSpace(bone, rootQuatInv, targetX, targetY, targetZ, blendAlpha) {
@@ -2893,7 +2915,7 @@
     }
     _qParentCharInv.copy(_qParentChar).invert();
     bone.quaternion.copy(_qParentCharInv).multiply(_qBoneChar);
-    bone.updateMatrixWorld(true);
+    bone.updateMatrixWorld(false);
   }
 
   function updateSkinnedZombie(z, timeSec, dt) {
@@ -2903,9 +2925,21 @@
 
     const rig = getSlotRigForVariant(z, slot);
     if (!rig || !rig.root) return;
-    if (slot.infected && slot.infected !== rig && slot.infected.root) slot.infected.root.visible = false;
-    if (slot.commuter && slot.commuter !== rig && slot.commuter.root) slot.commuter.root.visible = false;
-    if (slot.soldier && slot.soldier !== rig && slot.soldier.root) slot.soldier.root.visible = false;
+    if (slot.infected && slot.infected !== rig && slot.infected.root) {
+      slot.infected.root.visible = false;
+      if (E.enemyRoot && slot.infected.root.parent === E.enemyRoot) E.enemyRoot.remove(slot.infected.root);
+    }
+    if (slot.commuter && slot.commuter !== rig && slot.commuter.root) {
+      slot.commuter.root.visible = false;
+      if (E.enemyRoot && slot.commuter.root.parent === E.enemyRoot) E.enemyRoot.remove(slot.commuter.root);
+    }
+    if (slot.soldier && slot.soldier !== rig && slot.soldier.root) {
+      slot.soldier.root.visible = false;
+      if (E.enemyRoot && slot.soldier.root.parent === E.enemyRoot) E.enemyRoot.remove(slot.soldier.root);
+    }
+    if (E.enemyRoot && rig.root.parent !== E.enemyRoot) {
+      E.enemyRoot.add(rig.root);
+    }
 
     const isBrute = (z.variant === 'brute');
     rig.root.visible = true;
@@ -2968,20 +3002,21 @@
       rig.runnerEyes.visible = !z.dead && (z.variant === 'runner' || z.variant === 'screamer');
     }
 
+    const skipCystPulse = _potatoMode && E.camPos && (((z.x - E.camPos.x) * (z.x - E.camPos.x) + (z.z - E.camPos.z) * (z.z - E.camPos.z)) > 324.0);
     if (rig.spitterNodes) {
       const showSp = (z.variant === 'spitter' && !z.dead);
-      const spPulse = 1.0 + Math.sin(timeSec * 5.2 + z.seed) * 0.14 + (z.spitAnimTimer > 0 ? 0.18 : 0);
+      const spPulse = skipCystPulse ? 1.0 : (1.0 + Math.sin(timeSec * 5.2 + z.seed) * 0.14 + (z.spitAnimTimer > 0 ? 0.18 : 0));
       for (let i = 0; i < rig.spitterNodes.length; i++) {
         rig.spitterNodes[i].visible = showSp;
-        if (showSp) rig.spitterNodes[i].scale.setScalar(spPulse);
+        if (showSp && !skipCystPulse) rig.spitterNodes[i].scale.setScalar(spPulse);
       }
     }
     if (rig.screamerNodes) {
       const showSc = (z.variant === 'screamer' && !z.dead);
-      const scPulse = 1.0 + Math.sin(timeSec * 7.6 + z.seed) * 0.16 + (z.shriekTimer > 0 ? 0.22 : 0);
+      const scPulse = skipCystPulse ? 1.0 : (1.0 + Math.sin(timeSec * 7.6 + z.seed) * 0.16 + (z.shriekTimer > 0 ? 0.22 : 0));
       for (let i = 0; i < rig.screamerNodes.length; i++) {
         rig.screamerNodes[i].visible = showSc;
-        if (showSc) rig.screamerNodes[i].scale.setScalar(scPulse);
+        if (showSc && !skipCystPulse) rig.screamerNodes[i].scale.setScalar(scPulse);
       }
     }
 
@@ -3018,8 +3053,8 @@
         acts.zombieWalk.paused = false;
         acts.zombieWalk.setEffectiveWeight(0);
       }
-      if (rig.mixer) {
-        rig.mixer.update((z.dead && z.deathTimer >= 0.35) ? 0 : animDt);
+      if (rig.mixer && !(z.dead && z.deathTimer >= 0.35)) {
+        rig.mixer.update(animDt);
       }
     } else {
       if (acts.idle) {
@@ -3255,6 +3290,7 @@
         aimBoneInCharSpace(injLow, _qRootInv, injLeg * 0.10, -0.94, -0.28, 0.75);
       }
     }
+    rig.root.updateMatrixWorld(true);
   }
 
   function getZombieCrawlerAnchors(z, outHead, outChest, outHips, outFeet) {
@@ -3716,13 +3752,44 @@
         _useSkinnedRigs = false;
         buildZombieMeshes();
       }
+      applyQualityTier();
       E.initialized = true;
     } else if (E.enemyRoot && E.enemyRoot.parent !== scene) {
       scene.add(E.enemyRoot);
     }
   }
 
+  function applyQualityTier(tier) {
+    const t = tier || (LRT.Config && LRT.Config.QUALITY_TIERS && LRT.Core && LRT.Config.QUALITY_TIERS[LRT.Core.qualityKey]) || {};
+    const qKey = (LRT.Core && LRT.Core.qualityKey) || '';
+    _enemyCastShadow = t.enemyCastShadow !== undefined ? !!t.enemyCastShadow : true;
+    _enemyReceiveShadow = (qKey === 'high') || (t.maxEnemies >= 32 && t.shadows !== false);
+    _potatoMode = (qKey === 'potato') || (t.maxEnemies !== undefined && t.maxEnemies <= 16);
+
+    for (let i = 0; i < _rigPool.length; i++) {
+      const slot = _rigPool[i];
+      if (!slot) continue;
+      const rigs = [slot.infected, slot.commuter, slot.soldier];
+      for (let r = 0; r < rigs.length; r++) {
+        const rig = rigs[r];
+        if (!rig || !rig.skinnedMeshes) continue;
+        for (let m = 0; m < rig.skinnedMeshes.length; m++) {
+          const sm = rig.skinnedMeshes[m];
+          if (sm) {
+            sm.castShadow = _enemyCastShadow;
+            sm.receiveShadow = _enemyReceiveShadow;
+          }
+        }
+      }
+    }
+    for (let i = 0; i < _allPartMeshes.length; i++) {
+      const pm = _allPartMeshes[i];
+      if (pm) pm.castShadow = _enemyCastShadow;
+    }
+  }
+
   E.isUsingSkinnedRigs = () => _useSkinnedRigs;
+  E.applyQualityTier = applyQualityTier;
   E.getEnemyCfg = getEnemyCfg;
   E.play3D = play3D;
   E.assignVariantVisuals = assignVariantVisuals;

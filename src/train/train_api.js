@@ -78,11 +78,15 @@
     if (!halos) return;
     const activeBoarded = (T.state === 'BOARDED_WAIT' && T.trainGroup && T.trainGroup.visible);
     const doorsOpen = areDoorsOpen();
+    const qTier = (LRT.Config && LRT.Config.QUALITY_TIERS && LRT.Core && LRT.Core.qualityKey)
+      ? LRT.Config.QUALITY_TIERS[LRT.Core.qualityKey]
+      : null;
+    const subtleOrOff = (!qTier || qTier.enableSubtleHalos !== false) ? 'subtle' : 'off';
     const map = [
-      ['train_depart_front', halos.departFront, activeBoarded ? (doorsOpen ? 'subtle' : 'objective') : 'off'],
-      ['train_depart_rear', halos.departRear, activeBoarded ? (doorsOpen ? 'subtle' : 'objective') : 'off'],
-      ['train_door_lock_front', halos.lockFront, activeBoarded ? (doorsOpen ? 'objective' : 'subtle') : 'off'],
-      ['train_door_lock_rear', halos.lockRear, activeBoarded ? (doorsOpen ? 'objective' : 'subtle') : 'off']
+      ['train_depart_front', halos.departFront, activeBoarded ? (doorsOpen ? subtleOrOff : 'objective') : 'off'],
+      ['train_depart_rear', halos.departRear, activeBoarded ? (doorsOpen ? subtleOrOff : 'objective') : 'off'],
+      ['train_door_lock_front', halos.lockFront, activeBoarded ? (doorsOpen ? 'objective' : subtleOrOff) : 'off'],
+      ['train_door_lock_rear', halos.lockRear, activeBoarded ? (doorsOpen ? 'objective' : subtleOrOff) : 'off']
     ];
     for (let i = 0; i < map.length; i++) {
       const [id, halo, baseMode] = map[i];
@@ -554,8 +558,9 @@
   function setHeadlights(on, intensity) {
     T.headlightIntensityTarget = on ? (intensity !== undefined ? intensity : 2.8) : 0.0;
     if (T.headlightLight) {
-      T.headlightLight.visible = true;
-      T.headlightLight.intensity = (T.warmupActive || (T.state !== 'AWAY' && T.trainGroup && T.trainGroup.visible))
+      const active = !T._tierDisableLights && (T.warmupActive || (T.state !== 'AWAY' && T.trainGroup && T.trainGroup.visible));
+      T.headlightLight.visible = !!on && active;
+      T.headlightLight.intensity = active
         ? T.headlightIntensityTarget
         : 0.0;
     }
@@ -774,7 +779,8 @@
       T.doorOpen = Math.max(0, Math.min(1, T.doorOpen + dir * clampedDt * 1.35));
       T.updateDoorTransforms();
     }
-    if (stationRef && typeof stationRef.setPsdOpen === 'function' && (T.state === 'BOARDED_WAIT' || Math.abs(T.doorOpen - prevDoor) > 0.0001)) {
+    if (stationRef && typeof stationRef.setPsdOpen === 'function' && (T._psdSyncDirty || Math.abs(T.doorOpen - prevDoor) > 0.0001)) {
+      T._psdSyncDirty = false;
       stationRef.setPsdOpen(T.doorOpen, T.travelDir);
     }
 
@@ -797,6 +803,7 @@
         T.speed = 0.0;
         T.accel = 0.0;
         T.state = 'BOARDED_WAIT';
+        T._psdSyncDirty = true;
         setHeadlights(true, 1.15);
         if (T.viaductGroup) T.viaductGroup.visible = false;
         openDoors();
@@ -901,6 +908,7 @@
           T.speed = 0.0;
           T.accel = 0.0;
           T.state = 'BOARDED_WAIT';
+        T._psdSyncDirty = true;
           setHeadlights(true, 1.15);
           if (T.viaductGroup) T.viaductGroup.visible = false;
           if (LRT.Audio && typeof LRT.Audio.stopLoop === 'function') {
@@ -1154,6 +1162,7 @@
     interact,
     getVisualRoot: () => T.trainVisualRoot,
     getRoot: () => T.trainGroup,
+    get trainGroup() { return T.trainGroup; },
     setWarmupMode,
     setNextStationName: (name, dir) => {
       T.currentStationName = name || 'Cawang';
@@ -1172,6 +1181,24 @@
       nextSpawned: !!T.nextSpawned,
       nextBuildInProgress: !!T.nextBuildInProgress
     }),
-    syncLights: T.syncTrainLights
+    syncLights: T.syncTrainLights,
+    applyQualityTier: (tier) => {
+      const t = tier || {};
+      const propShadow = !!t.propCastShadow;
+      if (T.hvacInst) T.hvacInst.castShadow = propShadow;
+      const disableLights = typeof t.maxPointLights === 'number' && t.maxPointLights <= 3;
+      T._tierDisableLights = disableLights;
+      if (T.headlightLight) {
+        T.headlightLight.visible = !disableLights && T.headlightIntensityTarget > 0.001 && T.headlightLight.intensity > 0.001;
+        if (disableLights) T.headlightLight.intensity = 0;
+      }
+      for (let i = 0; i < cabinLights.length; i++) {
+        const cl = cabinLights[i];
+        if (cl) {
+          cl.visible = !disableLights;
+          if (disableLights) cl.intensity = 0;
+        }
+      }
+    }
   };
 })(window.LRT = window.LRT || {});

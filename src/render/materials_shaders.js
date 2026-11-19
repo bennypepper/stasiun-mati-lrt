@@ -1026,6 +1026,34 @@
     }
   `;
 
+  const _haloBackTemplate = new THREE.ShaderMaterial({
+    uniforms: {
+      uColor: { value: new THREE.Color(0xfacc15) },
+      uOpacity: { value: 0.0 },
+      uThickness: { value: 0.012 }
+    },
+    vertexShader: HALO_VERT_SHADER,
+    fragmentShader: HALO_FRAG_SHADER,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    side: THREE.BackSide
+  });
+
+  const _haloFrontTemplate = new THREE.ShaderMaterial({
+    uniforms: {
+      uColor: { value: new THREE.Color(0xfacc15) },
+      uOpacity: { value: 0.0 },
+      uThickness: { value: 0.012 }
+    },
+    vertexShader: HALO_VERT_SHADER,
+    fragmentShader: HALO_FRAG_SHADER,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    side: THREE.FrontSide
+  });
+
   function attachPerimeterHalo(targetObj, opts) {
     const o = opts || {};
     const haloGroup = new THREE.Group();
@@ -1043,19 +1071,13 @@
     const thicknessMult = o.thicknessScale !== undefined ? o.thicknessScale : 1.0;
     const phase = o.phase !== undefined ? o.phase : (Math.random() * Math.PI * 2);
 
-    const makeHaloMat = (side) => new THREE.ShaderMaterial({
-      uniforms: {
-        uColor: { value: new THREE.Color(baseColorHex) },
-        uOpacity: { value: 0.0 },
-        uThickness: { value: 0.012 * thicknessMult }
-      },
-      vertexShader: HALO_VERT_SHADER,
-      fragmentShader: HALO_FRAG_SHADER,
-      transparent: true,
-      depthWrite: false,
-      depthTest: true,
-      side: side
-    });
+    const makeHaloMat = (side) => {
+      const m = (side === THREE.FrontSide ? _haloFrontTemplate : _haloBackTemplate).clone();
+      m.uniforms.uColor.value.setHex(baseColorHex);
+      m.uniforms.uOpacity.value = 0.0;
+      m.uniforms.uThickness.value = 0.012 * thicknessMult;
+      return m;
+    };
 
     const matBack = makeHaloMat(THREE.BackSide);
     let matFront = null;
@@ -1084,7 +1106,7 @@
       _haloRelMat.decompose(hm.position, hm.quaternion, hm.scale);
       hm.castShadow = false;
       hm.receiveShadow = false;
-      hm.frustumCulled = false;
+      hm.frustumCulled = true;
       hm.renderOrder = 2;
       hm.visible = child.visible;
       hm.userData._isPerimeterHalo = true;

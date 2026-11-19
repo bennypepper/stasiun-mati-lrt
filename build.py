@@ -335,13 +335,13 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
     </div>
   </div>
 
-  <!-- GTA V-Style Fast Travel & Station Inspector Modal ([Tab] / Pause Menu) -->
+  <!-- RE-Style Fast Travel & Station Inspector Modal ([Tab] / Pause Menu) -->
   <div id="fast-travel-modal" class="fast-travel-modal hidden" role="dialog" aria-modal="true" aria-labelledby="ft-modal-title">
     <div class="ft-shell">
       <div class="ft-topbar">
         <div class="ft-title-block">
-          <div class="ft-kicker">KORIDOR SELATAN LRT &middot; NAVIGASI CEPAT</div>
-          <h2 class="ft-title" id="ft-modal-title">FAST TRAVEL &amp; STATION INSPECTOR</h2>
+          <div class="ft-kicker">NAVIGASI KORIDOR LRT</div>
+          <h2 class="ft-title" id="ft-modal-title">FAST TRAVEL</h2>
           <div class="ft-meta" id="ft-active-meta">Stasiun Aktif: Dukuh Atas BSI (01)</div>
         </div>
         <div class="ft-topbar-actions">

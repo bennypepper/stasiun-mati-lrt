@@ -318,6 +318,9 @@
     if (masterGain && ctx) {
       masterGain.gain.setTargetAtTime((muted || gameplayPaused) ? 0 : masterVolume, ctx.currentTime, 0.03);
     }
+    if (!muted && !gameplayPaused && ctx && ctx.state === 'suspended' && typeof ctx.resume === 'function') {
+      ctx.resume().catch(() => {});
+    }
   }
 
   function setGameplayPaused(flag) {
