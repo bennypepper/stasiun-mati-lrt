@@ -1102,6 +1102,7 @@
       z.headDmg = (z.headDmg || 0) + finalDmg;
     }
 
+    const dismOn = !(I.core && I.core.dismembermentEnabled === false);
     let armSeveredNow = false;
     let legSeveredNow = false;
     if (!armoredHit) {
@@ -1110,14 +1111,14 @@
       } else if (zone === 'leftArm') {
         z.woundMask = (z.woundMask || 0) | 4;
         z.armLDmg = (z.armLDmg || 0) + finalDmg * dMult;
-        if (!z.lostLeftArm && (z.armLDmg >= 44 || (finalDmg * dMult >= 46) || ((knockbackForce || 0) >= 5.0 && dMult >= 1.5))) {
+        if (dismOn && !z.lostLeftArm && (z.armLDmg >= 44 || (finalDmg * dMult >= 46) || ((knockbackForce || 0) >= 5.0 && dMult >= 1.5))) {
           z.lostLeftArm = true;
           armSeveredNow = true;
         }
       } else if (zone === 'rightArm') {
         z.woundMask = (z.woundMask || 0) | 8;
         z.armRDmg = (z.armRDmg || 0) + finalDmg * dMult;
-        if (!z.lostRightArm && (z.armRDmg >= 44 || (finalDmg * dMult >= 46) || ((knockbackForce || 0) >= 5.0 && dMult >= 1.5))) {
+        if (dismOn && !z.lostRightArm && (z.armRDmg >= 44 || (finalDmg * dMult >= 46) || ((knockbackForce || 0) >= 5.0 && dMult >= 1.5))) {
           z.lostRightArm = true;
           armSeveredNow = true;
         }
@@ -1136,7 +1137,7 @@
           if (!z.crawling) z.speed = baseSpd * 0.48;
         }
         const sideCumDmg = legSide >= 0 ? z.legLDmg : z.legRDmg;
-        const canSeverLeg = (sideCumDmg >= 48) || (legBurst >= 46) || ((knockbackForce || 0) >= 5.0 && dMult >= 1.5);
+        const canSeverLeg = dismOn && ((sideCumDmg >= 48) || (legBurst >= 46) || ((knockbackForce || 0) >= 5.0 && dMult >= 1.5));
         if (canSeverLeg) {
           if (legSide >= 0 && !z.lostLeftLeg) {
             z.lostLeftLeg = true;
@@ -1206,7 +1207,7 @@
 
     if (z.hp <= 0) {
       const headSever = isHead && (dMult >= 1.35 || (knockbackForce || 0) >= 4.2 || finalDmg >= 65 || (z.headDmg || 0) >= 55);
-      z.decapitated = !!(headSever || ((knockbackForce || 0) >= 5.0 && (z.headDmg || 0) >= 28))
+      z.decapitated = !!(dismOn && (headSever || ((knockbackForce || 0) >= 5.0 && (z.headDmg || 0) >= 28)))
         && !(z.variant === 'brute' && z.hasArmor);
       handleZombieDeath(z, hitDir, onDropPickup);
       return { hit: true, killed: true, armored: armoredHit, hitZone: zone, legCrippledNow, armSeveredNow, legSeveredNow };

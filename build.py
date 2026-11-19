@@ -517,6 +517,13 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
               <button class="zenith-tab" data-atmosphere="daylight_outbreak" type="button">DAYLIGHT&ndash;SUNSET</button>
             </div>
           </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">DISMEMBERMENT</span>
+              <span class="setting-desc">Enable or disable enemy limb severing and headshot decapitation.</span>
+            </div>
+            <button class="zenith-toggle" id="btn-menu-dismember" type="button">ON</button>
+          </div>
         </div>
 
         <div class="setting-group" data-cat="display">
@@ -744,6 +751,14 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
               <button class="zenith-tab active" data-atmosphere="night_horror" type="button">NIGHT HORROR</button>
               <button class="zenith-tab" data-atmosphere="daylight_outbreak" type="button">DAYLIGHT&ndash;SUNSET</button>
             </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">DISMEMBERMENT</span>
+              <span class="setting-desc">Enable or disable enemy limb severing and headshot decapitation.</span>
+            </div>
+            <button class="zenith-toggle" id="btn-pause-dismember" type="button">ON</button>
           </div>
         </div>
 

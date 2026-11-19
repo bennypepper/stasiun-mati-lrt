@@ -117,8 +117,8 @@
           const cm = m.clone();
           const mName = (cm.name || '').toLowerCase();
           const isVisor = isSoldier && (sm === visorMesh || mName.includes('visor'));
-          const isPants = !isSoldier && mName.includes('pants');
-          const isSkin = !isSoldier && mName.includes('skin');
+          const isPants = mName.includes('pants');
+          const isSkin = mName.includes('skin');
           if ('envMapIntensity' in cm) cm.envMapIntensity = isVisor ? 0.95 : 0.72;
           if (!isVisor && typeof cm.roughness === 'number') {
             cm.roughness = Math.max(isSoldier ? 0.62 : 0.78, cm.roughness);
@@ -203,9 +203,9 @@
       idle: setupAction(idleClip, 1),
       walk: setupAction(walkClip, 0),
       run: setupAction(runClip, 0),
-      zombieWalk: (!isSoldier && zombieWalkClip && zombieWalkClip !== walkClip) ? setupAction(zombieWalkClip, 0) : null
+      zombieWalk: (zombieWalkClip && zombieWalkClip !== walkClip) ? setupAction(zombieWalkClip, 0) : null
     };
-    if (!actions.zombieWalk && !isSoldier) {
+    if (!actions.zombieWalk) {
       actions.zombieWalk = actions.walk;
     }
 
@@ -360,7 +360,7 @@
       if (!thighBone) return null;
       thighBone.getWorldScale(_v1);
       const lInvS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
-      const distalY = (kind === 'commuter') ? 0.398 : 0.442;
+      const distalY = (kind === 'commuter' || kind === 'soldier') ? 0.398 : 0.442;
       const grp = new THREE.Group();
       grp.visible = false;
       const collar = new THREE.Mesh(E._st._legCollarGeo, E._st._neckStumpMat);
@@ -421,11 +421,211 @@
       addWoundPatch(bones.rightUpLeg, 0.0, 0.18, 0.074, 0.95)
     ];
 
-    // Attach bone-mounted bioluminescent cysts & glowing feral eyes for infected/commuter variants
+    // Attach bone-mounted bioluminescent cysts, glowing feral eyes, and Brimob Riot Police armor for soldier/brute
     let spitterNodes = null;
     let screamerNodes = null;
     let runnerEyes = null;
-    if (!isSoldier) {
+    let riotArmorGroup = null;
+    let riotHelmetGroup = null;
+    let riotVisorNode = cloned.visorMesh || null;
+
+    if (!E._st._runnerEyeMat) {
+      E._st._runnerEyeMat = new THREE.MeshStandardMaterial({
+        color: 0xff5a18,
+        emissive: new THREE.Color(0xff3408),
+        emissiveIntensity: 2.8,
+        roughness: 0.18,
+        metalness: 0.0
+      });
+    }
+
+    const addCystCluster = (parentBone, mat, specs) => {
+      if (!parentBone) return null;
+      parentBone.getWorldScale(_v1);
+      const invS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
+      const grp = new THREE.Group();
+      grp.visible = false;
+      for (let i = 0; i < specs.length; i++) {
+        const sp = specs[i];
+        const m = new THREE.Mesh(E._st._cystGeo, mat);
+        m.position.set(sp.x * invS, sp.y * invS, sp.z * invS);
+        m.scale.set(sp.sx * invS, sp.sy * invS, sp.sz * invS);
+        m.castShadow = false;
+        m.receiveShadow = false;
+        grp.add(m);
+      }
+      parentBone.add(grp);
+      return grp;
+    };
+
+    // Infected, commuter, and Riot Police soldier all share the realistic humanoid zombie facial geometry
+    const eyeZ = 0.132;
+    const eyeY = 0.080;
+    const eyeX = 0.032;
+    runnerEyes = addCystCluster(bones.head, E._st._runnerEyeMat, [
+      { x: -eyeX, y: eyeY, z: eyeZ, sx: 0.0085, sy: 0.0065, sz: 0.0065 },
+      { x:  eyeX, y: eyeY, z: eyeZ, sx: 0.0085, sy: 0.0065, sz: 0.0065 }
+    ]);
+
+    if (isSoldier) {
+      // Shared Brimob Riot Police materials & procedural POLISI stencil badge texture
+      if (!E._st._riotArmorMat) {
+        E._st._riotArmorMat = new THREE.MeshStandardMaterial({
+          color: 0x161d28,
+          roughness: 0.62,
+          metalness: 0.18
+        });
+        E._st._riotPlateMat = new THREE.MeshStandardMaterial({
+          color: 0x202938,
+          roughness: 0.48,
+          metalness: 0.32
+        });
+        E._st._riotVisorMat = new THREE.MeshStandardMaterial({
+          color: 0x101822,
+          emissive: new THREE.Color(0x060b12),
+          roughness: 0.14,
+          metalness: 0.55,
+          transparent: true,
+          opacity: 0.76
+        });
+        let badgeTex = null;
+        if (typeof document !== 'undefined') {
+          const c = document.createElement('canvas');
+          c.width = 256;
+          c.height = 128;
+          const ctx = c.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = '#18202c';
+            ctx.fillRect(0, 0, 256, 128);
+            ctx.strokeStyle = '#eab308';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(8, 8, 240, 112);
+            ctx.fillStyle = '#f8fafc';
+            ctx.font = 'bold 46px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('POLISI', 128, 48);
+            ctx.fillStyle = '#eab308';
+            ctx.font = 'bold 26px sans-serif';
+            ctx.fillText('BRIMOB', 128, 92);
+            // Blood smear across stencil
+            ctx.fillStyle = 'rgba(78, 8, 10, 0.52)';
+            ctx.beginPath();
+            ctx.arc(185, 62, 36, 0, Math.PI * 2);
+            ctx.fill();
+            badgeTex = new THREE.CanvasTexture(c);
+            if (THREE.SRGBColorSpace) badgeTex.colorSpace = THREE.SRGBColorSpace;
+          }
+        }
+        E._st._riotBadgeMat = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          map: badgeTex,
+          roughness: 0.68,
+          metalness: 0.10
+        });
+      }
+
+      const addArmorBox = (parentGrp, invS, mat, w, h, d, x, y, z, rx, ry, rz) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+        m.position.set(x * invS, y * invS, z * invS);
+        if (rx || ry || rz) m.rotation.set(rx || 0, ry || 0, rz || 0);
+        m.scale.setScalar(invS);
+        m.castShadow = false;
+        m.receiveShadow = false;
+        parentGrp.add(m);
+        return m;
+      };
+
+      // 1. PASGT Riot Police Helmet + "POLISI" front patch + cracked polycarbonate riot visor on Head bone
+      // (Leaves zombie face & snarling jaw visible beneath the visor; collapses automatically on decapitation!)
+      if (bones.head) {
+        bones.head.getWorldScale(_v1);
+        const hInvS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
+        riotHelmetGroup = new THREE.Group();
+        // Upper helmet dome crown + brow rim (above eye line y = 0.095 so face is never covered by a spacesuit hood)
+        const domeGeo = new THREE.SphereGeometry(0.128, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.56);
+        const dome = new THREE.Mesh(domeGeo, E._st._riotPlateMat);
+        dome.position.set(0, 0.092 * hInvS, -0.008 * hInvS);
+        dome.scale.set(0.96 * hInvS, 1.02 * hInvS, 1.08 * hInvS);
+        dome.castShadow = false;
+        riotHelmetGroup.add(dome);
+        // Side ear covers & rear ballistic nape guard
+        addArmorBox(riotHelmetGroup, hInvS, E._st._riotArmorMat, 0.026, 0.095, 0.120, -0.112, 0.068, -0.015, 0, 0, 0.10);
+        addArmorBox(riotHelmetGroup, hInvS, E._st._riotArmorMat, 0.026, 0.095, 0.120,  0.112, 0.068, -0.015, 0, 0, -0.10);
+        addArmorBox(riotHelmetGroup, hInvS, E._st._riotArmorMat, 0.195, 0.075, 0.028,  0.0,   0.045, -0.118, 0.18, 0, 0);
+        // Front brow mount + POLISI stencil plate
+        addArmorBox(riotHelmetGroup, hInvS, E._st._riotPlateMat, 0.150, 0.032, 0.024,  0.0,   0.138,  0.118, -0.12, 0, 0);
+        addArmorBox(riotHelmetGroup, hInvS, E._st._riotBadgeMat, 0.088, 0.036, 0.008,  0.0,   0.162,  0.118, -0.18, 0, 0);
+
+        // Detachable transparent Riot Visor across upper face (shatters off when armor breaks!)
+        const vGrp = new THREE.Group();
+        addArmorBox(vGrp, hInvS, E._st._riotVisorMat, 0.215, 0.082, 0.014, 0.0, 0.084, 0.136, 0.06, 0, 0);
+        addArmorBox(vGrp, hInvS, E._st._riotVisorMat, 0.014, 0.080, 0.085, -0.106, 0.084, 0.092, 0, -0.18, 0);
+        addArmorBox(vGrp, hInvS, E._st._riotVisorMat, 0.014, 0.080, 0.085,  0.106, 0.084, 0.092, 0,  0.18, 0);
+        riotHelmetGroup.add(vGrp);
+        riotVisorNode = vGrp;
+        bones.head.add(riotHelmetGroup);
+      }
+
+      // 2. Heavy Brimob MOLLE Ballistic Plate Carrier + POLISI / BRIMOB chest patch + pouches + radio on Spine2
+      if (bones.spine2) {
+        bones.spine2.getWorldScale(_v1);
+        const sInvS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
+        riotArmorGroup = new THREE.Group();
+        // Front & back ballistic vest carrier + side cummerbunds
+        addArmorBox(riotArmorGroup, sInvS, E._st._riotArmorMat, 0.340, 0.340, 0.255, 0, 0.045, 0.005);
+        addArmorBox(riotArmorGroup, sInvS, E._st._riotPlateMat, 0.275, 0.280, 0.036, 0, 0.055, 0.128, -0.05, 0, 0);
+        addArmorBox(riotArmorGroup, sInvS, E._st._riotPlateMat, 0.270, 0.285, 0.034, 0, 0.055, -0.122, 0.04, 0, 0);
+        // High-contrast "POLISI / BRIMOB" chest & back identification patch
+        addArmorBox(riotArmorGroup, sInvS, E._st._riotBadgeMat, 0.185, 0.088, 0.010, 0, 0.125, 0.146, -0.05, 0, 0);
+        addArmorBox(riotArmorGroup, sInvS, E._st._riotBadgeMat, 0.200, 0.094, 0.010, 0, 0.120, -0.138, 0.04, Math.PI, 0);
+        // Padded shoulder straps + ballistic throat collar guard
+        addArmorBox(riotArmorGroup, sInvS, E._st._riotPlateMat, 0.075, 0.042, 0.220, -0.118, 0.215, 0.005);
+        addArmorBox(riotArmorGroup, sInvS, E._st._riotPlateMat, 0.075, 0.042, 0.220,  0.118, 0.215, 0.005);
+        // 3 Front tactical rifle mag pouches + left shoulder HT police radio & whip antenna
+        for (let p = -1; p <= 1; p++) {
+          addArmorBox(riotArmorGroup, sInvS, E._st._riotArmorMat, 0.068, 0.112, 0.044, p * 0.082, -0.018, 0.152);
+        }
+        addArmorBox(riotArmorGroup, sInvS, E._st._riotPlateMat, 0.048, 0.088, 0.038, -0.118, 0.175, 0.128, 0, 0, 0.15);
+        addArmorBox(riotArmorGroup, sInvS, E._st._riotArmorMat, 0.008, 0.145, 0.008, -0.132, 0.265, 0.128);
+        // Zombie gore decoration on vest: coagulated blood clots & torn ballistic trauma wound
+        for (let c = 0; c < 3; c++) {
+          const cl = new THREE.Mesh(E._st._cystGeo, E._st._neckStumpMat);
+          cl.position.set((-0.06 + c * 0.055) * sInvS, (0.04 + (c & 1) * 0.05) * sInvS, 0.148 * sInvS);
+          cl.scale.set(0.045 * sInvS, 0.038 * sInvS, 0.016 * sInvS);
+          cl.castShadow = false;
+          riotArmorGroup.add(cl);
+        }
+        bones.spine2.add(riotArmorGroup);
+      }
+
+      // 3. Riot Shoulder Pauldrons (on LeftArm / RightArm), Forearm Bracers (on LeftForeArm / RightForeArm — sever with arms!),
+      //    and Knee/Shin Guards (on LeftLeg / RightLeg — sever with legs!)
+      const attachLimbGuard = (bone, w, h, d, lx, ly, lz) => {
+        if (!bone) return;
+        bone.getWorldScale(_v1);
+        const bInvS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
+        const g = new THREE.Group();
+        addArmorBox(g, bInvS, E._st._riotPlateMat, w, h, d, lx, ly, lz);
+        bone.add(g);
+      };
+      attachLimbGuard(bones.leftArm,      0.115, 0.145, 0.125,  0.022, 0.085, 0.0);
+      attachLimbGuard(bones.rightArm,     0.115, 0.145, 0.125, -0.022, 0.085, 0.0);
+      attachLimbGuard(bones.leftForeArm,  0.092, 0.185, 0.096,  0.0,   0.115, 0.0);
+      attachLimbGuard(bones.rightForeArm, 0.092, 0.185, 0.096,  0.0,   0.115, 0.0);
+      attachLimbGuard(bones.leftLeg,      0.122, 0.275, 0.130,  0.0,   0.175, 0.018);
+      attachLimbGuard(bones.rightLeg,     0.122, 0.275, 0.130,  0.0,   0.175, 0.018);
+      // Tactical utility belt & drop-leg holster on Hips
+      if (bones.hips) {
+        bones.hips.getWorldScale(_v1);
+        const pInvS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
+        const beltGrp = new THREE.Group();
+        addArmorBox(beltGrp, pInvS, E._st._riotArmorMat, 0.365, 0.065, 0.265, 0, 0.025, 0.005);
+        addArmorBox(beltGrp, pInvS, E._st._riotPlateMat, 0.062, 0.135, 0.088, -0.195, -0.045, 0.020);
+        addArmorBox(beltGrp, pInvS, E._st._riotPlateMat, 0.058, 0.095, 0.075,  0.192,  0.015, 0.025);
+        bones.hips.add(beltGrp);
+      }
+    } else {
       if (!E._st._spitterCystMat) {
         E._st._spitterCystMat = new THREE.MeshStandardMaterial({
           color: 0xa8e024,
@@ -444,43 +644,6 @@
           metalness: 0.05
         });
       }
-      if (!E._st._runnerEyeMat) {
-        E._st._runnerEyeMat = new THREE.MeshStandardMaterial({
-          color: 0xff5a18,
-          emissive: new THREE.Color(0xff3408),
-          emissiveIntensity: 2.8,
-          roughness: 0.18,
-          metalness: 0.0
-        });
-      }
-
-      const addCystCluster = (parentBone, mat, specs) => {
-        if (!parentBone) return null;
-        parentBone.getWorldScale(_v1);
-        const invS = _v1.y > 0.0005 ? (1.0 / _v1.y) : 100.0;
-        const grp = new THREE.Group();
-        grp.visible = false;
-        for (let i = 0; i < specs.length; i++) {
-          const sp = specs[i];
-          const m = new THREE.Mesh(E._st._cystGeo, mat);
-          m.position.set(sp.x * invS, sp.y * invS, sp.z * invS);
-          m.scale.set(sp.sx * invS, sp.sy * invS, sp.sz * invS);
-          m.castShadow = false;
-          m.receiveShadow = false;
-          grp.add(m);
-        }
-        parentBone.add(grp);
-        return grp;
-      };
-
-      // Both infected and new realistic clothed commuter share Zombie.glb facial geometry
-      const eyeZ = 0.132;
-      const eyeY = 0.080;
-      const eyeX = 0.032;
-      runnerEyes = addCystCluster(bones.head, E._st._runnerEyeMat, [
-        { x: -eyeX, y: eyeY, z: eyeZ, sx: 0.0085, sy: 0.0065, sz: 0.0065 },
-        { x:  eyeX, y: eyeY, z: eyeZ, sx: 0.0085, sy: 0.0065, sz: 0.0065 }
-      ]);
 
       spitterNodes = [];
       const spChest = addCystCluster(bones.spine2, E._st._spitterCystMat, [
@@ -524,7 +687,9 @@
       actions,
       bones,
       materials: cloned.materials,
-      visorMesh: cloned.visorMesh,
+      visorMesh: riotVisorNode,
+      riotArmorGroup,
+      riotHelmetGroup,
       neckStumpNode,
       armStumpL,
       armStumpR,

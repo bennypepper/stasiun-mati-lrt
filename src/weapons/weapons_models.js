@@ -1004,16 +1004,16 @@
         blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
       }),
       gloveDark: new THREE.MeshStandardMaterial({
-        color: 0x1b1e24, map: texCache.knurlTex || whiteTex,
-        bumpMap: texCache.knurlBump || null, bumpScale: 0.0022,
-        roughness: 0.80, metalness: 0.08, envMapIntensity: 0.9
+        color: 0x15181e, map: texCache.knurlTex || whiteTex,
+        bumpMap: texCache.knurlBump || null, bumpScale: 0.0020,
+        roughness: 0.90, metalness: 0.02, envMapIntensity: 0.35
       }),
       gloveKnuckle: new THREE.MeshStandardMaterial({
-        color: 0x2d333d, roughness: 0.46, metalness: 0.30, envMapIntensity: 1.15
+        color: 0x1f242c, roughness: 0.80, metalness: 0.05, envMapIntensity: 0.40
       }),
       sleeveTactical: new THREE.MeshStandardMaterial({
-        color: 0x222831, map: texCache.knurlTex || whiteTex,
-        roughness: 0.88, metalness: 0.05, envMapIntensity: 0.85
+        color: 0x1a2029, map: texCache.knurlTex || whiteTex,
+        roughness: 0.92, metalness: 0.02, envMapIntensity: 0.32
       }),
       tritiumGreen: new THREE.MeshBasicMaterial({ color: 0x55ff77 }),
       redDot: new THREE.MeshBasicMaterial({ color: 0xff2a2a }),
@@ -1128,29 +1128,92 @@
     ret.renderOrder = 4;
   }
 
-  // Shared helper: ergonomic dark tactical gloved hands & forearm sleeves (skipped on world pickups!)
+  // Shared helper: continuous anatomically connected limb (wrist cuff -> tapered oval forearm -> upper sleeve)
+  const _armUp = new THREE.Vector3(0, 1, 0);
+  const _armDir = new THREE.Vector3();
+  const _armQuat = new THREE.Quaternion();
+  const _armEuler = new THREE.Euler();
+
+  function addConnectedForearm(target, mats, wx, wy, wz, ex, ey, ez) {
+    _armDir.set(ex - wx, ey - wy, ez - wz);
+    const len = _armDir.length();
+    if (len < 0.02) return;
+    _armDir.divideScalar(len);
+    _armQuat.setFromUnitVectors(_armUp, _armDir);
+    _armEuler.setFromQuaternion(_armQuat);
+
+    // 1. Overlapping glove gauntlet / wrist cuff bridge embedded inside the rear of the palm (zero gap!)
+    const cuffLen = 0.068;
+    const cuffT = 0.018;
+    const cuffGeo = new THREE.CylinderGeometry(0.0235, 0.0215, cuffLen, 12);
+    cuffGeo.scale(0.86, 1.0, 1.04);
+    addPart(
+      target, cuffGeo, mats.gloveDark,
+      wx + _armDir.x * cuffT, wy + _armDir.y * cuffT, wz + _armDir.z * cuffT,
+      _armEuler.x, _armEuler.y, _armEuler.z
+    );
+
+    // Subtle tactical watch / Velcro wrist strap band
+    const strapT = 0.036;
+    const strapGeo = new THREE.CylinderGeometry(0.0245, 0.0242, 0.018, 12);
+    strapGeo.scale(0.88, 1.0, 1.05);
+    addPart(
+      target, strapGeo, mats.gloveKnuckle,
+      wx + _armDir.x * strapT, wy + _armDir.y * strapT, wz + _armDir.z * strapT,
+      _armEuler.x, _armEuler.y, _armEuler.z
+    );
+
+    // 2. Continuous anatomical oval forearm sleeve extending from inside the wrist cuff to off-screen shoulder
+    const armStart = 0.032;
+    const armLen = Math.max(0.18, len - armStart);
+    const armMid = armStart + armLen * 0.5;
+    const armGeo = new THREE.CylinderGeometry(0.034, 0.024, armLen, 14);
+    armGeo.scale(0.86, 1.0, 1.06);
+    addPart(
+      target, armGeo, mats.sleeveTactical,
+      wx + _armDir.x * armMid, wy + _armDir.y * armMid, wz + _armDir.z * armMid,
+      _armEuler.x, _armEuler.y, _armEuler.z
+    );
+
+    // 3. Rolled BDU sleeve cuff fold along mid-forearm for realistic fabric silhouette
+    const foldT = armStart + 0.048;
+    const foldGeo = new THREE.CylinderGeometry(0.0285, 0.0265, 0.034, 12);
+    foldGeo.scale(0.88, 1.0, 1.07);
+    addPart(
+      target, foldGeo, mats.gloveKnuckle,
+      wx + _armDir.x * foldT, wy + _armDir.y * foldT, wz + _armDir.z * foldT,
+      _armEuler.x, _armEuler.y, _armEuler.z
+    );
+  }
+
+  // Shared helper: ergonomic dark tactical gloved hands & continuous forearm sleeves (skipped on world pickups!)
   function addTacticalHands(parent, mats, cfg) {
     if (!cfg || !mats.gloveDark) return;
-    // Right (trigger) hand + forearm sleeve
+    // Right (trigger) hand + continuous forearm sleeve
     if (cfg.right) {
       const r = cfg.right;
       const rh = new THREE.Group();
       rh.position.set(r.x, r.y, r.z);
       if (r.rx || r.ry || r.rz) rh.rotation.set(r.rx || 0, r.ry || 0, r.rz || 0);
-      // Palm & grip wrap
-      addPart(rh, new THREE.BoxGeometry(0.044, 0.062, 0.056), mats.gloveDark, 0.004, -0.004, 0.004);
-      // Armored knuckle ridge
-      addPart(rh, new THREE.BoxGeometry(0.048, 0.016, 0.022), mats.gloveKnuckle, 0.005, 0.018, -0.018);
-      // Curled grip fingers
-      addPart(rh, new THREE.BoxGeometry(0.042, 0.044, 0.024), mats.gloveDark, 0.002, -0.012, -0.026, 0.16, 0, 0);
-      // Left-side thumb wrapping over backstrap
-      addPart(rh, new THREE.CylinderGeometry(0.0095, 0.0105, 0.046, 8), mats.gloveDark, -0.019, 0.020, -0.006, 1.15, 0, -0.22);
-      // Wrist cuff + tactical forearm sleeve angled back toward right shoulder
-      addPart(rh, new THREE.CylinderGeometry(0.028, 0.032, 0.055, 10), mats.gloveKnuckle, 0.016, -0.026, 0.050, 1.25, 0, -0.18);
-      addPart(rh, new THREE.CylinderGeometry(0.034, 0.042, 0.240, 10), mats.sleeveTactical, 0.048, -0.072, 0.165, 1.22, 0, -0.24);
+      // Contoured palm & dorsal backhand wrap around pistol grip
+      addPart(rh, new THREE.BoxGeometry(0.038, 0.056, 0.052), mats.gloveDark, 0.005, -0.004, 0.006);
+      addPart(rh, new THREE.BoxGeometry(0.014, 0.050, 0.044), mats.gloveKnuckle, 0.021, -0.002, 0.008, 0, 0, -0.14);
+      // 4 articulated curled fingers (index on trigger + 3 stacked grip fingers)
+      addPart(rh, new THREE.BoxGeometry(0.032, 0.011, 0.030), mats.gloveDark, 0.003, 0.020, -0.024, 0.08, -0.10, 0);
+      for (let f = 0; f < 3; f++) {
+        const fy = 0.004 - f * 0.013;
+        const fz = -0.018 + f * 0.002;
+        addPart(rh, new THREE.BoxGeometry(0.036, 0.0115, 0.024), mats.gloveDark, 0.002, fy, fz, 0.12, 0, 0);
+        addPart(rh, new THREE.BoxGeometry(0.012, 0.011, 0.020), mats.gloveKnuckle, -0.015, fy, fz - 0.004, 0, 0.25, 0);
+      }
+      // Articulated opposable thumb wrapping high around left backstrap
+      addPart(rh, new THREE.BoxGeometry(0.014, 0.015, 0.034), mats.gloveDark, -0.016, 0.018, 0.008, 0.28, 0.24, -0.18);
+      addPart(rh, new THREE.BoxGeometry(0.012, 0.013, 0.024), mats.gloveKnuckle, -0.019, 0.022, -0.016, 0.12, 0.08, -0.10);
+      // Continuous connected wrist & forearm extending to lower-right camera shoulder
+      addConnectedForearm(rh, mats, 0.010, -0.018, 0.022, 0.135, -0.145, 0.360);
       parent.add(rh);
     }
-    // Left (support) hand + forearm sleeve (optionally parented to moving pump/forend group!)
+    // Left (support) hand + continuous forearm sleeve (optionally parented to moving pump/forend group!)
     if (cfg.left) {
       const l = cfg.left;
       const target = l.parent || parent;
@@ -1159,18 +1222,31 @@
       if (l.rx || l.ry || l.rz) lh.rotation.set(l.rx || 0, l.ry || 0, l.rz || 0);
       if (l.twoHandPistol) {
         // Two-handed thumbs-forward support wrap on pistol grip
-        addPart(lh, new THREE.BoxGeometry(0.048, 0.058, 0.050), mats.gloveDark, -0.008, -0.008, -0.014);
-        addPart(lh, new THREE.BoxGeometry(0.016, 0.046, 0.022), mats.gloveKnuckle, -0.026, -0.006, -0.024);
-        addPart(lh, new THREE.CylinderGeometry(0.009, 0.010, 0.052, 8), mats.gloveDark, -0.021, 0.018, -0.036, Math.PI * 0.5, 0, 0);
-        addPart(lh, new THREE.CylinderGeometry(0.027, 0.031, 0.052, 10), mats.gloveKnuckle, -0.024, -0.028, 0.044, 1.22, 0, 0.22);
-        addPart(lh, new THREE.CylinderGeometry(0.033, 0.041, 0.240, 10), mats.sleeveTactical, -0.068, -0.074, 0.162, 1.20, 0, 0.30);
+        addPart(lh, new THREE.BoxGeometry(0.036, 0.054, 0.048), mats.gloveDark, -0.010, -0.006, 0.002);
+        addPart(lh, new THREE.BoxGeometry(0.014, 0.048, 0.042), mats.gloveKnuckle, -0.024, -0.004, -0.002, 0, 0, 0.14);
+        for (let f = 0; f < 4; f++) {
+          const fy = 0.012 - f * 0.0125;
+          addPart(lh, new THREE.BoxGeometry(0.034, 0.011, 0.024), mats.gloveDark, -0.004, fy, -0.024, 0.10, 0, 0);
+        }
+        // Support thumb pointing forward along frame dust cover
+        addPart(lh, new THREE.BoxGeometry(0.013, 0.014, 0.046), mats.gloveDark, -0.020, 0.022, -0.022, 0.08, -0.08, 0.12);
+        addConnectedForearm(lh, mats, -0.016, -0.020, 0.018, -0.175, -0.155, 0.350);
       } else {
-        // C-clamp / forend support hand cupping under handguard/pump (angled cleanly down-left off viewport)
-        addPart(lh, new THREE.BoxGeometry(0.052, 0.036, 0.064), mats.gloveDark, -0.004, -0.016, 0.0);
-        addPart(lh, new THREE.BoxGeometry(0.014, 0.030, 0.052), mats.gloveKnuckle, -0.026, -0.004, -0.004);
-        addPart(lh, new THREE.CylinderGeometry(0.009, 0.010, 0.044, 8), mats.gloveDark, -0.020, 0.016, -0.006, 0.35, 0, -0.95);
-        addPart(lh, new THREE.SphereGeometry(0.024, 10, 8), mats.gloveKnuckle, -0.022, -0.032, 0.032);
-        addPart(lh, new THREE.CylinderGeometry(0.026, 0.036, 0.300, 10), mats.sleeveTactical, -0.105, -0.125, 0.165, 0.98, 0, 0.46);
+        // C-clamp / forend support hand cupping cleanly under handguard/pump (NO sphere, NO disconnected cylinder!)
+        // Contoured palm cradle beneath handguard + angled outer backhand plate
+        addPart(lh, new THREE.BoxGeometry(0.042, 0.018, 0.064), mats.gloveDark, -0.004, -0.020, 0.002, 0, 0, 0.18);
+        addPart(lh, new THREE.BoxGeometry(0.015, 0.034, 0.060), mats.gloveKnuckle, -0.024, -0.006, 0.002, 0, 0, 0.26);
+        // 4 individual articulated fingers wrapping underneath & up the right side of the forend
+        for (let f = 0; f < 4; f++) {
+          const fz = -0.022 + f * 0.0145;
+          addPart(lh, new THREE.BoxGeometry(0.028, 0.011, 0.0125), mats.gloveDark, 0.006, -0.021, fz, 0, 0, -0.12);
+          addPart(lh, new THREE.BoxGeometry(0.011, 0.024, 0.0120), mats.gloveKnuckle, 0.021, -0.009, fz, 0, 0, -0.22);
+        }
+        // Opposable thumb wrapping naturally along the left side of the handguard (below sight line)
+        addPart(lh, new THREE.BoxGeometry(0.014, 0.015, 0.036), mats.gloveDark, -0.023, 0.010, -0.008, 0.22, -0.14, -0.35);
+        addPart(lh, new THREE.BoxGeometry(0.012, 0.012, 0.024), mats.gloveKnuckle, -0.019, 0.016, -0.028, 0.08, 0.15, -0.52);
+        // Continuous connected wrist & forearm extending from inside the palm to lower-left off-screen elbow
+        addConnectedForearm(lh, mats, -0.016, -0.018, 0.022, -0.210, -0.195, 0.420);
       }
       target.add(lh);
     }

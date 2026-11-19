@@ -638,6 +638,10 @@
           if (typeof CORE.setSubtitlesEnabled === 'function') CORE.setSubtitlesEnabled(!CORE.subtitlesEnabled);
           return;
         }
+        if (e.target.closest('#btn-menu-dismember, #btn-pause-dismember')) {
+          if (typeof CORE.setDismembermentEnabled === 'function') CORE.setDismembermentEnabled(CORE.dismembermentEnabled === false);
+          return;
+        }
         const subLangBtn = e.target.closest('[data-sublang]');
         if (subLangBtn) {
           if (typeof CORE.setSubtitleLang === 'function') CORE.setSubtitleLang(subLangBtn.dataset.sublang);
@@ -1040,6 +1044,7 @@
         setBloomEnabled: CORE.setBloomEnabled,
         setAoMode: CORE.setAoMode,
         setFpsCounterEnabled: CORE.setFpsCounterEnabled,
+        setDismembermentEnabled: CORE.setDismembermentEnabled,
         executeCheat: (code) => (LRT.PlayerUI && typeof LRT.PlayerUI.executeCheat === 'function')
           ? LRT.PlayerUI.executeCheat(code)
           : null
@@ -1063,6 +1068,7 @@
     setBloomEnabled: CORE.setBloomEnabled,
     setAoMode: CORE.setAoMode,
     setFpsCounterEnabled: CORE.setFpsCounterEnabled,
+    setDismembermentEnabled: CORE.setDismembermentEnabled,
     setDifficulty: (k, notify) => applyDifficultySetting(k, !!notify),
     setAtmosphereMode: (m, notify) => applyAtmosphereSetting(m, !!notify),
     getAtmosphereMode: () => getAtmosphereMode(),

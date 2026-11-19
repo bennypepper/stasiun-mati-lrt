@@ -320,15 +320,15 @@
       if ((res.triggerTrainCall || res.action === 'call_train' || res.action === 'call_train_prev') && callbacks.onSummonTrain) {
         callbacks.onSummonTrain(res.direction || (res.action === 'call_train_prev' ? -1 : 1));
       }
-      if (res.logTitle && res.logBody && PL.showFieldLog) {
-        PL.showFieldLog(res.logTitle, res.logBody);
-      }
       if (callbacks.onInteractResult) {
         try {
           callbacks.onInteractResult(res, item);
         } catch (cbErr) {
           console.warn('[LRT.PlayerUI] onInteractResultCb error:', cbErr);
         }
+      }
+      if (res.logTitle && res.logBody && PL.showFieldLog) {
+        PL.showFieldLog(res.logTitle, res.logBody);
       }
     }
   }

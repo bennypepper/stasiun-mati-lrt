@@ -35,6 +35,7 @@
   let decodePromise = null;
   let muted = false;
   let gameplayPaused = false;
+  let pauseFadeTimer = null;
   let masterVolume = 0.85;
   let sfxVolume = 0.90;
 
@@ -327,30 +328,71 @@
     const next = !!flag;
     if (next === gameplayPaused) return;
     gameplayPaused = next;
+    if (pauseFadeTimer) {
+      clearTimeout(pauseFadeTimer);
+      pauseFadeTimer = null;
+    }
+
     if (gameplayPaused) {
-      for (let i = 0; i < activeVoices.length; i++) {
-        try {
-          if (activeVoices[i] && activeVoices[i].src) activeVoices[i].src.stop();
-        } catch (_) {}
+      // Pause (do NOT stop!) active mission narrator voiceover timer so it resumes cleanly after closing note/pause
+      if (currentVoice && !currentVoice.ended) {
+        const nowMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        if (currentVoice.timerStartedAtMs) {
+          const elapsedMs = Math.max(0, nowMs - currentVoice.timerStartedAtMs);
+          currentVoice.remainingMs = Math.max(120, (currentVoice.remainingMs || currentVoice.durationSec * 1000) - elapsedMs);
+        }
+        if (currentVoice.timerId) {
+          clearTimeout(currentVoice.timerId);
+          currentVoice.timerId = null;
+        }
+        currentVoice.paused = true;
       }
-      activeVoices.length = 0;
-      stopVoice();
+
+      const FADE_OUT_SEC = 0.20;
       if (ctx && masterGain) {
         const now = ctx.currentTime;
+        const curVal = Math.max(0.0001, masterGain.gain.value || (muted ? 0.0001 : masterVolume));
         masterGain.gain.cancelScheduledValues(now);
-        masterGain.gain.setValueAtTime(0, now);
+        masterGain.gain.setValueAtTime(curVal, now);
+        masterGain.gain.linearRampToValueAtTime(0.0001, now + FADE_OUT_SEC);
       }
-      if (ctx && ctx.state === 'running' && typeof ctx.suspend === 'function') {
-        ctx.suspend().catch(() => {});
-      }
+      // Suspend AudioContext after smooth fade-out so all BufferSources (narrator + ambience + zombies) freeze in place
+      pauseFadeTimer = setTimeout(() => {
+        pauseFadeTimer = null;
+        if (gameplayPaused && ctx && ctx.state === 'running' && typeof ctx.suspend === 'function') {
+          ctx.suspend().catch(() => {});
+        }
+      }, Math.ceil(FADE_OUT_SEC * 1000) + 15);
     } else {
-      if (ctx && masterGain) {
-        const now = ctx.currentTime;
-        masterGain.gain.cancelScheduledValues(now);
-        masterGain.gain.setValueAtTime(muted ? 0 : masterVolume, now);
-      }
+      const FADE_IN_SEC = 0.24;
+      const targetVol = muted ? 0 : masterVolume;
+      const onResumed = () => {
+        if (gameplayPaused) return;
+        if (ctx && masterGain) {
+          const now = ctx.currentTime;
+          masterGain.gain.cancelScheduledValues(now);
+          masterGain.gain.setValueAtTime(0.0001, now);
+          masterGain.gain.linearRampToValueAtTime(targetVol, now + FADE_IN_SEC);
+        }
+        // Resume pending narrator voiceover or restart its remaining timer
+        if (currentVoice && !currentVoice.ended) {
+          currentVoice.paused = false;
+          if (typeof currentVoice.pendingStartFn === 'function' && !currentVoice.src) {
+            const fn = currentVoice.pendingStartFn;
+            currentVoice.pendingStartFn = null;
+            fn();
+          } else if (typeof currentVoice.finishVoice === 'function' && !currentVoice.timerId) {
+            const remMs = Math.max(150, currentVoice.remainingMs || (currentVoice.durationSec * 1000));
+            currentVoice.timerStartedAtMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+            currentVoice.timerId = setTimeout(currentVoice.finishVoice, remMs + 80);
+          }
+        }
+      };
+
       if (ctx && ctx.state === 'suspended' && !muted && typeof ctx.resume === 'function') {
-        ctx.resume().catch(() => {});
+        ctx.resume().then(onResumed).catch(onResumed);
+      } else {
+        onResumed();
       }
     }
   }
@@ -475,7 +517,7 @@
   }
 
   function playVoice(voId, opts) {
-    if (!voId || gameplayPaused) return null;
+    if (!voId) return null;
     const entry = voiceManifest[voId];
     if (!entry) return null;
 
@@ -492,15 +534,21 @@
 
     const durationSec = Math.max(0.5, typeof entry.duration_sec === 'number' ? entry.duration_sec : 5.0);
     const durationMs = durationSec * 1000;
+    const nowMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
     const handle = {
       id: voId,
       entry: entry,
       priorityRank: newPriority,
       durationSec: durationSec,
+      remainingMs: durationMs,
+      timerStartedAtMs: nowMs,
       elapsed: 0,
       src: null,
       timerId: null,
+      finishVoice: null,
+      pendingStartFn: null,
+      paused: gameplayPaused,
       ended: false
     };
     currentVoice = handle;
@@ -538,19 +586,28 @@
         }
       }
     };
+    handle.finishVoice = finishVoice;
 
-    // Scheduled deterministic fallback timer
-    handle.timerId = setTimeout(finishVoice, durationMs);
+    // Scheduled deterministic fallback timer (only runs while unpaused)
+    if (!gameplayPaused) {
+      handle.timerStartedAtMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      handle.timerId = setTimeout(finishVoice, durationMs);
+    }
 
-    // If audio is available and unmuted, play voice clip
+    // If audio is available and unmuted, play voice clip (or queue if currently reading a note / paused)
     const c = ensureContext();
     if (c && !muted) {
-      if (c.state === 'suspended') {
+      if (!gameplayPaused && c.state === 'suspended') {
         c.resume().catch(() => {});
       }
 
       const startPlayback = (buf) => {
-        if (gameplayPaused || currentVoice !== handle || handle.ended) return;
+        if (currentVoice !== handle || handle.ended) return;
+        if (gameplayPaused) {
+          handle.remainingMs = Math.ceil(buf.duration * 1000);
+          handle.pendingStartFn = () => startPlayback(buf);
+          return;
+        }
         if (handle.timerId) {
           clearTimeout(handle.timerId);
           handle.timerId = null;
@@ -571,7 +628,9 @@
         };
 
         // Safety fallback timer if onended is delayed or missed
-        handle.timerId = setTimeout(finishVoice, Math.ceil(buf.duration * 1000) + 120);
+        handle.remainingMs = Math.ceil(buf.duration * 1000);
+        handle.timerStartedAtMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        handle.timerId = setTimeout(finishVoice, handle.remainingMs + 120);
 
         try {
           src.start(0);

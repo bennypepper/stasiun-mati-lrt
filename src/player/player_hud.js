@@ -139,6 +139,7 @@
       'btn-menu-bloom', 'btn-pause-bloom',
       'menu-ao-group', 'pause-ao-group',
       'btn-menu-fps', 'btn-pause-fps',
+      'btn-menu-dismember', 'btn-pause-dismember',
       'menu-main-view', 'btn-menu-settings-back', 'btn-menu-controls-back',
       'pause-main-view', 'btn-pause-settings', 'btn-pause-controls', 'btn-pause-logs',
       'pause-settings-panel', 'pause-controls-panel', 'pause-logs-panel',
@@ -394,10 +395,16 @@
     }
   }
 
+  function syncDismembermentUi(enabled) {
+    const isOn = enabled !== undefined ? !!enabled : true;
+    syncToggleButtons([dom['btn-menu-dismember'], dom['btn-pause-dismember']], isOn, 'ON', 'OFF', 'is-off');
+  }
+
   function syncAllSettingsUi(settings) {
     const s = settings || {};
     syncDifficultyUi(s.difficultyKey || s.difficulty || 'medium');
     syncAtmosphereUi(s.atmosphereMode || 'night_horror');
+    syncDismembermentUi(s.dismembermentEnabled !== undefined ? s.dismembermentEnabled : true);
     syncQualityUi(s.qualityKey || s.quality || 'balanced');
     syncResScaleUi(s.resScaleMode || s.resScale || 'floor_720');
     syncShadowsUi(s.shadowsEnabled !== undefined ? s.shadowsEnabled : (s.shadows !== undefined ? s.shadows : true));
@@ -639,8 +646,8 @@
       }
     }
 
-    // Subtitle timer
-    if (subtitleTimer > 0) {
+    // Subtitle timer (pauses while reading notes or paused so narrator subtitles resume in sync!)
+    if (subtitleTimer > 0 && !PL.flags.paused && !(PL.state && PL.state.docViewerOpen)) {
       subtitleTimer -= dt;
       if (subtitleTimer <= 0) {
         hideSubtitle();
@@ -1217,6 +1224,7 @@
     syncFpsUi,
     syncSubtitlesUi,
     syncSubtitleLangUi,
+    syncDismembermentUi,
     syncAllSettingsUi,
     syncBrightnessUi,
     syncLightingUi,

@@ -1260,7 +1260,9 @@
         pantsHex = 0x7a727a;
         emHex = 0x1a0406;
       } else if (z.variant === 'brute') {
-        tintHex = z.hasArmor ? 0x627084 : 0x868a90;
+        tintHex = z.hasArmor ? 0xd8dee8 : 0xc2c8d2;
+        pantsHex = 0xc8d0dc;
+        emHex = 0x060202;
       } else {
         // Gritty neutral urban commuter wardrobe variants (never neon/pastel)
         const wPalette = [0xc8c5bc, 0xb8bec6, 0xc2bdb2, 0xb2b8ac];
@@ -1276,6 +1278,10 @@
         if (m.color) {
           if (info.isVisor) {
             m.color.setHex(0x18222e);
+          } else if (info.isSkin) {
+            _color.setHex(0xd4d0c8);
+            m.color.copy(info.baseColor).multiply(_color);
+            if (isHit) m.color.setRGB(m.color.r * 1.25, m.color.g * 0.52, m.color.b * 0.52);
           } else {
             _color.setHex(info.isPants ? pantsHex : tintHex);
             m.color.copy(info.baseColor).multiply(_color);
@@ -1299,8 +1305,11 @@
       if (rig.visorMesh) {
         rig.visorMesh.visible = !!(z.hasArmor && !z.dead);
       }
+      if (rig.riotArmorGroup) {
+        rig.riotArmorGroup.visible = !!(z.hasArmor);
+      }
       if (rig.runnerEyes) {
-        rig.runnerEyes.visible = !z.dead && (z.variant === 'runner' || z.variant === 'screamer');
+        rig.runnerEyes.visible = !z.dead && (z.variant === 'runner' || z.variant === 'screamer' || z.variant === 'brute');
       }
       return;
     }
@@ -1382,7 +1391,7 @@
     if (E._st._useSkinnedRigs) {
       const slot = E._st._rigPool[idx];
       if (slot) {
-        const rigs = [slot.infected, slot.commuter];
+        const rigs = [slot.infected, slot.commuter, slot.soldier];
         for (let r = 0; r < rigs.length; r++) {
           const rig = rigs[r];
           if (!rig) continue;

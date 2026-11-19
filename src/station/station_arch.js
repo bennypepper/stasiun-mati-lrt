@@ -446,7 +446,7 @@
         });
         root.add(derelictTrain);
       }
-      station._addCollider(wreckX - 1.38, -1.0, -11.6, wreckX + 1.48, 3.15, 23.6, 'metal');
+      station._addCollider(wreckX - 1.72, -1.0, -11.6, wreckX + 1.48, 3.15, 23.6, 'metal');
       buildTacticalSupplyCabinet(i2MaxX - 2.2, 0.0, 22.0, -Math.PI * 0.5, 'emergency');
       station._addCollider(i2MaxX - 2.55, 0, 21.42, i2MaxX - 1.85, 1.20, 22.58, 'metal');
       const i2Used = station._usedIds.has('island2_supply');
@@ -461,11 +461,11 @@
       station.interactables.push({
         id: 'cawang_derelict_cab',
         type: 'derelict_fuse',
-        x: wreckX - 1.55,
-        y: 1.0,
-        z: -10.5,
-        label: cabUsed ? '[E] Kabin Bangkai LRT Cawang (Sudah Digeledah)' : '[E] Periksa Kabin Bangkai LRT Cawang (+Sekring Bypass & Shotgun 12G)',
-        prompt: cabUsed ? '[E] Kabin Bangkai LRT Cawang (Sudah Digeledah)' : '[E] Periksa Kabin Bangkai LRT Cawang (+Sekring Bypass & Shotgun 12G)',
+        x: wreckX - 2.25,
+        y: 0.25,
+        z: -10.6,
+        label: cabUsed ? '[E] Kabin Bangkai LRT Cawang (Sudah Digeledah)' : '[E] Periksa Konsol Sekring Kabin Bangkai LRT (+Sekring Bypass & Shotgun 12G)',
+        prompt: cabUsed ? '[E] Kabin Bangkai LRT Cawang (Sudah Digeledah)' : '[E] Periksa Konsol Sekring Kabin Bangkai LRT (+Sekring Bypass & Shotgun 12G)',
         used: cabUsed
       });
     }

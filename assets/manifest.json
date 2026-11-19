@@ -469,8 +469,8 @@
       "id": "zombie_soldier",
       "category": "enemy",
       "gltf": "assets/models/zombie_soldier/zombie_soldier.glb",
-      "binBytes": 1042220,
-      "totalBytes": 1042220,
+      "binBytes": 724232,
+      "totalBytes": 724232,
       "files": 1
     }
   },

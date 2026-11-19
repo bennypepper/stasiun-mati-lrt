@@ -173,8 +173,11 @@
     if (rig.visorMesh) {
       rig.visorMesh.visible = !!(z.hasArmor && !z.dead);
     }
+    if (rig.riotArmorGroup) {
+      rig.riotArmorGroup.visible = !!(z.hasArmor);
+    }
     if (rig.runnerEyes) {
-      rig.runnerEyes.visible = !z.dead && (z.variant === 'runner' || z.variant === 'screamer');
+      rig.runnerEyes.visible = !z.dead && (z.variant === 'runner' || z.variant === 'screamer' || z.variant === 'brute');
     }
 
     const skipCystPulse = E._st._potatoMode && E.camPos && (((z.x - E.camPos.x) * (z.x - E.camPos.x) + (z.z - E.camPos.z) * (z.z - E.camPos.z)) > 324.0);
@@ -289,8 +292,9 @@
 
     const b = rig.bones;
     const limp = z.limbBias || 1;
+    const dismOn = !(I.core && I.core.dismembermentEnabled === false);
     if (b.head) {
-      if (z.dead && z.decapitated) {
+      if (dismOn && z.dead && z.decapitated) {
         b.head.scale.set(0.0001, 0.0001, 0.0001);
         if (rig.neckStumpNode) rig.neckStumpNode.visible = true;
       } else {
@@ -298,10 +302,10 @@
         if (rig.neckStumpNode) rig.neckStumpNode.visible = false;
       }
     }
-    const lostL = !!z.lostLeftArm;
-    const lostR = !!z.lostRightArm;
-    const lostLegL = !!z.lostLeftLeg;
-    const lostLegR = !!z.lostRightLeg;
+    const lostL = !!(dismOn && z.lostLeftArm);
+    const lostR = !!(dismOn && z.lostRightArm);
+    const lostLegL = !!(dismOn && z.lostLeftLeg);
+    const lostLegR = !!(dismOn && z.lostRightLeg);
     if (b.leftForeArm) {
       b.leftForeArm.scale.setScalar(lostL ? 0.0001 : 1.0);
       if (rig.armStumpL) rig.armStumpL.visible = lostL;

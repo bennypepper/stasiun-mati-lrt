@@ -87,27 +87,42 @@
     const addPbrPart = S.addPbrPart;
     // 3D Physical Field Log Paper / Manila Folder Props at Station Note Counters
     if (isCawang && ctx.cawangWreckX !== undefined) {
+      const cabX = ctx.cawangWreckX - 2.25;
+      const cabZ = -10.6;
       const cabGrp = new THREE.Group();
       cabGrp.name = 'CawangFuseJunctionBox';
-      cabGrp.position.set(ctx.cawangWreckX - 1.58, 0, -10.5);
+      // Grounded on the y = -1.0 trackbed cleanly outside the derailed train cab nose (no hull clipping!)
+      cabGrp.position.set(cabX, -1.0, cabZ);
       root.add(cabGrp);
       const cabSteel = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.46, metalness: 0.68 });
       const cabTrim = new THREE.MeshStandardMaterial({ color: 0x1e252e, roughness: 0.36, metalness: 0.78 });
       const cabWarn = new THREE.MeshStandardMaterial({ color: 0xeab308, emissive: 0x422006, emissiveIntensity: 0.45, roughness: 0.42 });
       const cabLed = new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xf97316, emissiveIntensity: 1.5 });
-      station.disposableMaterials.push(cabSteel, cabTrim, cabWarn, cabLed);
-      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.46, 0.06, 0.40), cabTrim, 0, 0.03, 0);
-      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.40, 0.36, 0.34), cabSteel, 0, 0.24, 0);
-      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.44, 0.04, 0.38), cabTrim, 0, 0.43, 0);
-      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.24, 0.14, 0.02), cabWarn, 0, 0.25, 0.18);
-      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.05, 0.05, 0.03), cabLed, 0.14, 0.36, 0.18);
-      addPbrPart(station, cabGrp, new THREE.CylinderGeometry(0.022, 0.022, 0.38, 8), cabTrim, -0.18, 0.22, -0.18);
+      const cabCopper = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.30, metalness: 0.85 });
+      station.disposableMaterials.push(cabSteel, cabTrim, cabWarn, cabLed, cabCopper);
+      // Heavy steel base plate & dual support legs resting on the trackbed ballast (y = 0..0.96 local)
+      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.66, 0.06, 0.56), cabTrim, 0, 0.03, 0);
+      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.08, 0.92, 0.08), cabTrim, -0.22, 0.49, -0.14);
+      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.08, 0.92, 0.08), cabTrim, 0.22, 0.49, -0.14);
+      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.52, 0.06, 0.06), cabSteel, 0, 0.48, -0.14);
+      // Flat inspection work table shelf at local y = 0.96 (world y = -0.04)
+      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.64, 0.05, 0.52), cabTrim, 0, 0.96, 0);
+      // High-voltage LRT emergency cab bypass junction box rising to local y = 1.42 (world y = +0.42)
+      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.50, 0.42, 0.36), cabSteel, 0, 1.19, -0.04);
+      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.54, 0.04, 0.40), cabTrim, 0, 1.41, -0.04);
+      // Open hinged inspection door + yellow hazard plate + glowing bypass fuse cartridge & status LED
+      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.03, 0.36, 0.26), cabSteel, -0.28, 1.19, 0.24, 0, -0.45, 0);
+      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.28, 0.16, 0.02), cabWarn, 0, 1.16, 0.15);
+      addPbrPart(station, cabGrp, new THREE.CylinderGeometry(0.028, 0.028, 0.14, 10), cabCopper, -0.08, 1.24, 0.16);
+      addPbrPart(station, cabGrp, new THREE.BoxGeometry(0.055, 0.055, 0.03), cabLed, 0.15, 1.30, 0.15);
+      // Heavy armored umbilical conduit connecting back toward the derailed train cab undercarriage
+      addPbrPart(station, cabGrp, new THREE.CylinderGeometry(0.028, 0.028, 0.62, 8), cabTrim, 0.28, 0.72, -0.08, 0, 0, -0.62);
       if (typeof station._registerHaloTarget === 'function') {
         station._registerHaloTarget('cawang_derelict_cab', cabGrp, {
-          category: 'interactable', x: ctx.cawangWreckX - 1.58, y: 0.42, z: -10.5, hitRadius: 0.72
+          category: 'interactable', x: cabX, y: 0.25, z: cabZ, hitRadius: 0.82
         });
       }
-      placeFieldLogProp(station, root, 'cawang_derelict_cab', ctx.cawangWreckX - 1.58, 0.45, -10.5, 0.22, station._usedIds.has('cawang_derelict_cab'), true);
+      placeFieldLogProp(station, root, 'cawang_derelict_cab', cabX + 0.04, 0.44, cabZ - 0.02, 0.22, station._usedIds.has('cawang_derelict_cab'), true);
     }
     if (arch.hasGardenTerrace) {
       const gCX = (track2X + 1.85 + gardenMaxX) * 0.5;

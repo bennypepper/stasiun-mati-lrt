@@ -33,6 +33,7 @@
   CORE.fpsCounterEnabled = false;
   CORE.subtitlesEnabled = true;
   CORE.subtitleLang = 'id';
+  CORE.dismembermentEnabled = true;
   CORE.difficultyKey = 'medium';
   CORE.currentLightingKey = 'DAYLIGHT_CLEAR';
   CORE.lightingLockedByUser = false;
@@ -130,6 +131,9 @@
       if (parsed.subtitleLang === 'id' || parsed.subtitleLang === 'en') {
         CORE.subtitleLang = parsed.subtitleLang;
       }
+      if (typeof parsed.dismembermentEnabled === 'boolean') {
+        CORE.dismembermentEnabled = parsed.dismembermentEnabled;
+      }
       if (parsed.difficultyKey && C.DIFFICULTY_TIERS && (parsed.difficultyKey in C.DIFFICULTY_TIERS)) {
         CORE.difficultyKey = parsed.difficultyKey;
       }
@@ -151,6 +155,7 @@
         fpsCounterEnabled: CORE.fpsCounterEnabled,
         subtitlesEnabled: CORE.subtitlesEnabled,
         subtitleLang: CORE.subtitleLang,
+        dismembermentEnabled: CORE.dismembermentEnabled,
         difficultyKey: CORE.difficultyKey,
         brightness: CORE.currentBrightness
       }));
@@ -167,6 +172,7 @@
       fpsCounterEnabled: CORE.fpsCounterEnabled,
       subtitlesEnabled: CORE.subtitlesEnabled,
       subtitleLang: CORE.subtitleLang,
+      dismembermentEnabled: CORE.dismembermentEnabled,
       difficultyKey: CORE.difficultyKey,
       brightness: CORE.currentBrightness
     };
@@ -411,6 +417,15 @@
     saveSettings();
     syncSettingsUi();
     return CORE.subtitleLang;
+  }
+
+  function setDismembermentEnabled(flag) {
+    CORE.dismembermentEnabled = !!flag;
+    saveSettings();
+    syncSettingsUi();
+    syncSceneMatrices();
+    requestPausedRender();
+    return CORE.dismembermentEnabled;
   }
 
   function setDifficulty(key) {
@@ -1235,6 +1250,7 @@
   CORE.setFpsCounterEnabled = setFpsCounterEnabled;
   CORE.setSubtitlesEnabled = setSubtitlesEnabled;
   CORE.setSubtitleLang = setSubtitleLang;
+  CORE.setDismembermentEnabled = setDismembermentEnabled;
   CORE.setDifficulty = setDifficulty;
   CORE.getSettings = getSettings;
   CORE.saveSettings = saveSettings;
