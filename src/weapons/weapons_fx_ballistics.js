@@ -1169,18 +1169,30 @@
     // Audio
     W.play3D(wCfg.sfxFire || 'pistol_fire', null, 0.04, 1.0);
 
+    // Stance & movement modifiers (crouch stabilizes spread & recoil; moving/airborne blooms hipfire)
+    const pState = (I.player && I.player.state) ? I.player.state : null;
+    const isCrouching = !!(pState && pState.crouching);
+    const isGrounded = pState ? (pState.grounded !== false) : true;
+    const moveSpd = (pState && typeof pState.speed === 'number') ? pState.speed : 0;
+
     // Recoil + Bloom + Camera kick
-    const adsFactor = W._isADS ? 0.58 : 1.0;
+    const adsFactor = W._isADS ? 0.54 : 1.0;
+    const crouchRecoilMult = isCrouching ? 0.72 : 1.0;
     const isHeavyPistol = wCfg.variantId === 'revolver';
     const isCoach = wCfg.variantId === 'doublebarrel';
-    const vmKickZ = isCoach ? 0.115 : (wCfg.id === 'shotgun' ? 0.095 : wCfg.id === 'rpg' ? 0.12 : isHeavyPistol ? 0.068 : 0.045);
-    const vmKickPitch = isCoach ? 0.165 : (wCfg.id === 'shotgun' ? 0.14 : wCfg.id === 'rpg' ? 0.16 : isHeavyPistol ? 0.105 : 0.065);
+    const vmKickZ = (isCoach ? 0.115 : (wCfg.id === 'shotgun' ? 0.095 : wCfg.id === 'rpg' ? 0.12 : isHeavyPistol ? 0.068 : 0.045)) * crouchRecoilMult * (W._isADS ? 0.72 : 1.0);
+    const vmKickPitch = (isCoach ? 0.165 : (wCfg.id === 'shotgun' ? 0.14 : wCfg.id === 'rpg' ? 0.16 : isHeavyPistol ? 0.105 : 0.065)) * crouchRecoilMult * (W._isADS ? 0.65 : 1.0);
     W._recoilZ = Math.min(0.15, W._recoilZ + vmKickZ);
     W._recoilPitchVM = Math.min(0.28, W._recoilPitchVM + vmKickPitch);
-    W._pendingCamPitch += (wCfg.recoilPitch || 0.02) * adsFactor;
-    W._pendingCamYaw += (Math.random() - 0.5) * 2 * (wCfg.recoilYaw || 0.008) * adsFactor;
-    W._bloom = Math.min(0.038, W._bloom + (wCfg.id === 'rifle' ? 0.0045 : 0.003));
-    W._trauma = Math.min(1.0, W._trauma + (wCfg.id === 'rpg' ? 0.42 : isCoach ? 0.34 : wCfg.id === 'shotgun' ? 0.28 : isHeavyPistol ? 0.14 : 0.06));
+    const shotCamPitch = (wCfg.recoilPitch || 0.02) * adsFactor * crouchRecoilMult;
+    W._pendingCamPitch += shotCamPitch;
+    W._pendingCamYaw += (Math.random() - 0.5) * 2 * (wCfg.recoilYaw || 0.008) * adsFactor * crouchRecoilMult;
+    // Queue smooth partial recoil recovery (stronger on semi-auto taps)
+    const recFrac = (wCfg.fireMode === 'auto') ? 0.28 : 0.55;
+    W._recoilRecoverPitch = Math.min(0.16, (W._recoilRecoverPitch || 0) + shotCamPitch * recFrac);
+    W._recoilRecoverDelay = (wCfg.fireMode === 'auto') ? 0.11 : 0.07;
+    W._bloom = Math.min(0.038, W._bloom + (wCfg.id === 'rifle' ? 0.0045 : 0.003) * crouchRecoilMult);
+    W._trauma = Math.min(1.0, W._trauma + (wCfg.id === 'rpg' ? 0.42 : isCoach ? 0.34 : wCfg.id === 'shotgun' ? 0.28 : isHeavyPistol ? 0.14 : 0.06) * crouchRecoilMult);
 
     // Muzzle flash & light (significantly toned down during ADS so target stays completely clear)
     const vm = _vmModels[W._activeIdx];
@@ -1233,9 +1245,12 @@
       ejectShellCasing(wCfg.id);
     }
 
-    // Hitscan pellets
+    // Hitscan pellets (stance-aware spread: crouch -35%, moving bloom, airborne penalty)
     const pellets = wCfg.pellets || 1;
-    const baseSpread = (W._isADS ? (wCfg.adsSpread || 0.003) : (wCfg.spread || 0.01)) + W._bloom * adsFactor;
+    const crouchSpreadMult = isCrouching ? 0.65 : 1.0;
+    const airSpreadMult = isGrounded ? 1.0 : (W._isADS ? 1.55 : 2.10);
+    const moveBloom = (moveSpd > 0.5) ? Math.min(0.018, moveSpd * 0.0022) * (W._isADS ? 0.30 : 1.0) : 0;
+    const baseSpread = (((W._isADS ? (wCfg.adsSpread || 0.003) : (wCfg.spread || 0.01)) + moveBloom) * crouchSpreadMult * airSpreadMult) + W._bloom * adsFactor * crouchSpreadMult;
     const dismemberMult = wCfg.dismemberMult || 1.0;
     let landedAny = false;
     let anyHeadshot = false;
@@ -1994,14 +2009,23 @@
       }
     }
 
-    // Trauma decay & subtle viewmodel shake
+    // Trauma decay, smooth semi-auto recoil recovery & subtle viewmodel shake
     W._traumaTime += step;
     if (W._trauma > 0) {
       W._trauma = Math.max(0, W._trauma - step * 1.45);
     }
+    if (W._recoilRecoverDelay > 0) {
+      W._recoilRecoverDelay = Math.max(0, W._recoilRecoverDelay - step);
+    } else if (W._recoilRecoverPitch > 0.0001) {
+      const recStep = Math.min(W._recoilRecoverPitch, W._recoilRecoverPitch * Math.min(1, step * 9.0) + step * 0.04);
+      W._recoilRecoverPitch -= recStep;
+      W._pendingCamPitch -= recStep;
+    }
 
-    if (W._viewmodelRoot && !W._viewmodelRoot.visible) W._viewmodelRoot.visible = true;
+    const hideForScope = !!W._scopeOverlayActive;
+    if (W._viewmodelRoot) W._viewmodelRoot.visible = !hideForScope;
     W.updateViewmodel(step, playerState);
+    if (W._viewmodelRoot) W._viewmodelRoot.visible = !W._scopeOverlayActive;
     updateRockets(step);
     updateVfxPools(step);
   }
@@ -2397,7 +2421,14 @@
       reloadProgress: W._isReloading ? Math.max(0, Math.min(1, 1 - W._reloadTimer / W._reloadDuration)) : 0,
       isADS: W._isADS,
       adsBlend: W._adsBlend,
-      spread: (W._isADS ? (wCfg.adsSpread || 0.003) : (wCfg.spread || 0.01)) + W._bloom,
+      scopeOverlayActive: !!W._scopeOverlayActive,
+      spread: (() => {
+        const ps = (I.player && I.player.state) ? I.player.state : null;
+        const cMult = (ps && ps.crouching) ? 0.65 : 1.0;
+        const aMult = (ps && ps.grounded === false) ? 2.0 : 1.0;
+        const mBloom = (ps && ps.speed > 0.5) ? Math.min(0.018, ps.speed * 0.0022) : 0;
+        return (((W._isADS ? (wCfg.adsSpread || 0.003) : (wCfg.spread || 0.01)) + mBloom) * cMult * aMult) + W._bloom * cMult;
+      })(),
       hitmarkerTimer: W._hitmarkerTimer,
       headshotHit: W._headshotHit,
       killConfirmTimer: W._killConfirmTimer,
@@ -2440,6 +2471,7 @@
   function meleeShove() {
     if (W._meleeCooldown > 0 || !W._camera) return { hitCount: 0 };
     W._meleeCooldown = 0.95;
+    W._meleeAnimTimer = 0.34;
     W._recoilZ = -0.10;
     W._recoilPitchVM = -0.14;
     W._trauma = Math.min(1.0, W._trauma + 0.08);

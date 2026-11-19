@@ -41,8 +41,13 @@
     eyeHeight: P.eyeHeight,
     grounded: true,
     crouching: false,
+    crouchToggle: false,
+    crouchBlend: 0,
     sprinting: false,
     ads: false,
+    strafeRoll: 0,
+    lookDeltaX: 0,
+    lookDeltaY: 0,
     health: P.maxHealth,
     maxHealth: P.maxHealth,
     armor: 0,
@@ -628,11 +633,19 @@
           }
         }
       } else if (e.code === 'KeyC') {
-        if (state.isSitting) standFromSeat();
+        if (!e.repeat) {
+          if (state.isSitting) {
+            standFromSeat();
+          } else {
+            state.crouchToggle = !state.crouchToggle;
+          }
+        }
       } else if (e.code === 'Space') {
         if (state.isSitting) {
           standFromSeat();
-        } else if (state.grounded && !state.crouching) {
+        } else if (state.crouching) {
+          state.crouchToggle = false;
+        } else if (state.grounded) {
           state.vel.y = P.jumpSpeed;
           state.grounded = false;
         }
@@ -657,9 +670,14 @@
       if (document.pointerLockElement !== canvas) return;
       // Chromium pointer lock spike guard
       if (Math.abs(e.movementX) > 180 || Math.abs(e.movementY) > 180) return;
-      const sens = P.mouseSensitivity * (state.ads ? 0.65 : 1.0);
+      const curFov = (refs.camera && refs.camera.fov) ? refs.camera.fov : (P.baseFov || 74);
+      const baseFov = P.baseFov || 74;
+      const fovScale = Math.tan((curFov * 0.5) * Math.PI / 180) / Math.tan((baseFov * 0.5) * Math.PI / 180);
+      const sens = P.mouseSensitivity * Math.max(0.28, Math.min(1.0, fovScale));
       state.yaw -= e.movementX * sens;
       state.pitch = Math.max(-1.46, Math.min(1.46, state.pitch - e.movementY * sens));
+      state.lookDeltaX = Math.max(-80, Math.min(80, state.lookDeltaX + e.movementX));
+      state.lookDeltaY = Math.max(-80, Math.min(80, state.lookDeltaY + e.movementY));
     });
 
     canvas.addEventListener('mousedown', (e) => {
@@ -1167,14 +1185,49 @@
       // Input axes
       const fInput = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
       const sInput = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
-      state.crouching = !!(keys.ControlLeft || keys.ControlRight || keys.KeyC);
-      state.sprinting = !!(keys.ShiftLeft || keys.ShiftRight) && fInput > 0 && !state.crouching && !state.ads;
+      const shiftHeld = !!(keys.ShiftLeft || keys.ShiftRight);
+      const ctrlHeld = !!(keys.ControlLeft || keys.ControlRight);
+      // Pressing Shift forward smoothly exits toggle-crouch into sprint (subject to ceiling clearance)
+      if (shiftHeld && fInput > 0 && state.crouchToggle && !ctrlHeld) {
+        state.crouchToggle = false;
+      }
+      const wantCrouch = !!(ctrlHeld || state.crouchToggle);
+
+      const colliders = collectNearbyColliders(
+        state.pos.x,
+        state.pos.z,
+        worldCtx.stationGrid,
+        worldCtx.stationColliders,
+        worldCtx.trainColliders
+      );
+      const trainMovingInside = state.isInsideTrain && LRT.Train && LRT.Train.getSpeed && LRT.Train.getSpeed() > 0.5;
+      const bvhMeshes = trainMovingInside ? null : gatherBVHMeshes(worldCtx);
+
+      // Ceiling head-clearance check before allowing uncrouch under stairs/barriers
+      if (state.crouching && !wantCrouch) {
+        const standCheck = findSupportAndCeiling(state.pos.x, state.pos.z, state.pos.y, P.capsuleHeight, P.radius, colliders);
+        let standCeil = standCheck.ceilY;
+        if (bvhMeshes && bvhMeshes.length > 0) {
+          const bvhCheck = findBVHGroundAndCeiling(state.pos.x, state.pos.z, state.pos.y, P.capsuleHeight, bvhMeshes, standCheck.groundY, standCeil);
+          standCeil = bvhCheck.ceilY;
+        }
+        state.crouching = (standCeil < state.pos.y + P.capsuleHeight + 0.04);
+      } else {
+        state.crouching = wantCrouch;
+      }
+
+      state.crouchBlend += ((state.crouching ? 1 : 0) - state.crouchBlend) * Math.min(1, dt * 13);
+      state.sprinting = shiftHeld && fInput > 0 && !state.crouching && !state.ads;
 
       const targetEye = state.crouching ? P.crouchEyeHeight : P.eyeHeight;
-      state.eyeHeight += (targetEye - state.eyeHeight) * Math.min(1, dt * 12);
+      state.eyeHeight += (targetEye - state.eyeHeight) * Math.min(1, dt * 13);
+
+      const targetRoll = -sInput * (state.ads ? 0.0025 : (state.crouching ? 0.0055 : 0.0105));
+      state.strafeRoll += (targetRoll - state.strafeRoll) * Math.min(1, dt * 10);
 
       const sprintSpeed = state.fastSprint ? (P.sprintSpeed * 1.8) : P.sprintSpeed;
-      const speed = state.crouching ? P.crouchSpeed : (state.sprinting ? sprintSpeed : P.walkSpeed);
+      const adsMoveMult = state.ads ? 0.72 : 1.0;
+      const speed = (state.crouching ? P.crouchSpeed : (state.sprinting ? sprintSpeed : P.walkSpeed)) * adsMoveMult;
       const sinY = Math.sin(state.yaw);
       const cosY = Math.cos(state.yaw);
       _tmpForward.set(-sinY, 0, -cosY);
@@ -1192,16 +1245,6 @@
       state.vel.x += (moveX - state.vel.x) * Math.min(1, dt * accel);
       state.vel.z += (moveZ - state.vel.z) * Math.min(1, dt * accel);
       state.vel.y -= P.gravity * dt;
-
-      const colliders = collectNearbyColliders(
-        state.pos.x,
-        state.pos.z,
-        worldCtx.stationGrid,
-        worldCtx.stationColliders,
-        worldCtx.trainColliders
-      );
-      const trainMovingInside = state.isInsideTrain && LRT.Train && LRT.Train.getSpeed && LRT.Train.getSpeed() > 0.5;
-      const bvhMeshes = trainMovingInside ? null : gatherBVHMeshes(worldCtx);
 
       const capsuleH = state.crouching ? 1.24 : P.capsuleHeight;
       const nx = state.pos.x + state.vel.x * dt;
@@ -1298,7 +1341,8 @@
       }
     }
 
-    const bobY = state.grounded && horizSpeed > 0.4 ? Math.sin(state.bobPhase) * 0.032 : 0;
+    const bobAmp = state.ads ? 0.006 : (state.crouching ? 0.014 : (state.sprinting ? 0.040 : 0.028));
+    const bobY = state.grounded && horizSpeed > 0.4 ? Math.sin(state.bobPhase) * bobAmp : 0;
     const trainBobY = (state.isInsideTrain && LRT.Train && LRT.Train.getSpeed && LRT.Train.getSpeed() > 1)
       ? Math.sin(performance.now() * 0.015) * 0.008
       : 0;
@@ -1311,7 +1355,7 @@
     camera.rotation.order = 'YXZ';
     camera.rotation.y = state.yaw + shakeYaw;
     camera.rotation.x = Math.max(-1.48, Math.min(1.48, state.pitch + shakePitch));
-    camera.rotation.z = shakeRoll;
+    camera.rotation.z = shakeRoll + (state.strafeRoll || 0);
 
     // Look vector for interaction detection
     camera.getWorldDirection(_tmpLook);

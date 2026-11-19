@@ -107,7 +107,8 @@
     const ids = [
       'damage-vignette', 'hud', 'hud-waypoints', 'hud-mode-badge', 'hud-station-code',
       'hud-station-name', 'hud-station-sub', 'objective-title', 'objective-detail',
-      'fps-readout', 'crosshair', 'hitmarker', 'hud-notice', 'interact-prompt',
+      'fps-readout', 'scope-overlay', 'crosshair', 'hitmarker', 'hud-notice', 'interact-prompt',
+      'pill-stance',
       'interact-label', 'hud-subtitle-box', 'subtitle-speaker', 'subtitle-text-id', 'subtitle-text-en',
       'hud-log-banner', 'log-title', 'log-body',
       'document-viewer-modal', 'doc-viewer-sheet', 'doc-viewer-kicker', 'doc-viewer-submeta',
@@ -1081,6 +1082,22 @@
         if (_hudCache.chAds !== chAds) {
           _hudCache.chAds = chAds;
           if (dom.crosshair) dom.crosshair.classList.toggle('ads-active', chAds);
+        }
+
+        const chCrouch = !!(PL.state && PL.state.crouching);
+        if (_hudCache.chCrouch !== chCrouch) {
+          _hudCache.chCrouch = chCrouch;
+          if (dom.crosshair) dom.crosshair.classList.toggle('crouch-active', chCrouch);
+          if (dom['pill-stance']) {
+            dom['pill-stance'].classList.toggle('active', chCrouch);
+            dom['pill-stance'].textContent = chCrouch ? 'C JONGKOK' : 'C Jongkok';
+          }
+        }
+
+        const scopeOn = !!(wh.scopeOverlayActive);
+        if (_hudCache.scopeOn !== scopeOn) {
+          _hudCache.scopeOn = scopeOn;
+          if (dom['scope-overlay']) dom['scope-overlay'].classList.toggle('active', scopeOn);
         }
       }
     }

@@ -132,6 +132,46 @@
 
     <div id="hud-waypoints" aria-hidden="true"></div>
 
+    <div id="scope-overlay" aria-hidden="true">
+      <svg class="scope-svg" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <radialGradient id="scopeLensGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="rgba(16, 48, 42, 0.02)"/>
+            <stop offset="76%" stop-color="rgba(8, 28, 24, 0.14)"/>
+            <stop offset="93%" stop-color="rgba(4, 10, 12, 0.62)"/>
+            <stop offset="100%" stop-color="rgba(2, 4, 6, 0.98)"/>
+          </radialGradient>
+          <mask id="scopeApertureMask" maskUnits="userSpaceOnUse" x="-1500" y="-1500" width="4000" height="4000">
+            <rect x="-1500" y="-1500" width="4000" height="4000" fill="white"/>
+            <circle cx="500" cy="500" r="385" fill="black"/>
+          </mask>
+        </defs>
+        <rect x="-1500" y="-1500" width="4000" height="4000" fill="rgba(3, 4, 7, 0.96)" mask="url(#scopeApertureMask)"/>
+        <circle cx="500" cy="500" r="385" fill="url(#scopeLensGrad)" stroke="rgba(18, 24, 28, 0.96)" stroke-width="12"/>
+        <circle cx="500" cy="500" r="380" fill="none" stroke="rgba(224, 180, 34, 0.20)" stroke-width="1.2"/>
+        <!-- PGO-7 Illuminated Stadiametric Crosshairs & Ballistic Chevrons -->
+        <g stroke="#e0b422" stroke-linecap="round" fill="none" opacity="0.92">
+          <line x1="175" y1="500" x2="452" y2="500" stroke-width="2"/>
+          <line x1="548" y1="500" x2="825" y2="500" stroke-width="2"/>
+          <line x1="500" y1="538" x2="500" y2="815" stroke-width="1.8"/>
+          <!-- Windage ticks -->
+          <line x1="340" y1="491" x2="340" y2="509" stroke-width="1.6"/>
+          <line x1="400" y1="493" x2="400" y2="507" stroke-width="1.6"/>
+          <line x1="600" y1="493" x2="600" y2="507" stroke-width="1.6"/>
+          <line x1="660" y1="491" x2="660" y2="509" stroke-width="1.6"/>
+          <!-- Ballistic drop chevrons (100m, 200m, 300m) -->
+          <polyline points="484,512 500,500 516,512" stroke-width="2.2"/>
+          <polyline points="488,554 500,544 512,554" stroke-width="1.8"/>
+          <polyline points="491,596 500,588 509,596" stroke-width="1.6"/>
+          <!-- Stadiametric rangefinder curve (bottom-right) -->
+          <path d="M 555 660 Q 615 620 680 612" stroke-width="1.4" opacity="0.72"/>
+          <line x1="555" y1="670" x2="680" y2="670" stroke-width="1.4" opacity="0.72"/>
+        </g>
+        <circle cx="500" cy="500" r="2.6" fill="#ff4d2e"/>
+      </svg>
+      <div class="scope-telemetry">PGO-7V · 2.7× OPTICAL</div>
+    </div>
+
     <div id="crosshair">
       <div class="ch-tick ch-top"></div>
       <div class="ch-tick ch-bot"></div>
@@ -186,6 +226,7 @@
           <div class="armor-bar-track"><div id="armor-bar-fill"></div></div>
         </div>
         <div class="tool-pills">
+          <span class="pill-ind" id="pill-stance">C Jongkok</span>
           <span class="pill-ind" id="pill-flashlight">F Senter</span>
           <span class="pill-ind active" id="pill-lighting">L Cahaya</span>
           <span class="pill-ind active" id="pill-hud">H Layar</span>
