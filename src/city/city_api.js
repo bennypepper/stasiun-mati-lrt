@@ -552,8 +552,8 @@
         P.setLampBulbsPowered(anyOn, anyOn ? (0.78 + 0.30 * nightStrength) : 0.0);
       }
       if (this._lampPoolMat && this._lampPoolMesh) {
-        // Localized horror pool: bright under poles, dark between poles!
-        const poolOpacity = anyOn ? (0.08 + 0.20 * nightStrength) : 0.0;
+        // Subtle road pool decal — real 3D PointLights do the heavy lifting on walls, cars, curbs & road!
+        const poolOpacity = anyOn ? (0.06 + 0.14 * nightStrength) : 0.0;
         this._lampPoolMat.opacity = poolOpacity;
         this._lampPoolMesh.visible = anyOn && poolOpacity > 0.01;
       }

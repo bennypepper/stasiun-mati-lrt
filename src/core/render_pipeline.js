@@ -762,10 +762,10 @@
       ? Math.max(0.0, Math.min(1.0, baseMood.daylightBlend))
       : (baseMood.isDaylight ? 1.0 : 0.0);
     const nightMix = 1.0 - dayMix;
-    // Steep non-linear darkness curve: under 50% feels genuinely dark; at 10% ambient/sky drops to near pitch-black!
+    // Steep non-linear darkness curve: under 50% atmosphere stays truly dark so ONLY real lights (streetlamps/interior/flashlight) illuminate the world!
     const bNorm = Math.max(0.0, Math.min(1.0, (b - 0.08) / 0.92));
     const lsDay = b <= 1.0 ? Math.pow(bNorm, 1.45) : 1.0;
-    const lsNight = b <= 1.0 ? Math.pow(bNorm, 2.55) : 1.0;
+    const lsNight = b <= 1.0 ? Math.pow(bNorm, 3.15) : 1.0;
     const lightScale = lsNight + (lsDay - lsNight) * dayMix;
 
     syncMenuLights();
@@ -795,7 +795,7 @@
           ? Math.max(0.015, baseMood.envIntensity * (0.12 + 0.88 * bNorm))
           : Math.min(1.85, baseMood.envIntensity + over * 0.85);
         const envNight = b <= 1.0
-          ? baseMood.envIntensity * Math.pow(bNorm, 2.65)
+          ? baseMood.envIntensity * Math.pow(bNorm, 3.25)
           : Math.min(0.45, baseMood.envIntensity + over * 0.22);
         const envVal = envNight + (envDay - envNight) * dayMix;
         CORE.scene.environmentIntensity = (envVal + (isMenu ? 0.04 * nightMix : 0)) * (1.0 - 0.75 * tb);
@@ -805,7 +805,7 @@
         CORE.scene.fog.color.copy(baseMood.fogColor).lerp(_brightFogTarget, fogLift);
         // Darken night sky & atmospheric fog color smoothly into pure #000000 at low brightness (eliminates pink/blue sky glow at <=50%!)
         if (b < 1.0 && nightMix > 0.01) {
-          const skyScale = Math.pow(bNorm, 1.95);
+          const skyScale = Math.pow(bNorm, 2.35);
           const blendScale = 1.0 + (skyScale - 1.0) * nightMix;
           CORE.scene.fog.color.multiplyScalar(blendScale);
         }
@@ -834,8 +834,8 @@
       CORE.bloomPass.strength = baseMood.bloomStrength * (b <= 1.0 ? 0.85 + 0.15 * b : 1.0 + over * 0.25);
     }
     const lampDay = b <= 1.0 ? (0.30 + 0.70 * b) : 1.0;
-    // Boost local streetlamps slightly at ultra-low brightness so light pools under working poles stay vivid against pitch-black darkness!
-    const lampNight = b <= 1.0 ? (1.32 - 0.32 * b) : (1.0 + over * 0.20);
+    // Boost real local streetlamp PointLights at low brightness so working poles visibly light walls, curbs, cars & road against dark atmosphere!
+    const lampNight = b <= 1.0 ? (1.45 - 0.35 * b) : (1.0 + over * 0.20);
     const localLampScale = lampNight + (lampDay - lampNight) * dayMix;
     applyStreetLightsIntensity(baseMood.streetLampIntensity * localLampScale);
     if (LRT.Materials && LRT.Materials.mats) {

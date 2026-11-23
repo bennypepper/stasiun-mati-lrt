@@ -1464,11 +1464,11 @@
     const parentWorldZ = (root && root.parent && root.parent.position) ? (root.parent.position.z || 0) : 0;
     for (let pi = 0; pi < poolCount; pi++) {
       const lp = city.litLampPositions[pi];
-      const baseInt = 24.0;
+      const baseInt = 68.0;
       const initInt = (city._isBuilding || !plnInitiallyOn) ? 0.0 : (baseInt * Math.max(1.1, initialStreetFactor));
       const ptLight = typeof city._acquirePooledLight === 'function'
-        ? city._acquirePooledLight(pi, poolTargetScene, 0xffad48, initInt, 26, 1.80)
-        : new THREE.PointLight(0xffad48, initInt, 26, 1.80);
+        ? city._acquirePooledLight(pi, poolTargetScene, 0xffb454, initInt, 32, 1.42)
+        : new THREE.PointLight(0xffb454, initInt, 32, 1.42);
       ptLight.position.set(lp.x, lp.y, lp.z + parentWorldZ);
       ptLight.visible = true; // NEVER toggle visible! Control strictly via intensity.
       ptLight.castShadow = false;

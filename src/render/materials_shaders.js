@@ -825,15 +825,17 @@
         }),
 
         cityStripeWhite: new THREE.MeshStandardMaterial({
-          color: 0xe2e6ec,
-          roughness: 0.75,
-          metalness: 0.02
+          color: 0xaab0b8,
+          roughness: 0.94,
+          metalness: 0.0,
+          envMapIntensity: 0.14
         }),
 
         cityStripeYellow: new THREE.MeshStandardMaterial({
-          color: 0xe2b424,
-          roughness: 0.72,
-          metalness: 0.02
+          color: 0xba941e,
+          roughness: 0.94,
+          metalness: 0.0,
+          envMapIntensity: 0.14
         }),
 
         citySkylineDistant: new THREE.MeshStandardMaterial({
