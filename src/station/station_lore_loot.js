@@ -97,7 +97,13 @@
       const cabSteel = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.46, metalness: 0.68 });
       const cabTrim = new THREE.MeshStandardMaterial({ color: 0x1e252e, roughness: 0.36, metalness: 0.78 });
       const cabWarn = new THREE.MeshStandardMaterial({ color: 0xeab308, emissive: 0x422006, emissiveIntensity: 0.45, roughness: 0.42 });
-      const cabLed = new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xf97316, emissiveIntensity: 1.5 });
+      const cabUsedNow = !!(station._usedIds && station._usedIds.has('cawang_derelict_cab'));
+      const cabLed = new THREE.MeshStandardMaterial({
+        color: cabUsedNow ? 0x22c55e : 0xf97316,
+        emissive: cabUsedNow ? 0x22c55e : 0xf97316,
+        emissiveIntensity: 1.5
+      });
+      station._cawangCabLedMat = cabLed;
       const cabCopper = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.30, metalness: 0.85 });
       station.disposableMaterials.push(cabSteel, cabTrim, cabWarn, cabLed, cabCopper);
       // Heavy steel base plate & dual support legs resting on the trackbed ballast (y = 0..0.96 local)

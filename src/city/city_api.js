@@ -361,6 +361,10 @@
         P.missionProps.disposeMissionProps(this);
       }
       this._missionPropsState = null;
+      this._feederMask = null;
+      this._kuninganWestBeaconMat = null;
+      this._kuninganWestCableMat = null;
+      this._kuninganEastCableMat = null;
       this.cornerHubs = null;
       this.layoutBounds = null;
       this._fieldLogGlints = null;
@@ -483,6 +487,38 @@
       return this;
     },
 
+    setKuninganFeederState: function (side, isOn) {
+      if (!this._feederMask) this._feederMask = { west: 0, east: 0 };
+      const val = isOn ? 1 : 0;
+      if (side === 'west') {
+        this._feederMask.west = val;
+        if (this._kuninganWestBeaconMat) {
+          this._kuninganWestBeaconMat.color.setHex(isOn ? 0x22c55e : 0xef4444);
+          this._kuninganWestBeaconMat.emissive.setHex(isOn ? 0x22c55e : 0xef4444);
+        }
+        if (this._kuninganWestCableMat) {
+          this._kuninganWestCableMat.color.setHex(isOn ? 0x22c55e : 0xeab308);
+          this._kuninganWestCableMat.emissive.setHex(isOn ? 0x15803d : 0x854d0e);
+          this._kuninganWestCableMat.emissiveIntensity = isOn ? 1.15 : 0.45;
+        }
+      } else if (side === 'east') {
+        this._feederMask.east = val;
+        if (this._kuninganEastCableMat) {
+          this._kuninganEastCableMat.color.setHex(isOn ? 0x22c55e : 0xeab308);
+          this._kuninganEastCableMat.emissive.setHex(isOn ? 0x15803d : 0x854d0e);
+          this._kuninganEastCableMat.emissiveIntensity = isOn ? 1.15 : 0.45;
+        }
+      }
+      this.setLightingFactor(Math.max(this._lightingFactor, 1.0));
+    },
+
+    _getFeederLampScale: function (localX) {
+      if (!this._feederMask) return 1.0;
+      const isWest = (localX < 0);
+      const on = isWest ? !!this._feederMask.west : !!this._feederMask.east;
+      return on ? 1.35 : 0.08;
+    },
+
     setLightingFactor: function (factor) {
       const num = Number(factor);
       this._lightingFactor = Number.isFinite(num) ? Math.max(0, num) : 1.0;
@@ -494,6 +530,7 @@
           continue;
         }
         const distScale = sl._distScale !== undefined ? sl._distScale : 1.0;
+        const feederScale = sl._feederScale !== undefined ? sl._feederScale : 1.0;
         sl.light.visible = true;
         if (sl.kind === 'traffic') {
           const blinkScale = sl._blinkScale !== undefined
@@ -502,7 +539,7 @@
           sl._blinkScale = blinkScale;
           sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale * blinkScale;
         } else {
-          sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale;
+          sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale * feederScale;
         }
       }
     },
@@ -652,6 +689,7 @@
         );
         sl.light.updateMatrixWorld(false);
         sl.flicker = !!lp.flicker;
+        sl._feederScale = this._getFeederLampScale(lp.x);
         if (suppressLights) {
           sl._distScale = 0.0;
         } else {
@@ -659,7 +697,7 @@
           sl._distScale = dist <= 50 ? 1.0 : (dist >= 88 ? 0.0 : (1.0 - (dist - 50) / 38.0));
         }
         if (!sl.flicker) {
-          sl.light.intensity = sl.baseIntensity * this._lightingFactor * sl._distScale;
+          sl.light.intensity = sl.baseIntensity * this._lightingFactor * sl._distScale * sl._feederScale;
         }
       }
     },
@@ -736,8 +774,9 @@
         if (!sl.flicker) continue;
         // Subtle sodium-vapor streetlamp buzz (NEVER toggles visible!)
         const pulse = 0.85 + 0.15 * Math.sin(this._timeAccum * 17.0 + i * 3.1) * Math.sin(this._timeAccum * 4.3);
+        const feederScale = sl._feederScale !== undefined ? sl._feederScale : 1.0;
         sl.light.visible = true;
-        sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale * pulse;
+        sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale * feederScale * pulse;
       }
     },
 
@@ -1220,6 +1259,9 @@
         if (this._plnBeaconMat) {
           this._plnBeaconMat.color.setHex(0x22c55e);
           this._plnBeaconMat.emissive.setHex(0x22c55e);
+        }
+        if (this._arch && this._arch.id === 'kuningan') {
+          this.setKuninganFeederState('east', true);
         }
         this.setLightingFactor(Math.max(this._lightingFactor, 1.35));
         it.used = true;

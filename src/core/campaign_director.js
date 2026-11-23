@@ -95,20 +95,24 @@
   let _keyItemsDisplayCache = '';
   let _keyItemsDirty = true;
 
+  function createDefaultStationObjectives() {
+    return {
+      0: { genInspected: false, fuelFound: false, genOn: false, waveCleared: false },
+      1: { cabInspected: false, keycardFound: false, fuseFound: false, waveCleared: false },
+      2: { depotInspected: false, vaxCryoFound: false, pmiKeyFound: false, vaxFound: false, depotDone: false, waveCleared: false },
+      3: { breakerInspected: false, feederWestOn: false, feederEastOn: false, plnDone: false, waveCleared: false },
+      4: { barricadeInspected: false, c4Found: false, barricadeCleared: false, waveCleared: false },
+      5: { relays: { street: false, jpo: false, platform: false, totem: false, pln: false }, waveCleared: false, omegaActive: false, holdoutElapsed: 0 }
+    };
+  }
+
   const campaignState = {
     stationUsedIds: new Map(),
     clearedStations: new Set(),
     visitedStations: new Set([0]),
     triggeredSurgeStations: new Set(),
     keyItems: new Set(),
-    stationObjectives: {
-      0: { genOn: false, waveCleared: false },
-      1: { fuseFound: false, waveCleared: false },
-      2: { vaxFound: false, depotDone: false, waveCleared: false },
-      3: { plnDone: false, waveCleared: false },
-      4: { barricadeCleared: false, waveCleared: false },
-      5: { relays: { totem: false, pln: false, jpo: false }, waveCleared: false, omegaActive: false, holdoutElapsed: 0 }
-    },
+    stationObjectives: createDefaultStationObjectives(),
     voTriggered: new Set(),
     collectedLogs: [],
     campaignVictory: false,
@@ -172,6 +176,7 @@
   }
 
   const triggerObjectiveSurgeWave = (...args) => CORE.triggerObjectiveSurgeWave(...args);
+  const triggerStreetReturnAmbush = (...args) => (typeof CORE.triggerStreetReturnAmbush === 'function' ? CORE.triggerStreetReturnAmbush(...args) : 0);
   const triggerTrainCallSiegeWave = (...args) => CORE.triggerTrainCallSiegeWave(...args);
   const triggerTrainCallReinforcementTrickle = (...args) => CORE.triggerTrainCallReinforcementTrickle(...args);
   const spawnStationRoamers = (...args) => CORE.spawnStationRoamers(...args);
@@ -188,14 +193,7 @@
     campaignState.keyItems.clear();
     _keyItemsDirty = true;
     _keyItemsDisplayCache = '';
-    campaignState.stationObjectives = {
-      0: { genOn: false, waveCleared: false },
-      1: { fuseFound: false, waveCleared: false },
-      2: { vaxFound: false, depotDone: false, waveCleared: false },
-      3: { plnDone: false, waveCleared: false },
-      4: { barricadeCleared: false, waveCleared: false },
-      5: { relays: { totem: false, pln: false, jpo: false }, waveCleared: false, omegaActive: false, holdoutElapsed: 0 }
-    };
+    campaignState.stationObjectives = createDefaultStationObjectives();
     campaignState.voTriggered.clear();
     campaignState.collectedLogs.length = 0;
     campaignState.campaignVictory = false;
@@ -223,7 +221,9 @@
   };
 
   CORE.onCikokoBarricadeCleared = function () {
+    consumeKeyItem('c4_charge');
     if (campaignState.stationObjectives[4]) {
+      campaignState.stationObjectives[4].barricadeInspected = true;
       campaignState.stationObjectives[4].barricadeCleared = true;
     }
     if (CORE.stationIndex === 4) {
@@ -310,7 +310,11 @@
   function checkSetiabudiRelays() {
     const s5 = campaignState.stationObjectives[5];
     if (!s5 || !s5.relays) return;
-    if (s5.relays.totem && s5.relays.pln && s5.relays.jpo) {
+    const r = s5.relays;
+    const streetDone = !!(r.street || r.pln);
+    const jpoDone = !!r.jpo;
+    const platDone = !!(r.platform || r.totem);
+    if (streetDone && jpoDone && platDone) {
       s5.omegaActive = true;
       if (!campaignState.voTriggered.has('VO_19_FINAL_WAVE')) {
         campaignState.voTriggered.add('VO_19_FINAL_WAVE');
@@ -319,7 +323,7 @@
         }
       }
       if (LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
-        LRT.PlayerUI.setNotice('SEMUA 3 RELAI TERHUBUNG — OMEGA SWARM MENDEKAT!', '#ef4444');
+        LRT.PlayerUI.setNotice('SEMUA 3 RELAI ZONA TERHUBUNG — OMEGA SWARM MENDEKAT!', '#ef4444');
       }
     }
   }
@@ -357,6 +361,16 @@
     }
     if (LRT.Enemies && typeof LRT.Enemies.setAtmosphereMode === 'function') {
       LRT.Enemies.setAtmosphereMode(CORE.atmosphereMode);
+    }
+    if (idx % 6 === 3 && campaignState.stationObjectives[3]) {
+      const s3 = campaignState.stationObjectives[3];
+      if (LRT.City && typeof LRT.City.setKuninganFeederState === 'function') {
+        LRT.City.setKuninganFeederState('west', !!s3.feederWestOn);
+        LRT.City.setKuninganFeederState('east', !!s3.feederEastOn);
+      }
+      if (LRT.Station && typeof LRT.Station.syncKuninganBreakerLeds === 'function') {
+        LRT.Station.syncKuninganBreakerLeds(!!s3.feederWestOn, !!s3.feederEastOn, !!s3.plnDone);
+      }
     }
     if (!offsetZ) {
       spawnStationRoamers(idx);
@@ -425,6 +439,24 @@
       consumeKeyItem(res.consumeKeyItemId);
     }
 
+    if (res.action === 'generator_dry') {
+      if (s0) s0.genInspected = true;
+      return;
+    }
+
+    if (item.id === 'dukuh_fuel_can') {
+      if (s0) {
+        s0.genInspected = true;
+        s0.fuelFound = true;
+      }
+      if (res.fresh !== false) {
+        triggerStreetReturnAmbush(['runner', 'runner', 'walker', 'walker'], { x: item.x, z: item.z }, {
+          notice: 'PENYERGAPAN JALAN TIMUR — LARI KEMBALI KE GENERATOR CONCOURSE!'
+        });
+      }
+      return;
+    }
+
     if (item.id === 'portable_generator' || res.action === 'generator') {
       if (CORE.tutorialActive && typeof CORE.getTutorialStep === 'function' && CORE.getTutorialStep() < 7) {
         if (LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
@@ -433,6 +465,8 @@
         return;
       }
       if (s0) {
+        s0.genInspected = true;
+        s0.fuelFound = true;
         s0.genOn = true;
       }
       if (LRT.Station && typeof LRT.Station.setLightingFactor === 'function') {
@@ -450,8 +484,28 @@
       }
     }
 
+    if (res.action === 'derelict_locked') {
+      if (s1) s1.cabInspected = true;
+      return;
+    }
+
+    if (item.id === 'cawang_bypass_keycard') {
+      if (s1) {
+        s1.cabInspected = true;
+        s1.keycardFound = true;
+      }
+      if (res.fresh !== false) {
+        triggerStreetReturnAmbush(['brute', 'walker', 'walker', 'walker'], { x: item.x, z: item.z }, {
+          notice: 'RIOT BRUTE MENJAGA GUDANG LOGISTIK — KEMBALI KE KABIN JALUR 4!'
+        });
+      }
+      return;
+    }
+
     if (item.id === 'cawang_derelict_cab' || res.action === 'derelict_fuse') {
       if (s1) {
+        s1.cabInspected = true;
+        s1.keycardFound = true;
         s1.fuseFound = true;
       }
       if (!CORE.tutorialActive && !campaignState.voTriggered.has('VO_08_FUSE_FOUND')) {
@@ -465,9 +519,52 @@
       }
     }
 
+    if (res.action === 'depot_sealed') {
+      if (campaignState.stationObjectives[2]) campaignState.stationObjectives[2].depotInspected = true;
+      return;
+    }
+
+    if (item.id === 'harja_pmi_key') {
+      if (campaignState.stationObjectives[2]) {
+        campaignState.stationObjectives[2].depotInspected = true;
+        campaignState.stationObjectives[2].pmiKeyFound = true;
+      }
+      if (res.fresh !== false) {
+        triggerStreetReturnAmbush(['screamer', 'runner', 'runner'], { x: item.x, z: item.z }, {
+          notice: 'SCREAMER & RUNNER MENYERGAP JALAN BARAT — KEMBALI KE DEPO HARJAMUKTI!'
+        });
+      }
+      return;
+    }
+
     if (item.id === 'garden_supply') {
       if (campaignState.stationObjectives[2]) {
+        campaignState.stationObjectives[2].depotInspected = true;
+        campaignState.stationObjectives[2].vaxCryoFound = true;
+        if (CORE.gameMode !== MODES.SURVIVAL) {
+          campaignState.stationObjectives[2].vaxFound = true;
+        }
+      }
+      if (CORE.stationIndex === 2 && res.fresh !== false && CORE.gameMode === MODES.SURVIVAL) {
+        triggerStreetReturnAmbush(['spitter', 'spitter'], { x: item.x, z: item.z }, {
+          allowStationZones: true,
+          minDist: 6.0,
+          maxDist: 22.0,
+          fallbackY: 0.0,
+          notice: '2 SPITTER MUNCUL DI SEMAK KEBUN ATAP!'
+        });
+      }
+    }
+
+    if (item.id === 'depot_supply' && res.action !== 'depot_sealed') {
+      consumeKeyItem('harja_cryo');
+      consumeKeyItem('harja_pmi_key');
+      if (campaignState.stationObjectives[2]) {
+        campaignState.stationObjectives[2].depotInspected = true;
+        campaignState.stationObjectives[2].vaxCryoFound = true;
+        campaignState.stationObjectives[2].pmiKeyFound = true;
         campaignState.stationObjectives[2].vaxFound = true;
+        campaignState.stationObjectives[2].depotDone = true;
       }
       if (!CORE.tutorialActive && !campaignState.voTriggered.has('VO_12_VAX_FOUND')) {
         campaignState.voTriggered.add('VO_12_VAX_FOUND');
@@ -480,28 +577,97 @@
       }
     }
 
-    if (item.id === 'depot_supply') {
-      if (campaignState.stationObjectives[2]) {
-        campaignState.stationObjectives[2].depotDone = true;
+    if (res.action === 'kuningan_breaker_locked') {
+      if (campaignState.stationObjectives[3]) campaignState.stationObjectives[3].breakerInspected = true;
+      return;
+    }
+
+    if (item.id === 'kuningan_feeder_west' || res.action === 'kuningan_feeder_west') {
+      const s3 = campaignState.stationObjectives[3];
+      if (s3) {
+        s3.breakerInspected = true;
+        s3.feederWestOn = true;
+        if (LRT.Station && typeof LRT.Station.syncKuninganBreakerLeds === 'function') {
+          LRT.Station.syncKuninganBreakerLeds(s3.feederWestOn, s3.feederEastOn, s3.plnDone);
+        }
       }
-      if (CORE.stationIndex === 2) {
+      if (res.fresh !== false) {
+        triggerStreetReturnAmbush(['runner', 'walker', 'walker'], { x: item.x, z: item.z }, {
+          notice: 'TRAFO BARAT MENYALA — INFECTED JALANAN TERTARIK SUARA GARDU!'
+        });
+      }
+      return;
+    }
+
+    if (item.id === 'kuningan_main_breaker' || res.action === 'kuningan_breaker_on') {
+      const s3 = campaignState.stationObjectives[3];
+      if (s3) {
+        s3.breakerInspected = true;
+        s3.feederWestOn = true;
+        s3.feederEastOn = true;
+        s3.plnDone = true;
+      }
+      CORE.applyBrightness();
+      if (CORE.stationIndex === 3) {
         triggerObjectiveSurgeWave(CORE.stationIndex);
       }
+      return;
     }
 
     if (item.id === 'city_pln_box' || res.action === 'power_box') {
       if (CORE.stationIndex === 3 && campaignState.stationObjectives[3]) {
-        campaignState.stationObjectives[3].plnDone = true;
-        triggerObjectiveSurgeWave(CORE.stationIndex);
+        const s3 = campaignState.stationObjectives[3];
+        s3.breakerInspected = true;
+        s3.feederEastOn = true;
+        if (LRT.Station && typeof LRT.Station.syncKuninganBreakerLeds === 'function') {
+          LRT.Station.syncKuninganBreakerLeds(s3.feederWestOn, s3.feederEastOn, s3.plnDone);
+        }
+        if (res.fresh !== false) {
+          triggerStreetReturnAmbush(['brute', 'spitter', 'walker', 'walker'], { x: item.x, z: item.z }, {
+            notice: 'FEEDER TIMUR AKTIF — PATROLI RIOT BRUTE & SPITTER MENDEKAT!'
+          });
+        }
       } else if (CORE.stationIndex === 5 && campaignState.stationObjectives[5]) {
         campaignState.stationObjectives[5].relays.pln = true;
+        campaignState.stationObjectives[5].relays.street = true;
         checkSetiabudiRelays();
+      }
+    }
+
+    if (res.action === 'barricade_locked') {
+      if (campaignState.stationObjectives[4]) campaignState.stationObjectives[4].barricadeInspected = true;
+      return;
+    }
+
+    if (item.id === 'cikoko_c4_charge') {
+      if (campaignState.stationObjectives[4]) {
+        campaignState.stationObjectives[4].barricadeInspected = true;
+        campaignState.stationObjectives[4].c4Found = true;
+      }
+      if (res.fresh !== false) {
+        triggerStreetReturnAmbush(['brute', 'runner', 'runner'], { x: item.x, z: item.z }, {
+          notice: 'KONVOI MILITER DISERGAP RIOT BRUTE — KEMBALI & LEDAKKAN BARIKADE TOL!'
+        });
+      }
+    }
+
+    if (item.id === 'setiabudi_relay_street' || res.action === 'setiabudi_relay_street') {
+      if (CORE.stationIndex === 5 && campaignState.stationObjectives[5]) {
+        campaignState.stationObjectives[5].relays.street = true;
+        campaignState.stationObjectives[5].relays.pln = true;
+        checkSetiabudiRelays();
+      }
+      if (res.fresh !== false) {
+        triggerStreetReturnAmbush(['runner', 'runner', 'spitter'], { x: item.x, z: item.z }, {
+          notice: 'RELAI JALANAN AKTIF — INFECTED RASUNA SAID MENGEJAR!'
+        });
       }
     }
 
     if (item.id === 'route_totem') {
       if (CORE.stationIndex === 5 && campaignState.stationObjectives[5]) {
         campaignState.stationObjectives[5].relays.totem = true;
+        campaignState.stationObjectives[5].relays.platform = true;
         checkSetiabudiRelays();
       }
     }
@@ -515,7 +681,7 @@
 
     if (CORE.stationIndex === 5 && campaignState.stationObjectives[5] && campaignState.stationObjectives[5].relays) {
       const r5 = campaignState.stationObjectives[5].relays;
-      const relayCount = (r5.totem ? 1 : 0) + (r5.pln ? 1 : 0) + (r5.jpo ? 1 : 0);
+      const relayCount = ((r5.platform || r5.totem) ? 1 : 0) + ((r5.street || r5.pln) ? 1 : 0) + (r5.jpo ? 1 : 0);
       if (relayCount >= 2) {
         triggerObjectiveSurgeWave(5);
       }
@@ -566,12 +732,12 @@
     // Survival world-progression weapon unlocks on station & street caches
     if (CORE.gameMode === MODES.SURVIVAL && LRT.Weapons && typeof LRT.Weapons.unlockWeapon === 'function') {
       let unlockRes = null;
-      if ((item.id === 'portable_generator' && CORE.difficultyKey === 'easy' && !wasGenOn)
+      if ((res.action === 'generator' && CORE.difficultyKey === 'easy' && !wasGenOn)
         || (isFresh && (item.id === 'jaklingko_kiosk' || item.id === 'city_coffee_cart' || item.id === 'balcony_supply'))) {
         unlockRes = LRT.Weapons.unlockWeapon('rifle', 60);
-      } else if (isFresh && ((item.id === 'cawang_derelict_cab' && !wasFuseFound) || item.id === 'city_convoy_car')) {
+      } else if (isFresh && ((res.action === 'derelict_fuse' && !wasFuseFound) || item.id === 'city_convoy_car')) {
         unlockRes = LRT.Weapons.unlockWeapon('shotgun', 16);
-      } else if (isFresh && (item.id === 'depot_supply' || (item.id === 'city_pocket_park' && CORE.stationIndex >= 1))) {
+      } else if (isFresh && (res.action === 'depot_unlocked' || item.id === 'cikoko_c4_charge' || (item.id === 'city_pocket_park' && CORE.stationIndex >= 1))) {
         unlockRes = LRT.Weapons.unlockWeapon('rpg', 2);
       }
       if (unlockRes && unlockRes.newlyUnlocked && LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
@@ -586,10 +752,10 @@
     if (!obj) return true;
     if (idx === 0) return !!obj.genOn;
     if (idx === 1) return !!obj.fuseFound;
-    if (idx === 2) return !!(obj.vaxFound && obj.depotDone);
+    if (idx === 2) return !!obj.depotDone;
     if (idx === 3) return !!obj.plnDone;
     if (idx === 4) return !!obj.barricadeCleared;
-    if (idx === 5) return !!(obj.relays && obj.relays.totem && obj.relays.pln && obj.relays.jpo);
+    if (idx === 5) return !!(obj.relays && (obj.relays.platform || obj.relays.totem) && (obj.relays.street || obj.relays.pln) && obj.relays.jpo);
     return true;
   }
 
@@ -633,12 +799,12 @@
         if (!isStationPrimaryObjectiveComplete(CORE.stationIndex)) {
           let hint = 'Selesaikan objektif utama stasiun terlebih dahulu!';
           const s = CORE.stationIndex % 6;
-          if (s === 0) hint = 'Hidupkan generator portabel di Concourse [E]!';
-          else if (s === 1) hint = 'Ambil sekring bypass dari kabin Jalur 4 [E]!';
-          else if (s === 2) hint = 'Amankan vaksin (Kebun Atap) & data depot [E]!';
-          else if (s === 3) hint = 'Aktifkan kotak relai PLN jalanan [E]!';
-          else if (s === 4) hint = 'Hancurkan barikade jalan tol Cikoko [E / Tembak]!';
-          else if (s === 5) hint = 'Hubungkan ketiga relai sinyal evakuasi Setiabudi [E]!';
+          if (s === 0) hint = 'Isi solar (Pojok SE) & nyalakan generator Concourse [E]!';
+          else if (s === 1) hint = 'Ambil kartu akses (Pojok NE) & buka sekring kabin Jalur 4 [E]!';
+          else if (s === 2) hint = 'Gabungkan Cryo (Kebun Atap) & Kunci PMI (Pojok NW) di Depo [E]!';
+          else if (s === 3) hint = 'Nyalakan Feeder Barat & Timur lalu tarik Panel Induk Concourse [E]!';
+          else if (s === 4) hint = 'Ambil C4 / RPG (Pojok SW) & ledakkan Barikade Tol Cikoko!';
+          else if (s === 5) hint = 'Hubungkan 3 Zona Relai Setiabudi (Jalan, JPO, Peron Tengah) [E]!';
           if (LRT.Audio) LRT.Audio.play('station_chime', { gain: 0.55 });
           LRT.PlayerUI.setNotice(`OBJEKTIF BELUM SELESAI: ${hint}`, '#e0b422');
           return;
@@ -971,14 +1137,35 @@
 
     // Station Active
     if (sIdx === 0) {
-      if (!campaignState.stationObjectives[0].genOn) {
+      const o0 = campaignState.stationObjectives[0];
+      if (!o0.genOn) {
+        if (hasKeyItem('fuel_can') || o0.fuelFound) {
+          return {
+            mode: CORE.gameMode,
+            stationName: name,
+            stationCode: code,
+            stationSub: sub,
+            objectiveTitle: 'ISI SOLAR & NYALAKAN GENERATOR',
+            objectiveDetail: 'Kembali ke Concourse & nyalakan generator portabel [E]'
+          };
+        }
+        if (o0.genInspected) {
+          return {
+            mode: CORE.gameMode,
+            stationName: name,
+            stationCode: code,
+            stationSub: sub,
+            objectiveTitle: 'CARI JERIGEN SOLAR',
+            objectiveDetail: 'Periksa Pojok SE — Pos Ronda & Warung Kopi'
+          };
+        }
         return {
           mode: CORE.gameMode,
           stationName: name,
           stationCode: code,
           stationSub: sub,
           objectiveTitle: 'RESTORE AUXILIARY POWER',
-          objectiveDetail: 'Locate portable generator in Concourse [E]'
+          objectiveDetail: 'Periksa generator portabel di Concourse [E]'
         };
       }
       if (alive > 0) {
@@ -1002,14 +1189,35 @@
     }
 
     if (sIdx === 1) {
-      if (!campaignState.stationObjectives[1].fuseFound) {
+      const o1 = campaignState.stationObjectives[1];
+      if (!o1.fuseFound) {
+        if (hasKeyItem('cawang_keycard') || o1.keycardFound) {
+          return {
+            mode: CORE.gameMode,
+            stationName: name,
+            stationCode: code,
+            stationSub: sub,
+            objectiveTitle: 'BUKA PANEL 750V & AMBIL SEKRING',
+            objectiveDetail: 'Kembali ke Kabin Bangkai Jalur 4 & buka panel [E]'
+          };
+        }
+        if (o1.cabInspected) {
+          return {
+            mode: CORE.gameMode,
+            stationName: name,
+            stationCode: code,
+            stationSub: sub,
+            objectiveTitle: 'CARI KARTU AKSES 750V',
+            objectiveDetail: 'Periksa Pos Sekuriti — Pojok NE (Gudang Logistik)'
+          };
+        }
         return {
           mode: CORE.gameMode,
           stationName: name,
           stationCode: code,
           stationSub: sub,
           objectiveTitle: 'RECOVER SIGNAL FUSE',
-          objectiveDetail: 'Cross JPO to Track 4 Derelict Cab (North End) [E]'
+          objectiveDetail: 'Periksa Kabin Bangkai Jalur 4 (Ujung Utara) [E]'
         };
       }
       if (alive > 0) {
@@ -1034,14 +1242,39 @@
 
     if (sIdx === 2) {
       const o2 = campaignState.stationObjectives[2];
-      if (!o2.vaxFound || !o2.depotDone) {
+      if (!o2.depotDone) {
+        const hasCryo = hasKeyItem('harja_cryo') || o2.vaxCryoFound;
+        const hasPmi = hasKeyItem('harja_pmi_key') || o2.pmiKeyFound;
+        if (hasCryo && hasPmi) {
+          return {
+            mode: CORE.gameMode,
+            stationName: name,
+            stationCode: code,
+            stationSub: sub,
+            objectiveTitle: 'EKSTRAK VAKSIN SPORA',
+            objectiveDetail: 'Kembali ke Depo Harjamukti & buka peti pendingin [E]'
+          };
+        }
+        if (o2.depotInspected || hasCryo || hasPmi) {
+          const need = [];
+          if (!hasCryo) need.push('Cryo Stabilizer (Kebun Atap)');
+          if (!hasPmi) need.push('Kunci PMI (Pojok NW — Ambulans)');
+          return {
+            mode: CORE.gameMode,
+            stationName: name,
+            stationCode: code,
+            stationSub: sub,
+            objectiveTitle: 'KUMPULKAN SEGEL PENDINGIN VAKSIN',
+            objectiveDetail: `Cari: ${need.join(' & ')}`
+          };
+        }
         return {
           mode: CORE.gameMode,
           stationName: name,
           stationCode: code,
           stationSub: sub,
-          objectiveTitle: 'RECOVER VACCINE & HEAVY ARMS',
-          objectiveDetail: (!o2.vaxFound ? 'Search South Garden Crate' : '') + (!o2.vaxFound && !o2.depotDone ? ' & ' : '') + (!o2.depotDone ? 'Search North Depot Armory' : '')
+          objectiveTitle: 'PERIKSA PENDINGIN VAKSIN DEPO',
+          objectiveDetail: 'Periksa peti bio-kontainmen di Depo Utara Harjamukti [E]'
         };
       }
       if (alive > 0) {
@@ -1065,14 +1298,38 @@
     }
 
     if (sIdx === 3) {
-      if (!campaignState.stationObjectives[3].plnDone) {
+      const o3 = campaignState.stationObjectives[3];
+      if (!o3.plnDone) {
+        if (o3.feederWestOn && o3.feederEastOn) {
+          return {
+            mode: CORE.gameMode,
+            stationName: name,
+            stationCode: code,
+            stationSub: sub,
+            objectiveTitle: 'NYALAKAN PANEL INDUK CONCOURSE',
+            objectiveDetail: 'Kedua feeder aktif — tarik sakelar induk Kuningan [E]'
+          };
+        }
+        if (o3.breakerInspected || o3.feederWestOn || o3.feederEastOn) {
+          const need = [];
+          if (!o3.feederWestOn) need.push('Feeder Barat (Trafo Jalan Barat)');
+          if (!o3.feederEastOn) need.push('Feeder Timur (Gardu PLN Timur)');
+          return {
+            mode: CORE.gameMode,
+            stationName: name,
+            stationCode: code,
+            stationSub: sub,
+            objectiveTitle: 'PULIHKAN 2 FEEDER JALANAN',
+            objectiveDetail: `Ikuti kabel kuning: ${need.join(' & ')}`
+          };
+        }
         return {
           mode: CORE.gameMode,
           stationName: name,
           stationCode: code,
           stationSub: sub,
-          objectiveTitle: 'RESTORE STREET POWER RELAY',
-          objectiveDetail: 'Restore East Boulevard PLN Substation Box [E]'
+          objectiveTitle: 'PERIKSA PANEL INDUK KUNINGAN',
+          objectiveDetail: 'Periksa panel pemutus daya utama di Concourse [E]'
         };
       }
       if (alive > 0) {
@@ -1096,14 +1353,36 @@
     }
 
     if (sIdx === 4) {
-      if (!campaignState.stationObjectives[4] || !campaignState.stationObjectives[4].barricadeCleared) {
+      const o4 = campaignState.stationObjectives[4] || {};
+      if (!o4.barricadeCleared) {
+        const hasC4 = hasKeyItem('c4_charge') || o4.c4Found;
+        if (hasC4) {
+          return {
+            mode: CORE.gameMode,
+            stationName: name,
+            stationCode: code,
+            stationSub: sub,
+            objectiveTitle: 'LEDAKKAN BARIKADE BAJA CIKOKO',
+            objectiveDetail: 'Pasang C4 [E] atau tembak roket RPG-7 ke barikade tol'
+          };
+        }
+        if (o4.barricadeInspected) {
+          return {
+            mode: CORE.gameMode,
+            stationName: name,
+            stationCode: code,
+            stationSub: sub,
+            objectiveTitle: 'AMBIL C4 & RPG-7 KONVOI MILITER',
+            objectiveDetail: 'Ikuti asap hitam & suar merah — Pojok SW (Konvoi Militer)'
+          };
+        }
         return {
           mode: CORE.gameMode,
           stationName: name,
           stationCode: code,
           stationSub: sub,
-          objectiveTitle: 'BREACH HIGHWAY BARRICADE',
-          objectiveDetail: 'Destroy Cikoko Roadblock with [E] Breach Charge or Firepower'
+          objectiveTitle: 'PERIKSA BARIKADE JALAN TOL CIKOKO',
+          objectiveDetail: 'Periksa sekat baja jalan tol di selatan stasiun [E]'
         };
       }
       if (alive > 0) {
@@ -1128,19 +1407,22 @@
 
     if (sIdx === 5) {
       const r = campaignState.stationObjectives[5].relays;
-      const count = (r.totem ? 1 : 0) + (r.pln ? 1 : 0) + (r.jpo ? 1 : 0);
+      const stDone = !!(r.street || r.pln);
+      const jpoDone = !!r.jpo;
+      const plDone = !!(r.platform || r.totem);
+      const count = (stDone ? 1 : 0) + (jpoDone ? 1 : 0) + (plDone ? 1 : 0);
       if (count < 3) {
         const missing = [];
-        if (!r.totem) missing.push('Platform Totem');
-        if (!r.pln) missing.push('Street PLN Box');
-        if (!r.jpo) missing.push('JPO Switch');
+        if (!stDone) missing.push('Relai Jalan Rasuna Said');
+        if (!jpoDone) missing.push('Relai JPO Atas');
+        if (!plDone) missing.push('Totem Peron Tengah');
         return {
           mode: CORE.gameMode,
           stationName: name,
           stationCode: code,
           stationSub: sub,
-          objectiveTitle: `ACTIVATE 3 SIGNAL RELAYS (${count}/3)`,
-          objectiveDetail: `Remaining: ${missing.join(', ')} [E]`
+          objectiveTitle: `AKTIFKAN 3 ZONA RELAI SINYAL (${count}/3)`,
+          objectiveDetail: `Tersisa: ${missing.join(', ')} [E]`
         };
       }
       if (alive > 0) {
@@ -1182,41 +1464,68 @@
     const waveRemaining = getWaveRemainingCountSafe();
 
     if (sIdx === 0) {
-      if (!obj.genOn) return ['portable_generator'];
+      if (!obj.genOn) {
+        if (hasKeyItem('fuel_can') || obj.fuelFound) return ['portable_generator'];
+        if (obj.genInspected) return ['dukuh_fuel_can'];
+        return ['portable_generator'];
+      }
       if (waveRemaining > 0) return [];
       return ['call_train'];
     }
     if (sIdx === 1) {
-      if (!obj.fuseFound) return ['cawang_derelict_cab'];
+      if (!obj.fuseFound) {
+        if (hasKeyItem('cawang_keycard') || obj.keycardFound) return ['cawang_derelict_cab'];
+        if (obj.cabInspected) return ['cawang_bypass_keycard'];
+        return ['cawang_derelict_cab'];
+      }
       if (waveRemaining > 0) return [];
       return campaignState.clearedStations.has(CORE.stationIndex) ? ['call_train', 'call_train_p2'] : ['call_train'];
     }
     if (sIdx === 2) {
-      if (!obj.vaxFound || !obj.depotDone) {
-        const targets = [];
-        if (!obj.vaxFound) targets.push('garden_supply');
-        if (!obj.depotDone) targets.push('depot_supply');
-        return targets;
+      if (!obj.depotDone) {
+        const hasCryo = hasKeyItem('harja_cryo') || obj.vaxCryoFound;
+        const hasPmi = hasKeyItem('harja_pmi_key') || obj.pmiKeyFound;
+        if (hasCryo && hasPmi) return ['depot_supply'];
+        if (obj.depotInspected || hasCryo || hasPmi) {
+          const targets = [];
+          if (!hasCryo) targets.push('garden_supply');
+          if (!hasPmi) targets.push('harja_pmi_key');
+          return targets;
+        }
+        return ['depot_supply'];
       }
       if (waveRemaining > 0) return [];
       return ['call_train', 'call_train_p2'];
     }
     if (sIdx === 3) {
-      if (!obj.plnDone) return ['city_pln_box'];
+      if (!obj.plnDone) {
+        if (obj.feederWestOn && obj.feederEastOn) return ['kuningan_main_breaker'];
+        if (obj.breakerInspected || obj.feederWestOn || obj.feederEastOn) {
+          const targets = [];
+          if (!obj.feederWestOn) targets.push('kuningan_feeder_west');
+          if (!obj.feederEastOn) targets.push('city_pln_box');
+          return targets;
+        }
+        return ['kuningan_main_breaker'];
+      }
       if (waveRemaining > 0) return [];
       return ['call_train', 'call_train_p2'];
     }
     if (sIdx === 4) {
-      if (!obj.barricadeCleared) return ['cikoko_barricade'];
+      if (!obj.barricadeCleared) {
+        if (hasKeyItem('c4_charge') || obj.c4Found) return ['cikoko_barricade'];
+        if (obj.barricadeInspected) return ['cikoko_c4_charge'];
+        return ['cikoko_barricade'];
+      }
       if (waveRemaining > 0) return [];
       return ['call_train', 'call_train_p2'];
     }
     if (sIdx === 5) {
       const r = obj.relays || {};
       const targets = [];
-      if (!r.totem) targets.push('route_totem');
-      if (!r.pln) targets.push('city_pln_box');
+      if (!(r.street || r.pln)) targets.push('setiabudi_relay_street');
       if (!r.jpo) targets.push('setiabudi_jpo_switch');
+      if (!(r.platform || r.totem)) targets.push('route_totem');
       if (targets.length > 0) return targets;
       if (waveRemaining > 0) return [];
       return ['call_train', 'call_train_p2'];
@@ -1363,6 +1672,29 @@
     }
   }
 
+  const MID_RIDE_BRIEFINGS = {
+    1: {
+      id: 'Arya, kita mendekati Cawang Interchange. Panel 750V di kabin bangkai Jalur 4 terkunci magnetik — siapkan diri menyisir Pos Sekuriti Gudang Logistik (Pojok NE) untuk kartu akses.',
+      en: 'Arya, approaching Cawang Interchange. The Track 4 derelict cab 750V panel is magnetically locked — be ready to raid the NE Logistics Security Booth for the bypass keycard.'
+    },
+    2: {
+      id: 'Harjamukti di depan, Arya. Pendingin vaksin di Depo tersegel termal — kamu perlu Cryo Stabilizer dari Kebun Atap dan Kunci PMI dari ambulans Pojok Barat Laut.',
+      en: 'Harjamukti ahead, Arya. The depot vaccine cooler is thermally sealed — you will need the Cryo Stabilizer from the Garden Terrace and the PMI Override Key from the NW ambulance.'
+    },
+    3: {
+      id: 'Arya, sensor listrik Kuningan mati total di tengah badai monsun — siap-siap ikuti kabel kuning di jalanan untuk menyalakan Feeder Barat dan Timur sebelum menarik sakelar induk.',
+      en: 'Arya, Kuningan grid sensors are completely dead in the monsoon blackout — follow the yellow asphalt cables to restore both West and East street feeders before throwing the main breaker.'
+    },
+    4: {
+      id: 'Cikoko di depan — barikade baja karantina memblokir jalur tol dan tahan peluru biasa. Pantau asap hitam di Konvoi Militer Pojok SW untuk muatan C4 atau peluncur RPG-7.',
+      en: 'Cikoko ahead — an armored quarantine barricade blocks the highway and shrugs off small arms. Look for black smoke at the SW Military Convoy for C4 charges or an RPG-7.'
+    },
+    5: {
+      id: 'Perhentian terakhir: Setiabudi. Tiga zona pemancar harus aktif serentak — Jalan Rasuna Said, JPO atas, dan Peron Tengah — untuk membuka gerbang ekstraksi Omega.',
+      en: 'Final stop: Setiabudi. All three signal relay zones — Street Boulevard, JPO Skybridge, and Central Platform — must come online to open the Omega extraction gates.'
+    }
+  };
+
   function updateTrainCampaign(dt, pState) {
     const plFlags = I.player && I.player.flags ? I.player.flags : null;
     if ((pState && (pState.docViewerOpen || pState.fastTravelOpen)) || (plFlags && plFlags.paused)) return false;
@@ -1485,6 +1817,7 @@
           }
         } else if (trState === 'DEPARTING') {
           campaignState.trainCallActive = false;
+          CORE._rideBriefingSent = false;
           CORE.gameState = STATES.TRAIN_DEPARTING;
           if (!CORE.isMoodLerping || !CORE._rideFromMoodKey || !CORE._rideToMoodKey) {
             initRideMoodTransition();
@@ -1525,6 +1858,25 @@
           typeof CORE.lerpMoodLighting === 'function' &&
           typeof LRT.Train.getRideProgress === 'function') {
         CORE.lerpMoodLighting(CORE._rideFromMoodKey, CORE._rideToMoodKey, LRT.Train.getRideProgress());
+      }
+
+      // Mid-Ride LRT Safe-Room Briefing Radio (rideProgress ~ 0.35)
+      if (trState === 'CRUISE' &&
+          CORE.activeTravelDir === 1 &&
+          CORE.gameMode === MODES.SURVIVAL &&
+          !CORE.tutorialActive &&
+          !CORE._rideBriefingSent &&
+          typeof LRT.Train.getRideProgress === 'function' &&
+          LRT.Train.getRideProgress() >= 0.32) {
+        CORE._rideBriefingSent = true;
+        const upcomingIdx = CORE.rideCompleteReady ? CORE.stationIndex : (CORE.stationIndex + 1);
+        const brief = MID_RIDE_BRIEFINGS[upcomingIdx];
+        if (brief && LRT.PlayerUI && typeof LRT.PlayerUI.showSubtitle === 'function') {
+          if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+            LRT.Audio.play('station_chime', { gain: 0.28 });
+          }
+          LRT.PlayerUI.showSubtitle('SARAH', brief.id, brief.en, 6.8);
+        }
       }
 
       // Sync PSD smooth slide & disembark flow across both Peron 1 and Peron 2

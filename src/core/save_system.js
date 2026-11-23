@@ -96,7 +96,25 @@
     campaignState.triggeredSurgeStations = new Set(c.triggeredSurgeStations || []);
     campaignState.keyItems = new Set(Array.isArray(c.keyItems) ? c.keyItems : []);
     if (typeof CORE.invalidateKeyItemsCache === 'function') CORE.invalidateKeyItemsCache();
-    if (c.stationObjectives) campaignState.stationObjectives = c.stationObjectives;
+    if (c.stationObjectives) {
+      for (const k of Object.keys(c.stationObjectives)) {
+        const idx = parseInt(k, 10);
+        if (campaignState.stationObjectives[idx] && c.stationObjectives[k]) {
+          const savedObj = c.stationObjectives[k];
+          Object.assign(campaignState.stationObjectives[idx], savedObj);
+          if (idx === 5 && savedObj.relays && campaignState.stationObjectives[5].relays) {
+            const sr = savedObj.relays;
+            campaignState.stationObjectives[5].relays = {
+              street: !!(sr.street || sr.pln),
+              jpo: !!sr.jpo,
+              platform: !!(sr.platform || sr.totem),
+              pln: !!(sr.street || sr.pln),
+              totem: !!(sr.platform || sr.totem)
+            };
+          }
+        }
+      }
+    }
     campaignState.voTriggered = new Set(c.voTriggered || []);
     campaignState.collectedLogs.length = 0;
     (c.collectedLogs || []).forEach((l) => campaignState.collectedLogs.push(l));

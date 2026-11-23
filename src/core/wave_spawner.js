@@ -333,10 +333,97 @@
     }
   }
 
+  function triggerStreetReturnAmbush(variants, anchorPos, opts) {
+    if (CORE.tutorialActive) return 0;
+    if (CORE.gameMode !== MODES.SURVIVAL) return 0;
+    if (!LRT.Enemies || typeof LRT.Enemies.spawnOneZombie !== 'function') return 0;
+    if (!Array.isArray(variants) || variants.length === 0) return 0;
+
+    const o = opts || {};
+    const ax = anchorPos && typeof anchorPos.x === 'number' ? anchorPos.x : 0;
+    const az = anchorPos && typeof anchorPos.z === 'number' ? anchorPos.z : 0;
+    const minDist = o.minDist !== undefined ? o.minDist : 11.0;
+    const maxDist = o.maxDist !== undefined ? o.maxDist : 54.0;
+
+    const cands = [];
+    const pushNode = (n) => {
+      if (!n || typeof n.x !== 'number' || typeof n.z !== 'number') return;
+      const d = Math.hypot(n.x - ax, n.z - az);
+      if (d < minDist || d > maxDist) return;
+      // Prefer street nodes lying along the return path back toward station center (0, 0)
+      const toCenterD = Math.hypot(n.x, n.z);
+      const anchorCenterD = Math.hypot(ax, az);
+      const returnBias = (toCenterD < anchorCenterD) ? -12.0 : 4.0;
+      cands.push({ x: n.x, y: n.y !== undefined ? n.y : -1.0, z: n.z, score: Math.abs(d - 22.0) + returnBias });
+    };
+
+    if (LRT.City && typeof LRT.City.getSpawnNodes === 'function') {
+      const cNodes = LRT.City.getSpawnNodes() || [];
+      for (let i = 0; i < cNodes.length; i++) pushNode(cNodes[i]);
+    }
+    if (LRT.Station && typeof LRT.Station.getSpawnNodes === 'function') {
+      const sNodes = LRT.Station.getSpawnNodes() || [];
+      for (let i = 0; i < sNodes.length; i++) {
+        const sn = sNodes[i];
+        const zTag = String((sn && (sn.zone || sn.tag)) || '').toLowerCase();
+        if (o.allowStationZones || zTag.indexOf('street') !== -1 || zTag.indexOf('crossing') !== -1) {
+          pushNode(sn);
+        }
+      }
+    }
+
+    cands.sort((a, b) => a.score - b.score);
+
+    // Fallback: synthesize return-path asphalt spawn points 16–24m toward station center
+    if (cands.length === 0) {
+      const len = Math.hypot(ax, az) || 1;
+      const dirX = -ax / len;
+      const dirZ = -az / len;
+      const perpX = -dirZ;
+      const perpZ = dirX;
+      for (let i = 0; i < Math.max(4, variants.length); i++) {
+        const dist = 16.0 + (i % 3) * 4.5;
+        const lat = ((i % 2 === 0) ? 1 : -1) * (2.5 + (i % 3) * 1.6);
+        cands.push({
+          x: ax + dirX * dist + perpX * lat,
+          y: o.fallbackY !== undefined ? o.fallbackY : -1.0,
+          z: az + dirZ * dist + perpZ * lat,
+          score: dist
+        });
+      }
+    }
+
+    let spawned = 0;
+    const spread = Math.min(cands.length, Math.max(variants.length, 4));
+    for (let i = 0; i < variants.length; i++) {
+      const pt = cands[i % spread];
+      const px = pt.x + (Math.random() - 0.5) * 1.4;
+      const pz = pt.z + (Math.random() - 0.5) * 1.4;
+      if (LRT.Enemies.spawnOneZombie(variants[i], { x: px, y: pt.y, z: pz }, {
+        isRoamer: false,
+        aggroState: 'CHASE',
+        diffKey: CORE.difficultyKey
+      })) {
+        spawned++;
+      }
+    }
+
+    if (spawned > 0) {
+      if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+        LRT.Audio.play('zombie_groan_2', { gain: 0.78 });
+      }
+      if (o.notice && LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
+        LRT.PlayerUI.setNotice(o.notice, o.noticeColor || '#f97316');
+      }
+    }
+    return spawned;
+  }
+
   CORE.pickDifficultyVariant = pickDifficultyVariant;
   CORE.gatherClusterSpawnNodes = gatherClusterSpawnNodes;
   CORE.spawnExtraInfectedCluster = spawnExtraInfectedCluster;
   CORE.triggerObjectiveSurgeWave = triggerObjectiveSurgeWave;
+  CORE.triggerStreetReturnAmbush = triggerStreetReturnAmbush;
   CORE.buildTrainCallSiegeVariants = buildTrainCallSiegeVariants;
   CORE.triggerTrainCallSiegeWave = triggerTrainCallSiegeWave;
   CORE.triggerTrainCallReinforcementTrickle = triggerTrainCallReinforcementTrickle;

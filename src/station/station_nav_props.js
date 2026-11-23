@@ -384,6 +384,74 @@
 
     station._placeNormalizedModel('ammo_box', supX + 0.85, UPPER_FLOOR_Y, supZ, 0.25, 0.26);
 
+    // Kuningan Concourse Main Breaker Cabinet (2 Street Feeder LEDs + Master Switch)
+    station._kuninganBreakerMats = null;
+    if (arch.id === 'kuningan') {
+      const kbX = !isIsland ? (concMinX + 4.8) : (p1MaxX - 1.8);
+      const kbY = 0.0;
+      const kbZ = !isIsland ? concMidZ : -14.0;
+      const kbUsed = !!(station._usedIds && station._usedIds.has('kuningan_main_breaker'));
+      const kbGrp = new THREE.Group();
+      kbGrp.name = 'KuninganMainBreaker';
+      kbGrp.position.set(kbX, kbY, kbZ);
+
+      const kbSteelMat = new THREE.MeshStandardMaterial({ color: 0x26313f, roughness: 0.46, metalness: 0.72 });
+      const kbTrimMat = new THREE.MeshStandardMaterial({ color: 0x151a22, roughness: 0.42, metalness: 0.78 });
+      const kbLeverMat = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.35, metalness: 0.32 });
+      const kbWestLed = new THREE.MeshStandardMaterial({
+        color: kbUsed ? 0x22c55e : 0xef4444,
+        emissive: kbUsed ? 0x22c55e : 0xef4444,
+        emissiveIntensity: 1.65
+      });
+      const kbEastLed = new THREE.MeshStandardMaterial({
+        color: kbUsed ? 0x22c55e : 0xef4444,
+        emissive: kbUsed ? 0x22c55e : 0xef4444,
+        emissiveIntensity: 1.65
+      });
+      const kbMasterLed = new THREE.MeshStandardMaterial({
+        color: kbUsed ? 0x22c55e : 0xef4444,
+        emissive: kbUsed ? 0x22c55e : 0xef4444,
+        emissiveIntensity: 1.65
+      });
+      station.disposableMaterials.push(kbSteelMat, kbTrimMat, kbLeverMat, kbWestLed, kbEastLed, kbMasterLed);
+
+      const addKb = (geo, mat, px, py, pz) => {
+        station.disposableGeometries.push(geo);
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(px, py, pz);
+        kbGrp.add(m);
+        return m;
+      };
+      addKb(new THREE.BoxGeometry(0.84, 0.14, 0.56), kbTrimMat, 0, 0.07, 0);
+      addKb(new THREE.BoxGeometry(0.76, 1.56, 0.46), kbSteelMat, 0, 0.92, 0);
+      addKb(new THREE.BoxGeometry(0.82, 0.08, 0.52), kbTrimMat, 0, 1.74, 0);
+      addKb(new THREE.BoxGeometry(0.24, 0.08, 0.04), kbWestLed, -0.18, 1.38, 0.24);
+      addKb(new THREE.BoxGeometry(0.24, 0.08, 0.04), kbEastLed, 0.18, 1.38, 0.24);
+      addKb(new THREE.BoxGeometry(0.46, 0.07, 0.04), kbMasterLed, 0, 1.54, 0.24);
+      addKb(new THREE.BoxGeometry(0.08, 0.34, 0.08), kbLeverMat, 0.42, 1.12, 0.06);
+      root.add(kbGrp);
+      kbGrp.updateMatrixWorld(true);
+      station._addCollider(kbX - 0.46, 0.0, kbZ - 0.32, kbX + 0.46, 1.80, kbZ + 0.32, 'metal');
+      station._kuninganBreakerMats = { westLed: kbWestLed, eastLed: kbEastLed, masterLed: kbMasterLed };
+
+      station.interactables.push({
+        id: 'kuningan_main_breaker',
+        type: 'kuningan_breaker',
+        x: kbX,
+        y: 1.15,
+        z: kbZ + 0.35,
+        used: kbUsed,
+        label: kbUsed ? '[E] Panel Induk Concourse Kuningan (Aktif)' : '[E] Periksa Panel Induk Concourse Kuningan',
+        prompt: kbUsed ? '[E] Panel Induk Concourse Kuningan (Aktif)' : '[E] Periksa Panel Induk Concourse Kuningan',
+        targetObj: kbGrp
+      });
+      if (typeof station._registerHaloTarget === 'function') {
+        station._registerHaloTarget('kuningan_main_breaker', kbGrp, {
+          category: 'interactable', x: kbX, y: 1.15, z: kbZ, hitRadius: 0.90
+        });
+      }
+    }
+
     S.loreLoot.buildFieldLogProps(station, ctx);
     S.loreLoot.buildPelicanLootboxes(station, ctx);
     S.loreLoot.buildExplosiveBarrels(station, ctx);

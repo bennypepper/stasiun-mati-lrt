@@ -319,6 +319,10 @@
       this._barrelCueActive = false;
       this._barrelCueMarker = null;
       this._cikokoBarricade = null;
+      this._cikokoC4Timer = 0;
+      this._cikokoC4BeepAccum = 0;
+      this._cawangCabLedMat = null;
+      this._kuninganBreakerMats = null;
       this._track1Barricade = null;
       this._groundPickups = null;
       this._groundPickupAssets = null;
@@ -786,6 +790,23 @@
           }
         } else if (pSprintSt && !pSprintSt.fastSprint) {
           pSprintSt.fastSprint = true;
+        }
+      }
+
+      // Cikoko planted C4 4-second beeping fuse countdown
+      if (this._cikokoC4Timer > 0 && this._cikokoBarricade && !this._cikokoBarricade.cleared) {
+        this._cikokoC4Timer -= dt;
+        this._cikokoC4BeepAccum += dt;
+        const beepInterval = this._cikokoC4Timer <= 1.5 ? 0.22 : 0.55;
+        if (this._cikokoC4BeepAccum >= beepInterval) {
+          this._cikokoC4BeepAccum = 0;
+          if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+            LRT.Audio.play('turnstile_beep', { gain: 0.62, pitchVar: 0.04 });
+          }
+        }
+        if (this._cikokoC4Timer <= 0) {
+          this._cikokoC4Timer = 0;
+          this.breachCikokoBarricade();
         }
       }
 
@@ -1862,9 +1883,30 @@
         const nearZ = Math.abs(lz - bc.z) <= (0.9 + rad);
         const nearY = Math.abs(ly - (bc.y + 0.7)) <= (1.8 + rad);
         if (nearX && nearZ && nearY) {
-          bc.hp -= (isExplosion ? dmgVal * 1.6 : dmgVal);
-          if (bc.hp <= 0) {
-            this.breachCikokoBarricade();
+          const core = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core;
+          const armoredInSurvival = !!(core && core.gameMode === 'survival' && !core.tutorialActive);
+          if (armoredInSurvival && !isExplosion) {
+            if (LRT.Weapons && typeof LRT.Weapons.spawnSparks === 'function') {
+              LRT.Weapons.spawnSparks(origin, 12);
+            }
+            if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+              LRT.Audio.play('impact_metal', { pos: origin, gain: 0.72, pitchVar: 0.14 });
+            }
+            if (core.campaignState && core.campaignState.stationObjectives && core.campaignState.stationObjectives[4]) {
+              core.campaignState.stationObjectives[4].barricadeInspected = true;
+            }
+            if (!this._cikokoArmorNoticeAt || (this._timeAccum - this._cikokoArmorNoticeAt) > 2.2) {
+              this._cikokoArmorNoticeAt = this._timeAccum;
+              if (LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
+                LRT.PlayerUI.setNotice('BARIKADE BAJA TERLALU TEBAL — BUTUH PELEDAK C4 / RPG DARI KONVOI MILITER (POJOK SW)', '#e0b422');
+              }
+            }
+          } else {
+            bc.hp -= (isExplosion ? Math.max(bc.hp, dmgVal * 1.6) : dmgVal);
+            if (bc.hp <= 0) {
+              this._cikokoC4Timer = 0;
+              this.breachCikokoBarricade();
+            }
           }
         }
       }
@@ -2109,6 +2151,29 @@
       }
 
       if (it.type === 'generator' || it.id === 'portable_generator') {
+        const core = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core;
+        const needsFuel = !!(
+          core &&
+          core.gameMode === 'survival' &&
+          !core.tutorialActive &&
+          !it.used &&
+          this._stationIndex % 6 === 0 &&
+          typeof core.hasKeyItem === 'function' &&
+          !core.hasKeyItem('fuel_can')
+        );
+        if (needsFuel) {
+          if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('dry_fire', { gain: 0.8 });
+          it.label = '[E] Generator Kering — Butuh Jerigen Solar (Pojok SE)';
+          it.prompt = it.label;
+          return {
+            ok: true,
+            type: 'generator',
+            action: 'generator_dry',
+            logTitle: 'Slip Perawatan Generator — Dukuh Atas',
+            logBody: '16 November, pukul 18.05 WIB — Ruang Genset Concourse.\n\nTangki generator portabel ini sudah benar-benar kering sejak pemadaman kedua sore tadi.\n\n**PETUNJUK LOKASI:** Solar cadangan terakhir diangkut petugas ke **Pos Ronda & Warung Kopi (Pojok Tenggara / SE)** di seberang jalan timur. Ikuti lampu jalan ke arah tenggara untuk mengambil Jerigen Solar.',
+            message: 'TANGKI BBM KOSONG — CARI JERIGEN SOLAR DI POJOK SE (POS RONDA & WARUNG)'
+          };
+        }
         if (LRT.Audio) {
           if (LRT.Audio.play) LRT.Audio.play('generator_start', { gain: 0.9 });
           if (LRT.Audio.startLoop) LRT.Audio.startLoop('generator_loop', 0.32, 1.2, 1.0);
@@ -2128,19 +2193,46 @@
           ok: true,
           type: 'generator',
           action: 'generator',
+          consumeKeyItemId: 'fuel_can',
           lurePos: { x: it.x, y: it.y, z: it.z },
-          message: 'Generator Darurat Aktif — Lampu & Gerbang KAI Menyala!'
+          message: 'Solar dituang — Generator Darurat Aktif & Lampu Stasiun Menyala!'
         };
       }
 
       if (it.type === 'derelict_fuse' || it.id === 'cawang_derelict_cab') {
+        const core = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core;
+        const needsKeycard = !!(
+          core &&
+          core.gameMode === 'survival' &&
+          !core.tutorialActive &&
+          !it.used &&
+          typeof core.hasKeyItem === 'function' &&
+          !core.hasKeyItem('cawang_keycard')
+        );
+        if (needsKeycard) {
+          if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('dry_fire', { gain: 0.8 });
+          it.label = '[E] Panel 750V Terkunci — Butuh Kartu Akses (Pojok NE)';
+          it.prompt = it.label;
+          return {
+            ok: true,
+            type: 'derelict_fuse',
+            action: 'derelict_locked',
+            logTitle: 'Log Darurat Masinis — Cawang Interchange',
+            logBody: '16 November, pukul 18.40 WIB — Kabin Rangkaian Delapan.\n\nRangkaian Bekasi anjlok menabrak wesel pemindah jalur dan kotak sekring 750V otomatis terkunci magnetik.\n\n**PETUNJUK LOKASI:** Kartu akses bypass 750V disimpan kepala regu di **Pos Keamanan Gudang Logistik (Pojok Timur Laut / NE)**. Cari meja loket sekuriti di sebelah radio darurat.',
+            message: 'PANEL 750V TERKUNCI MAGNETIK — CARI KARTU AKSES DI POS SEKURITI POJOK NE'
+          };
+        }
         if (LRT.Audio && LRT.Audio.play) {
           LRT.Audio.play('electric_box_open', { gain: 0.8 });
           LRT.Audio.play('breaker_throw', { gain: 0.65 });
         }
+        if (this._cawangCabLedMat) {
+          this._cawangCabLedMat.color.setHex(0x22c55e);
+          this._cawangCabLedMat.emissive.setHex(0x22c55e);
+        }
         const fresh = !it.used;
         it.used = true;
-        it.label = '[E] Kabin Bangkai LRT Cawang (Sudah Digeledah)';
+        it.label = '[E] Kabin Bangkai LRT Cawang (Terbuka)';
         it.prompt = it.label;
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
@@ -2149,10 +2241,11 @@
           ok: true,
           type: 'derelict_fuse',
           action: 'derelict_fuse',
+          consumeKeyItemId: 'cawang_keycard',
           ammo: fresh ? { type: 'shotgun', amount: 18 } : null,
           logTitle: 'Catatan Masinis Kereta Rangkaian Delapan',
-          logBody: '16 November, pukul 18.40 WIB.\n\nKereta dari arah Bekasi anjlok menabrak wesel pemindah jalur di Cawang. Seluruh petugas stasiun sudah mundur ke Peron Empat. Jangan biarkan orang-orang yang terinfeksi itu mendekati tangki hidrogen cadangan.\n\nPeluru karet sama sekali tidak mempan terhadap mereka. Bagi siapa pun yang menemukan catatan ini di kabin, segera ambil sekring di bawah meja kendali dan nyalakan kembali aliran listrik peron sebelum terlambat.\n\nHendra, Masinis Utama',
-          message: fresh ? 'Sekring Bypass dan Shotgun ditemukan' : 'Kabin bangkai kereta Cawang sudah digeledah.'
+          logBody: '16 November, pukul 18.40 WIB.\n\nKereta dari arah Bekasi anjlok menabrak wesel pemindah jalur di Cawang. Seluruh petugas stasiun sudah mundur ke Peron Empat. Jangan biarkan orang-orang yang terinfeksi itu mendekati tangki hidrogen cadangan.\n\nPeluru karet sama sekali tidak mempan terhadap mereka. Gunakan Shotgun 12G dari loker kabin ini dan sekring bypass 750V untuk mengaktifkan kembali sinyal peron.\n\nHendra, Masinis Utama',
+          message: fresh ? 'Panel 750V Terbuka — Sekring Bypass & Shotgun 12G diperoleh!' : 'Kabin bangkai kereta Cawang sudah digeledah.'
         };
       }
 
@@ -2254,6 +2347,9 @@
       }
 
       if (it.type === 'jpo2_supply' || it.id === 'jpo2_supply') {
+        const core = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core;
+        const diffKey = core && core.difficultyKey ? String(core.difficultyKey).toLowerCase() : 'medium';
+        const lockerAmmoScale = diffKey === 'easy' ? 1.0 : 0.75;
         if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('crate_open', { gain: 0.78 });
         const fresh = !it.used;
         it.used = true;
@@ -2262,16 +2358,17 @@
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
         this._syncObjectiveBeacons();
+        const amt = Math.max(10, Math.round(20 * lockerAmmoScale));
         return {
           ok: true,
           type: 'jpo2_supply',
           action: 'jpo2_supply',
           heal: fresh ? 15 : 0,
           healAmount: fresh ? 15 : 0,
-          ammo: fresh ? { type: 'all', amount: 20 } : null,
+          ammo: fresh ? { type: 'all', amount: amt } : null,
           ammoBonus: fresh ? 1 : 0,
           message: fresh
-            ? 'Tas Logistik JPO Sekunder: +20 Amunisi & +15 HP diamankan!'
+            ? `Tas Logistik JPO Sekunder: +${amt} Amunisi & +15 HP diamankan!`
             : 'Tas Logistik JPO Sekunder sudah diambil.'
         };
       }
@@ -2292,6 +2389,9 @@
       }
 
       if (it.type === 'jaklingko') {
+        const core = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core;
+        const diffKey = core && core.difficultyKey ? String(core.difficultyKey).toLowerCase() : 'medium';
+        const lockerAmmoScale = diffKey === 'easy' ? 1.0 : 0.75;
         if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('electric_box_open', { gain: 0.7 });
         const bonus = it.used ? 0 : 1;
         it.used = true;
@@ -2302,7 +2402,7 @@
         this._syncObjectiveBeacons();
         const res = {
           ok: true, type: 'jaklingko',
-          ammo: bonus > 0 ? { type: 'rifle', amount: 30 } : null, ammoBonus: bonus,
+          ammo: bonus > 0 ? { type: 'rifle', amount: Math.max(15, Math.round(30 * lockerAmmoScale)) } : null, ammoBonus: bonus,
           message: bonus > 0 ? 'Menemukan suplai amunisi darurat di loker JakLingko.' : 'Terminal JakLingko kosong.'
         };
         if (bonus > 0) {
@@ -2313,7 +2413,38 @@
       }
 
       if (it.type === 'balcony_supply') {
-        if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('crate_open', { gain: 0.78 });
+        const core = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core;
+        const isSurvival = !!(core && core.gameMode === 'survival' && !core.tutorialActive);
+        const diffKey = core && core.difficultyKey ? String(core.difficultyKey).toLowerCase() : 'medium';
+        const lockerAmmoScale = diffKey === 'easy' ? 1.0 : 0.75;
+
+        // Harjamukti Station 03: Sealed Depot Vaccine Cooler requires BOTH Cryo Stabilizer + PMI Override Key
+        if (it.id === 'depot_supply' && this._stationIndex % 6 === 2 && isSurvival && !it.used) {
+          const s2 = core.campaignState && core.campaignState.stationObjectives && core.campaignState.stationObjectives[2];
+          const hasCryo = !!(typeof core.hasKeyItem === 'function' && core.hasKeyItem('harja_cryo')) || !!(s2 && s2.vaxCryoFound);
+          const hasPmi = !!(typeof core.hasKeyItem === 'function' && core.hasKeyItem('harja_pmi_key')) || !!(s2 && s2.pmiKeyFound);
+          if (!hasCryo || !hasPmi) {
+            if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('dry_fire', { gain: 0.8 });
+            const missingParts = [];
+            if (!hasCryo) missingParts.push('Cryo Stabilizer (Kebun Atap)');
+            if (!hasPmi) missingParts.push('Kunci Triage PMI (Pojok NW — Ambulans)');
+            it.label = `[E] Pendingin Vaksin Tersegel — Butuh ${missingParts.join(' & ')}`;
+            it.prompt = it.label;
+            return {
+              ok: true,
+              type: 'balcony_supply',
+              action: 'depot_sealed',
+              logTitle: 'Disposisi Lapangan PMI — Harjamukti',
+              logBody: '17 November — Pos Depo Bio-Kontainmen Harjamukti.\n\nTabung vaksin spora terkunci termal-biometrik agar tidak rusak selama pemadaman.\n\n**PETUNJUK LOKASI:** Untuk membuka peti pendingin, gabungkan dua komponen:\n1. **Cryo Stabilizer Pack** di meja triase **Kebun Atap (Garden Terrace)** stasiun.\n2. **Kunci Triage PMI** di bagian belakang ambulans **Posko Medis PMI (Pojok Barat Laut / NW)** — ikuti lampu strobo biru-merah di seberang jalan barat.',
+              message: `PENDINGIN VAKSIN TERSEGEL — BUTUH: ${missingParts.join(' + ').toUpperCase()}`
+            };
+          }
+        }
+
+        if (LRT.Audio && LRT.Audio.play) {
+          LRT.Audio.play('crate_open', { gain: 0.78 });
+          if (it.id === 'depot_supply' || it.id === 'garden_supply') LRT.Audio.play('loot_chime', { gain: 0.65 });
+        }
         const fresh = !it.used;
         it.used = true;
         it.label = it.label.replace(/\(\+[^)]+\)/, '(Sudah Diambil)');
@@ -2322,10 +2453,45 @@
         if (this._usedIds) this._usedIds.add(id);
         this._markFieldLogGlintUsed(id);
         this._syncObjectiveBeacons();
+
+        if (it.id === 'garden_supply' && this._stationIndex % 6 === 2 && isSurvival) {
+          return {
+            ok: true,
+            type: 'balcony_supply',
+            action: 'harja_cryo_pickup',
+            keyItemId: fresh ? 'harja_cryo' : null,
+            heal: fresh ? 20 : 0,
+            healAmount: fresh ? 20 : 0,
+            ammo: fresh ? { type: 'all', amount: Math.max(12, Math.round(24 * lockerAmmoScale)) } : null,
+            ammoBonus: fresh ? 1 : 0,
+            logTitle: 'Catatan Penelitian Dokter Rina Wulandari',
+            logBody: 'Hari keempat pengamatan di kebun atap Harjamukti.\n\nSpora ini berkembang cepat di tempat gelap dan lembap, namun getaran klakson frekuensi rendah kereta membuat mereka terhuyung. Saya tinggalkan **Cryo Stabilizer Pack** di sini.\n\n**PETUNJUK LOKASI:** Kunci biometrik pendingin Depo masih dibawa petugas ambulans di **Posko Medis PMI (Pojok Barat Laut / NW)** — cari strobo merah-biru di seberang jalan barat.',
+            message: fresh ? 'CRYO STABILIZER DIAMANKAN — WASPADA SPITTER DI KEBUN ATAP!' : 'Meja Kebun Atap sudah diambil.'
+          };
+        }
+
+        if (it.id === 'depot_supply' && this._stationIndex % 6 === 2 && isSurvival) {
+          if (fresh && LRT.Weapons && typeof LRT.Weapons.addAmmo === 'function') {
+            LRT.Weapons.addAmmo('rifle', Math.max(15, Math.round(30 * lockerAmmoScale)));
+          }
+          return {
+            ok: true,
+            type: 'balcony_supply',
+            action: 'depot_unlocked',
+            heal: fresh ? 25 : 0,
+            healAmount: fresh ? 25 : 0,
+            ammo: fresh ? { type: 'rpg', amount: 3 } : null,
+            ammoBonus: fresh ? 1 : 0,
+            logTitle: 'Surat Tugas Teknisi Depo Harjamukti',
+            logBody: 'Pendingin bio-kontainmen terbuka dan sampel vaksin spora telah diamankan dalam tabung Cryo.\n\nKereta cadangan hidrogen di jalur timur siap dipanggil dari peron begitu jalur dibersihkan.',
+            message: fresh ? 'PENDINGIN TERBUKA — SAMPEL VAKSIN SPORA & AMUNISI BERAT DIAMANKAN!' : 'Loker Depo Harjamukti sudah kosong.'
+          };
+        }
+
         const res = {
           ok: true, type: 'balcony_supply',
           heal: fresh ? 25 : 0, healAmount: fresh ? 25 : 0,
-          ammo: fresh ? (it.id === 'depot_supply' ? { type: 'rpg', amount: 3 } : { type: 'all', amount: 30 }) : null,
+          ammo: fresh ? (it.id === 'depot_supply' ? { type: 'rpg', amount: 3 } : { type: 'all', amount: Math.max(12, Math.round(30 * lockerAmmoScale)) }) : null,
           ammoBonus: fresh ? 1 : 0,
           message: fresh ? (it.id === 'garden_supply' ? 'Kotak Medis Kebun Atap: Antiviral Serum dan Amunisi diamankan.' : (it.id === 'depot_supply' ? 'Loker Taktis Depot: Pelontar Roket dan Amunisi diambil.' : 'Loker Taktis: Amunisi dan Medkit diambil.')) : 'Loker persediaan sudah diambil.'
         };
@@ -2337,11 +2503,53 @@
             res.logTitle = 'Surat Tugas Teknisi Depo Harjamukti';
             res.logBody = 'Untuk rekan teknisi jaga malam,\n\nKereta rangkaian keempat yang parkir di jalur timur adalah kereta cadangan berbahan bakar hidrogen. Kereta ini tetap bisa berjalan meskipun aliran listrik dari gardu induk padam sepenuhnya.\n\nJika kalian harus keluar dari Harjamukti malam ini, nyalakan lebih dulu sakelar cadangan di ruang mesin, lalu panggil kereta dari ujung peron. Selama tabung bahan bakar di bagian atap tidak bocor terkena tembakan, kereta ini sanggup membawa kalian menembus jalur selatan sampai ke titik penjemputan.';
             if (LRT.Weapons && typeof LRT.Weapons.addAmmo === 'function') {
-              LRT.Weapons.addAmmo('rifle', 30);
+              LRT.Weapons.addAmmo('rifle', Math.max(15, Math.round(30 * lockerAmmoScale)));
             }
           }
         }
         return res;
+      }
+
+      if (it.id === 'kuningan_main_breaker' || it.type === 'kuningan_breaker') {
+        const core = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core;
+        const s3 = core && core.campaignState && core.campaignState.stationObjectives && core.campaignState.stationObjectives[3];
+        const isSurvival = !!(core && core.gameMode === 'survival' && !core.tutorialActive);
+        const westOn = !isSurvival || !!(s3 && s3.feederWestOn);
+        const eastOn = !isSurvival || !!(s3 && s3.feederEastOn);
+        if (isSurvival && !it.used && (!westOn || !eastOn)) {
+          if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('dry_fire', { gain: 0.8 });
+          const statusMsg = `FEEDER BARAT: ${westOn ? 'ON' : 'OFF'} | FEEDER TIMUR: ${eastOn ? 'ON' : 'OFF'}`;
+          it.label = `[E] Panel Induk Kuningan (${statusMsg})`;
+          it.prompt = it.label;
+          return {
+            ok: true,
+            type: 'kuningan_breaker',
+            action: 'kuningan_breaker_locked',
+            logTitle: 'Log Gardu Induk — Stasiun Kuningan',
+            logBody: '17 November — Ruang Panel Concourse Kuningan.\n\nKedua jalur pasokan jalanan trip serentak saat badai monsun menghantam Rasuna Said.\n\n**PETUNJUK LOKASI:** Ikuti dua **kabel kuning berinsulasi di atas aspal** keluar stasiun untuk mengaktifkan kedua gardu (bebas pilih urutan):\n- **Feeder Barat**: Trafo Jalan Barat di seberang jalan sisi barat.\n- **Feeder Timur**: Gardu PLN Jalan Timur di sisi timur.\nSetelah kedua LED menyala hijau, kembali ke Panel Induk Concourse ini.',
+            message: `SAKELAR UTAMA TERPUTUS — ${statusMsg}`
+          };
+        }
+        if (LRT.Audio && LRT.Audio.play) {
+          LRT.Audio.play('breaker_throw', { gain: 0.9 });
+          LRT.Audio.play('generator_start', { gain: 0.78 });
+        }
+        it.used = true;
+        it.label = '[E] Panel Induk Concourse Kuningan (Aktif)';
+        it.prompt = it.label;
+        if (this._usedIds) this._usedIds.add(id);
+        this.syncKuninganBreakerLeds(true, true, true);
+        this._powerRestored = true;
+        this.setLightingFactor(Math.max(this._lightingFactor, 1.15));
+        this._markFieldLogGlintUsed(id);
+        this._syncObjectiveBeacons();
+        return {
+          ok: true,
+          type: 'kuningan_breaker',
+          action: 'kuningan_breaker_on',
+          lurePos: { x: it.x, y: it.y, z: it.z },
+          message: 'PANEL INDUK KUNINGAN AKTIF — DAYA STASIUN & SINYAL LRT PULIH!'
+        };
       }
 
       if (it.type === 'bench') {
@@ -2454,6 +2662,56 @@
       }
 
       if (it.id === 'cikoko_barricade' || it.type === 'barricade_breach') {
+        const core = window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core;
+        const isSurvival = !!(core && core.gameMode === 'survival' && !core.tutorialActive);
+        const bc = this._cikokoBarricade;
+        if (bc && bc.cleared) {
+          return {
+            ok: true,
+            type: 'barricade_breach',
+            action: 'barricade_breach',
+            fresh: false,
+            message: 'Barikade jalan tol Cikoko sudah ditembus.'
+          };
+        }
+        if (this._cikokoC4Timer > 0) {
+          return {
+            ok: true,
+            type: 'barricade_breach',
+            action: 'barricade_c4_armed',
+            fresh: false,
+            message: `MUATAN C4 AKTIF — MENJAUH! (${Math.ceil(this._cikokoC4Timer)}s)`
+          };
+        }
+        if (isSurvival) {
+          const hasC4 = !!(typeof core.hasKeyItem === 'function' && core.hasKeyItem('c4_charge'));
+          if (!hasC4) {
+            if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('dry_fire', { gain: 0.8 });
+            it.label = '[E] Barikade Baja — Butuh C4 / RPG-7 (Pojok SW)';
+            it.prompt = it.label;
+            return {
+              ok: true,
+              type: 'barricade_breach',
+              action: 'barricade_locked',
+              logTitle: 'Catatan Radio Pos Zeni TNI — Cikoko',
+              logBody: '17 November — Sekat Jalan Tol Cikoko.\n\nBarikade beton dan pelat baja ini terlalu tebal untuk peluru biasa.\n\n**PETUNJUK LOKASI:** Unit zeni mundur ke **Konvoi Militer (Pojok Barat Daya / SW)**. Ikuti kolom asap hitam dan suar merah di barat daya — tas **Peledak C4** dan **Peluncur RPG-7** masih ada di samping truk militer.',
+              message: 'BARIKADE BAJA TERLALU TEBAL — CARI C4 / RPG-7 DI KONVOI MILITER (POJOK SW)'
+            };
+          }
+          this._cikokoC4Timer = 4.0;
+          this._cikokoC4BeepAccum = 0;
+          if (LRT.Audio && LRT.Audio.play) LRT.Audio.play('turnstile_beep', { gain: 0.8 });
+          it.label = 'C4 TERPASANG — MENJAUH!';
+          it.prompt = it.label;
+          return {
+            ok: true,
+            type: 'barricade_breach',
+            action: 'barricade_c4_planted',
+            consumeKeyItemId: 'c4_charge',
+            fresh: true,
+            message: 'C4 TERPASANG — MENJAUH! LEDAKAN DALAM 4 DETIK!'
+          };
+        }
         const breachedNow = this.breachCikokoBarricade();
         return {
           ok: true,
@@ -2485,6 +2743,20 @@
       }
 
       return { ok: false };
+    },
+
+    syncKuninganBreakerLeds: function (westOn, eastOn, masterOn) {
+      const m = this._kuninganBreakerMats;
+      if (!m) return;
+      const setLed = (mat, on) => {
+        if (!mat) return;
+        const hex = on ? 0x22c55e : 0xef4444;
+        mat.color.setHex(hex);
+        mat.emissive.setHex(hex);
+      };
+      setLed(m.westLed, !!westOn);
+      setLed(m.eastLed, !!eastOn);
+      setLed(m.masterLed, !!masterOn);
     },
 
     triggerBarrel: function (id) {
