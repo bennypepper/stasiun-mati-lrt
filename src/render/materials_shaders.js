@@ -1128,6 +1128,7 @@
     const hoverColorHex = o.hoverColor !== undefined ? o.hoverColor : 0xfacc15;
     const objColorHex = o.objectiveColor !== undefined ? o.objectiveColor : 0xfde047;
     const thicknessMult = o.thicknessScale !== undefined ? o.thicknessScale : 1.0;
+    const subtleOpacity = o.subtleOpacity !== undefined ? o.subtleOpacity : 0.34;
     const phase = o.phase !== undefined ? o.phase : (Math.random() * Math.PI * 2);
 
     const makeHaloMat = (side) => {
@@ -1192,15 +1193,15 @@
         const u = mats[i].uniforms;
         if (m === 'subtle') {
           u.uColor.value.setHex(baseColorHex);
-          u.uOpacity.value = 0.28;
-          u.uThickness.value = 0.011 * thicknessMult;
+          u.uOpacity.value = subtleOpacity;
+          u.uThickness.value = 0.012 * thicknessMult;
         } else if (m === 'hover') {
           u.uColor.value.setHex(hoverColorHex);
-          u.uOpacity.value = 0.90;
-          u.uThickness.value = 0.018 * thicknessMult;
+          u.uOpacity.value = 0.96;
+          u.uThickness.value = 0.019 * thicknessMult;
         } else if (m === 'objective') {
           u.uColor.value.setHex(objColorHex);
-          u.uOpacity.value = 0.85;
+          u.uOpacity.value = 0.88;
           u.uThickness.value = 0.022 * thicknessMult;
         }
       }

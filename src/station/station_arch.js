@@ -1294,11 +1294,11 @@
         addJpoWayfindingGantry(stairX, 6.42, nearGantryZ, 0.0, SIGN_UV.jpoWayfinding, jpoPergolaY);
         if (!isIsland) {
           addJpoWayfindingGantry(-9.4, 6.42, nearGantryZ, 0.0, SIGN_UV.peron2, jpoPergolaY);
-          addJpoWayfindingGantry(jpoCX, 6.42, jpoZ, Math.PI * 0.5, SIGN_UV.jpoWayfinding, jpoPergolaY);
+          // Center mid-span gantry cleanly over tracks (-2.35) so it never overlaps stairX gantry!
+          addJpoWayfindingGantry(-2.35, 6.42, jpoZ, Math.PI * 0.5, SIGN_UV.jpoWayfinding, jpoPergolaY);
         } else {
           addJpoWayfindingGantry(jpoSpanMinX + 1.7, 6.42, nearGantryZ, 0.0, SIGN_UV.exitYellow, jpoPergolaY);
           addJpoWayfindingGantry(jpoSpanMaxX - 1.7, 6.42, nearGantryZ, 0.0, SIGN_UV.exitYellow, jpoPergolaY);
-          addJpoWayfindingGantry(jpoCX, 6.42, jpoZ, Math.PI * 0.5, SIGN_UV.jpoWayfinding, jpoPergolaY);
         }
       }
     }

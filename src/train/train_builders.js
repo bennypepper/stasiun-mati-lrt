@@ -638,8 +638,8 @@
 
     ctx.textAlign = 'center';
     ctx.fillStyle = isForward ? '#34D399' : '#FBBF24';
-    ctx.font = 'bold 20px sans-serif';
-    ctx.fillText(isForward ? 'MAJU →' : '← KEMBALI', 87, 44);
+    ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
+    ctx.fillText(isForward ? 'LIN CB/BK →' : '← LIN CB/BK', 87, 44);
     ctx.fillStyle = isForward ? '#A7F3D0' : '#FDE68A';
     ctx.font = 'bold 13px monospace';
     ctx.fillText(isForward ? 'PERON 1' : 'PERON 2', 87, 68);
@@ -687,9 +687,9 @@
     ctx.fillStyle = isForward ? '#059669' : '#D97706';
     ctx.fillRect(298, 14, 196, 26);
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 13px sans-serif';
+    ctx.font = 'bold 13px "Segoe UI", Arial, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(isForward ? 'MAJU →  •  PERON 1' : '← KEMBALI  •  PERON 2', 396, 32);
+    ctx.fillText(isForward ? 'PERON 1  •  LIN CB / BK' : 'PERON 2  •  LIN CB / BK', 396, 32);
 
     ctx.textAlign = 'left';
     ctx.fillStyle = isForward ? '#065F46' : '#92400E';

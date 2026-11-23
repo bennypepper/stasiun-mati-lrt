@@ -1372,38 +1372,62 @@
       }
     }
 
-    // Streetlamps along Boulevards, Station Promenade Portals & Level Crossings (3 Pooled PointLights + emissive bulbs on ALL poles!)
+    // Evenly distributed Jakarta PJU Streetlamps across ENTIRE map (inner promenades, outer boulevards, collector roads & perimeter avenues)
+    // All poles share 1 InstancedMesh batch (zero extra draw calls!)
     const lampSpecs = [
-      // East inner promenade curb (along East Boulevard & station portals)
+      // Inner East promenade curb
       { x: eastInnerSwMaxX - 0.55, z: -88, ry: 0, lit: true },
-      { x: eastInnerSwMaxX - 0.55, z: -66, ry: 0, lit: true },
-      { x: eastInnerSwMaxX - 0.55, z: -41, ry: 0, lit: true },
-      { x: eastInnerSwMaxX - 0.55, z: -20, ry: 0, lit: true },
-      { x: eastInnerSwMaxX - 0.55, z: 0,   ry: 0, lit: true },
-      { x: eastInnerSwMaxX - 0.55, z: 20,  ry: 0, lit: true },
-      { x: eastInnerSwMaxX - 0.55, z: 41,  ry: 0, lit: true },
-      { x: eastInnerSwMaxX - 0.55, z: 66,  ry: 0, lit: true },
-      { x: eastInnerSwMaxX - 0.55, z: 88,  ry: 0, lit: true },
-      // West inner promenade curb (along West Boulevard & platform edges)
+      { x: eastInnerSwMaxX - 0.55, z: -60, ry: 0, lit: true },
+      { x: eastInnerSwMaxX - 0.55, z: -32, ry: 0, lit: true },
+      { x: eastInnerSwMaxX - 0.55, z: -6,  ry: 0, lit: true },
+      { x: eastInnerSwMaxX - 0.55, z: 22,  ry: 0, lit: true },
+      { x: eastInnerSwMaxX - 0.55, z: 50,  ry: 0, lit: true },
+      { x: eastInnerSwMaxX - 0.55, z: 82,  ry: 0, lit: true },
+      // Inner West promenade curb
       { x: westInnerSwMinX + 0.55, z: -88, ry: Math.PI, lit: true },
-      { x: westInnerSwMinX + 0.55, z: -66, ry: Math.PI, lit: true },
-      { x: westInnerSwMinX + 0.55, z: -41, ry: Math.PI, lit: true },
-      { x: westInnerSwMinX + 0.55, z: -18, ry: Math.PI, lit: true },
-      { x: westInnerSwMinX + 0.55, z: 0,   ry: Math.PI, lit: true },
-      { x: westInnerSwMinX + 0.55, z: 18,  ry: Math.PI, lit: true },
-      { x: westInnerSwMinX + 0.55, z: 41,  ry: Math.PI, lit: true },
-      { x: westInnerSwMinX + 0.55, z: 66,  ry: Math.PI, lit: true },
-      { x: westInnerSwMinX + 0.55, z: 88,  ry: Math.PI, lit: true },
-      // Outer boulevard curbs
-      { x: eastOuterSwMinX + 0.55, z: -42, ry: Math.PI, lit: true },
-      { x: eastOuterSwMinX + 0.55, z: 42,  ry: Math.PI, lit: true },
-      { x: westOuterSwMaxX - 0.55, z: -42, ry: 0, lit: true },
-      { x: westOuterSwMaxX - 0.55, z: 42,  ry: 0, lit: true },
-      // Level crossing flank lamps (z = ±74 crossings)
+      { x: westInnerSwMinX + 0.55, z: -60, ry: Math.PI, lit: true },
+      { x: westInnerSwMinX + 0.55, z: -32, ry: Math.PI, lit: true },
+      { x: westInnerSwMinX + 0.55, z: -6,  ry: Math.PI, lit: true },
+      { x: westInnerSwMinX + 0.55, z: 22,  ry: Math.PI, lit: true },
+      { x: westInnerSwMinX + 0.55, z: 50,  ry: Math.PI, lit: true },
+      { x: westInnerSwMinX + 0.55, z: 82,  ry: Math.PI, lit: true },
+      // Outer East boulevard curb (staggered evenly along ruko & tower frontage)
+      { x: eastOuterSwMinX + 0.55, z: -76, ry: Math.PI, lit: true },
+      { x: eastOuterSwMinX + 0.55, z: -46, ry: Math.PI, lit: true },
+      { x: eastOuterSwMinX + 0.55, z: -18, ry: Math.PI, lit: true },
+      { x: eastOuterSwMinX + 0.55, z: 10,  ry: Math.PI, lit: true },
+      { x: eastOuterSwMinX + 0.55, z: 38,  ry: Math.PI, lit: true },
+      { x: eastOuterSwMinX + 0.55, z: 68,  ry: Math.PI, lit: true },
+      // Outer West boulevard curb (staggered evenly)
+      { x: westOuterSwMaxX - 0.55, z: -76, ry: 0, lit: true },
+      { x: westOuterSwMaxX - 0.55, z: -46, ry: 0, lit: true },
+      { x: westOuterSwMaxX - 0.55, z: -18, ry: 0, lit: true },
+      { x: westOuterSwMaxX - 0.55, z: 10,  ry: 0, lit: true },
+      { x: westOuterSwMaxX - 0.55, z: 38,  ry: 0, lit: true },
+      { x: westOuterSwMaxX - 0.55, z: 68,  ry: 0, lit: true },
+      // East Collector Road (outer district streetlamps — eliminates dark outer-map zones!)
+      { x: eastColRoadMinX - 0.55, z: -82, ry: 0, lit: true },
+      { x: eastColRoadMinX - 0.55, z: -48, ry: 0, lit: true },
+      { x: eastColRoadMinX - 0.55, z: -14, ry: 0, lit: true },
+      { x: eastColRoadMinX - 0.55, z: 20,  ry: 0, lit: true },
+      { x: eastColRoadMinX - 0.55, z: 54,  ry: 0, lit: true },
+      { x: eastColRoadMinX - 0.55, z: 86,  ry: 0, lit: true },
+      // West Collector Road (outer district streetlamps)
+      { x: westColRoadMaxX + 0.55, z: -82, ry: Math.PI, lit: true },
+      { x: westColRoadMaxX + 0.55, z: -48, ry: Math.PI, lit: true },
+      { x: westColRoadMaxX + 0.55, z: -14, ry: Math.PI, lit: true },
+      { x: westColRoadMaxX + 0.55, z: 20,  ry: Math.PI, lit: true },
+      { x: westColRoadMaxX + 0.55, z: 54,  ry: Math.PI, lit: true },
+      { x: westColRoadMaxX + 0.55, z: 86,  ry: Math.PI, lit: true },
+      // South & North Perimeter Cross-Streets & Level Crossing Flanks
+      { x: -52, z: CROSSING_Z_SOUTH - 6.8, ry: -Math.PI * 0.5, lit: true },
       { x: cMinX - 2.2, z: CROSSING_Z_SOUTH - 6.8, ry: -Math.PI * 0.5, lit: true },
       { x: cMaxX + 2.2, z: CROSSING_Z_SOUTH - 6.8, ry: -Math.PI * 0.5, lit: true },
+      { x: 64,  z: CROSSING_Z_SOUTH - 6.8, ry: -Math.PI * 0.5, lit: true },
+      { x: -52, z: CROSSING_Z_NORTH + 6.8, ry: Math.PI * 0.5, lit: true },
       { x: cMinX - 2.2, z: CROSSING_Z_NORTH + 6.8, ry: Math.PI * 0.5, lit: true },
-      { x: cMaxX + 2.2, z: CROSSING_Z_NORTH + 6.8, ry: Math.PI * 0.5, lit: true }
+      { x: cMaxX + 2.2, z: CROSSING_Z_NORTH + 6.8, ry: Math.PI * 0.5, lit: true },
+      { x: 64,  z: CROSSING_Z_NORTH + 6.8, ry: Math.PI * 0.5, lit: true }
     ];
     for (let i = 0; i < lampSpecs.length; i++) {
       const ls = lampSpecs[i];
@@ -1414,23 +1438,25 @@
       const headZ = ls.z - Math.sin(ls.ry) * 1.05;
 
       if (ls.lit) {
+        // Exact bulb position inside getStreetLampProto() is (1.05, 4.68, 0) -> align PointLight & glare EXACTLY on fixture!
         city.litLampPositions.push({
           x: headX,
-          y: SIDEWALK_Y + 4.05,
+          y: SIDEWALK_Y + 4.65,
           z: headZ,
-          flicker: (i % 3 === 2)
+          isPole: true,
+          flicker: (i % 3 === 1)
         });
       }
     }
-    // Register the 4 Far-Corner Hub focal lighting anchors into the pooled streetlamp system (zero extra PointLights!)
+    // Register the 4 Far-Corner Hub focal lighting anchors into the pooled streetlamp system (marked isPole:false so no floating mid-air halo!)
     city.litLampPositions.push(
-      { x: cornerHubCoords.NW.cx + 3.2, y: SIDEWALK_Y + 3.3, z: cornerHubCoords.NW.cz + 2.0, flicker: false },
-      { x: cornerHubCoords.NE.cx + 2.8, y: SIDEWALK_Y + 3.0, z: cornerHubCoords.NE.cz + 1.0, flicker: false },
-      { x: cornerHubCoords.SW.cx + 3.4, y: SIDEWALK_Y + 3.2, z: cornerHubCoords.SW.cz + 1.6, flicker: true },
-      { x: cornerHubCoords.SE.cx - 0.5, y: SIDEWALK_Y + 2.55, z: cornerHubCoords.SE.cz - 2.4, flicker: false }
+      { x: cornerHubCoords.NW.cx + 3.2, y: SIDEWALK_Y + 3.3, z: cornerHubCoords.NW.cz + 2.0, isPole: false, flicker: false },
+      { x: cornerHubCoords.NE.cx + 2.8, y: SIDEWALK_Y + 3.0, z: cornerHubCoords.NE.cz + 1.0, isPole: false, flicker: false },
+      { x: cornerHubCoords.SW.cx + 3.4, y: SIDEWALK_Y + 3.2, z: cornerHubCoords.SW.cz + 1.6, isPole: false, flicker: true },
+      { x: cornerHubCoords.SE.cx - 0.5, y: SIDEWALK_Y + 2.55, z: cornerHubCoords.SE.cz - 2.4, isPole: false, flicker: false }
     );
     // Emit 3 persistent pooled streetlamp PointLights (attached to main scene so NUM_POINT_LIGHTS never shifts!)
-    // Strictly OFF (intensity = 0) until player restores the PLN relay box (city_pln_box)!
+    // Localized horror streetlight falloff (distance 26m, decay 1.80) — bright near working poles, dark horror between poles!
     const poolTargetScene = o.scene || (window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core && window.__LRT_INTERNAL__.core.scene) || root;
     const poolCount = Math.min(3, city.litLampPositions.length);
     const initialStreetFactor = Math.max(0, streetLampIntensity / 1.8);
@@ -1438,11 +1464,11 @@
     const parentWorldZ = (root && root.parent && root.parent.position) ? (root.parent.position.z || 0) : 0;
     for (let pi = 0; pi < poolCount; pi++) {
       const lp = city.litLampPositions[pi];
-      const baseInt = 36.0;
-      const initInt = (city._isBuilding || !plnInitiallyOn) ? 0.0 : (baseInt * Math.max(1.2, initialStreetFactor));
+      const baseInt = 24.0;
+      const initInt = (city._isBuilding || !plnInitiallyOn) ? 0.0 : (baseInt * Math.max(1.1, initialStreetFactor));
       const ptLight = typeof city._acquirePooledLight === 'function'
-        ? city._acquirePooledLight(pi, poolTargetScene, 0xffad48, initInt, 58, 1.0)
-        : new THREE.PointLight(0xffad48, initInt, 58, 1.0);
+        ? city._acquirePooledLight(pi, poolTargetScene, 0xffad48, initInt, 26, 1.80)
+        : new THREE.PointLight(0xffad48, initInt, 26, 1.80);
       ptLight.position.set(lp.x, lp.y, lp.z + parentWorldZ);
       ptLight.visible = true; // NEVER toggle visible! Control strictly via intensity.
       ptLight.castShadow = false;
@@ -1452,8 +1478,13 @@
         baseIntensity: baseInt,
         kind: 'streetlamp',
         flicker: !!lp.flicker,
+        _lampIdx: pi,
         _distScale: 1.0,
-        _feederScale: plnInitiallyOn ? 1.0 : 0.0
+        _feederScale: plnInitiallyOn ? 1.0 : 0.0,
+        _faultCooldown: 3.5 + pi * 2.8,
+        _faultTime: 0.0,
+        _faultDur: 0.0,
+        _sparkCount: 0
       });
     }
 
@@ -1462,18 +1493,17 @@
       P.setLampBulbsPowered(plnInitiallyOn, plnInitiallyOn ? 1.0 : 0.0);
     }
 
-    // 1-draw-call InstancedMesh of warm sodium-vapor ground light pools + 1-draw-call lamp-head glow cones (0 extra PointLights!)
-    // Both stay strictly hidden (visible = false, opacity = 0) while PLN is OFF, and blaze across the entire street when PLN is restored!
+    // 1-draw-call localized sodium ground pools + 1-draw-call tight bulb glare seated EXACTLY ON each pole fixture (0 extra PointLights!)
     if (city.litLampPositions.length > 0 && typeof document !== 'undefined') {
       const poolCvs = document.createElement('canvas');
       poolCvs.width = 128;
       poolCvs.height = 128;
       const pCtx = poolCvs.getContext('2d');
       const grad = pCtx.createRadialGradient(64, 64, 2, 64, 64, 64);
-      grad.addColorStop(0.0, 'rgba(255, 224, 168, 1.0)');
-      grad.addColorStop(0.28, 'rgba(255, 186, 98, 0.68)');
-      grad.addColorStop(0.62, 'rgba(255, 148, 56, 0.24)');
-      grad.addColorStop(1.0, 'rgba(255, 132, 42, 0.0)');
+      grad.addColorStop(0.0, 'rgba(255, 214, 146, 0.92)');
+      grad.addColorStop(0.32, 'rgba(255, 174, 82, 0.48)');
+      grad.addColorStop(0.68, 'rgba(255, 138, 48, 0.12)');
+      grad.addColorStop(1.0, 'rgba(255, 124, 38, 0.0)');
       pCtx.fillStyle = grad;
       pCtx.fillRect(0, 0, 128, 128);
       const poolTex = new THREE.CanvasTexture(poolCvs);
@@ -1481,14 +1511,14 @@
       poolTex.needsUpdate = true;
       city.disposableTextures.push(poolTex);
 
-      const poolGeo = new THREE.PlaneGeometry(15.2, 15.2);
+      const poolGeo = new THREE.PlaneGeometry(10.6, 10.6);
       poolGeo.rotateX(-Math.PI * 0.5);
       city.disposableGeometries.push(poolGeo);
 
-      const initPoolOp = plnInitiallyOn ? (initialStreetFactor >= 0.8 ? 0.56 : 0.20) : 0.0;
+      const initPoolOp = plnInitiallyOn ? (initialStreetFactor >= 0.8 ? 0.28 : 0.12) : 0.0;
       const poolMat = new THREE.MeshBasicMaterial({
         map: poolTex,
-        color: 0xffc67c,
+        color: 0xffbf70,
         transparent: true,
         opacity: initPoolOp,
         blending: THREE.AdditiveBlending,
@@ -1507,9 +1537,10 @@
       const pDummy = new THREE.Object3D();
       for (let li = 0; li < city.litLampPositions.length; li++) {
         const lp = city.litLampPositions[li];
+        const s = lp.isPole ? 1.0 : 0.0;
         pDummy.position.set(lp.x, STREET_GROUND_Y + 0.025, lp.z);
         pDummy.rotation.set(0, 0, 0);
-        pDummy.scale.set(1, 1, 1);
+        pDummy.scale.set(s, s, s);
         pDummy.updateMatrix();
         poolInst.setMatrixAt(li, pDummy.matrix);
       }
@@ -1518,19 +1549,19 @@
       city._lampPoolMat = poolMat;
       city._lampPoolMesh = poolInst;
 
-      // Crossed vertical warm-sodium halo planes right under each lamp head so every pole visibly lights up along the entire street!
-      const h1 = new THREE.PlaneGeometry(2.6, 2.4);
-      const h2 = new THREE.PlaneGeometry(2.6, 2.4);
+      // Tight sodium bulb glare planes seated EXACTLY AT the fixture bulb (lp.y = SIDEWALK_Y + 4.65 -> ZERO floating orb below lamp!)
+      const h1 = new THREE.PlaneGeometry(1.05, 0.72);
+      const h2 = new THREE.PlaneGeometry(1.05, 0.72);
       h2.rotateY(Math.PI * 0.5);
       const haloGeo = THREE_UTILS.mergeGeometries([h1, h2], false);
       h1.dispose();
       h2.dispose();
       if (haloGeo) {
         city.disposableGeometries.push(haloGeo);
-        const initHaloOp = plnInitiallyOn ? (initialStreetFactor >= 0.8 ? 0.42 : 0.18) : 0.0;
+        const initHaloOp = plnInitiallyOn ? (initialStreetFactor >= 0.8 ? 0.26 : 0.12) : 0.0;
         const haloMat = new THREE.MeshBasicMaterial({
           map: poolTex,
-          color: 0xffcb82,
+          color: 0xffcf88,
           transparent: true,
           opacity: initHaloOp,
           blending: THREE.AdditiveBlending,
@@ -1545,9 +1576,10 @@
         haloInst.visible = initHaloOp > 0.01;
         for (let li = 0; li < city.litLampPositions.length; li++) {
           const lp = city.litLampPositions[li];
-          pDummy.position.set(lp.x, lp.y - 0.35, lp.z);
+          const s = lp.isPole ? 1.0 : 0.0;
+          pDummy.position.set(lp.x, lp.y, lp.z);
           pDummy.rotation.set(0, 0, 0);
-          pDummy.scale.set(1, 1, 1);
+          pDummy.scale.set(s, s, s);
           pDummy.updateMatrix();
           haloInst.setMatrixAt(li, pDummy.matrix);
         }

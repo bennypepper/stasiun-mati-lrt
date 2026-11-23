@@ -1019,9 +1019,9 @@
         roughness: 0.62, metalness: 0.12, envMapIntensity: 0.36
       }),
       sleeveTactical: new THREE.MeshStandardMaterial({
-        color: 0x1b2229, map: texCache.knurlTex || whiteTex,
-        bumpMap: texCache.knurlBump || null, bumpScale: 0.0028,
-        roughness: 0.95, metalness: 0.01, envMapIntensity: 0.20
+        color: 0x151a20, map: texCache.knurlTex || whiteTex,
+        bumpMap: texCache.knurlBump || null, bumpScale: 0.0030,
+        roughness: 0.96, metalness: 0.01, envMapIntensity: 0.14
       }),
       tritiumGreen: new THREE.MeshBasicMaterial({ color: 0x55ff77 }),
       redDot: new THREE.MeshBasicMaterial({ color: 0xff2a2a }),
@@ -1108,30 +1108,58 @@
     addPart(parent, new THREE.TorusGeometry(0.0075, 0.0018, 6, 12), mats.gunSteelLight, x, y - 0.007, z, 0, Math.PI * 0.5, rz || 0);
   }
 
-  // Shared helper: sculpted EOTech / Reflex holographic optic housing with rounded arch, turrets & glowing reticle
+  // Shared helper: watertight EOTech EXPS3-style holographic optic housing (zero gaps/seams!)
   function addSculptedHoloOptic(parent, mats, reticleMat, centerY, zPos, width, height) {
     const hw = (width || 0.048) * 0.5;
     const hh = (height || 0.040) * 0.5;
-    const baseY = centerY - hh - 0.008;
-    // QD mount base + locking lever
-    addPart(parent, new THREE.BoxGeometry(hw * 1.65, 0.012, 0.058), mats.gunSteelDark, 0, baseY, zPos + 0.002);
-    addPart(parent, new THREE.BoxGeometry(0.006, 0.008, 0.022), mats.gunSteelLight, -hw * 0.92, baseY, zPos + 0.004);
-    // Battery/control housing nose (cleanly below lens window)
-    addPart(parent, new THREE.BoxGeometry(hw * 1.48, 0.013, 0.032), mats.gunSteelMid, 0, baseY + 0.006, zPos - 0.024);
-    // Slim beveled hood pillars + chamfered top arch (keeps wide unobstructed sight picture!)
-    const t = 0.0032;
-    addPart(parent, new THREE.BoxGeometry(t, hh * 1.85, 0.036), mats.gunSteelMid, -hw, centerY - 0.001, zPos);
-    addPart(parent, new THREE.BoxGeometry(t, hh * 1.85, 0.036), mats.gunSteelMid, hw, centerY - 0.001, zPos);
-    // Chamfered 45° upper corner brackets
-    addPart(parent, new THREE.BoxGeometry(0.008, t, 0.036), mats.gunSteelLight, -hw + 0.0035, centerY + hh - 0.002, zPos, 0, 0, 0.55);
-    addPart(parent, new THREE.BoxGeometry(0.008, t, 0.036), mats.gunSteelLight, hw - 0.0035, centerY + hh - 0.002, zPos, 0, 0, -0.55);
-    addPart(parent, new THREE.BoxGeometry(hw * 1.72, t, 0.036), mats.gunSteelLight, 0, centerY + hh + 0.001, zPos);
-    // Compact side windage/elevation turret knob
-    addPart(parent, new THREE.CylinderGeometry(0.0042, 0.0042, 0.006, 10), mats.gunSteelLight, hw + 0.0035, centerY - hh * 0.45, zPos + 0.002, 0, 0, Math.PI * 0.5);
-    // Anti-reflective lens + glowing holographic reticle plane (marked non-batchable via userData)
-    const lens = addPart(parent, new THREE.PlaneGeometry(hw * 1.92, hh * 1.90), mats.opticLens, 0, centerY, zPos - 0.009);
+    const wallT = 0.0044;
+    const hoodD = 0.040;
+    const outerW = hw * 2 + wallT * 2;
+    const winBotY = centerY - hh;
+    const winTopY = centerY + hh;
+    const baseH = 0.014;
+    const baseY = winBotY - baseH * 0.5 + 0.001; // top of base overlaps window bottom cleanly!
+
+    // 1) Solid full-width QD Picatinny rail mount + lower optic deck (completely seals underside — ZERO gaps!)
+    addPart(parent, new THREE.BoxGeometry(outerW, baseH, 0.060), mats.gunSteelDark, 0, baseY, zPos + 0.001);
+    // Lower Picatinny clamp lug + side QD throw lever
+    addPart(parent, new THREE.BoxGeometry(outerW * 0.62, 0.007, 0.052), mats.polymerBlack, 0, baseY - baseH * 0.5 - 0.002, zPos + 0.001);
+    addPart(parent, new THREE.BoxGeometry(0.006, 0.008, 0.024), mats.gunSteelMid, -outerW * 0.5 - 0.002, baseY - 0.001, zPos + 0.004);
+    // Forward transverse CR123A battery compartment nose (seated cleanly into lower deck)
+    addPart(parent, new THREE.BoxGeometry(outerW * 0.92, baseH + 0.003, 0.024), mats.gunSteelDark, 0, baseY + 0.0015, zPos - 0.032);
+    addPart(parent, new THREE.CylinderGeometry(0.0068, 0.0068, outerW * 0.96, 12), mats.gunSteelMid, 0, baseY + 0.002, zPos - 0.042, 0, 0, Math.PI * 0.5);
+    // Rear brightness/NV control button pad (seated flush on rear deck)
+    addPart(parent, new THREE.BoxGeometry(outerW * 0.72, 0.006, 0.012), mats.polymerGrip, 0, winBotY + 0.0015, zPos + 0.024);
+
+    // 2) Watertight protective aluminum hood (side walls run continuously into the base deck!)
+    const pillarBot = baseY + 0.002;
+    const pillarTop = winTopY + wallT * 0.85;
+    const pillarH = pillarTop - pillarBot;
+    const pillarCY = (pillarBot + pillarTop) * 0.5;
+    addPart(parent, new THREE.BoxGeometry(wallT, pillarH, hoodD), mats.gunSteelMid, -hw - wallT * 0.5, pillarCY, zPos);
+    addPart(parent, new THREE.BoxGeometry(wallT, pillarH, hoodD), mats.gunSteelMid, hw + wallT * 0.5, pillarCY, zPos);
+    // Continuous top hood bridge spanning full outer width (overlaps both side pillars cleanly — zero corner gaps!)
+    addPart(parent, new THREE.BoxGeometry(outerW, wallT, hoodD), mats.gunSteelMid, 0, winTopY + wallT * 0.5, zPos);
+    // Subtle beveled top roof cap for authentic EOTech silhouette
+    addPart(parent, new THREE.BoxGeometry(outerW - 0.006, 0.0026, hoodD - 0.004), mats.gunSteelDark, 0, winTopY + wallT + 0.0010, zPos);
+
+    // 3) Dark matte anodized inner optical bezel frame (seals all 4 edges around glass window cleanly!)
+    const innerT = 0.0022;
+    const innerD = 0.022;
+    addPart(parent, new THREE.BoxGeometry(hw * 2 + 0.002, innerT, innerD), mats.polymerBlack, 0, winBotY + innerT * 0.5, zPos - 0.006);
+    addPart(parent, new THREE.BoxGeometry(hw * 2 + 0.002, innerT, innerD), mats.polymerBlack, 0, winTopY - innerT * 0.5, zPos - 0.006);
+    addPart(parent, new THREE.BoxGeometry(innerT, hh * 2, innerD), mats.polymerBlack, -hw + innerT * 0.5, centerY, zPos - 0.006);
+    addPart(parent, new THREE.BoxGeometry(innerT, hh * 2, innerD), mats.polymerBlack, hw - innerT * 0.5, centerY, zPos - 0.006);
+
+    // 4) Recessed right-side windage & elevation adjustment boss + knurled dials
+    addPart(parent, new THREE.BoxGeometry(0.004, 0.018, 0.020), mats.gunSteelDark, hw + wallT + 0.001, centerY - hh * 0.42, zPos + 0.002);
+    addPart(parent, new THREE.CylinderGeometry(0.0038, 0.0038, 0.0045, 10), mats.gunSteelLight, hw + wallT + 0.0035, centerY - hh * 0.58, zPos + 0.005, 0, 0, Math.PI * 0.5);
+    addPart(parent, new THREE.CylinderGeometry(0.0038, 0.0038, 0.0045, 10), mats.gunSteelLight, hw + wallT + 0.0035, centerY - hh * 0.24, zPos - 0.003, 0, 0, Math.PI * 0.5);
+
+    // 5) Anti-reflective lens + glowing holographic reticle plane seated squarely inside the dark inner bezel
+    const lens = addPart(parent, new THREE.PlaneGeometry(hw * 1.96, hh * 1.96), mats.opticLens, 0, centerY, zPos - 0.009);
     lens.userData._noBatch = true;
-    const ret = addPart(parent, new THREE.PlaneGeometry(hw * 1.76, hh * 1.76), reticleMat, 0, centerY, zPos - 0.007);
+    const ret = addPart(parent, new THREE.PlaneGeometry(hw * 1.80, hh * 1.80), reticleMat, 0, centerY, zPos - 0.007);
     ret.userData._noBatch = true;
     ret.renderOrder = 4;
   }

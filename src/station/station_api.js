@@ -896,17 +896,61 @@
           }
 
           let flick = 1.0;
-          if (nightMix > 0.01) {
-            const wave = Math.sin(this._timeAccum * (5.8 + i * 2.1) + i * 1.7);
-            const jitter = Math.sin(this._timeAccum * 19.0 + i * 4.3);
-            let rawFlick = 1.0;
-            if (i % 2 === 1) {
-              const cyc = (this._timeAccum * 0.7 + i * 0.9) % 3.8;
-              rawFlick = (cyc > 2.4 && wave > -0.25) ? 0.16 : (jitter < -0.55 ? 0.38 : 0.82);
+          const stepDt = Math.max(0.0, Math.min(0.1, dt || 0.016));
+          if (sl._faultCooldown === undefined) {
+            sl._faultCooldown = 4.5 + i * 3.7 + Math.random() * 4.5;
+            sl._faultTime = 0.0;
+            sl._faultDur = 0.0;
+            sl._sparkCount = 0;
+          }
+          if (sl._faultTime > 0) {
+            sl._faultTime -= stepDt;
+            const p = 1.0 - Math.max(0.0, sl._faultTime) / Math.max(0.1, sl._faultDur);
+            if (p < 0.15) {
+              flick = 0.14;
+            } else if (p < 0.24) {
+              flick = 1.38;
+              if (sl._sparkCount < 1) {
+                sl._sparkCount = 1;
+                if (LRT.Weapons && typeof LRT.Weapons.spawnSparks === 'function') {
+                  LRT.Weapons.spawnSparks(sl.light.position, 10);
+                }
+                if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+                  LRT.Audio.play('electric_box_open', { gain: 0.16, pitchVar: 0.22 });
+                }
+              }
+            } else if (p < 0.58) {
+              // Sudden fluorescent tube blackout — player's station vision genuinely dips dark!
+              flick = 0.05;
+            } else if (p < 0.68) {
+              flick = 1.30;
+              if (sl._sparkCount < 2) {
+                sl._sparkCount = 2;
+                if (LRT.Weapons && typeof LRT.Weapons.spawnSparks === 'function') {
+                  LRT.Weapons.spawnSparks(sl.light.position, 8);
+                }
+              }
+            } else if (p < 0.80) {
+              flick = 0.16;
             } else {
-              rawFlick = (wave < -0.78 && jitter < -0.3) ? 0.25 : (0.72 + 0.22 * wave);
+              flick = 0.84 + 0.16 * Math.sin(p * 42.0);
             }
-            flick = 1.0 + (rawFlick - 1.0) * nightMix;
+            if (sl._faultTime <= 0) {
+              sl._faultTime = 0;
+              sl._faultCooldown = 6.0 + Math.random() * 9.0;
+              flick = 1.0;
+            }
+          } else {
+            sl._faultCooldown -= stepDt;
+            if (sl._faultCooldown <= 0 && tubeAliveFactor > 0.5 && (nightMix > 0.2 || !this._powerRestored)) {
+              sl._faultDur = 0.95 + Math.random() * 1.15;
+              sl._faultTime = sl._faultDur;
+              sl._sparkCount = 0;
+            } else if (nightMix > 0.01) {
+              const wave = Math.sin(this._timeAccum * (5.8 + i * 2.1) + i * 1.7);
+              const rawFlick = 0.86 + 0.14 * wave;
+              flick = 1.0 + (rawFlick - 1.0) * nightMix;
+            }
           }
           const pwr = this._powerRestored ? 1.0 : 0.22;
           sl.light.intensity = sl.baseIntensity * tubeInt * this._lightingFactor * flick * pwr * tubeAliveFactor;

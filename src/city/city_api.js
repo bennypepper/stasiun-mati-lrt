@@ -549,32 +549,34 @@
       const anyOn = this._anyLampPowered();
       const nightStrength = Math.min(1.0, Math.max(0.0, ((this._lightingFactor || 0.0) - 0.25) / 1.45));
       if (typeof P.setLampBulbsPowered === 'function') {
-        P.setLampBulbsPowered(anyOn, anyOn ? (0.85 + 0.35 * nightStrength) : 0.0);
+        P.setLampBulbsPowered(anyOn, anyOn ? (0.78 + 0.30 * nightStrength) : 0.0);
       }
       if (this._lampPoolMat && this._lampPoolMesh) {
-        const poolOpacity = anyOn ? (0.16 + 0.26 * nightStrength) : 0.0;
+        // Localized horror pool: bright under poles, dark between poles!
+        const poolOpacity = anyOn ? (0.08 + 0.20 * nightStrength) : 0.0;
         this._lampPoolMat.opacity = poolOpacity;
         this._lampPoolMesh.visible = anyOn && poolOpacity > 0.01;
       }
       if (this._lampHaloMat && this._lampHaloMesh) {
-        const haloOpacity = anyOn ? (0.14 + 0.20 * nightStrength) : 0.0;
+        // Tight bulb-seated fixture glare (zero floating orb below lamp!)
+        const haloOpacity = anyOn ? (0.10 + 0.16 * nightStrength) : 0.0;
         this._lampHaloMat.opacity = haloOpacity;
         this._lampHaloMesh.visible = anyOn && haloOpacity > 0.01;
       }
-      // On Kuningan (split West/East feeders), hide unpowered-side pool/halo instances cleanly
-      if (anyOn && this._feederMask && this.litLampPositions && this.litLampPositions.length > 0) {
+      if (anyOn && this.litLampPositions && this.litLampPositions.length > 0) {
+        const groundY = (this.layoutBounds && this.layoutBounds.STREET_GROUND_Y !== undefined) ? this.layoutBounds.STREET_GROUND_Y : -1.0;
         const dummy = new THREE.Object3D();
         for (let li = 0; li < this.litLampPositions.length; li++) {
           const lp = this.litLampPositions[li];
-          const s = this._isLampPowered(lp.x) ? 1.0 : 0.0;
+          const s = (lp.isPole && this._isLampPowered(lp.x)) ? 1.0 : 0.0;
           if (this._lampPoolMesh) {
-            dummy.position.set(lp.x, STREET_GROUND_Y + 0.025, lp.z);
+            dummy.position.set(lp.x, groundY + 0.025, lp.z);
             dummy.scale.set(s, s, s);
             dummy.updateMatrix();
             this._lampPoolMesh.setMatrixAt(li, dummy.matrix);
           }
           if (this._lampHaloMesh) {
-            dummy.position.set(lp.x, lp.y - 0.35, lp.z);
+            dummy.position.set(lp.x, lp.y, lp.z);
             dummy.scale.set(s, s, s);
             dummy.updateMatrix();
             this._lampHaloMesh.setMatrixAt(li, dummy.matrix);
@@ -582,6 +584,30 @@
         }
         if (this._lampPoolMesh) this._lampPoolMesh.instanceMatrix.needsUpdate = true;
         if (this._lampHaloMesh) this._lampHaloMesh.instanceMatrix.needsUpdate = true;
+      }
+    },
+
+    _setLampInstanceScale: function (lampIdx, scaleVal) {
+      if (lampIdx < 0 || !this.litLampPositions || lampIdx >= this.litLampPositions.length) return;
+      const lp = this.litLampPositions[lampIdx];
+      if (!lp || !lp.isPole) return;
+      if (!this._lampScaleDummy) this._lampScaleDummy = new THREE.Object3D();
+      const d = this._lampScaleDummy;
+      const groundY = (this.layoutBounds && this.layoutBounds.STREET_GROUND_Y !== undefined) ? this.layoutBounds.STREET_GROUND_Y : -1.0;
+      const s = this._isLampPowered(lp.x) ? Math.max(0.0, scaleVal) : 0.0;
+      if (this._lampPoolMesh) {
+        d.position.set(lp.x, groundY + 0.025, lp.z);
+        d.scale.set(s, s, s);
+        d.updateMatrix();
+        this._lampPoolMesh.setMatrixAt(lampIdx, d.matrix);
+        this._lampPoolMesh.instanceMatrix.needsUpdate = true;
+      }
+      if (this._lampHaloMesh) {
+        d.position.set(lp.x, lp.y, lp.z);
+        d.scale.set(s, s, s);
+        d.updateMatrix();
+        this._lampHaloMesh.setMatrixAt(lampIdx, d.matrix);
+        this._lampHaloMesh.instanceMatrix.needsUpdate = true;
       }
     },
 
@@ -764,6 +790,10 @@
           continue;
         }
         const lp = lamps[idx];
+        if (sl._lampIdx !== undefined && sl._lampIdx !== idx && sl._lampIdx >= 0) {
+          this._setLampInstanceScale(sl._lampIdx, 1.0);
+        }
+        sl._lampIdx = idx;
         sl.light.position.set(
           lp.x + _tmpWorldOffset.x,
           lp.y + _tmpWorldOffset.y,
@@ -773,13 +803,13 @@
         sl.flicker = !!lp.flicker;
         sl._feederScale = this._getFeederLampScale(lp.x);
         if (suppressLights || sl._feederScale <= 0) {
-          sl._distScale = sl._feederScale <= 0 ? 0.0 : 0.0;
+          sl._distScale = 0.0;
         } else {
           const dist = Math.sqrt(_chosenLampDSq[slotIdx]);
-          sl._distScale = dist <= 56 ? 1.0 : (dist >= 96 ? 0.0 : (1.0 - (dist - 56) / 40.0));
+          sl._distScale = dist <= 34 ? 1.0 : (dist >= 68 ? 0.0 : (1.0 - (dist - 34) / 34.0));
         }
         const effLampFactor = this._getEffectiveStreetLampFactor();
-        if (!sl.flicker || sl._feederScale <= 0) {
+        if (sl._feederScale <= 0 || !(sl._faultTime > 0)) {
           sl.light.intensity = sl.baseIntensity * effLampFactor * sl._distScale * sl._feederScale;
         }
       }
@@ -860,12 +890,69 @@
           sl.light.intensity = 0.0;
           continue;
         }
-        if (!sl.flicker) continue;
-        // Subtle sodium-vapor streetlamp buzz (NEVER toggles visible!)
-        const pulse = 0.88 + 0.12 * Math.sin(this._timeAccum * 17.0 + i * 3.1) * Math.sin(this._timeAccum * 4.3);
+        const stepDt = Math.max(0.0, Math.min(0.1, dt || 0.016));
         const effLampFactor = this._getEffectiveStreetLampFactor();
+        let faultMult = 1.0;
+
+        // Realistic stochastic electrical ballast-fault + spark shower system (directly impacts local street visibility!)
+        if (sl._faultCooldown === undefined) {
+          sl._faultCooldown = 4.0 + i * 3.1 + Math.random() * 4.5;
+          sl._faultTime = 0.0;
+          sl._faultDur = 0.0;
+          sl._sparkCount = 0;
+        }
+        if (sl._faultTime > 0) {
+          sl._faultTime -= stepDt;
+          const p = 1.0 - Math.max(0.0, sl._faultTime) / Math.max(0.1, sl._faultDur);
+          if (p < 0.14) {
+            faultMult = 0.14;
+          } else if (p < 0.22) {
+            faultMult = 1.38;
+            if (sl._sparkCount < 1) {
+              sl._sparkCount = 1;
+              if (LRT.Weapons && typeof LRT.Weapons.spawnSparks === 'function') {
+                LRT.Weapons.spawnSparks(sl.light.position, 10);
+              }
+              if (LRT.Audio && typeof LRT.Audio.play === 'function' && distScale > 0.35) {
+                LRT.Audio.play('electric_box_open', { gain: 0.16 * distScale, pitchVar: 0.18 });
+              }
+            }
+          } else if (p < 0.56) {
+            // Sudden dark dropout — player visibility around this streetlamp genuinely drops!
+            faultMult = 0.04;
+          } else if (p < 0.65) {
+            faultMult = 1.28;
+            if (sl._sparkCount < 2) {
+              sl._sparkCount = 2;
+              if (LRT.Weapons && typeof LRT.Weapons.spawnSparks === 'function') {
+                LRT.Weapons.spawnSparks(sl.light.position, 8);
+              }
+            }
+          } else if (p < 0.78) {
+            faultMult = 0.18;
+          } else {
+            faultMult = 0.85 + 0.15 * Math.sin(p * 38.0);
+          }
+          if (sl._faultTime <= 0) {
+            sl._faultTime = 0;
+            sl._faultCooldown = 5.5 + Math.random() * 8.5;
+            faultMult = 1.0;
+          }
+          if (sl._lampIdx >= 0) {
+            this._setLampInstanceScale(sl._lampIdx, faultMult < 0.25 ? 0.12 : Math.min(1.18, faultMult));
+          }
+        } else {
+          sl._faultCooldown -= stepDt;
+          if (sl._faultCooldown <= 0 && distScale > 0.45 && this._lightingFactor > 0.35) {
+            sl._faultDur = 1.0 + Math.random() * 1.1;
+            sl._faultTime = sl._faultDur;
+            sl._sparkCount = 0;
+          } else if (sl.flicker) {
+            faultMult = 0.90 + 0.10 * Math.sin(this._timeAccum * 19.0 + i * 3.1) * Math.sin(this._timeAccum * 5.3);
+          }
+        }
         sl.light.visible = true;
-        sl.light.intensity = sl.baseIntensity * effLampFactor * distScale * feederScale * pulse;
+        sl.light.intensity = sl.baseIntensity * effLampFactor * distScale * feederScale * faultMult;
       }
     },
 
@@ -1118,7 +1205,7 @@
         const py = dy - proj * lookDir.y;
         const pzErr = dz - proj * lookDir.z;
         const perp = Math.hypot(px, py, pzErr);
-        const rad = it.isLootSlot ? 0.24 : 0.56;
+        const rad = it.isLootSlot ? 0.44 : 0.58;
         if (perp <= rad && perp < bestPerp) {
           bestPerp = perp;
           bestId = it.id;

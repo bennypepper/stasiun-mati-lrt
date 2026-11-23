@@ -299,8 +299,14 @@
       addPbrPart(station, grp, new THREE.CylinderGeometry(0.026, 0.028, 0.024, 12), steelMat, -0.14, 0.14, 0.336, Math.PI * 0.5, 0, 0);
       addPbrPart(station, grp, new THREE.BoxGeometry(0.36, 0.095, 0.018), station._pelicanStencilMat, 0.04, 0.24, 0.338);
 
-      // Recessed charcoal foam interior tray + 3 contoured divider ribs
+      // Recessed softly backlit foam tray + warm amber lid LED strip (readable in blackout!)
+      const ledStripMat = new THREE.MeshBasicMaterial({ color: 0xfde68a });
+      station.disposableMaterials.push(ledStripMat);
+      foamMat.color.setHex(0x2c3440);
+      foamMat.emissive = new THREE.Color(0x282112);
+      foamMat.emissiveIntensity = 0.40;
       addPbrPart(station, grp, new THREE.BoxGeometry(1.04, 0.048, 0.58), foamMat, 0, 0.405, 0);
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.92, 0.016, 0.022), ledStripMat, 0, 0.436, -0.275);
       for (const divX of [-0.17, 0.17]) {
         addPbrPart(station, grp, makeBox(0.032, 0.040, 0.54, 0.006), rubberMat, divX, 0.432, 0);
       }
@@ -314,6 +320,7 @@
       addPbrPart(station, lidPivot, makeBox(1.16, 0.095, 0.70, 0.018), rubberMat, 0, 0.048, 0.34);
       addPbrPart(station, lidPivot, makeBox(1.04, 0.055, 0.58, 0.014), caseMat, 0, 0.108, 0.34);
       addPbrPart(station, lidPivot, new THREE.BoxGeometry(0.98, 0.024, 0.52), foamMat, 0, 0.006, 0.34);
+      addPbrPart(station, lidPivot, new THREE.BoxGeometry(0.84, 0.018, 0.024), ledStripMat, 0, -0.002, 0.58);
       for (const lxPos of [-0.36, -0.12, 0.12, 0.36]) {
         addPbrPart(station, lidPivot, makeBox(0.048, 0.032, 0.56, 0.008), rubberMat, lxPos, 0.140, 0.34);
       }
@@ -322,6 +329,49 @@
       }
       addPbrPart(station, lidPivot, new THREE.BoxGeometry(0.74, 0.024, 0.06), latchMat, 0, 0.142, 0.58);
       addPbrPart(station, lidPivot, new THREE.BoxGeometry(0.36, 0.020, 0.095), station._pelicanStencilMat, 0, 0.140, 0.34);
+
+      // Batch static Pelican hull & lid meshes by material before attaching perimeter halo (cuts ~86 draw calls -> ~10!)
+      const batchCrateParts = (targetGrp, skipObj) => {
+        const mergeFn = window.THREE_UTILS && window.THREE_UTILS.mergeGeometries;
+        if (!targetGrp || typeof mergeFn !== 'function') return;
+        const byMat = new Map();
+        const toRemove = [];
+        for (let ci = 0; ci < targetGrp.children.length; ci++) {
+          const ch = targetGrp.children[ci];
+          if (!ch || !ch.isMesh || ch === skipObj || !ch.geometry || !ch.material || Array.isArray(ch.material)) continue;
+          ch.updateMatrix();
+          let g = ch.geometry.clone();
+          if (g.index) g = g.toNonIndexed();
+          if (!g.attributes.normal) g.computeVertexNormals();
+          if (!g.attributes.uv) {
+            const cnt = g.attributes.position.count;
+            g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(cnt * 2), 2));
+          }
+          g.deleteAttribute('color');
+          g.applyMatrix4(ch.matrix);
+          let arr = byMat.get(ch.material);
+          if (!arr) { arr = []; byMat.set(ch.material, arr); }
+          arr.push(g);
+          toRemove.push(ch);
+        }
+        if (toRemove.length <= byMat.size) {
+          byMat.forEach((arr) => { for (let k = 0; k < arr.length; k++) arr[k].dispose(); });
+          return;
+        }
+        for (let r = 0; r < toRemove.length; r++) targetGrp.remove(toRemove[r]);
+        byMat.forEach((arr, mat) => {
+          const merged = arr.length === 1 ? arr[0] : mergeFn(arr, false);
+          if (arr.length > 1) { for (let k = 0; k < arr.length; k++) arr[k].dispose(); }
+          if (!merged) return;
+          station.disposableGeometries.push(merged);
+          const m = new THREE.Mesh(merged, mat);
+          m.castShadow = false;
+          m.receiveShadow = true;
+          targetGrp.add(m);
+        });
+      };
+      batchCrateParts(grp, lidPivot);
+      batchCrateParts(lidPivot, null);
 
       // Attach outer Pelican case perimeter halo BEFORE adding interior item slots
       const crateHalo = (LRT.Render && typeof LRT.Render.attachPerimeterHalo === 'function')
@@ -418,7 +468,7 @@
         }
 
         const slotHalo = (LRT.Render && typeof LRT.Render.attachPerimeterHalo === 'function')
-          ? LRT.Render.attachPerimeterHalo(slotGrp, { initialMode: 'off', thicknessScale: 0.78 })
+          ? LRT.Render.attachPerimeterHalo(slotGrp, { color: 0xfacc15, hoverColor: 0xfde047, initialMode: 'off', thicknessScale: 1.32, subtleOpacity: 0.68 })
           : null;
         const [sx, sy, sz] = slotWorldPos(spec.lx, 0);
         const slotRec = {

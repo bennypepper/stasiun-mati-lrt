@@ -1050,74 +1050,98 @@
     etx.fillStyle = '#000000';
     etx.fillRect(0, 0, 1024, 1024);
 
-    // TILE 1 (0..512, 0..160): PSD Navy Header (Kereta 3 Pintu 2 + CB/BK Directions)
-    ctx.fillStyle = '#16325C';
+    // TILE 1 (0..512, 0..160): PSD Navy Header — Authentic KAI LRT Jabodebek Peron 1
+    ctx.fillStyle = '#13294B';
     ctx.fillRect(0, 0, 512, 160);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 24px sans-serif';
-    ctx.fillText('Kereta 3  Pintu 2', 20, 42);
-    ctx.font = '14px sans-serif';
-    ctx.fillStyle = '#C8D6EA';
-    ctx.fillText('Car 3  Door 2', 20, 62);
-    // 6-car schematic bar
-    for (let c = 0; c < 6; c++) {
-      ctx.fillStyle = c === 2 ? '#E5D429' : '#6C84A6';
-      ctx.fillRect(20 + c * 28, 78, 24, 16);
-    }
-    // Direction arrows + CB & BK badges
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 20px sans-serif';
-    ctx.fillText('Ke Harjamukti', 220, 52);
-    ctx.fillText('Ke Jati Mulya', 220, 98);
-    ctx.fillStyle = '#1D4ED8';
-    ctx.beginPath();
-    ctx.arc(395, 45, 16, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#15803D';
-    ctx.beginPath();
-    ctx.arc(395, 91, 16, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillText('CB', 385, 50);
-    ctx.fillText('BK', 385, 96);
-    ctx.fillStyle = '#E5D429';
-    ctx.font = 'bold 34px sans-serif';
-    ctx.fillText('1 →', 436, 78);
-    ctx.fillStyle = '#C8D6EA';
-    ctx.font = '12px sans-serif';
-    ctx.fillText('Dahulukan penumpang yang turun', 20, 134);
-    etx.fillStyle = '#243C66';
+    ctx.fillStyle = '#E5C038';
+    ctx.fillRect(0, 0, 512, 6);
+    etx.fillStyle = '#0B182E';
     etx.fillRect(0, 0, 512, 160);
+    etx.fillStyle = '#8F761D';
+    etx.fillRect(0, 0, 512, 6);
 
-    // TILE 2 (512..1024, 0..160): Mustard Yellow Overhead Exit Wayfinding + Green Evakuasi
-    ctx.fillStyle = '#C9A426';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 24px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Kereta 3 · Pintu 2', 18, 44);
+    etx.fillStyle = '#D8E6FA';
+    etx.font = 'bold 24px "Segoe UI", Arial, sans-serif';
+    etx.fillText('Kereta 3 · Pintu 2', 18, 44);
+    ctx.font = '600 14px "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle = '#B8CBE3';
+    ctx.fillText('Car 3 · Door 2', 18, 66);
+    for (let c = 0; c < 6; c++) {
+      ctx.fillStyle = c === 2 ? '#E5D429' : '#5E7699';
+      ctx.fillRect(18 + c * 28, 82, 24, 15);
+    }
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 20px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Harjamukti', 228, 52);
+    ctx.fillText('Jatimulya', 228, 98);
+    etx.fillStyle = '#E2EEFF';
+    etx.font = 'bold 20px "Segoe UI", Arial, sans-serif';
+    etx.fillText('Harjamukti', 228, 52);
+    etx.fillText('Jatimulya', 228, 98);
+    ctx.fillStyle = '#1D4ED8';
+    ctx.beginPath(); ctx.arc(386, 45, 16, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#15803D';
+    ctx.beginPath(); ctx.arc(386, 91, 16, 0, Math.PI * 2); ctx.fill();
+    etx.fillStyle = '#1D4ED8';
+    etx.beginPath(); etx.arc(386, 45, 15, 0, Math.PI * 2); etx.fill();
+    etx.fillStyle = '#15803D';
+    etx.beginPath(); etx.arc(386, 91, 15, 0, Math.PI * 2); etx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 13px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('CB', 376, 50);
+    ctx.fillText('BK', 376, 96);
+    ctx.fillStyle = '#E5D429';
+    ctx.font = 'bold 34px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('1 →', 428, 80);
+    etx.fillStyle = '#D4B828';
+    etx.font = 'bold 34px "Segoe UI", Arial, sans-serif';
+    etx.fillText('1 →', 428, 80);
+    ctx.fillStyle = '#B8CBE3';
+    ctx.font = '600 12px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Dahulukan penumpang turun / Let passengers alight first', 18, 138);
+
+    // TILE 2 (512..896, 0..160): Authentic KAI Mustard-Yellow Exit Lightbox (dark ink properly masked in emissiveMap!)
+    ctx.fillStyle = '#D4AE2A';
     ctx.fillRect(512, 0, 384, 160);
-    ctx.fillStyle = 'rgba(20,22,26,0.10)';
+    ctx.fillStyle = '#13294B';
     ctx.fillRect(512, 0, 384, 10);
-    ctx.fillStyle = '#14171A';
-    ctx.font = 'bold 34px sans-serif';
-    ctx.fillText('Pintu Keluar ↗', 536, 62);
-    ctx.font = '600 22px sans-serif';
-    ctx.fillStyle = '#24292E';
-    ctx.fillText('Exit  •  KRL / TransJakarta', 536, 104);
-    ctx.font = 'bold 16px sans-serif';
-    ctx.fillStyle = '#333940';
-    ctx.fillText('← JALAN RAYA / STREET LEVEL', 536, 138);
-    etx.fillStyle = '#6E5A12';
-    etx.fillRect(512, 0, 384, 160);
+    ctx.fillRect(512, 150, 384, 10);
+    etx.fillStyle = '#735E14';
+    etx.fillRect(512, 10, 384, 140);
+
+    ctx.fillStyle = '#10141A';
+    ctx.font = 'bold 40px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Pintu Keluar ↗', 538, 76);
+    ctx.font = '600 23px "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle = '#1E242C';
+    ctx.fillText('Exit · TransJakarta · KRL', 538, 120);
+    // Mask dark lettering in emissiveMap so backlit acrylic text stays razor-sharp at night!
+    etx.fillStyle = '#080A0D';
+    etx.font = 'bold 40px "Segoe UI", Arial, sans-serif';
+    etx.fillText('Pintu Keluar ↗', 538, 76);
+    etx.font = '600 23px "Segoe UI", Arial, sans-serif';
+    etx.fillText('Exit · TransJakarta · KRL', 538, 120);
 
     // Green Jalur Evakuasi (896..1024, 0..160)
     ctx.fillStyle = '#0E7C41';
     ctx.fillRect(896, 0, 128, 160);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 17px sans-serif';
-    ctx.fillText('JALUR', 926, 56);
-    ctx.fillText('EVAKUASI', 912, 82);
-    ctx.font = 'bold 22px sans-serif';
-    ctx.fillText('EXIT →', 918, 126);
-    etx.fillStyle = '#0C8C48';
+    etx.fillStyle = '#084D28';
     etx.fillRect(896, 0, 128, 160);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 17px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('JALUR', 928, 54);
+    ctx.fillText('EVAKUASI', 912, 80);
+    ctx.font = 'bold 22px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('EXIT →', 918, 124);
+    etx.fillStyle = '#E6FFF0';
+    etx.font = 'bold 17px "Segoe UI", Arial, sans-serif';
+    etx.fillText('JALUR', 928, 54);
+    etx.fillText('EVAKUASI', 912, 80);
+    etx.font = 'bold 22px "Segoe UI", Arial, sans-serif';
+    etx.fillText('EXIT →', 918, 124);
 
     // TILE 3 (0..512, 160..360): Smart Travel Live Better PSD Poster
     ctx.fillStyle = '#DCE2E8';
@@ -1264,9 +1288,44 @@
     ctx.strokeStyle = '#34D399';
     ctx.lineWidth = 4;
     ctx.stroke();
-    ctx.fillStyle = '#ECFDF5';
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillText('TEKAN [E]', 680, 457);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 30px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('← Peron 1', 177, 922);
+    etx.fillStyle = '#EDF5FF';
+    etx.font = 'bold 30px "Segoe UI", Arial, sans-serif';
+    etx.fillText('← Peron 1', 177, 922);
+    ctx.fillStyle = '#B8D0EC';
+    ctx.font = '600 18px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Harjamukti · Jatimulya (CB/BK)', 177, 968);
+    etx.fillStyle = '#8FB0D8';
+    etx.font = '600 18px "Segoe UI", Arial, sans-serif';
+    etx.fillText('Harjamukti · Jatimulya (CB/BK)', 177, 968);
+
+    ctx.fillStyle = '#10141A';
+    ctx.font = 'bold 30px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Concourse ↓', 512, 922);
+    ctx.font = '600 18px "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle = '#1F262E';
+    ctx.fillText('Loket · Pintu Keluar / Exit', 512, 968);
+    etx.fillStyle = '#080A0D';
+    etx.font = 'bold 30px "Segoe UI", Arial, sans-serif';
+    etx.fillText('Concourse ↓', 512, 922);
+    etx.font = '600 18px "Segoe UI", Arial, sans-serif';
+    etx.fillText('Loket · Pintu Keluar / Exit', 512, 968);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 30px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Peron 2 →', 847, 922);
+    etx.fillStyle = '#EDF5FF';
+    etx.font = 'bold 30px "Segoe UI", Arial, sans-serif';
+    etx.fillText('Peron 2 →', 847, 922);
+    ctx.fillStyle = '#B8D0EC';
+    ctx.font = '600 18px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Dukuh Atas BSI · Sudirman', 847, 968);
+    etx.fillStyle = '#8FB0D8';
+    etx.font = '600 18px "Segoe UI", Arial, sans-serif';
+    etx.fillText('Dukuh Atas BSI · Sudirman', 847, 968);
+
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
 
@@ -1315,211 +1374,193 @@
     etx.font = 'bold 14px sans-serif';
     etx.fillText('LAYANAN PENUMPANG LRT', 792, 462);
 
-    // TILE 7 (0..512, 512..672): PSD Header Peron 2 (JALUR 2 • KERETA KEMBALI ← in Amber/Blue)
-    ctx.fillStyle = '#16325C';
+    // TILE 7 (0..512, 512..672): Authentic KAI PSD Header Peron 2 (Tujuan Dukuh Atas BSI)
+    ctx.fillStyle = '#13294B';
     ctx.fillRect(0, 512, 512, 160);
-    ctx.fillStyle = '#D97706';
-    ctx.fillRect(0, 512, 512, 10);
-    ctx.fillStyle = '#F59E0B';
+    ctx.fillStyle = '#E5C038';
+    ctx.fillRect(0, 512, 512, 6);
+    ctx.fillStyle = '#1D4ED8';
     ctx.fillRect(0, 664, 512, 8);
-    etx.fillStyle = '#1B355C';
+    etx.fillStyle = '#0A172B';
     etx.fillRect(0, 512, 512, 160);
-    etx.fillStyle = '#D97706';
-    etx.fillRect(0, 512, 512, 8);
+    etx.fillStyle = '#8F761D';
+    etx.fillRect(0, 512, 512, 6);
 
-    ctx.fillStyle = '#D97706';
-    ctx.beginPath();
-    ctx.arc(54, 588, 28, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    etx.fillStyle = '#D97706';
-    etx.beginPath();
-    etx.arc(54, 588, 26, 0, Math.PI * 2);
-    etx.fill();
+    ctx.fillStyle = '#1D4ED8';
+    ctx.beginPath(); ctx.arc(52, 588, 28, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#E5C038'; ctx.lineWidth = 3; ctx.stroke();
+    etx.fillStyle = '#1D4ED8';
+    etx.beginPath(); etx.arc(52, 588, 26, 0, Math.PI * 2); etx.fill();
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     etx.textAlign = 'center';
     etx.textBaseline = 'middle';
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 30px sans-serif';
-    ctx.fillText('2', 54, 589);
-    etx.fillStyle = '#FFFBEB';
-    etx.font = 'bold 30px sans-serif';
-    etx.fillText('2', 54, 589);
+    ctx.font = 'bold 30px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('2', 52, 589);
+    etx.fillStyle = '#FFFFFF';
+    etx.font = 'bold 30px "Segoe UI", Arial, sans-serif';
+    etx.fillText('2', 52, 589);
 
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
     etx.textAlign = 'left';
     etx.textBaseline = 'alphabetic';
-    ctx.fillStyle = '#FEF3C7';
-    ctx.font = 'bold 24px sans-serif';
-    ctx.fillText('JALUR 2 • KERETA KEMBALI ←', 98, 572);
-    etx.fillStyle = '#FDE68A';
-    etx.font = 'bold 24px sans-serif';
-    etx.fillText('JALUR 2 • KERETA KEMBALI ←', 98, 572);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 25px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('← Peron 2 · Dukuh Atas BSI', 96, 574);
+    etx.fillStyle = '#E8F2FF';
+    etx.font = 'bold 25px "Segoe UI", Arial, sans-serif';
+    etx.fillText('← Peron 2 · Dukuh Atas BSI', 96, 574);
 
-    ctx.fillStyle = '#FDBA74';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.fillText('← ARAH KEMBALI STASIUN SEBELUMNYA', 98, 602);
-    etx.fillStyle = '#F59E0B';
-    etx.font = 'bold 14px sans-serif';
-    etx.fillText('← ARAH KEMBALI STASIUN SEBELUMNYA', 98, 602);
+    ctx.fillStyle = '#B8CBE3';
+    ctx.font = '600 15px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Lin Cibubur (CB)  •  Lin Bekasi (BK)', 96, 606);
+    etx.fillStyle = '#8BA7CC';
+    etx.font = '600 15px "Segoe UI", Arial, sans-serif';
+    etx.fillText('Lin Cibubur (CB)  •  Lin Bekasi (BK)', 96, 606);
 
     for (let c = 0; c < 6; c++) {
-      ctx.fillStyle = c === 2 ? '#F59E0B' : '#64748B';
-      ctx.fillRect(98 + c * 24, 624, 20, 12);
+      ctx.fillStyle = c === 2 ? '#E5C038' : '#5E7699';
+      ctx.fillRect(96 + c * 24, 626, 20, 11);
     }
     ctx.fillStyle = '#CBD5E1';
-    ctx.font = '12px sans-serif';
-    ctx.fillText('DAHULUKAN PENUMPANG TURUN', 252, 635);
+    ctx.font = '12px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Dahulukan penumpang turun', 252, 636);
 
     // TILE 8 (512..1024, 512..672): Authentic Navy Blue Jakarta LRT "Ke Peron ↓ / To Platforms" Sign
-    ctx.fillStyle = '#152952';
+    ctx.fillStyle = '#13294B';
     ctx.fillRect(512, 512, 512, 160);
-    ctx.fillStyle = '#1E3A70';
+    ctx.fillStyle = '#E5C038';
     ctx.fillRect(512, 512, 512, 8);
-    ctx.fillStyle = '#0D1C3A';
+    ctx.fillStyle = '#0B182E';
     ctx.fillRect(512, 662, 512, 10);
-    etx.fillStyle = '#102246';
+    etx.fillStyle = '#0A162B';
     etx.fillRect(512, 512, 512, 160);
+    etx.fillStyle = '#8F761D';
+    etx.fillRect(512, 512, 512, 8);
 
-    // Bold downward arrow on right side (matching Image 2 wayfinding sign!)
-    ctx.fillStyle = '#E6ECF5';
-    ctx.font = 'bold 64px sans-serif';
+    ctx.fillStyle = '#F8FAFC';
+    ctx.font = 'bold 62px "Segoe UI", Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('↓', 944, 594);
-    etx.fillStyle = '#C8D8F0';
-    etx.font = 'bold 64px sans-serif';
+    ctx.fillText('↓', 956, 594);
+    etx.fillStyle = '#E2EEFF';
+    etx.font = 'bold 62px "Segoe UI", Arial, sans-serif';
     etx.textAlign = 'center';
     etx.textBaseline = 'middle';
-    etx.fillText('↓', 944, 594);
+    etx.fillText('↓', 956, 594);
 
-    // Platform 1 badge
     ctx.fillStyle = '#1D4ED8';
-    ctx.beginPath();
-    ctx.arc(566, 592, 30, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#E5C038';
-    ctx.lineWidth = 3;
-    ctx.stroke();
+    ctx.beginPath(); ctx.arc(564, 592, 30, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#E5C038'; ctx.lineWidth = 3; ctx.stroke();
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 34px sans-serif';
-    ctx.fillText('1', 566, 594);
+    ctx.font = 'bold 34px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('1', 564, 594);
     etx.fillStyle = '#1D4ED8';
-    etx.beginPath();
-    etx.arc(566, 592, 28, 0, Math.PI * 2);
-    etx.fill();
+    etx.beginPath(); etx.arc(564, 592, 28, 0, Math.PI * 2); etx.fill();
     etx.fillStyle = '#FFFFFF';
-    etx.font = 'bold 34px sans-serif';
-    etx.fillText('1', 566, 594);
+    etx.font = 'bold 34px "Segoe UI", Arial, sans-serif';
+    etx.fillText('1', 564, 594);
 
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
     etx.textAlign = 'left';
     etx.textBaseline = 'alphabetic';
-    ctx.fillStyle = '#F8FAFC';
-    ctx.font = 'bold 34px sans-serif';
-    ctx.fillText('Ke Peron', 616, 580);
-    etx.fillStyle = '#E2ECFA';
-    etx.font = 'bold 34px sans-serif';
-    etx.fillText('Ke Peron', 616, 580);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 38px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Ke Peron', 612, 582);
+    etx.fillStyle = '#F0F6FF';
+    etx.font = 'bold 38px "Segoe UI", Arial, sans-serif';
+    etx.fillText('Ke Peron', 612, 582);
 
-    ctx.fillStyle = '#B8C9E0';
-    ctx.font = '600 22px sans-serif';
-    ctx.fillText('To Platforms  •  Peron 1 →', 616, 622);
-    etx.fillStyle = '#8FB0D8';
-    etx.font = '600 22px sans-serif';
-    etx.fillText('To Platforms  •  Peron 1 →', 616, 622);
+    ctx.fillStyle = '#C8D8EE';
+    ctx.font = '600 22px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('To Platforms · Peron 1 & 2', 612, 624);
+    etx.fillStyle = '#9BB8DC';
+    etx.font = '600 22px "Segoe UI", Arial, sans-serif';
+    etx.fillText('To Platforms · Peron 1 & 2', 612, 624);
 
-    // TILE 9 (0..512, 672..832): Peron 2 Hanging Banner (PERON 2 • JALUR KEMBALI ←)
-    ctx.fillStyle = '#24170B';
+    // TILE 9 (0..512, 672..832): Authentic Peron 2 Hanging Banner (Dukuh Atas BSI)
+    ctx.fillStyle = '#13294B';
     ctx.fillRect(0, 672, 512, 160);
-    ctx.fillStyle = '#F59E0B';
-    ctx.fillRect(0, 672, 512, 10);
-    ctx.fillStyle = '#EA580C';
+    ctx.fillStyle = '#E5C038';
+    ctx.fillRect(0, 672, 512, 8);
+    ctx.fillStyle = '#1D4ED8';
     ctx.fillRect(0, 824, 512, 8);
-    etx.fillStyle = '#2E1C0D';
+    etx.fillStyle = '#0A162B';
     etx.fillRect(0, 672, 512, 160);
-    etx.fillStyle = '#F59E0B';
+    etx.fillStyle = '#8F761D';
     etx.fillRect(0, 672, 512, 8);
 
-    ctx.fillStyle = '#D97706';
-    ctx.beginPath();
-    ctx.arc(56, 752, 34, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#FCD34D';
-    ctx.lineWidth = 4;
-    ctx.stroke();
-    etx.fillStyle = '#D97706';
-    etx.beginPath();
-    etx.arc(56, 752, 32, 0, Math.PI * 2);
-    etx.fill();
+    ctx.fillStyle = '#1D4ED8';
+    ctx.beginPath(); ctx.arc(58, 752, 34, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#E5C038'; ctx.lineWidth = 4; ctx.stroke();
+    etx.fillStyle = '#1D4ED8';
+    etx.beginPath(); etx.arc(58, 752, 32, 0, Math.PI * 2); etx.fill();
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     etx.textAlign = 'center';
     etx.textBaseline = 'middle';
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 38px sans-serif';
-    ctx.fillText('2', 56, 753);
-    etx.fillStyle = '#FFFBEB';
-    etx.font = 'bold 38px sans-serif';
-    etx.fillText('2', 56, 753);
+    ctx.font = 'bold 38px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('2', 58, 753);
+    etx.fillStyle = '#FFFFFF';
+    etx.font = 'bold 38px "Segoe UI", Arial, sans-serif';
+    etx.fillText('2', 58, 753);
 
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
     etx.textAlign = 'left';
     etx.textBaseline = 'alphabetic';
-    ctx.fillStyle = '#FFFBEB';
-    ctx.font = 'bold 25px sans-serif';
-    ctx.fillText('PERON 2 • JALUR KEMBALI ←', 106, 738);
-    etx.fillStyle = '#FDE68A';
-    etx.font = 'bold 25px sans-serif';
-    etx.fillText('PERON 2 • JALUR KEMBALI ←', 106, 738);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 30px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('← Peron 2 · Dukuh Atas', 108, 742);
+    etx.fillStyle = '#EEF5FF';
+    etx.font = 'bold 30px "Segoe UI", Arial, sans-serif';
+    etx.fillText('← Peron 2 · Dukuh Atas', 108, 742);
 
-    ctx.fillStyle = '#FDBA74';
-    ctx.font = 'bold 16px sans-serif';
-    ctx.fillText('← KERETA KEMBALI KE STASIUN LALU', 106, 776);
-    etx.fillStyle = '#FB923C';
-    etx.font = 'bold 16px sans-serif';
-    etx.fillText('← KERETA KEMBALI KE STASIUN LALU', 106, 776);
+    ctx.fillStyle = '#B8CBE3';
+    ctx.font = '600 18px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('To Dukuh Atas BSI  •  Lin CB / BK', 108, 782);
+    etx.fillStyle = '#8AA8CC';
+    etx.font = '600 18px "Segoe UI", Arial, sans-serif';
+    etx.fillText('To Dukuh Atas BSI  •  Lin CB / BK', 108, 782);
 
-    // TILE 10 (0..1024, 832..1024): 2nd-Floor JPO Wayfinding Gantry
-    ctx.fillStyle = '#111E33';
+    // TILE 10 (0..1024, 832..1024): Authentic 2nd-Floor JPO Overhead Transit Wayfinding Board
+    ctx.fillStyle = '#0F223F';
     ctx.fillRect(0, 832, 1024, 192);
-    ctx.fillStyle = '#E5D429';
-    ctx.fillRect(0, 832, 1024, 10);
-    ctx.fillRect(0, 1014, 1024, 10);
-    etx.fillStyle = '#13243D';
+    ctx.fillStyle = '#E5C038';
+    ctx.fillRect(0, 832, 1024, 8);
+    ctx.fillRect(0, 1016, 1024, 8);
+    etx.fillStyle = '#081326';
     etx.fillRect(0, 832, 1024, 192);
-    etx.fillStyle = '#E5D429';
+    etx.fillStyle = '#8F761D';
     etx.fillRect(0, 832, 1024, 6);
 
-    // Zone cards
-    ctx.fillStyle = '#0B2E26';
-    ctx.fillRect(14, 850, 332, 156);
-    ctx.fillStyle = '#10B981';
-    ctx.fillRect(14, 850, 332, 6);
-    etx.fillStyle = '#0F3B31';
-    etx.fillRect(14, 850, 332, 156);
+    // 3 Authentic KAI LRT Wayfinding Zone Cards
+    ctx.fillStyle = '#15315A';
+    ctx.fillRect(14, 850, 326, 156);
+    ctx.fillStyle = '#1D4ED8';
+    ctx.fillRect(14, 850, 326, 8);
+    etx.fillStyle = '#0C1E3B';
+    etx.fillRect(14, 850, 326, 156);
 
-    ctx.fillStyle = '#1A2B45';
-    ctx.fillRect(360, 850, 304, 156);
-    ctx.fillStyle = '#E5D429';
-    ctx.fillRect(360, 850, 304, 6);
-    etx.fillStyle = '#203554';
-    etx.fillRect(360, 850, 304, 156);
+    ctx.fillStyle = '#D4AE2A';
+    ctx.fillRect(354, 850, 316, 156);
+    ctx.fillStyle = '#10141A';
+    ctx.fillRect(354, 850, 316, 6);
+    etx.fillStyle = '#6B5714';
+    etx.fillRect(354, 850, 316, 156);
 
-    ctx.fillStyle = '#2E1B08';
-    ctx.fillRect(678, 850, 332, 156);
-    ctx.fillStyle = '#F59E0B';
-    ctx.fillRect(678, 850, 332, 6);
-    etx.fillStyle = '#3B220A';
-    etx.fillRect(678, 850, 332, 156);
+    ctx.fillStyle = '#15315A';
+    ctx.fillRect(684, 850, 326, 156);
+    ctx.fillStyle = '#15803D';
+    ctx.fillRect(684, 850, 326, 8);
+    etx.fillStyle = '#0C1E3B';
+    etx.fillRect(684, 850, 326, 156);
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';

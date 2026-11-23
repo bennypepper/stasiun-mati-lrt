@@ -1647,44 +1647,291 @@
     return proto;
   }
 
-  // Modern Jakarta TransJakarta Halte Shelter (blue BRT fascia, glass shelter back, route board & stainless bench)
+  let _halteGlassMat = null;
+  let _halteSignMat = null;
+  let _halteMapMat = null;
+
+  function getHalteGlassMaterial() {
+    if (!_halteGlassMat) {
+      _halteGlassMat = new THREE.MeshStandardMaterial({
+        color: 0x6b8aa6,
+        roughness: 0.34,
+        metalness: 0.10,
+        transparent: true,
+        opacity: 0.36,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+    }
+    return _halteGlassMat;
+  }
+
+  function getHalteSignMaterial() {
+    if (_halteSignMat) return _halteSignMat;
+    if (typeof document === 'undefined') return getVehiclePaintedVertexMaterial();
+    const c = document.createElement('canvas');
+    c.width = 1024;
+    c.height = 160;
+    const ctx = c.getContext('2d');
+    const cE = document.createElement('canvas');
+    cE.width = 1024;
+    cE.height = 160;
+    const etx = cE.getContext('2d');
+
+    ctx.fillStyle = '#144c8a';
+    ctx.fillRect(0, 0, 1024, 160);
+    ctx.fillStyle = '#e6edf5';
+    ctx.fillRect(0, 140, 1024, 20);
+    ctx.fillStyle = '#d42428';
+    ctx.fillRect(0, 0, 1024, 10);
+
+    etx.fillStyle = '#092240';
+    etx.fillRect(0, 0, 1024, 160);
+
+    // TransJakarta corridor badge pill
+    const drawBadge = (cx, text, bg) => {
+      ctx.fillStyle = bg;
+      ctx.fillRect(cx, 30, 74, 84);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(cx, 30, 74, 84);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 46px "Segoe UI", Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, cx + 37, 74);
+
+      etx.fillStyle = bg;
+      etx.fillRect(cx + 2, 32, 70, 80);
+      etx.fillStyle = '#ffffff';
+      etx.font = 'bold 46px "Segoe UI", Arial, sans-serif';
+      etx.textAlign = 'center';
+      etx.textBaseline = 'middle';
+      etx.fillText(text, cx + 37, 74);
+    };
+    drawBadge(28, '1', '#d42428');
+    drawBadge(116, '6', '#15803d');
+    drawBadge(204, '9', '#0284c7');
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    etx.textAlign = 'left';
+    etx.textBaseline = 'alphabetic';
+
+    ctx.fillStyle = '#fde047';
+    ctx.font = 'bold 22px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('TRANSJAKARTA  •  HALTE INTEGRASI BRT', 306, 56);
+    etx.fillStyle = '#d4b828';
+    etx.font = 'bold 22px "Segoe UI", Arial, sans-serif';
+    etx.fillText('TRANSJAKARTA  •  HALTE INTEGRASI BRT', 306, 56);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 46px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('HALTE KORIDOR LRT SUDIRMAN', 306, 114);
+    etx.fillStyle = '#e8f3ff';
+    etx.font = 'bold 46px "Segoe UI", Arial, sans-serif';
+    etx.fillText('HALTE KORIDOR LRT SUDIRMAN', 306, 114);
+
+    const map = new THREE.CanvasTexture(c);
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.anisotropy = 8;
+    map.needsUpdate = true;
+    const em = new THREE.CanvasTexture(cE);
+    em.colorSpace = THREE.SRGBColorSpace;
+    em.anisotropy = 4;
+    em.needsUpdate = true;
+
+    _halteSignMat = new THREE.MeshStandardMaterial({
+      map,
+      emissive: new THREE.Color(0xffffff),
+      emissiveMap: em,
+      emissiveIntensity: 0.42,
+      roughness: 0.42,
+      metalness: 0.14
+    });
+    return _halteSignMat;
+  }
+
+  function getHalteMapMaterial() {
+    if (_halteMapMat) return _halteMapMat;
+    if (typeof document === 'undefined') return getVehiclePaintedVertexMaterial();
+    const c = document.createElement('canvas');
+    c.width = 512;
+    c.height = 640;
+    const ctx = c.getContext('2d');
+    const cE = document.createElement('canvas');
+    cE.width = 512;
+    cE.height = 640;
+    const etx = cE.getContext('2d');
+
+    ctx.fillStyle = '#eef2f6';
+    ctx.fillRect(0, 0, 512, 640);
+    ctx.fillStyle = '#123e72';
+    ctx.fillRect(0, 0, 512, 92);
+    ctx.fillStyle = '#e5c038';
+    ctx.fillRect(0, 92, 512, 10);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 28px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('PETA RUTE TRANSJAKARTA', 24, 46);
+    ctx.fillStyle = '#bfdbfe';
+    ctx.font = '600 17px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('KORIDOR 1 · 6 · 9  |  INTEGRASI LRT JABODEBEK', 24, 76);
+
+    // Schematic BRT lines
+    const lines = [
+      { col: '#d42428', y: 180, name: 'KORIDOR 1 : BLOK M — KOTA', stops: ['Blok M', 'Sudirman', 'Dukuh Atas', 'HI', 'Monas'] },
+      { col: '#15803d', y: 318, name: 'KORIDOR 6 : RAGUNAN — GALUNGGUNG', stops: ['Ragunan', 'Kuningan', 'Setiabudi', 'Dukuh Atas'] },
+      { col: '#0284c7', y: 456, name: 'KORIDOR 9 : PINANG RANTI — PLUIT', stops: ['Pinang Ranti', 'Cawang', 'Cikoko', 'Semanggi'] }
+    ];
+    for (let li = 0; li < lines.length; li++) {
+      const ln = lines[li];
+      ctx.fillStyle = ln.col;
+      ctx.font = 'bold 17px "Segoe UI", Arial, sans-serif';
+      ctx.fillText(ln.name, 26, ln.y - 26);
+      ctx.strokeStyle = ln.col;
+      ctx.lineWidth = 10;
+      ctx.beginPath();
+      ctx.moveTo(42, ln.y);
+      ctx.lineTo(470, ln.y);
+      ctx.stroke();
+      const step = 428 / Math.max(1, ln.stops.length - 1);
+      for (let si = 0; si < ln.stops.length; si++) {
+        const sx = 42 + si * step;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(sx, ln.y, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 3; ctx.stroke();
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 13px "Segoe UI", Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(ln.stops[si], sx, ln.y + 28);
+      }
+      ctx.textAlign = 'left';
+    }
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(20, 540, 472, 76);
+    ctx.fillStyle = '#fde047';
+    ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('JAM OPERASIONAL: 05.00 – 22.00 WIB', 38, 574);
+    ctx.fillStyle = '#cbd5e1';
+    ctx.font = '600 14px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('TAP KARTU UANG ELEKTRONIK DI PINTU MASUK HALTE', 38, 602);
+
+    // Soft subtle lightbox glow in emissiveMap
+    etx.drawImage(c, 0, 0);
+
+    const map = new THREE.CanvasTexture(c);
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.anisotropy = 8;
+    map.needsUpdate = true;
+    const em = new THREE.CanvasTexture(cE);
+    em.colorSpace = THREE.SRGBColorSpace;
+    em.anisotropy = 4;
+    em.needsUpdate = true;
+
+    _halteMapMat = new THREE.MeshStandardMaterial({
+      map,
+      emissive: new THREE.Color(0xdbe8f5),
+      emissiveMap: em,
+      emissiveIntensity: 0.24,
+      roughness: 0.36,
+      metalness: 0.08
+    });
+    return _halteMapMat;
+  }
+
+  // Modern Jakarta TransJakarta Halte Shelter (zero z-fighting, translucent glass + mullions, real signage, BRT route lightbox & slatted steel bench)
   function getTransJakartaHalteProto() {
-    const cacheKey = 'proc_prop_tj_halte_v1';
+    const cacheKey = 'proc_prop_tj_halte_v3';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
     const bAlloy = [];
     const bPaint = [];
     const bGlass = [];
-    const bAmber = [];
+    const bSign = [];
+    const bMap = [];
+    const bLed = [];
 
-    // Grounded concrete/steel threshold pad + 4 steel shelter columns
-    addColoredBox(bAlloy, 5.2, 0.14, 1.85, 0, 0.07, 0, 0, 0, 0, 0x475569, 0.84);
-    for (const px of [-2.35, -0.78, 0.78, 2.35]) {
-      addColoredBox(bAlloy, 0.12, 2.75, 0.12, px, 1.44, -0.72, 0, 0, 0, 0x334155, 0.88);
+    // 1) Grounded concrete threshold platform + curb lip + yellow tactile boarding strip (distinct non-overlapping Y levels!)
+    addColoredBox(bAlloy, 5.40, 0.14, 2.00, 0, 0.07, 0.04, 0, 0, 0, 0x475569, 0.84);
+    addColoredBox(bPaint, 5.36, 0.016, 0.22, 0, 0.148, 0.90, 0, 0, 0, 0xd9a820, 0.90);
+
+    // 2) 4 Rear structural steel I-columns positioned cleanly BEHIND glass windscreen (z = -0.84 vs glass z = -0.70 -> ZERO intersection!)
+    for (const px of [-2.42, -0.82, 0.82, 2.42]) {
+      addColoredBox(bAlloy, 0.11, 2.74, 0.11, px, 1.51, -0.84, 0, 0, 0, 0x2a3442, 0.88);
+      // Base mounting flange bolts
+      addColoredBox(bAlloy, 0.20, 0.04, 0.20, px, 0.16, -0.84, 0, 0, 0, 0x1e2530, 0.86);
+      // Cantilevered steel roof rafter arm extending forward over shelter
+      addColoredBox(bAlloy, 0.08, 0.11, 2.12, px, 2.84, 0.16, -0.04, 0, 0, 0x384556, 0.90);
     }
-    // Cantilevered steel roof canopy + TransJakarta blue/white fascia header + route light strip
-    addColoredBox(bAlloy, 5.5, 0.14, 2.25, 0, 2.86, 0.08, -0.05, 0, 0, 0x64748b, 0.90);
-    addColoredBox(bPaint, 5.46, 0.34, 0.10, 0, 2.68, 1.15, 0, 0, 0, 0x1b74c4, 0.90);
-    addColoredBox(bPaint, 5.46, 0.07, 0.12, 0, 2.52, 1.15, 0, 0, 0, 0xeef2f6, 0.95);
-    addBox(bAmber, 1.45, 0.14, 0.08, -1.55, 2.70, 1.19); // glowing HALTE TJ sign box
-    // Glass wind-screen back panel + side end panel + BRT corridor map frame
-    addBox(bGlass, 4.70, 2.10, 0.06, 0, 1.38, -0.72);
-    addBox(bGlass, 0.06, 2.05, 1.55, -2.38, 1.36, 0.05);
-    addColoredBox(bPaint, 1.25, 1.35, 0.12, 1.62, 1.45, -0.64, 0, 0, 0, 0x0f2f60, 0.90);
-    addColoredBox(bPaint, 1.10, 1.12, 0.14, 1.62, 1.45, -0.62, 0, 0, 0, 0xe2e8f0, 0.92);
-    // Stainless waiting bench inside shelter
-    addColoredBox(bAlloy, 2.65, 0.07, 0.44, -0.45, 0.50, -0.35, 0, 0, 0, 0x94a3b8, 0.92);
-    for (const bx of [-1.55, -0.45, 0.65]) {
-      addColoredBox(bAlloy, 0.08, 0.44, 0.38, bx, 0.25, -0.35, 0, 0, 0, 0x334155, 0.88);
+    // Horizontal lower & upper transom steel rails framing the back glass panels
+    addColoredBox(bAlloy, 4.96, 0.06, 0.08, 0, 0.34, -0.70, 0, 0, 0, 0x334155, 0.88);
+    addColoredBox(bAlloy, 4.96, 0.06, 0.08, 0, 2.48, -0.70, 0, 0, 0, 0x334155, 0.88);
+    // Vertical slim stainless glass mullion clips at bay dividers (separated cleanly from glass face)
+    for (const mx of [-2.42, -0.82, 0.82, 2.42]) {
+      addColoredBox(bAlloy, 0.05, 2.14, 0.07, mx, 1.41, -0.70, 0, 0, 0, 0x64748b, 0.92);
+    }
+
+    // 3) Cantilevered roof deck + corrugated underside ceiling ribs + overhead recessed shelter LED light strip
+    addColoredBox(bAlloy, 5.66, 0.08, 2.38, 0, 2.96, 0.12, -0.04, 0, 0, 0x566475, 0.90);
+    addColoredBox(bAlloy, 5.56, 0.05, 2.26, 0, 2.89, 0.12, -0.04, 0, 0, 0x26303d, 0.84);
+    addBox(bLed, 3.80, 0.035, 0.12, -0.25, 2.84, 0.14);
+
+    // 4) TransJakarta Header Fascia Box (non-overlapping backing box + crisp front & back textured sign planes!)
+    addColoredBox(bAlloy, 5.60, 0.44, 0.14, 0, 2.74, 1.24, 0, 0, 0, 0x16325c, 0.90);
+    const frontSign = new THREE.PlaneGeometry(5.52, 0.40);
+    frontSign.translate(0, 2.74, 1.318);
+    bSign.push(frontSign);
+    const backSign = new THREE.PlaneGeometry(5.52, 0.40);
+    backSign.rotateY(Math.PI);
+    backSign.translate(0, 2.74, 1.162);
+    bSign.push(backSign);
+
+    // 5) Translucent tinted safety-glass windscreen bays + framed left windbreak wing (zero black reflection blob!)
+    addBox(bGlass, 1.54, 2.08, 0.025, -1.62, 1.41, -0.70);
+    addBox(bGlass, 1.54, 2.08, 0.025, 0.0, 1.41, -0.70);
+    // Left side end-frame + translucent glass pane
+    addColoredBox(bAlloy, 0.06, 2.50, 0.06, -2.42, 1.39, 0.72, 0, 0, 0, 0x334155, 0.88);
+    addColoredBox(bAlloy, 0.06, 0.06, 1.56, -2.42, 0.34, -0.04, 0, 0, 0, 0x334155, 0.88);
+    addColoredBox(bAlloy, 0.06, 0.06, 1.56, -2.42, 2.48, -0.04, 0, 0, 0, 0x334155, 0.88);
+    addBox(bGlass, 0.025, 2.08, 1.46, -2.42, 1.41, -0.04);
+
+    // 6) Illuminated BRT Route Map Lightbox Cabinet (right bay x = 1.62, cleanly inset with zero z-fighting!)
+    addColoredBox(bAlloy, 1.48, 1.88, 0.16, 1.62, 1.40, -0.68, 0, 0, 0, 0x1e293b, 0.90);
+    const mapFront = new THREE.PlaneGeometry(1.34, 1.68);
+    mapFront.translate(1.62, 1.40, -0.592);
+    bMap.push(mapFront);
+    const mapBack = new THREE.PlaneGeometry(1.34, 1.68);
+    mapBack.rotateY(Math.PI);
+    mapBack.translate(1.62, 1.40, -0.768);
+    bMap.push(mapBack);
+
+    // 7) Contoured Slatted Stainless Waiting Bench (4 seat slats, curved backrest bar, 2 end armrests & 3 pedestal legs)
+    for (let si = 0; si < 4; si++) {
+      addColoredBox(bAlloy, 2.68, 0.032, 0.088, -0.45, 0.51, -0.48 + si * 0.105, 0, 0, 0, 0xa8b4c2, 0.94);
+    }
+    // Slatted backrest + angled uprights
+    addColoredBox(bAlloy, 2.68, 0.11, 0.03, -0.45, 0.86, -0.56, -0.14, 0, 0, 0x94a3b8, 0.92);
+    addColoredBox(bAlloy, 2.68, 0.09, 0.03, -0.45, 0.72, -0.54, -0.14, 0, 0, 0x94a3b8, 0.92);
+    for (const bx of [-1.62, -0.45, 0.72]) {
+      addColoredBox(bAlloy, 0.06, 0.37, 0.36, bx, 0.32, -0.32, 0, 0, 0, 0x334155, 0.88);
+      addColoredBox(bAlloy, 0.05, 0.42, 0.05, bx, 0.70, -0.52, -0.14, 0, 0, 0x475569, 0.88);
+    }
+    // End armrests
+    for (const ax of [-1.76, 0.86]) {
+      addColoredBox(bAlloy, 0.045, 0.04, 0.38, ax, 0.68, -0.32, 0, 0, 0, 0x64748b, 0.90);
+      addColoredBox(bAlloy, 0.045, 0.18, 0.045, ax, 0.59, -0.15, 0, 0, 0, 0x475569, 0.88);
     }
 
     const proto = {
       parts: mergePartBuckets([
         { bucket: bAlloy, mat: getAlloyMetalMaterial() },
         { bucket: bPaint, mat: getVehiclePaintedVertexMaterial() },
-        { bucket: bGlass, mat: getCabinGlassMaterial() },
-        { bucket: bAmber, mat: getAmberAccentEmissiveMaterial() }
+        { bucket: bGlass, mat: getHalteGlassMaterial() },
+        { bucket: bSign, mat: getHalteSignMaterial() },
+        { bucket: bMap, mat: getHalteMapMaterial() },
+        { bucket: bLed, mat: getHeadlightEmissiveMaterial() }
       ]),
-      size: { x: 5.5, y: 2.95, z: 2.25 }
+      size: { x: 5.66, y: 3.02, z: 2.40 }
     };
     _cityProtoCache.set(cacheKey, proto);
     return proto;
@@ -1861,16 +2108,35 @@
     }
     addPart(crateHullGrp, new THREE.BoxGeometry(0.28, 0.05, 0.02), mats.gold, 0, 0.24, 0.308);
 
-    // Recessed foam supply tray
-    addPart(crateHullGrp, new THREE.BoxGeometry(0.84, 0.04, 0.52), mats.rim, 0, 0.41, 0);
-    if (!mats._interiorRed) {
-      mats._interiorRed = new THREE.MeshStandardMaterial({ color: 0xc81e1e, roughness: 0.42, metalness: 0.15 });
-      mats._interiorWhite = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.45, metalness: 0.1 });
-      mats._interiorBrass = new THREE.MeshStandardMaterial({ color: 0xd9a738, roughness: 0.28, metalness: 0.85 });
-      mats._interiorGun = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.38, metalness: 0.72 });
-      mats._interiorArmor = new THREE.MeshStandardMaterial({ color: 0x273444, roughness: 0.68, metalness: 0.22 });
-      disposableMats.push(mats._interiorRed, mats._interiorWhite, mats._interiorBrass, mats._interiorGun, mats._interiorArmor);
+    // Recessed softly backlit tactical foam supply tray + subtle interior lid LED strip (readable in pitch-black night!)
+    if (!mats._interiorFoam) {
+      mats._interiorFoam = new THREE.MeshStandardMaterial({
+        color: 0x2c3440, emissive: new THREE.Color(0x282112), emissiveIntensity: 0.42, roughness: 0.86, metalness: 0.06
+      });
+      mats._interiorLed = new THREE.MeshBasicMaterial({ color: 0xfde68a });
+      mats._interiorRed = new THREE.MeshStandardMaterial({
+        color: 0xdc2626, emissive: new THREE.Color(0x521212), emissiveIntensity: 0.34, roughness: 0.40, metalness: 0.14
+      });
+      mats._interiorWhite = new THREE.MeshStandardMaterial({
+        color: 0xf1f5f9, emissive: new THREE.Color(0x3a404a), emissiveIntensity: 0.32, roughness: 0.42, metalness: 0.10
+      });
+      mats._interiorBrass = new THREE.MeshStandardMaterial({
+        color: 0xeab308, emissive: new THREE.Color(0x4a380c), emissiveIntensity: 0.36, roughness: 0.28, metalness: 0.82
+      });
+      mats._interiorGun = new THREE.MeshStandardMaterial({
+        color: 0x475569, emissive: new THREE.Color(0x242830), emissiveIntensity: 0.34, roughness: 0.36, metalness: 0.68
+      });
+      mats._interiorArmor = new THREE.MeshStandardMaterial({
+        color: 0x334458, emissive: new THREE.Color(0x1c2636), emissiveIntensity: 0.34, roughness: 0.64, metalness: 0.22
+      });
+      disposableMats.push(
+        mats._interiorFoam, mats._interiorLed,
+        mats._interiorRed, mats._interiorWhite, mats._interiorBrass, mats._interiorGun, mats._interiorArmor
+      );
     }
+    addPart(crateHullGrp, new THREE.BoxGeometry(0.84, 0.04, 0.52), mats._interiorFoam, 0, 0.41, 0);
+    // Warm amber tactical interior rim LED bar along back inner edge of tray
+    addPart(crateHullGrp, new THREE.BoxGeometry(0.76, 0.016, 0.022), mats._interiorLed, 0, 0.436, -0.245);
 
     const slotSpecs = opts && Array.isArray(opts.slotSpecs) && opts.slotSpecs.length > 0 ? opts.slotSpecs : null;
     if (!slotSpecs) {
@@ -1903,6 +2169,8 @@
       return m;
     };
     addLidPart(new THREE.BoxGeometry(0.96, 0.10, 0.64), mats.rim, 0, 0.05, 0.31);
+    addLidPart(new THREE.BoxGeometry(0.84, 0.022, 0.52), mats._interiorFoam, 0, 0.002, 0.31);
+    addLidPart(new THREE.BoxGeometry(0.72, 0.018, 0.024), mats._interiorLed, 0, -0.002, 0.54);
     addLidPart(new THREE.BoxGeometry(0.84, 0.05, 0.52), mats.body, 0, 0.115, 0.31);
     for (const lx of [-0.28, 0, 0.28]) {
       addLidPart(new THREE.BoxGeometry(0.05, 0.03, 0.50), mats.rim, lx, 0.145, 0.31);
@@ -1910,6 +2178,41 @@
     addLidPart(new THREE.BoxGeometry(0.68, 0.025, 0.065), mats.gold, 0, 0.145, 0.52);
     addLidPart(new THREE.BoxGeometry(0.22, 0.028, 0.035), mats.gold, 0, 0.155, 0.31);
     crateHullGrp.add(lidPivot);
+
+    // Batch static meshes by material inside crate body & lidPivot (cuts ~58 draw calls -> ~8!)
+    const batchGroupMeshes = (targetGrp, skipObj) => {
+      if (!targetGrp || !THREE_UTILS || typeof THREE_UTILS.mergeGeometries !== 'function') return;
+      const byMat = new Map();
+      const toRemove = [];
+      for (let ci = 0; ci < targetGrp.children.length; ci++) {
+        const ch = targetGrp.children[ci];
+        if (!ch || !ch.isMesh || ch === skipObj || !ch.geometry || !ch.material || Array.isArray(ch.material)) continue;
+        ch.updateMatrix();
+        const g = prepGeo(ch.geometry.clone(), false);
+        g.applyMatrix4(ch.matrix);
+        let arr = byMat.get(ch.material);
+        if (!arr) { arr = []; byMat.set(ch.material, arr); }
+        arr.push(g);
+        toRemove.push(ch);
+      }
+      if (toRemove.length <= byMat.size) {
+        byMat.forEach((arr) => { for (let k = 0; k < arr.length; k++) arr[k].dispose(); });
+        return;
+      }
+      for (let r = 0; r < toRemove.length; r++) targetGrp.remove(toRemove[r]);
+      byMat.forEach((arr, mat) => {
+        const merged = arr.length === 1 ? arr[0] : THREE_UTILS.mergeGeometries(arr, false);
+        if (arr.length > 1) { for (let k = 0; k < arr.length; k++) arr[k].dispose(); }
+        if (!merged) return;
+        disposableGeos.push(merged);
+        const m = new THREE.Mesh(merged, mat);
+        m.castShadow = false;
+        m.receiveShadow = true;
+        targetGrp.add(m);
+      });
+    };
+    batchGroupMeshes(crateHullGrp, lidPivot);
+    batchGroupMeshes(lidPivot, null);
 
     const attachHalo = (typeof LRT !== 'undefined' && LRT.Render && typeof LRT.Render.attachPerimeterHalo === 'function')
       ? LRT.Render.attachPerimeterHalo
@@ -1931,7 +2234,7 @@
         slotGrp.name = `${id}_Slot_${si}`;
         const lx = sp.localX !== undefined ? sp.localX : (si === 0 ? -0.26 : (si === 1 ? 0.0 : 0.26));
         const lz = sp.localZ !== undefined ? sp.localZ : (si === 1 ? 0.08 : -0.14);
-        const ly = sp.localY !== undefined ? sp.localY : 0.435;
+        const ly = sp.localY !== undefined ? sp.localY : 0.448;
         slotGrp.position.set(lx, ly, lz);
 
         if (sp.itemType === 'weapon_variant') {
@@ -1941,11 +2244,27 @@
           }
           if (wMesh) {
             wMesh.rotation.y = Math.PI * 0.5;
-            const sc = sp.weaponId === 'pistol' ? 0.92 : 0.78;
-            wMesh.scale.setScalar(sc);
+            wMesh.updateMatrixWorld(true);
+            const wb = new THREE.Box3().setFromObject(wMesh);
+            const wsz = new THREE.Vector3();
+            const wctr = new THREE.Vector3();
+            wb.getSize(wsz);
+            wb.getCenter(wctr);
+            const maxDim = Math.max(wsz.x, wsz.y, wsz.z, 0.01);
+            const fit = sp.weaponId === 'pistol' ? 0.34 : 0.44;
+            const sc = maxDim > fit ? (fit / maxDim) : (sp.weaponId === 'pistol' ? 0.92 : 0.78);
+            wMesh.scale.multiplyScalar(sc);
+            wMesh.position.set(-wctr.x * sc, -wb.min.y * sc + 0.012, -wctr.z * sc);
             wMesh.traverse((c) => {
               if (c && c.isMesh) {
                 if (c.geometry) disposableGeos.push(c.geometry);
+                if (c.material && !Array.isArray(c.material) && c.material.emissive) {
+                  const cm = c.material.clone();
+                  cm.emissive.setHex(0x2a2416);
+                  cm.emissiveIntensity = Math.max(cm.emissiveIntensity || 0, 0.36);
+                  c.material = cm;
+                  disposableMats.push(cm);
+                }
               }
             });
             slotGrp.add(wMesh);
@@ -1978,7 +2297,7 @@
         slotGrp.visible = !slotTaken;
         grp.add(slotGrp);
         const sHalo = attachHalo
-          ? attachHalo(slotGrp, { color: 0xfacc15, hoverColor: 0xfacc15, thicknessScale: 0.85, initialMode: 'off' })
+          ? attachHalo(slotGrp, { color: 0xfacc15, hoverColor: 0xfde047, thicknessScale: 1.32, subtleOpacity: 0.68, initialMode: 'off' })
           : null;
 
         const wx = x + lx * cosR + lz * sinR;
@@ -2078,7 +2397,8 @@
             } else if (hoveredId && hoveredId === sl.id) {
               sl.halo.setMode('hover');
             } else {
-              sl.halo.setMode(allowSubtle ? 'subtle' : 'off');
+              // Opened lootbox items ALWAYS display a crisp golden perimeter halo so they pop at night!
+              sl.halo.setMode('subtle');
             }
             sl.halo.update(timeAccum);
           }

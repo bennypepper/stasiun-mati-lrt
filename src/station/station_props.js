@@ -6,53 +6,49 @@
 
   function createKaiCabinetTexture() {
     const c = document.createElement('canvas');
-    c.width = 128;
+    c.width = 512;
     c.height = 256;
     const ctx = c.getContext('2d');
-    // Grounded brushed stainless-steel industrial turnstile housing (matching Jakarta LRT concourse aesthetic)
-    const grad = ctx.createLinearGradient(0, 0, 128, 256);
-    grad.addColorStop(0, '#9aa2ab');
-    grad.addColorStop(0.45, '#7e8790');
+    // Crisp 2:1 brushed stainless-steel industrial turnstile housing (zero text clipping on chamfered edges!)
+    const grad = ctx.createLinearGradient(0, 0, 512, 256);
+    grad.addColorStop(0, '#9ba3ac');
+    grad.addColorStop(0.5, '#7e8790');
     grad.addColorStop(1, '#5d656e');
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 128, 256);
-    // Subtle vertical brushed-metal grain & panel seam
-    ctx.fillStyle = 'rgba(255,255,255,0.08)';
-    for (let x = 4; x < 128; x += 6) ctx.fillRect(x, 0, 2, 256);
+    ctx.fillRect(0, 0, 512, 256);
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    for (let x = 8; x < 512; x += 12) ctx.fillRect(x, 0, 3, 256);
     ctx.fillStyle = 'rgba(18,22,28,0.28)';
-    ctx.fillRect(0, 118, 128, 3);
-    // KAI LRT navy/purple accent fascia band at top
-    const band = ctx.createLinearGradient(0, 16, 128, 84);
+    ctx.fillRect(0, 128, 512, 4);
+    // KAI LRT navy/purple accent fascia band positioned safely BELOW the 45° chamfer shoulder (y=54..118)
+    const band = ctx.createLinearGradient(0, 54, 512, 118);
     band.addColorStop(0, '#1e325c');
-    band.addColorStop(0.65, '#4b266d');
+    band.addColorStop(0.60, '#4b266d');
     band.addColorStop(1, '#7a2564');
     ctx.fillStyle = band;
-    ctx.fillRect(0, 18, 128, 62);
+    ctx.fillRect(0, 54, 512, 64);
     ctx.fillStyle = '#e5c038';
-    ctx.fillRect(0, 78, 128, 4);
-    ctx.fillStyle = '#f1f5f9';
-    ctx.font = 'bold 18px sans-serif';
+    ctx.fillRect(0, 114, 512, 5);
+    // Centered safely inside the flat cabinet face (x = 256, never touches chamfered ends!)
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 30px "Segoe UI", Arial, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Access', 64, 46);
-    ctx.font = 'bold 12px sans-serif';
+    ctx.fillText('Access', 256, 86);
+    ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
     ctx.fillStyle = '#dbeafe';
-    ctx.fillText('by KAI LRT', 64, 65);
-    // Recessed crimson flap indicator accent & lower service louver vents
+    ctx.fillText('by KAI · LRT JABODEBEK', 256, 108);
+    // Recessed crimson accent & lower service louver vents
     ctx.fillStyle = '#5c191e';
-    ctx.fillRect(16, 134, 96, 26);
+    ctx.fillRect(104, 140, 304, 24);
     ctx.fillStyle = 'rgba(15,20,26,0.45)';
-    for (let y = 176; y < 236; y += 11) {
-      ctx.fillRect(22, y, 84, 4);
+    for (let y = 178; y < 232; y += 11) {
+      ctx.fillRect(120, y, 272, 4);
     }
-    // Hours-after-outbreak boot scuffs & grime along kickplate
     ctx.fillStyle = 'rgba(24,22,20,0.34)';
-    ctx.fillRect(0, 232, 128, 24);
-    ctx.fillStyle = 'rgba(32,28,24,0.18)';
-    ctx.fillRect(12, 198, 28, 14);
-    ctx.fillRect(76, 152, 24, 10);
+    ctx.fillRect(0, 234, 512, 22);
     const tex = new THREE.CanvasTexture(c);
     if ('colorSpace' in tex && THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
+    tex.anisotropy = 8;
     tex.needsUpdate = true;
     return tex;
   }
@@ -1071,8 +1067,8 @@
       c.fillText('PANGGIL KERETA LRT', w * 0.5, 43);
 
       c.fillStyle = subHex;
-      c.font = 'bold 17px sans-serif';
-      c.fillText(isPrev ? 'PERON 2  •  ← KEMBALI' : 'PERON 1  •  → MAJU', w * 0.5, 92);
+      c.font = 'bold 17px "Segoe UI", Arial, sans-serif';
+      c.fillText(isPrev ? 'PERON 2  •  LIN CB / BK' : 'PERON 1  •  LIN CB / BK', w * 0.5, 92);
       c.fillStyle = '#ffffff';
       c.font = 'bold 22px sans-serif';
       c.fillText(String(destName || '').toUpperCase().slice(0, 18), w * 0.5, 132);
@@ -1100,8 +1096,8 @@
       c.textBaseline = 'middle';
       c.fillText('PANGGIL KERETA LRT', w * 0.5, 43);
       c.fillStyle = subHex;
-      c.font = 'bold 17px sans-serif';
-      c.fillText(isPrev ? 'PERON 2  •  ← KEMBALI' : 'PERON 1  •  → MAJU', w * 0.5, 92);
+      c.font = 'bold 17px "Segoe UI", Arial, sans-serif';
+      c.fillText(isPrev ? 'PERON 2  •  LIN CB / BK' : 'PERON 1  •  LIN CB / BK', w * 0.5, 92);
       c.fillStyle = '#f8fafc';
       c.font = 'bold 22px sans-serif';
       c.fillText(String(destName || '').toUpperCase().slice(0, 18), w * 0.5, 132);
@@ -1171,46 +1167,51 @@
       : (getCanopyArchY(x) + 0.08);
     const rodLen = Math.max(0.25, roofY - (signY + signH * 0.5));
 
-    const pidsMap = makeCanvasTex(station, 512, 160, (c, w, h) => {
-      c.fillStyle = isPrev ? '#241406' : '#08241d';
-      c.fillRect(0, 0, w, h);
-      c.fillStyle = isPrev ? '#f59e0b' : '#10b981';
-      c.fillRect(0, 0, w, 14);
-      c.fillRect(0, h - 10, w, 10);
-      // Badge
-      c.fillStyle = isPrev ? '#d97706' : '#059669';
-      c.fillRect(14, 24, 68, 112);
+    const pidsMap = makeCanvasTex(station, 1024, 256, (c, w, h) => {
+      c.scale(2, 1.6);
+      const lw = 512, lh = 160;
+      c.fillStyle = '#0f223f';
+      c.fillRect(0, 0, lw, lh);
+      c.fillStyle = '#e5c038';
+      c.fillRect(0, 0, lw, 10);
+      c.fillStyle = isPrev ? '#15803d' : '#1d4ed8';
+      c.fillRect(0, lh - 8, lw, 8);
+      // Platform badge
+      c.fillStyle = isPrev ? '#15803d' : '#1d4ed8';
+      c.fillRect(14, 22, 70, 114);
       c.fillStyle = '#ffffff';
-      c.font = 'bold 34px sans-serif';
+      c.font = 'bold 38px "Segoe UI", Arial, sans-serif';
       c.textAlign = 'center';
       c.textBaseline = 'middle';
-      c.fillText(isPrev ? 'P2' : 'P1', 48, 80);
-      // Direction & Destination
+      c.fillText(isPrev ? '2' : '1', 49, 79);
+      // Authentic KAI PIDS Destination Readout
       c.textAlign = 'left';
       c.textBaseline = 'alphabetic';
-      c.fillStyle = isPrev ? '#fde68a' : '#6ee7b7';
-      c.font = 'bold 20px sans-serif';
-      c.fillText(isPrev ? '← KEMBALI (PERON 2)' : '→ MAJU (PERON 1)', 98, 52);
+      c.fillStyle = '#b8d0ec';
+      c.font = 'bold 18px "Segoe UI", Arial, sans-serif';
+      c.fillText(isPrev ? 'PERON 2  •  KEBERANGKATAN ←' : 'PERON 1  •  KEBERANGKATAN →', 100, 50);
       c.fillStyle = '#ffffff';
-      c.font = 'bold 29px sans-serif';
-      c.fillText(String(destName || '').toUpperCase().slice(0, 22), 98, 96);
+      c.font = 'bold 32px "Segoe UI", Arial, sans-serif';
+      c.fillText(String(destName || '').toUpperCase().slice(0, 22), 100, 96);
       c.fillStyle = '#cbd5e1';
-      c.font = 'bold 15px sans-serif';
-      c.fillText('LRT JABODEBEK  •  TEKAN [E] PANGGIL KERETA', 98, 130);
+      c.font = '600 14px "Segoe UI", Arial, sans-serif';
+      c.fillText('KAI LRT JABODEBEK  •  LIN CIBUBUR (CB) / BEKASI (BK)', 100, 130);
     }, false);
-    const pidsEm = makeCanvasTex(station, 512, 160, (c, w, h) => {
-      c.fillStyle = isPrev ? '#1c0f04' : '#051a14';
-      c.fillRect(0, 0, w, h);
-      c.fillStyle = isPrev ? '#f59e0b' : '#10b981';
-      c.fillRect(0, 0, w, 12);
+    const pidsEm = makeCanvasTex(station, 1024, 256, (c, w, h) => {
+      c.scale(2, 1.6);
+      const lw = 512, lh = 160;
+      c.fillStyle = '#081326';
+      c.fillRect(0, 0, lw, lh);
+      c.fillStyle = '#8f761d';
+      c.fillRect(0, 0, lw, 10);
       c.textAlign = 'left';
       c.textBaseline = 'alphabetic';
-      c.fillStyle = isPrev ? '#fde68a' : '#6ee7b7';
-      c.font = 'bold 20px sans-serif';
-      c.fillText(isPrev ? '← KEMBALI (PERON 2)' : '→ MAJU (PERON 1)', 98, 52);
-      c.fillStyle = '#e2f8f0';
-      c.font = 'bold 29px sans-serif';
-      c.fillText(String(destName || '').toUpperCase().slice(0, 22), 98, 96);
+      c.fillStyle = '#9bb8dc';
+      c.font = 'bold 18px "Segoe UI", Arial, sans-serif';
+      c.fillText(isPrev ? 'PERON 2  •  KEBERANGKATAN ←' : 'PERON 1  •  KEBERANGKATAN →', 100, 50);
+      c.fillStyle = '#edf5ff';
+      c.font = 'bold 32px "Segoe UI", Arial, sans-serif';
+      c.fillText(String(destName || '').toUpperCase().slice(0, 22), 100, 96);
     }, false);
     const pidsMat = new THREE.MeshStandardMaterial({
       map: pidsMap, emissive: new THREE.Color(0xffffff), emissiveMap: pidsEm, emissiveIntensity: 0.78, roughness: 0.30
@@ -1300,11 +1301,11 @@
       c.fillStyle = '#1e293b';
       c.font = 'bold 14px sans-serif';
       c.fillText('TRANSIT: KRL Commuter  •  TransJakarta  •  Whoosh Halim', 22, 238);
-      c.fillStyle = '#0e7c41';
+      c.fillStyle = '#13294b';
       c.fillRect(20, 260, 472, 42);
       c.fillStyle = '#ffffff';
-      c.font = 'bold 15px sans-serif';
-      c.fillText('AREA TUNGGU JPO 2  •  PERON 1 (MAJU)  |  PERON 2 (KEMBALI)', 32, 286);
+      c.font = 'bold 14px "Segoe UI", Arial, sans-serif';
+      c.fillText('PERON 1: HARJAMUKTI / JATIMULYA  |  PERON 2: DUKUH ATAS BSI', 28, 286);
     }, false);
     const routeBoardMat = new THREE.MeshStandardMaterial({
       map: routeMapTex, emissive: new THREE.Color(0xffffff), emissiveMap: routeMapTex, emissiveIntensity: 0.38, roughness: 0.36
@@ -1752,15 +1753,18 @@
       });
     }
 
-    const exX = p1MaxX - 1.1;
-    const exBy = 3.25, exBh = 0.64;
-    const exRoofY = getCanopyArchY(exX) + 0.08;
-    const exRodLen = Math.max(0.3, exRoofY - (exBy + exBh * 0.5));
-    addBox(bSteelDark, 0.10, exBh, 2.84, exX, exBy, concMidZ);
-    addBox(bSteelDark, 0.04, exRodLen, 0.04, exX, exBy + exBh * 0.5 + exRodLen * 0.5, concMidZ - 1.05);
-    addBox(bSteelDark, 0.04, exRodLen, 0.04, exX, exBy + exBh * 0.5 + exRodLen * 0.5, concMidZ + 1.05);
-    addAtlasQuad(bSign, 2.76, 0.60, exX - 0.06, exBy, concMidZ, 0, -Math.PI * 0.5, 0, SIGN_UV.exitYellow);
-    addAtlasQuad(bSign, 2.76, 0.60, exX + 0.06, exBy, concMidZ, 0, Math.PI * 0.5, 0, SIGN_UV.exitYellow);
+    // On non-island concourse stations, the prominent dual-color hanging sign in station_arch already covers Ke Peron / Pintu Keluar cleanly without visual overlap!
+    if (isIsland) {
+      const exX = p1MaxX - 1.1;
+      const exBy = 3.25, exBh = 0.64;
+      const exRoofY = getCanopyArchY(exX) + 0.08;
+      const exRodLen = Math.max(0.3, exRoofY - (exBy + exBh * 0.5));
+      addBox(bSteelDark, 0.10, exBh, 2.84, exX, exBy, concMidZ);
+      addBox(bSteelDark, 0.04, exRodLen, 0.04, exX, exBy + exBh * 0.5 + exRodLen * 0.5, concMidZ - 1.05);
+      addBox(bSteelDark, 0.04, exRodLen, 0.04, exX, exBy + exBh * 0.5 + exRodLen * 0.5, concMidZ + 1.05);
+      addAtlasQuad(bSign, 2.76, 0.60, exX - 0.06, exBy, concMidZ, 0, -Math.PI * 0.5, 0, SIGN_UV.exitYellow);
+      addAtlasQuad(bSign, 2.76, 0.60, exX + 0.06, exBy, concMidZ, 0, Math.PI * 0.5, 0, SIGN_UV.exitYellow);
+    }
 
     const evX = stairX;
     const evZ = stairFootZ + (jpoZ > 0 ? -0.35 : 0.35);
