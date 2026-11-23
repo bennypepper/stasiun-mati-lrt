@@ -936,29 +936,29 @@
     const reticleTex = createRpgReticleTexture();
     W._vmMats = {
       gunSteelDark: new THREE.MeshStandardMaterial({
-        color: 0x454d5a, map: texCache.brushedSteelTex || whiteTex,
-        bumpMap: texCache.brushedSteelBump || null, bumpScale: 0.0018,
-        roughness: 0.34, metalness: 0.74, envMapIntensity: 1.45
+        color: 0x1d2229, map: texCache.brushedSteelTex || whiteTex,
+        bumpMap: texCache.brushedSteelBump || null, bumpScale: 0.0020,
+        roughness: 0.50, metalness: 0.52, envMapIntensity: 0.58
       }),
       gunSteelMid: new THREE.MeshPhysicalMaterial({
-        color: 0x6c788a, map: texCache.brushedSteelTex || whiteTex,
-        bumpMap: texCache.brushedSteelBump || null, bumpScale: 0.0018,
-        roughness: 0.24, metalness: 0.82,
-        clearcoat: 0.34, clearcoatRoughness: 0.18, envMapIntensity: 1.65
+        color: 0x2f3640, map: texCache.brushedSteelTex || whiteTex,
+        bumpMap: texCache.brushedSteelBump || null, bumpScale: 0.0020,
+        roughness: 0.40, metalness: 0.62,
+        clearcoat: 0.12, clearcoatRoughness: 0.34, envMapIntensity: 0.66
       }),
       gunSteelLight: new THREE.MeshPhysicalMaterial({
-        color: 0xb2becf, map: texCache.brushedSteelTex || whiteTex,
-        bumpMap: texCache.brushedSteelBump || null, bumpScale: 0.0015,
-        roughness: 0.17, metalness: 0.92,
-        clearcoat: 0.42, clearcoatRoughness: 0.14, envMapIntensity: 1.85
+        color: 0x616b78, map: texCache.brushedSteelTex || whiteTex,
+        bumpMap: texCache.brushedSteelBump || null, bumpScale: 0.0018,
+        roughness: 0.32, metalness: 0.72,
+        clearcoat: 0.16, clearcoatRoughness: 0.26, envMapIntensity: 0.78
       }),
       polymerBlack: new THREE.MeshStandardMaterial({
-        color: 0x2d323b, map: whiteTex, roughness: 0.60, metalness: 0.14, envMapIntensity: 1.15
+        color: 0x171a1f, map: whiteTex, roughness: 0.78, metalness: 0.06, envMapIntensity: 0.36
       }),
       polymerGrip: new THREE.MeshStandardMaterial({
-        color: 0x424954, map: texCache.knurlTex || whiteTex,
-        bumpMap: texCache.knurlBump || null, bumpScale: 0.0032,
-        roughness: 0.72, metalness: 0.08, envMapIntensity: 1.12
+        color: 0x22262d, map: texCache.knurlTex || whiteTex,
+        bumpMap: texCache.knurlBump || null, bumpScale: 0.0036,
+        roughness: 0.86, metalness: 0.04, envMapIntensity: 0.32
       }),
       rpgOlive: new THREE.MeshPhysicalMaterial({
         color: 0x627a4b, map: texCache.brushedSteelTex || whiteTex,
@@ -1004,24 +1004,24 @@
         blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
       }),
       gloveDark: new THREE.MeshStandardMaterial({
-        color: 0x1c2129, map: texCache.knurlTex || whiteTex,
-        bumpMap: texCache.knurlBump || null, bumpScale: 0.0024,
-        roughness: 0.86, metalness: 0.03, envMapIntensity: 0.45
+        color: 0x161a20, map: texCache.knurlTex || whiteTex,
+        bumpMap: texCache.knurlBump || null, bumpScale: 0.0026,
+        roughness: 0.92, metalness: 0.02, envMapIntensity: 0.24
       }),
       gloveLeather: new THREE.MeshStandardMaterial({
-        color: 0x14171c, map: texCache.knurlTex || whiteTex,
-        bumpMap: texCache.knurlBump || null, bumpScale: 0.0014,
-        roughness: 0.62, metalness: 0.06, envMapIntensity: 0.62
+        color: 0x101317, map: texCache.knurlTex || whiteTex,
+        bumpMap: texCache.knurlBump || null, bumpScale: 0.0016,
+        roughness: 0.74, metalness: 0.04, envMapIntensity: 0.32
       }),
       gloveKnuckle: new THREE.MeshStandardMaterial({
-        color: 0x2a303a, map: texCache.carbonWeaveTex || whiteTex,
+        color: 0x20252d, map: texCache.carbonWeaveTex || whiteTex,
         bumpMap: texCache.carbonWeaveBump || null, bumpScale: 0.0018,
-        roughness: 0.46, metalness: 0.18, envMapIntensity: 0.78
+        roughness: 0.62, metalness: 0.12, envMapIntensity: 0.36
       }),
       sleeveTactical: new THREE.MeshStandardMaterial({
-        color: 0x20272e, map: texCache.knurlTex || whiteTex,
+        color: 0x1b2229, map: texCache.knurlTex || whiteTex,
         bumpMap: texCache.knurlBump || null, bumpScale: 0.0028,
-        roughness: 0.92, metalness: 0.02, envMapIntensity: 0.34
+        roughness: 0.95, metalness: 0.01, envMapIntensity: 0.20
       }),
       tritiumGreen: new THREE.MeshBasicMaterial({ color: 0x55ff77 }),
       redDot: new THREE.MeshBasicMaterial({ color: 0xff2a2a }),
@@ -1209,22 +1209,22 @@
     }
   }
 
-  // Articulated 3-segment finger / 2-segment thumb with dorsal flex pads & leather fingertip
+  // Articulated 3-segment finger / 2-segment thumb with slim anatomical proportions & leather fingertip
   function addDigit(parent, mat, knuckleMat, leatherMat, pts, radii) {
     const tipMat = leatherMat || mat;
     const lastSeg = pts.length - 2;
     for (let i = 0; i < pts.length - 1; i++) {
       const segMat = (i === lastSeg) ? tipMat : mat;
-      addSeg(parent, segMat, pts[i], pts[i + 1], radii[i], radii[i + 1], i > 0, i === lastSeg, 0.96, 0.88);
-      // Dorsal PIP flex-joint armor band on proximal-to-middle knuckle
+      addSeg(parent, segMat, pts[i], pts[i + 1], radii[i], radii[i + 1], i > 0, i === lastSeg, 0.84, 0.74);
+      // Slim dorsal PIP flex-joint pad (never chunky square blocks!)
       if (knuckleMat && i === 1 && pts.length >= 4) {
         const j = pts[1];
-        addBevelPart(parent, knuckleMat, radii[1] * 1.85, radii[1] * 1.45, radii[1] * 1.65, 0.0025, j[0], j[1], j[2]);
+        addBevelPart(parent, knuckleMat, radii[1] * 1.45, radii[1] * 1.15, radii[1] * 1.35, 0.0025, j[0], j[1], j[2]);
       }
     }
     if (knuckleMat) {
       const p0 = pts[0];
-      addBevelPart(parent, knuckleMat, radii[0] * 1.95, radii[0] * 1.60, radii[0] * 1.75, 0.003, p0[0], p0[1], p0[2]);
+      addBevelPart(parent, knuckleMat, radii[0] * 1.55, radii[0] * 1.25, radii[0] * 1.45, 0.003, p0[0], p0[1], p0[2]);
     }
   }
 
@@ -1309,21 +1309,21 @@
     // 4. Low-profile contoured carbon knuckle guard bar sitting flush across the dorsal MCP knuckles
     addBevelPart(grp, knuck, 0.007, 0.054, 0.016, 0.003, X(hw + 0.0145), 0.004 + yOff, -hd + 0.009 + zOff * 0.5, 0, 0, sx * -0.06);
 
-    // 5. Articulated 3-segment fingers wrapping cleanly around the front strap
-    const rows = g.trig ? (g.support ? [0.006, -0.009, -0.024, -0.038] : [0.006, -0.010, -0.026])
-                        : [0.024, 0.008, -0.009, -0.025];
-    const baseRadii = [0.0082, 0.0078, 0.0074, 0.0066];
+    // 5. Articulated 3-segment fingers wrapping tightly around the front strap (slim anatomical radii, no sausages!)
+    const rows = g.trig ? (g.support ? [0.004, -0.010, -0.024, -0.037] : [0.005, -0.010, -0.025])
+                        : [0.022, 0.007, -0.008, -0.023];
+    const baseRadii = [0.0068, 0.0064, 0.0060, 0.0054];
     for (let i = 0; i < rows.length; i++) {
       const y = rows[i];
       const fz = -hd + zOff;
       const rScale = (i === rows.length - 1) ? 0.88 : 1.0;
       const rads = [baseRadii[0] * rScale, baseRadii[1] * rScale, baseRadii[2] * rScale, baseRadii[3] * rScale];
-      const wrapIn = g.support ? -hw - 0.005 : -hw + 0.001;
+      const wrapIn = g.support ? -hw - 0.004 : -hw + 0.001;
       addDigit(grp, glove, knuck, leather, [
-        [X(hw + 0.009), y + 0.001, fz + 0.006],
-        [X(hw + 0.002), y, fz - 0.008],
-        [X(-0.002), y - 0.001, fz - 0.010],
-        [X(wrapIn), y - 0.001, fz - 0.003]
+        [X(hw + 0.008), y + 0.001, fz + 0.006],
+        [X(hw + 0.001), y, fz - 0.007],
+        [X(-0.002), y - 0.001, fz - 0.009],
+        [X(wrapIn), y - 0.001, fz - 0.002]
       ], rads);
     }
 
@@ -1332,26 +1332,26 @@
       const ty = g.trig[0];
       const tz = g.trig[1];
       addDigit(grp, glove, knuck, leather, [
-        [X(hw + 0.009), ty + 0.003, -hd + 0.008],
-        [X(hw + 0.006), ty + 0.003, tz + 0.024],
+        [X(hw + 0.008), ty + 0.003, -hd + 0.008],
+        [X(hw + 0.005), ty + 0.003, tz + 0.024],
         [X(hw * 0.55), ty + 0.001, tz + 0.009],
         [X(0.001), ty - 0.001, tz + 0.001]
-      ], [0.0080, 0.0074, 0.0067, 0.0060]);
+      ], [0.0066, 0.0062, 0.0056, 0.0050]);
     }
 
     // 7. Articulated thumb (thumbs-forward tactical posture along left side of frame)
     const tdy = g.thumbDy || 0;
     const tx = (v) => -v; // weapon's left side (-X)
-    const thumbOut = g.support ? 0.009 : 0.002;
+    const thumbOut = g.support ? 0.008 : 0.002;
     addDigit(grp, glove, null, leather, [
-      [X(g.support ? hw + 0.006 : 0.008), 0.032 + tdy, hd + 0.008],
-      [tx(hw + thumbOut), 0.036 + tdy, hd - 0.004],
-      [tx(hw + thumbOut + 0.003), 0.041 + tdy, -0.014],
-      [tx(hw + thumbOut + 0.003), 0.043 + tdy, -0.038]
-    ], [0.0092, 0.0084, 0.0076, 0.0068]);
+      [X(g.support ? hw + 0.005 : 0.007), 0.030 + tdy, hd + 0.007],
+      [tx(hw + thumbOut), 0.034 + tdy, hd - 0.004],
+      [tx(hw + thumbOut + 0.002), 0.039 + tdy, -0.014],
+      [tx(hw + thumbOut + 0.002), 0.041 + tdy, -0.036]
+    ], [0.0076, 0.0070, 0.0064, 0.0058]);
 
-    // 8. Forearm leaving from anatomical wrist behind palm heel
-    const wLocal = [X(hw + 0.006), -0.012 + yOff * 0.5, hd + 0.026];
+    // 8. Forearm overlapping cleanly into palm heel (eliminates visible wrist gap!)
+    const wLocal = [X(hw + 0.003), -0.014 + yOff * 0.5, hd + 0.014];
     const wr = rotXv(wLocal, g.tilt || 0);
     const w = [g.cx + wr[0], g.cy + wr[1], g.cz + wr[2]];
     addForearm(parent, mats, w, g.arm || [sx * 0.10, -0.14, 0.38], side);

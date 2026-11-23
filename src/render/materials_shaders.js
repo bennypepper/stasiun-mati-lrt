@@ -651,21 +651,23 @@
         jakartaShopfront: new THREE.MeshStandardMaterial({
           map: jakartaShopfront ? jakartaShopfront.map : stall.map,
           roughnessMap: jakartaShopfront ? jakartaShopfront.roughnessMap : null,
-          roughness: 0.56,
-          metalness: 0.16,
+          roughness: 0.82,
+          metalness: 0.06,
+          envMapIntensity: 0.32,
           emissive: new THREE.Color(0xffffff),
           emissiveMap: jakartaShopfront ? jakartaShopfront.emissiveMap : null,
-          emissiveIntensity: 0.55
+          emissiveIntensity: 0.52
         }),
 
         towerCurtainWall: new THREE.MeshStandardMaterial({
           map: skylineFacade.map,
           roughnessMap: skylineFacade.roughnessMap,
-          roughness: 0.32,
-          metalness: 0.38,
+          roughness: 0.44,
+          metalness: 0.24,
+          envMapIntensity: 0.50,
           emissive: new THREE.Color(0xffffff),
           emissiveMap: skylineFacade.emissiveMap,
-          emissiveIntensity: 0.42
+          emissiveIntensity: 0.48
         }),
 
         glassPsd: new THREE.MeshPhysicalMaterial({
@@ -707,15 +709,11 @@
           side: THREE.DoubleSide
         }),
 
-        glassBuilding: new THREE.MeshPhysicalMaterial({
-          color: 0x243846,
-          roughness: 0.09,
-          metalness: 0.32,
-          clearcoat: 0.92,
-          clearcoatRoughness: 0.06,
-          envMapIntensity: 1.15,
-          ior: 1.52,
-          reflectivity: 0.88
+        glassBuilding: new THREE.MeshStandardMaterial({
+          color: 0x1b2936,
+          roughness: 0.36,
+          metalness: 0.18,
+          envMapIntensity: 0.38
         }),
 
         foliageVine: new THREE.MeshStandardMaterial({

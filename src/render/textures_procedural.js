@@ -195,26 +195,22 @@
         const seamX = panelX < 2 ? 1.0 : 0.0;
         const seam = Math.max(seamX, seamY);
 
-        // Formwork tie-rod holes
+        // Formwork tie-rod holes (subtle modern precast pins)
         const tx = ((x + 64) % 128) - 64;
         const ty = ((y + 64) % 128) - 64;
         const tieDist = Math.sqrt(tx * tx + ty * ty);
-        const tieHole = tieDist < 5.5 ? smoothstep(5.5, 2.0, tieDist) : 0.0;
+        const tieHole = tieDist < 4.2 ? smoothstep(4.2, 1.5, tieDist) * 0.55 : 0.0;
 
-        // Vertical rain stain streaks below horizontal seams & tie holes
-        const streakMask = clamp01((fbmDrip[Math.floor(y * 0.25) * size + x] - 0.43) * 2.5);
-        const streak = clamp01(streakMask * (0.45 + 0.55 * dripDecay) + (Math.abs(tx) < 5 && ty > 0 ? smoothstep(40, 0, ty) * 0.55 : 0));
+        // Subtle vertical monsoon weathering beneath horizontal seams (NO harsh wavy cartoon blotches!)
+        const streakMask = clamp01((fbmDrip[Math.floor(y * 0.25) * size + x] - 0.52) * 1.4);
+        const streak = clamp01(streakMask * (0.30 + 0.45 * dripDecay));
 
-        // Hairline concrete cracks
-        const crackVal = Math.abs(fbmLow[i] - 0.5) * 2.0;
-        const crack = crackVal < 0.014 ? smoothstep(0.014, 0.002, crackVal) * 0.8 : 0.0;
-
-        const baseTone = 148 + (fbmLow[i] - 0.5) * 28 + (fbmFine[i] - 0.5) * 24;
-        const stainDark = 1.0 - streak * 0.30 - seam * 0.28 - tieHole * 0.42 - crack * 0.35;
-        const warmShift = streak * 5;
-        const r = clamp255(baseTone * stainDark - warmShift * 0.3);
-        const g = clamp255((baseTone - 2) * stainDark - warmShift * 0.1);
-        const b = clamp255((baseTone - 9) * stainDark - warmShift * 0.5);
+        const baseTone = 152 + (fbmLow[i] - 0.5) * 14 + (fbmFine[i] - 0.5) * 18;
+        const stainDark = 1.0 - streak * 0.12 - seam * 0.14 - tieHole * 0.22;
+        const warmShift = streak * 3;
+        const r = clamp255(baseTone * stainDark - warmShift * 0.2);
+        const g = clamp255((baseTone - 1) * stainDark - warmShift * 0.1);
+        const b = clamp255((baseTone - 4) * stainDark - warmShift * 0.3);
 
         const o = i * 4;
         d[o] = r;
@@ -222,8 +218,8 @@
         d[o + 2] = b;
         d[o + 3] = 255;
 
-        hBuf[i] = clamp01(0.65 + (fbmFine[i] - 0.5) * 0.25 - seam * 0.28 - tieHole * 0.45 - crack * 0.32);
-        rBuf[i] = clamp01(0.74 + fbmFine[i] * 0.20 + seam * 0.08 - streak * 0.07);
+        hBuf[i] = clamp01(0.65 + (fbmFine[i] - 0.5) * 0.14 - seam * 0.14 - tieHole * 0.22);
+        rBuf[i] = clamp01(0.80 + fbmFine[i] * 0.14 + seam * 0.05);
       }
     }
     ctx.putImageData(img, 0, 0);
@@ -1851,9 +1847,11 @@
   }
 
   function buildJakartaShopfrontAtlas(maxAniso) {
-    // 1024x1024 atlas: 4 columns x 2 rows = 8 authentic Jakarta commercial shopfronts
-    // Each cell (256x512): top 110px = illuminated Indonesian signboard fascia,
-    // middle 44px = striped storefront awning band, bottom 358px = half-open rolling shutter / glass display window!
+    // 1024x1024 LANDSCAPE-PROPORTIONED atlas: 2 columns x 4 rows = 8 authentic Jakarta commercial shopfronts
+    // Each cell is 512x256 (2:1 landscape aspect -> zero squashed/stretched text on ruko & podium facades!).
+    // Top 72px (vFrac 0.72..1.0): crisp horizontal Indonesian signboard fascia.
+    // Bottom 184px (vFrac 0.0..0.72): recessed dark shop interior + aluminum mullions + corrugated rolling shutter
+    // (NO baked-in awning stripe so it never clashes with 3D awnings, and NO MS-Paint crack lines!).
     const W = 1024;
     const H = 1024;
     const cA = makeCanvas(W, H);
@@ -1863,215 +1861,178 @@
     const cE = makeCanvas(W, H);
     const etx = cE.getContext('2d');
 
-    ctx.fillStyle = '#2b3038';
+    ctx.fillStyle = '#232830';
     ctx.fillRect(0, 0, W, H);
-    rtx.fillStyle = '#a8a8a8';
+    rtx.fillStyle = '#c8c8c8'; // matte storefront so no harsh white sun-blob glare!
     rtx.fillRect(0, 0, W, H);
     etx.fillStyle = '#000000';
     etx.fillRect(0, 0, W, H);
 
     const shops = [
       {
-        title: 'APOTEK K-24', sub: 'BUKA 24 JAM • OBAT & P3K',
+        title: 'APOTEK K-24', sub: 'BUKA 24 JAM  •  OBAT RESEP & P3K',
         signBg: '#0b6e4f', signAccent: '#f8fafc', titleCol: '#ffffff', subCol: '#bbf7d0',
-        awningA: '#0d8a63', awningB: '#e2e8f0', shutterFrac: 0.30, glassTint: '#163832',
-        glowCol: '#6ee7b7', badge: '+'
+        shutterFrac: 0.28, glassTint: '#112925', glowCol: '#6ee7b7', badge: '+'
       },
       {
-        title: 'ALFAMART', sub: 'MINIMARKET • ATM • KOPI',
-        signBg: '#c81e1e', signAccent: '#facc15', titleCol: '#ffffff', subCol: '#fef08a',
-        awningA: '#dc2626', awningB: '#1d4ed8', shutterFrac: 0.22, glassTint: '#1c2c3d',
-        glowCol: '#fde68a', badge: '24J'
+        title: 'ALFAMART', sub: 'MINIMARKET  •  ATM  •  KOPI',
+        signBg: '#b91c1c', signAccent: '#facc15', titleCol: '#ffffff', subCol: '#fef08a',
+        shutterFrac: 0.22, glassTint: '#14202e', glowCol: '#fde68a', badge: '24J'
       },
       {
-        title: 'WARTEG BAHARI', sub: 'MASAKAN RUMAHAN • ES TEH',
-        signBg: '#0f766e', signAccent: '#fbbf24', titleCol: '#fef9c3', subCol: '#fed7aa',
-        awningA: '#d97706', awningB: '#f8fafc', shutterFrac: 0.18, glassTint: '#2b2419',
-        glowCol: '#fcd34d', badge: 'WB'
+        title: 'WARTEG BAHARI', sub: 'MASAKAN RUMAHAN  •  ES TEH MANIS',
+        signBg: '#0f766e', signAccent: '#f59e0b', titleCol: '#fef9c3', subCol: '#fed7aa',
+        shutterFrac: 0.18, glassTint: '#241d15', glowCol: '#fcd34d', badge: 'WB'
       },
       {
-        title: 'BANK MANDIRI', sub: 'ATM CENTER 24 JAM • TUNAI',
+        title: 'BANK MANDIRI', sub: 'ATM CENTER 24 JAM  •  TARIK TUNAI',
         signBg: '#0f2b5b', signAccent: '#eab308', titleCol: '#fef08a', subCol: '#bfdbfe',
-        awningA: '#1e3a8a', awningB: '#eab308', shutterFrac: 0.0, glassTint: '#14273e',
-        glowCol: '#60a5fa', badge: 'ATM'
+        shutterFrac: 0.0, glassTint: '#102033', glowCol: '#60a5fa', badge: 'ATM'
       },
       {
-        title: 'KLINIK 24 JAM', sub: 'UGD • DOKTER UMUM • LAB',
-        signBg: '#f1f5f9', signAccent: '#dc2626', titleCol: '#991b1b', subCol: '#334155',
-        awningA: '#dc2626', awningB: '#f8fafc', shutterFrac: 0.36, glassTint: '#1b2b34',
-        glowCol: '#fca5a5', badge: '+'
+        title: 'KLINIK 24 JAM', sub: 'UGD  •  DOKTER UMUM  •  LABORATORIUM',
+        signBg: '#e2e8f0', signAccent: '#dc2626', titleCol: '#991b1b', subCol: '#334155',
+        shutterFrac: 0.34, glassTint: '#16242c', glowCol: '#fca5a5', badge: '+'
       },
       {
-        title: 'KEDAI KOPI', sub: 'KOPI SUSU GULA AREN • ROTI',
+        title: 'KEDAI KOPI', sub: 'KOPI SUSU GULA AREN  •  ROTI BAKAR',
         signBg: '#1c1917', signAccent: '#d97706', titleCol: '#fde68a', subCol: '#d6d3d1',
-        awningA: '#292524', awningB: '#b45309', shutterFrac: 0.15, glassTint: '#241c14',
-        glowCol: '#f59e0b', badge: 'KP'
+        shutterFrac: 0.16, glassTint: '#1e1711', glowCol: '#f59e0b', badge: 'KP'
       },
       {
-        title: 'FOTOKOPI & ATK', sub: 'PRINT • JILID • MATERAI',
+        title: 'FOTOKOPI & ATK', sub: 'PRINT WARNA  •  JILID  •  MATERAI',
         signBg: '#1d4ed8', signAccent: '#facc15', titleCol: '#ffffff', subCol: '#fde047',
-        awningA: '#2563eb', awningB: '#e2e8f0', shutterFrac: 0.62, glassTint: '#1c2430',
-        glowCol: '#93c5fd', badge: 'ATK'
+        shutterFrac: 0.56, glassTint: '#171f2a', glowCol: '#93c5fd', badge: 'ATK'
       },
       {
-        title: 'BENGKEL MOTOR', sub: 'SERVIS • OLI • TAMBAL BAN',
+        title: 'BENGKEL MOTOR', sub: 'SERVIS MESIN  •  GANTI OLI  •  BAN',
         signBg: '#c2410c', signAccent: '#18181b', titleCol: '#fff7ed', subCol: '#fed7aa',
-        awningA: '#ea580c', awningB: '#27272a', shutterFrac: 0.48, glassTint: '#1f1d1b',
-        glowCol: '#fb923c', badge: 'OIL'
+        shutterFrac: 0.44, glassTint: '#1b1917', glowCol: '#fb923c', badge: 'OIL'
       }
     ];
 
-    const cellW = 256;
-    const cellH = 512;
-    const rng = mulberry32(4821);
+    const cellW = 512;
+    const cellH = 256;
 
     for (let idx = 0; idx < shops.length; idx++) {
       const s = shops[idx];
-      const col = idx % 4;
-      const row = Math.floor(idx / 4);
+      const col = idx % 2;
+      const row = Math.floor(idx / 2);
       const x0 = col * cellW;
       const y0 = row * cellH;
 
-      // 1) Signboard Fascia Box (top 108px)
-      ctx.fillStyle = '#181c22';
-      ctx.fillRect(x0, y0, cellW, 108);
+      // 1) Landscape Signboard Fascia Box (top 72px: 512x72)
+      ctx.fillStyle = '#14181e';
+      ctx.fillRect(x0, y0, cellW, 72);
       ctx.fillStyle = s.signBg;
-      ctx.fillRect(x0 + 6, y0 + 8, cellW - 12, 92);
+      ctx.fillRect(x0 + 8, y0 + 6, cellW - 16, 60);
       ctx.fillStyle = s.signAccent;
-      ctx.fillRect(x0 + 6, y0 + 90, cellW - 12, 10);
-      ctx.fillRect(x0 + 6, y0 + 8, cellW - 12, 5);
+      ctx.fillRect(x0 + 8, y0 + 60, cellW - 16, 6);
+      ctx.fillRect(x0 + 8, y0 + 6, cellW - 16, 4);
 
-      // Emissive signboard glow (hours-after-outbreak: emergency/backup power dim glow)
-      etx.fillStyle = s.signBg === '#f1f5f9' ? '#94a3b8' : s.signBg;
-      etx.globalAlpha = 0.42;
-      etx.fillRect(x0 + 10, y0 + 12, cellW - 20, 82);
+      // Subtle emissive signboard glow for night/dusk readability
+      etx.fillStyle = s.signBg === '#e2e8f0' ? '#94a3b8' : s.signBg;
+      etx.globalAlpha = 0.45;
+      etx.fillRect(x0 + 12, y0 + 10, cellW - 24, 52);
       etx.globalAlpha = 1.0;
 
       // Badge emblem box on left
       ctx.fillStyle = s.signAccent;
-      ctx.fillRect(x0 + 14, y0 + 22, 34, 34);
-      ctx.fillStyle = s.signBg === '#f1f5f9' ? '#ffffff' : '#111827';
-      ctx.font = 'bold 16px sans-serif';
+      ctx.fillRect(x0 + 18, y0 + 16, 46, 36);
+      ctx.fillStyle = s.signBg === '#e2e8f0' ? '#ffffff' : '#111827';
+      ctx.font = 'bold 18px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(s.badge, x0 + 31, y0 + 39);
+      ctx.fillText(s.badge, x0 + 41, y0 + 34);
 
-      // Shop title & Indonesian subtitle
+      // Clean unstretched Indonesian shop title & subtitle
       ctx.textAlign = 'left';
       ctx.fillStyle = s.titleCol;
-      ctx.font = 'bold 21px sans-serif';
-      ctx.fillText(s.title, x0 + 56, y0 + 39);
+      ctx.font = 'bold 28px sans-serif';
+      ctx.fillText(s.title, x0 + 78, y0 + 29);
       ctx.fillStyle = s.subCol;
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText(s.sub, x0 + 14, y0 + 75);
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText(s.sub, x0 + 78, y0 + 51);
 
       etx.textAlign = 'left';
       etx.textBaseline = 'middle';
       etx.fillStyle = s.glowCol;
-      etx.font = 'bold 21px sans-serif';
-      etx.fillText(s.title, x0 + 56, y0 + 39);
+      etx.font = 'bold 28px sans-serif';
+      etx.fillText(s.title, x0 + 78, y0 + 29);
 
-      // 2) Striped Storefront Awning Band (y = 108..154)
-      const stripeCount = 8;
-      const sw = cellW / stripeCount;
-      for (let st = 0; st < stripeCount; st++) {
-        ctx.fillStyle = (st % 2 === 0) ? s.awningA : s.awningB;
-        ctx.fillRect(x0 + st * sw, y0 + 108, sw + 0.5, 44);
-      }
-      ctx.fillStyle = 'rgba(0,0,0,0.34)';
-      ctx.fillRect(x0, y0 + 144, cellW, 10);
+      // 2) Lower Recessed Display Shopfront & Aluminum Mullions (y = 72..256, 512x184)
+      ctx.fillStyle = '#2d343e';
+      ctx.fillRect(x0, y0 + 72, cellW, cellH - 72);
 
-      // 3) Lower Display Shopfront & Aluminum Frame (y = 154..512)
-      ctx.fillStyle = '#374151';
-      ctx.fillRect(x0, y0 + 154, cellW, cellH - 154);
+      const winX = x0 + 16;
+      const winY = y0 + 82;
+      const winW = cellW - 32;
+      const winH = 148;
 
-      const winX = x0 + 14;
-      const winY = y0 + 168;
-      const winW = cellW - 28;
-      const winH = 296;
-
-      // Interior display glass backdrop + warm/cool fluorescent shelf silhouette
+      // Deep dark interior showroom backdrop (higher roughness = subtle satin glass, zero sun blob!)
       ctx.fillStyle = s.glassTint;
       ctx.fillRect(winX, winY, winW, winH);
-      rtx.fillStyle = '#242424';
+      rtx.fillStyle = '#9a9a9a';
       rtx.fillRect(winX, winY, winW, winH);
 
-      // Interior shelves / ATM kiosk / display counter silhouettes behind glass
-      ctx.fillStyle = 'rgba(255,255,255,0.08)';
-      for (let sh = 0; sh < 4; sh++) {
-        ctx.fillRect(winX + 10, winY + 42 + sh * 58, winW - 20, 6);
-        for (let prod = 0; prod < 7; prod++) {
-          ctx.fillStyle = (prod % 2 === 0) ? 'rgba(220,232,240,0.14)' : 'rgba(180,150,110,0.14)';
-          ctx.fillRect(winX + 16 + prod * 28, winY + 20 + sh * 58, 18, 20);
-        }
-      }
-      // Subtle interior emergency light strip on ceiling behind glass
+      // Interior recessed ceiling fluorescent + shelves + counter depth
       ctx.fillStyle = s.glowCol;
-      ctx.globalAlpha = 0.30;
-      ctx.fillRect(winX + 20, winY + 12, winW - 40, 14);
+      ctx.globalAlpha = 0.24;
+      ctx.fillRect(winX + 36, winY + 8, winW - 72, 8);
       ctx.globalAlpha = 1.0;
       etx.fillStyle = s.glowCol;
-      etx.globalAlpha = 0.34;
-      etx.fillRect(winX + 20, winY + 14, winW - 40, 16);
+      etx.globalAlpha = 0.28;
+      etx.fillRect(winX + 36, winY + 8, winW - 72, 8);
       etx.globalAlpha = 1.0;
 
-      // Aluminum door & window mullions
-      ctx.fillStyle = '#64748b';
-      ctx.fillRect(winX + winW * 0.52, winY, 8, winH);
-      ctx.fillRect(winX, winY + winH * 0.68, winW, 6);
-      // Chrome vertical door handle
-      ctx.fillStyle = '#cbd5e1';
-      ctx.fillRect(winX + winW * 0.52 + 16, winY + 135, 6, 48);
-
-      // Glass reflection sheen + a few fresh outbreak cracks on select bays
-      const gr = ctx.createLinearGradient(winX, winY, winX + winW, winY + winH);
-      gr.addColorStop(0, 'rgba(190,220,240,0.18)');
-      gr.addColorStop(0.5, 'rgba(255,255,255,0.03)');
-      gr.addColorStop(1, 'rgba(140,185,215,0.12)');
-      ctx.fillStyle = gr;
-      ctx.fillRect(winX, winY, winW, winH);
-
-      if (idx % 3 === 1) {
-        ctx.strokeStyle = 'rgba(225, 240, 250, 0.55)';
-        ctx.lineWidth = 1.5;
-        const cx = winX + 62, cy = winY + 150;
-        for (let cr = 0; cr < 7; cr++) {
-          const ang = cr * 0.92 + rng() * 0.4;
-          ctx.beginPath();
-          ctx.moveTo(cx, cy);
-          ctx.lineTo(cx + Math.cos(ang) * (24 + rng() * 42), cy + Math.sin(ang) * (24 + rng() * 48));
-          ctx.stroke();
+      for (let sh = 0; sh < 3; sh++) {
+        const sy = winY + 34 + sh * 36;
+        ctx.fillStyle = 'rgba(220,232,242,0.08)';
+        ctx.fillRect(winX + 12, sy, winW - 24, 4);
+        for (let prod = 0; prod < 12; prod++) {
+          ctx.fillStyle = (prod % 2 === 0) ? 'rgba(200,215,228,0.12)' : 'rgba(175,148,118,0.12)';
+          ctx.fillRect(winX + 18 + prod * 36, sy - 14, 22, 13);
         }
       }
 
-      // Corrugated steel rolling shutter pulled down to shutterFrac!
+      // Crisp dark-anodized aluminum storefront doorway & vertical mullions (3 bays + double glass door)
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(winX, winY, 6, winH);
+      ctx.fillRect(winX + winW - 6, winY, 6, winH);
+      ctx.fillRect(winX + Math.floor(winW * 0.34), winY, 8, winH);
+      ctx.fillRect(winX + Math.floor(winW * 0.66), winY, 8, winH);
+      ctx.fillRect(winX, winY + Math.floor(winH * 0.72), winW, 5);
+      // Stainless push-bar door handles in center bay
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillRect(winX + Math.floor(winW * 0.48), winY + 62, 5, 34);
+      ctx.fillRect(winX + Math.floor(winW * 0.52), winY + 62, 5, 34);
+
+      // Corrugated steel rolling shutter pulled partway down from top housing
       if (s.shutterFrac > 0.02) {
         const shH = Math.floor(winH * s.shutterFrac);
-        ctx.fillStyle = '#737c88';
+        ctx.fillStyle = '#68717d';
         ctx.fillRect(winX - 2, winY, winW + 4, shH);
-        rtx.fillStyle = '#888888';
+        rtx.fillStyle = '#bcbcbc';
         rtx.fillRect(winX - 2, winY, winW + 4, shH);
         etx.fillStyle = '#000000';
         etx.fillRect(winX - 2, winY, winW + 4, shH);
-        for (let slY = winY + 4; slY < winY + shH - 6; slY += 10) {
-          ctx.fillStyle = '#525b66';
-          ctx.fillRect(winX - 2, slY, winW + 4, 3);
-          ctx.fillStyle = '#9aa3b0';
-          ctx.fillRect(winX - 2, slY + 3, winW + 4, 2);
+        for (let slY = winY + 4; slY < winY + shH - 6; slY += 8) {
+          ctx.fillStyle = '#49525e';
+          ctx.fillRect(winX - 2, slY, winW + 4, 2);
+          ctx.fillStyle = '#8b95a3';
+          ctx.fillRect(winX - 2, slY + 2, winW + 4, 2);
         }
-        // Bottom heavy shutter rail + padlock loop
-        ctx.fillStyle = '#334155';
-        ctx.fillRect(winX - 2, winY + shH - 8, winW + 4, 8);
+        ctx.fillStyle = '#2c3440';
+        ctx.fillRect(winX - 2, winY + shH - 6, winW + 4, 6);
       }
 
-      // Ceramic tiled base kickplate (y = 464..512)
-      ctx.fillStyle = '#4b5563';
-      ctx.fillRect(x0, y0 + 464, cellW, 48);
-      ctx.fillStyle = '#333b45';
+      // Ceramic tiled base kickplate (y = 230..256)
+      ctx.fillStyle = '#3f4754';
+      ctx.fillRect(x0, y0 + 230, cellW, 26);
+      ctx.fillStyle = '#2a303a';
       for (let tx = x0; tx < x0 + cellW; tx += 32) {
-        ctx.fillRect(tx, y0 + 464, 2, 48);
+        ctx.fillRect(tx, y0 + 230, 2, 26);
       }
-      ctx.fillRect(x0, y0 + 488, cellW, 2);
     }
 
     ctx.textAlign = 'left';

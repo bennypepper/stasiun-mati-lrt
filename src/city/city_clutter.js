@@ -566,13 +566,12 @@
       outdoorTablePlacements.push({ x: eastOuterSwMinX + 2.75, y: SIDEWALK_Y, z: tz, ry: -Math.PI * 0.5 + (rng() - 0.5) * 0.2 });
       outdoorTablePlacements.push({ x: westOuterSwMaxX - 2.75, y: SIDEWALK_Y, z: tz + 3.0, ry: Math.PI * 0.5 + (rng() - 0.5) * 0.2 });
     }
-    // Monobloc warung plastic chairs clustered beside all 3 Gerobaks (including overturned stools from evacuation panic!)
+    // Monobloc warung plastic chairs clustered cleanly beside Gerobaks (grounded upright/askew, never buried half into pavers!)
     for (let gi = 0; gi < gerobakPlacements.length; gi++) {
       const gs = gerobakPlacements[gi];
       const offX = gi === 0 ? 1.85 : (gi === 1 ? -1.45 : 1.45);
       monoblocChairPlacements.push({ x: gs.x + offX, y: SIDEWALK_Y, z: gs.z - 0.85, ry: gs.ry + 0.6 });
-      // Toppled monobloc chair (hours-after-outbreak evacuation chaos!)
-      monoblocChairPlacements.push({ x: gs.x + offX + 0.35, y: SIDEWALK_Y + 0.24, z: gs.z + 0.95, rx: 1.42, ry: gs.ry + 2.2, rz: 0.25 });
+      monoblocChairPlacements.push({ x: gs.x + offX + 0.35, y: SIDEWALK_Y, z: gs.z + 0.95, ry: gs.ry + 2.35 });
       plasticCratePlacements.push({ x: gs.x + offX * 0.65, y: SIDEWALK_Y, z: gs.z - 1.55, ry: 0.2 + gi });
       plasticCratePlacements.push({ x: gs.x + offX * 0.65, y: SIDEWALK_Y + 0.25, z: gs.z - 1.55, ry: 0.35 + gi });
     }

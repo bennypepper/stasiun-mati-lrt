@@ -365,6 +365,13 @@
       this._kuninganWestBeaconMat = null;
       this._kuninganWestCableMat = null;
       this._kuninganEastCableMat = null;
+      this._lampPoolMat = null;
+      this._lampPoolMesh = null;
+      this._lampHaloMat = null;
+      this._lampHaloMesh = null;
+      if (typeof P.setLampBulbsPowered === 'function') {
+        P.setLampBulbsPowered(false, 0.0);
+      }
       this.cornerHubs = null;
       this.layoutBounds = null;
       this._fieldLogGlints = null;
@@ -472,6 +479,7 @@
         this._buildRunner = null;
         this._isBuilding = false;
         if (this.rootGroup) this.rootGroup.updateMatrixWorld(true);
+        this._syncLampPowerVisuals();
         return _cityStepDone;
       }
       return _cityStepInProgress;
@@ -512,16 +520,76 @@
       this.setLightingFactor(Math.max(this._lightingFactor, 1.0));
     },
 
+    _isLampPowered: function (localX) {
+      if (this._feederMask) {
+        const isWest = (localX < 0);
+        return isWest ? !!this._feederMask.west : !!this._feederMask.east;
+      }
+      return !!this._plnRestored;
+    },
+
+    _anyLampPowered: function () {
+      if (this._feederMask) {
+        return !!(this._feederMask.west || this._feederMask.east);
+      }
+      return !!this._plnRestored;
+    },
+
     _getFeederLampScale: function (localX) {
-      if (!this._feederMask) return 1.0;
-      const isWest = (localX < 0);
-      const on = isWest ? !!this._feederMask.west : !!this._feederMask.east;
-      return on ? 1.35 : 0.08;
+      if (!this._isLampPowered(localX)) return 0.0;
+      return this._feederMask ? 1.25 : 1.0;
+    },
+
+    _getEffectiveStreetLampFactor: function () {
+      if (!this._anyLampPowered()) return 0.0;
+      return Math.max(1.25, this._lightingFactor || 0.0);
+    },
+
+    _syncLampPowerVisuals: function () {
+      const anyOn = this._anyLampPowered();
+      const nightStrength = Math.min(1.0, Math.max(0.0, ((this._lightingFactor || 0.0) - 0.25) / 1.45));
+      if (typeof P.setLampBulbsPowered === 'function') {
+        P.setLampBulbsPowered(anyOn, anyOn ? (0.85 + 0.35 * nightStrength) : 0.0);
+      }
+      if (this._lampPoolMat && this._lampPoolMesh) {
+        const poolOpacity = anyOn ? (0.16 + 0.26 * nightStrength) : 0.0;
+        this._lampPoolMat.opacity = poolOpacity;
+        this._lampPoolMesh.visible = anyOn && poolOpacity > 0.01;
+      }
+      if (this._lampHaloMat && this._lampHaloMesh) {
+        const haloOpacity = anyOn ? (0.14 + 0.20 * nightStrength) : 0.0;
+        this._lampHaloMat.opacity = haloOpacity;
+        this._lampHaloMesh.visible = anyOn && haloOpacity > 0.01;
+      }
+      // On Kuningan (split West/East feeders), hide unpowered-side pool/halo instances cleanly
+      if (anyOn && this._feederMask && this.litLampPositions && this.litLampPositions.length > 0) {
+        const dummy = new THREE.Object3D();
+        for (let li = 0; li < this.litLampPositions.length; li++) {
+          const lp = this.litLampPositions[li];
+          const s = this._isLampPowered(lp.x) ? 1.0 : 0.0;
+          if (this._lampPoolMesh) {
+            dummy.position.set(lp.x, STREET_GROUND_Y + 0.025, lp.z);
+            dummy.scale.set(s, s, s);
+            dummy.updateMatrix();
+            this._lampPoolMesh.setMatrixAt(li, dummy.matrix);
+          }
+          if (this._lampHaloMesh) {
+            dummy.position.set(lp.x, lp.y - 0.35, lp.z);
+            dummy.scale.set(s, s, s);
+            dummy.updateMatrix();
+            this._lampHaloMesh.setMatrixAt(li, dummy.matrix);
+          }
+        }
+        if (this._lampPoolMesh) this._lampPoolMesh.instanceMatrix.needsUpdate = true;
+        if (this._lampHaloMesh) this._lampHaloMesh.instanceMatrix.needsUpdate = true;
+      }
     },
 
     setLightingFactor: function (factor) {
       const num = Number(factor);
       this._lightingFactor = Number.isFinite(num) ? Math.max(0, num) : 1.0;
+      const anyOn = this._anyLampPowered();
+      const effLampFactor = this._getEffectiveStreetLampFactor();
       for (let i = 0; i < this.streetLights.length; i++) {
         const sl = this.streetLights[i];
         if (sl.light._tierDisabled) {
@@ -530,7 +598,6 @@
           continue;
         }
         const distScale = sl._distScale !== undefined ? sl._distScale : 1.0;
-        const feederScale = sl._feederScale !== undefined ? sl._feederScale : 1.0;
         sl.light.visible = true;
         if (sl.kind === 'traffic') {
           const blinkScale = sl._blinkScale !== undefined
@@ -539,9 +606,17 @@
           sl._blinkScale = blinkScale;
           sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale * blinkScale;
         } else {
-          sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale * feederScale;
+          if (!anyOn) {
+            sl._feederScale = 0.0;
+            sl.light.intensity = 0.0;
+          } else {
+            const feederScale = sl._feederScale > 0 ? sl._feederScale : (this._feederMask ? sl._feederScale : 1.0);
+            sl._feederScale = feederScale;
+            sl.light.intensity = sl.baseIntensity * effLampFactor * distScale * feederScale;
+          }
         }
       }
+      this._syncLampPowerVisuals();
     },
 
     setStreetLightIntensity: function (val) {
@@ -593,14 +668,16 @@
         camPos.z - _tmpWorldOffset.z
       );
 
-      // Find the 3 closest lit streetlamps to camPos in local space
+      // Find the 3 closest powered streetlamps to camPos in local space
       const lamps = this.litLampPositions;
+      const anyPowered = this._anyLampPowered();
       let best0 = -1, bestD0 = Infinity;
       let best1 = -1, bestD1 = Infinity;
       let best2 = -1, bestD2 = Infinity;
-      if (lamps && lamps.length > 0) {
+      if (lamps && lamps.length > 0 && anyPowered) {
         for (let i = 0; i < lamps.length; i++) {
           const lp = lamps[i];
+          if (!this._isLampPowered(lp.x)) continue;
           const dx = lp.x - _tmpLocalCam.x;
           const dy = lp.y - _tmpLocalCam.y;
           const dz = lp.z - _tmpLocalCam.z;
@@ -680,7 +757,12 @@
         const slotIdx = lampSlot % 3;
         lampSlot++;
         const idx = _chosenLampIdx[slotIdx];
-        if (idx < 0 || !lamps) continue;
+        if (!anyPowered || idx < 0 || !lamps) {
+          sl._feederScale = 0.0;
+          sl._distScale = 0.0;
+          sl.light.intensity = 0.0;
+          continue;
+        }
         const lp = lamps[idx];
         sl.light.position.set(
           lp.x + _tmpWorldOffset.x,
@@ -690,14 +772,15 @@
         sl.light.updateMatrixWorld(false);
         sl.flicker = !!lp.flicker;
         sl._feederScale = this._getFeederLampScale(lp.x);
-        if (suppressLights) {
-          sl._distScale = 0.0;
+        if (suppressLights || sl._feederScale <= 0) {
+          sl._distScale = sl._feederScale <= 0 ? 0.0 : 0.0;
         } else {
           const dist = Math.sqrt(_chosenLampDSq[slotIdx]);
-          sl._distScale = dist <= 50 ? 1.0 : (dist >= 88 ? 0.0 : (1.0 - (dist - 50) / 38.0));
+          sl._distScale = dist <= 56 ? 1.0 : (dist >= 96 ? 0.0 : (1.0 - (dist - 56) / 40.0));
         }
-        if (!sl.flicker) {
-          sl.light.intensity = sl.baseIntensity * this._lightingFactor * sl._distScale * sl._feederScale;
+        const effLampFactor = this._getEffectiveStreetLampFactor();
+        if (!sl.flicker || sl._feederScale <= 0) {
+          sl.light.intensity = sl.baseIntensity * effLampFactor * sl._distScale * sl._feederScale;
         }
       }
     },
@@ -771,12 +854,18 @@
           sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale * sl._blinkScale;
           continue;
         }
+        const feederScale = sl._feederScale !== undefined ? sl._feederScale : 0.0;
+        if (feederScale <= 0) {
+          sl.light.visible = true;
+          sl.light.intensity = 0.0;
+          continue;
+        }
         if (!sl.flicker) continue;
         // Subtle sodium-vapor streetlamp buzz (NEVER toggles visible!)
-        const pulse = 0.85 + 0.15 * Math.sin(this._timeAccum * 17.0 + i * 3.1) * Math.sin(this._timeAccum * 4.3);
-        const feederScale = sl._feederScale !== undefined ? sl._feederScale : 1.0;
+        const pulse = 0.88 + 0.12 * Math.sin(this._timeAccum * 17.0 + i * 3.1) * Math.sin(this._timeAccum * 4.3);
+        const effLampFactor = this._getEffectiveStreetLampFactor();
         sl.light.visible = true;
-        sl.light.intensity = sl.baseIntensity * this._lightingFactor * distScale * feederScale * pulse;
+        sl.light.intensity = sl.baseIntensity * effLampFactor * distScale * feederScale * pulse;
       }
     },
 
@@ -1311,7 +1400,10 @@
         if (this._arch && this._arch.id === 'kuningan') {
           this.setKuninganFeederState('east', true);
         }
-        this.setLightingFactor(Math.max(this._lightingFactor, 1.35));
+        this.setLightingFactor(Math.max(this._lightingFactor, 1.45));
+        if (this._lastCamPos) {
+          this._repositionPooledLights(this._lastCamPos, this._suppressPooledLights);
+        }
         it.used = true;
         it.label = '[E] Kotak Relai PLN Jalanan (Daya Aktif)';
         it.prompt = it.label;

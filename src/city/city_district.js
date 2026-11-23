@@ -726,16 +726,16 @@
       }
     };
 
-    // Atlas-mapped Jakarta shopfront / signboard quad helper (4x2 atlas in mats.jakartaShopfront)
-    // vSub0..vSub1 in [0..1] selects full storefront (0..1), signboard fascia (0.79..1.0), or lower display+shutter (0..0.79)
+    // Atlas-mapped Jakarta shopfront / signboard quad helper (2x4 LANDSCAPE atlas: each cell 512x256!)
+    // vSub0..vSub1 in [0..1] selects full storefront (0..1), signboard fascia (0.72..1.0), or lower recessed display (0..0.72)
     const addShopfrontQuad = (bucket, shopIdx, w, h, x, y, z, ry, vSub0, vSub1) => {
       const idx = ((shopIdx | 0) % 8 + 8) % 8;
-      const col = idx % 4;
-      const row = Math.floor(idx / 4); // row 0 = top half (v 0.5..1.0), row 1 = bottom half (v 0.0..0.5)
-      const u0 = col * 0.25 + 0.004;
-      const u1 = (col + 1) * 0.25 - 0.004;
-      const rowV0 = row === 0 ? 0.50 : 0.0;
-      const rowV1 = row === 0 ? 1.00 : 0.50;
+      const col = idx % 2;
+      const row = Math.floor(idx / 2); // 4 rows: row 0 = top (v 0.75..1.0), row 3 = bottom (v 0.0..0.25)
+      const u0 = col * 0.50 + 0.004;
+      const u1 = (col + 1) * 0.50 - 0.004;
+      const rowV1 = 1.0 - row * 0.25;
+      const rowV0 = rowV1 - 0.25;
       const vs0 = vSub0 !== undefined ? vSub0 : 0.0;
       const vs1 = vSub1 !== undefined ? vSub1 : 1.0;
       const v0 = rowV0 + (rowV1 - rowV0) * vs0 + 0.002;
@@ -753,25 +753,23 @@
       bucket.push(prepGeo(geo, false));
     };
 
-    // Double-sided protruding vertical/horizontal Indonesian blade signboard over sidewalk!
+    // Double-sided protruding horizontal/vertical Indonesian blade signboard over sidewalk (clean aspect ratio!)
     const addBladeSign = (sb, shopIdx, x, y, z, dirSign, alongZ) => {
-      const signW = 0.88;
-      const signH = 1.45;
+      const signW = 1.35;
+      const signH = 0.52;
       if (alongZ) {
-        // Protrudes along X out from front wall, faces +/-Z down the boulevard!
         const cx = x + dirSign * (signW * 0.5 + 0.14);
-        addBuildingBox(sb, 'steelDark', signW + 0.18, 0.08, 0.08, cx - dirSign * 0.06, y + signH * 0.42, z, 0, 0, 0, 1.0, false);
-        addBuildingBox(sb, 'steelDark', signW + 0.18, 0.08, 0.08, cx - dirSign * 0.06, y - signH * 0.42, z, 0, 0, 0, 1.0, false);
+        addBuildingBox(sb, 'steelDark', signW + 0.16, 0.06, 0.06, cx - dirSign * 0.06, y + signH * 0.44, z, 0, 0, 0, 1.0, false);
+        addBuildingBox(sb, 'steelDark', signW + 0.16, 0.06, 0.06, cx - dirSign * 0.06, y - signH * 0.44, z, 0, 0, 0, 1.0, false);
         addBuildingBox(sb, 'steelDark', signW, signH, 0.10, cx, y, z, 0, 0, 0, 1.0, false);
-        addShopfrontQuad(sb.shopfront, shopIdx, signW - 0.06, signH - 0.08, cx, y, z + 0.056, 0, 0.78, 1.0);
-        addShopfrontQuad(sb.shopfront, shopIdx, signW - 0.06, signH - 0.08, cx, y, z - 0.056, Math.PI, 0.78, 1.0);
+        addShopfrontQuad(sb.shopfront, shopIdx, signW - 0.06, signH - 0.06, cx, y, z + 0.056, 0, 0.72, 1.0);
+        addShopfrontQuad(sb.shopfront, shopIdx, signW - 0.06, signH - 0.06, cx, y, z - 0.056, Math.PI, 0.72, 1.0);
       } else {
-        // Protrudes along Z out from front wall, faces +/-X along cross street!
         const cz = z + dirSign * (signW * 0.5 + 0.14);
-        addBuildingBox(sb, 'steelDark', 0.08, 0.08, signW + 0.18, x, y + signH * 0.42, cz - dirSign * 0.06, 0, 0, 0, 1.0, false);
+        addBuildingBox(sb, 'steelDark', 0.06, 0.06, signW + 0.16, x, y + signH * 0.44, cz - dirSign * 0.06, 0, 0, 0, 1.0, false);
         addBuildingBox(sb, 'steelDark', 0.10, signH, signW, x, y, cz, 0, 0, 0, 1.0, false);
-        addShopfrontQuad(sb.shopfront, shopIdx, signW - 0.06, signH - 0.08, x + 0.056, y, cz, Math.PI * 0.5, 0.78, 1.0);
-        addShopfrontQuad(sb.shopfront, shopIdx, signW - 0.06, signH - 0.08, x - 0.056, y, cz, -Math.PI * 0.5, 0.78, 1.0);
+        addShopfrontQuad(sb.shopfront, shopIdx, signW - 0.06, signH - 0.06, x + 0.056, y, cz, Math.PI * 0.5, 0.72, 1.0);
+        addShopfrontQuad(sb.shopfront, shopIdx, signW - 0.06, signH - 0.06, x - 0.056, y, cz, -Math.PI * 0.5, 0.72, 1.0);
       }
     };
 
@@ -824,12 +822,14 @@
           const gfPts = [[coreX0, b0], [coreX1, b0], [coreX1, b1], [coreX0, b1]];
           addExtrudedTier(sb, wallKey, gfPts, baseY, gfH, 3.6, true, 'building', true);
 
-          // Authentic Jakarta recessed shopfront (rolling shutter + lit display glass + interior shelves)
+          // Authentic Jakarta recessed shopfront (pure lower bay 0..0.72 -> ZERO duplicate awning stripe!)
           const shopFaceX = (faceSide === 'east' ? coreX1 : coreX0) + dirX * 0.05;
-          addShopfrontQuad(sb.shopfront, shopIdx, bW - 0.32, 2.95, shopFaceX, SIDEWALK_Y + 1.48, bMid, faceRy, 0.0, 0.78);
-          // Front illuminated Indonesian signboard fascia along colonnade lintel + sloped corrugated awning
-          addBuildingBox(sb, 'steelDark', 0.26, 0.78, bW - 0.08, colX + dirX * 0.08, SIDEWALK_Y + gfH - 0.36, bMid, 0, 0, 0, 2.0, false);
-          addShopfrontQuad(sb.shopfront, shopIdx, bW - 0.14, 0.72, colX + dirX * 0.22, SIDEWALK_Y + gfH - 0.36, bMid, faceRy, 0.79, 1.0);
+          addShopfrontQuad(sb.shopfront, shopIdx, bW - 0.36, 2.85, shopFaceX, SIDEWALK_Y + 1.44, bMid, faceRy, 0.0, 0.715);
+          // 3D steel storefront header & vertical frame jambs for physical depth
+          addBuildingBox(sb, 'steelDark', 0.14, 0.24, bW - 0.28, shopFaceX + dirX * 0.04, SIDEWALK_Y + 2.94, bMid, 0, 0, 0, 1.0, false);
+          // Front illuminated Indonesian signboard fascia (proper 6:1 landscape ratio!) + sloped corrugated awning
+          addBuildingBox(sb, 'steelDark', 0.26, 0.76, bW - 0.08, colX + dirX * 0.08, SIDEWALK_Y + gfH - 0.36, bMid, 0, 0, 0, 2.0, false);
+          addShopfrontQuad(sb.shopfront, shopIdx, bW - 0.14, 0.70, colX + dirX * 0.22, SIDEWALK_Y + gfH - 0.36, bMid, faceRy, 0.72, 1.0);
           // Sloped storefront awning projecting over sidewalk edge
           addBuildingBox(sb, b % 2 === 0 ? 'roofTerra' : 'roofOchre', 1.12, 0.07, bW - 0.16, frontX + dirX * 0.46, SIDEWALK_Y + gfH - 0.86, bMid, 0, 0, dirX * -0.28, 1.8, false);
           if (sb.isNear && b % 2 === 1) {
@@ -896,9 +896,10 @@
 
           addExtrudedTier(sb, wallKey, [[b0, coreZ0], [b1, coreZ0], [b1, coreZ1], [b0, coreZ1]], baseY, gfH, 3.6, true, 'building', true);
           const shopFaceZ = (faceSide === 'south' ? coreZ1 : coreZ0) + dirZ * 0.05;
-          addShopfrontQuad(sb.shopfront, shopIdx, bW - 0.32, 2.95, bMid, SIDEWALK_Y + 1.48, shopFaceZ, faceRy, 0.0, 0.78);
-          addBuildingBox(sb, 'steelDark', bW - 0.08, 0.78, 0.26, bMid, SIDEWALK_Y + gfH - 0.36, colZ + dirZ * 0.08, 0, 0, 0, 2.0, false);
-          addShopfrontQuad(sb.shopfront, shopIdx, bW - 0.14, 0.72, bMid, SIDEWALK_Y + gfH - 0.36, colZ + dirZ * 0.22, faceRy, 0.79, 1.0);
+          addShopfrontQuad(sb.shopfront, shopIdx, bW - 0.36, 2.85, bMid, SIDEWALK_Y + 1.44, shopFaceZ, faceRy, 0.0, 0.715);
+          addBuildingBox(sb, 'steelDark', bW - 0.28, 0.24, 0.14, bMid, SIDEWALK_Y + 2.94, shopFaceZ + dirZ * 0.04, 0, 0, 0, 1.0, false);
+          addBuildingBox(sb, 'steelDark', bW - 0.08, 0.76, 0.26, bMid, SIDEWALK_Y + gfH - 0.36, colZ + dirZ * 0.08, 0, 0, 0, 2.0, false);
+          addShopfrontQuad(sb.shopfront, shopIdx, bW - 0.14, 0.70, bMid, SIDEWALK_Y + gfH - 0.36, colZ + dirZ * 0.22, faceRy, 0.72, 1.0);
           addBuildingBox(sb, b % 2 === 0 ? 'roofTerra' : 'roofOchre', bW - 0.16, 0.07, 1.12, bMid, SIDEWALK_Y + gfH - 0.86, frontZ + dirZ * 0.46, dirZ * 0.28, 0, 0, 1.8, false);
           if (sb.isNear && b % 2 === 1) {
             addBladeSign(sb, shopIdx, bMid, SIDEWALK_Y + gfH + 1.25, frontZ, dirZ, false);
@@ -981,13 +982,21 @@
 
       const shaftH = Math.max(12.0, totalH - podH - 0.15);
       const shaftPts = insetTowardCenter(lPts, 0.45);
-      // Multi-story glazed curtain-wall tower shaft (windows + aluminum mullions + emergency lit office floors!)
-      addExtrudedTier(sb, 'towerCurtain', shaftPts, baseY + podH + 0.15, shaftH, 16.0, false, 'building', true);
-      // Ground-floor podium commercial fascia signboard facing the main boulevard
+      // Multi-story glazed curtain-wall tower shaft (tileM = 48m -> 16 floors x 3.0m real scale, ZERO micro-tiling!)
+      addExtrudedTier(sb, 'towerCurtain', shaftPts, baseY + podH + 0.15, shaftH, 48.0, false, 'building', true);
+      // Ground-floor architectural storefront mullions across podium lobby glass (breaks up wide lobby glass!)
       const faceEast = (minX + maxX) * 0.5 < 0;
-      const lobbyFaceX = faceEast ? maxX + 0.06 : minX - 0.06;
+      const lobbyFaceX = faceEast ? maxX + 0.08 : minX - 0.08;
       const lobbyRy = faceEast ? Math.PI * 0.5 : -Math.PI * 0.5;
-      addShopfrontQuad(sb.shopfront, 3, Math.min(8.0, d * 0.42), 1.05, lobbyFaceX, SIDEWALK_Y + podH - 1.15, (minZ + maxZ) * 0.5, lobbyRy, 0.79, 1.0);
+      const lobbySpanZ = maxZ - minZ;
+      for (let mz = minZ + 2.8; mz <= maxZ - 2.8; mz += 3.2) {
+        addBuildingBox(sb, 'steelDark', 0.22, podH - 0.9, 0.16, faceEast ? maxX - 0.45 : minX + 0.45, baseY + (podH - 0.9) * 0.5, mz, 0, 0, 0, 1.0, false);
+      }
+      addBuildingBox(sb, 'steelDark', 0.26, 0.18, lobbySpanZ - 1.2, faceEast ? maxX - 0.45 : minX + 0.45, SIDEWALK_Y + 3.1, (minZ + maxZ) * 0.5, 0, 0, 0, 1.0, false);
+      // Proper framed 3D corporate lobby fascia lightbox (5.4m x 0.92m -> clean 5.8:1 aspect!)
+      const signSpan = Math.min(5.4, lobbySpanZ * 0.34);
+      addBuildingBox(sb, 'steelDark', 0.28, 0.98, signSpan + 0.16, faceEast ? maxX - 0.04 : minX + 0.04, SIDEWALK_Y + podH - 1.05, (minZ + maxZ) * 0.5, 0, 0, 0, 1.0, false);
+      addShopfrontQuad(sb.shopfront, 3, signSpan, 0.90, lobbyFaceX + (faceEast ? 0.04 : -0.04), SIDEWALK_Y + podH - 1.05, (minZ + maxZ) * 0.5, lobbyRy, 0.72, 1.0);
 
       // Horizontal architectural sun-shading fins every ~7m (only on near/detailed towers)
       if (!sb.isFar) {
@@ -1043,9 +1052,9 @@
       addExtrudedTier(sb, 'curb', podPts, baseY, 0.9, 4.0, true, 'building', true);
       addExtrudedTier(sb, 'glass', makeOct(cx, cz, w * 0.94, d * 0.94, ch), baseY + 0.9, 3.5, 3.0, false, 'building', true);
       addExtrudedTier(sb, 'curb', makeOct(cx, cz, w * 0.98, d * 0.98, ch), baseY + 4.4, 0.8, 4.0, false, 'building', false);
-      addExtrudedTier(sb, 'towerCurtain', midPts, baseY + 5.2, totalH * 0.62, 16.0, false, 'building', true);
+      addExtrudedTier(sb, 'towerCurtain', midPts, baseY + 5.2, totalH * 0.62, 48.0, false, 'building', true);
       addExtrudedTier(sb, 'glass', makeOct(cx, cz, w * 0.74, d * 0.74, ch * 0.85), baseY + 5.2 + totalH * 0.62, totalH * 0.24, 4.0, false, 'building', false);
-      addExtrudedTier(sb, 'towerCurtain', topPts, baseY + 5.2 + totalH * 0.86, totalH * 0.14, 14.0, false, 'building', false);
+      addExtrudedTier(sb, 'towerCurtain', topPts, baseY + 5.2 + totalH * 0.86, totalH * 0.14, 48.0, false, 'building', false);
 
       if (sb.isNear) {
         const marqShape = new THREE.Shape();
@@ -1098,13 +1107,23 @@
       }
 
       addExtrudedTier(sb, 'brick', uPts, baseY, 3.4, 3.2, false, 'building', true);
-      addExtrudedTier(sb, 'towerCurtain', uPts, baseY + 3.4, Math.max(4.0, h - 3.4), 14.0, false, 'building', true);
-      // Ground-floor commercial shopfront bays along the U-courtyard street wings
+      addExtrudedTier(sb, 'towerCurtain', uPts, baseY + 3.4, Math.max(4.0, h - 3.4), 48.0, false, 'building', true);
+      // Properly proportioned 3D-framed commercial shopfront bays on the U-courtyard street wings (ZERO stretched text!)
       const uDirX = openSide === 'east' ? 1 : -1;
       const uFaceRy = openSide === 'east' ? Math.PI * 0.5 : -Math.PI * 0.5;
-      const uFrontX = openSide === 'east' ? maxX + 0.06 : minX - 0.06;
-      addShopfrontQuad(sb.shopfront, (_shopCounter++) % 8, wingT * 0.84, 3.0, uFrontX, SIDEWALK_Y + 1.55, minZ + wingT * 0.5, uFaceRy, 0.0, 1.0);
-      addShopfrontQuad(sb.shopfront, (_shopCounter++) % 8, wingT * 0.84, 3.0, uFrontX, SIDEWALK_Y + 1.55, maxZ - wingT * 0.5, uFaceRy, 0.0, 1.0);
+      const uFrontX = openSide === 'east' ? maxX + 0.05 : minX - 0.05;
+      const bayW = Math.min(4.8, wingT * 0.78);
+      for (const bayZ of [minZ + wingT * 0.5, maxZ - wingT * 0.5]) {
+        const sIdx = (_shopCounter++) % 8;
+        // 3D storefront surround frame (pilasters + fascia lightbox + sloped metal canopy)
+        addBuildingBox(sb, 'steelDark', 0.26, 0.74, bayW + 0.20, uFrontX + uDirX * 0.10, SIDEWALK_Y + 2.98, bayZ, 0, 0, 0, 1.5, false);
+        addBuildingBox(sb, 'steelDark', 0.18, 2.65, 0.18, uFrontX + uDirX * 0.06, SIDEWALK_Y + 1.32, bayZ - bayW * 0.5, 0, 0, 0, 1.5, false);
+        addBuildingBox(sb, 'steelDark', 0.18, 2.65, 0.18, uFrontX + uDirX * 0.06, SIDEWALK_Y + 1.32, bayZ + bayW * 0.5, 0, 0, 0, 1.5, false);
+        addBuildingBox(sb, 'roofTerra', 0.92, 0.06, bayW + 0.16, uFrontX + uDirX * 0.48, SIDEWALK_Y + 2.56, bayZ, 0, 0, uDirX * -0.24, 1.8, false);
+        // Clean landscape fascia signboard (4.8m x 0.68m) + recessed lower display bay (4.6m x 2.50m)
+        addShopfrontQuad(sb.shopfront, sIdx, bayW, 0.68, uFrontX + uDirX * 0.24, SIDEWALK_Y + 2.98, bayZ, uFaceRy, 0.72, 1.0);
+        addShopfrontQuad(sb.shopfront, sIdx, bayW - 0.16, 2.52, uFrontX + uDirX * 0.02, SIDEWALK_Y + 1.26, bayZ, uFaceRy, 0.0, 0.715);
+      }
       for (let bi = 0; bi < boxes.length; bi++) {
         const bx = boxes[bi];
         self._addCollider(bx[0], baseY, bx[1], bx[2], baseY + h, bx[3], 'building', {
@@ -1169,7 +1188,7 @@
       ]);
       addExtrudedTier(sb, 'glass', glassTrap, baseY + 4.0, 2.5, 3.0, false, 'building', true);
       addExtrudedTier(sb, 'curb', midTrap, baseY + 6.5, 0.45, 3.5, false, 'building', false);
-      addExtrudedTier(sb, 'towerCurtain', midTrap, baseY + 6.95, Math.max(4.0, h - 6.95), 14.0, false, 'building', true);
+      addExtrudedTier(sb, 'towerCurtain', midTrap, baseY + 6.95, Math.max(4.0, h - 6.95), 48.0, false, 'building', true);
       addHippedRoof(sb.roofTerra, diagCX - (maxX - minX) * 0.42, diagCZ - (maxZ - minZ) * 0.42, diagCX + (maxX - minX) * 0.42, diagCZ + (maxZ - minZ) * 0.42, baseY + h, 2.2, 0.5, 3.0);
     };
 
@@ -1411,17 +1430,19 @@
       { x: cornerHubCoords.SE.cx - 0.5, y: SIDEWALK_Y + 2.55, z: cornerHubCoords.SE.cz - 2.4, flicker: false }
     );
     // Emit 3 persistent pooled streetlamp PointLights (attached to main scene so NUM_POINT_LIGHTS never shifts!)
+    // Strictly OFF (intensity = 0) until player restores the PLN relay box (city_pln_box)!
     const poolTargetScene = o.scene || (window.__LRT_INTERNAL__ && window.__LRT_INTERNAL__.core && window.__LRT_INTERNAL__.core.scene) || root;
     const poolCount = Math.min(3, city.litLampPositions.length);
     const initialStreetFactor = Math.max(0, streetLampIntensity / 1.8);
+    const plnInitiallyOn = !!city._plnRestored;
     const parentWorldZ = (root && root.parent && root.parent.position) ? (root.parent.position.z || 0) : 0;
     for (let pi = 0; pi < poolCount; pi++) {
       const lp = city.litLampPositions[pi];
-      const baseInt = 16.0;
-      const initInt = city._isBuilding ? 0.0 : (baseInt * initialStreetFactor);
+      const baseInt = 36.0;
+      const initInt = (city._isBuilding || !plnInitiallyOn) ? 0.0 : (baseInt * Math.max(1.2, initialStreetFactor));
       const ptLight = typeof city._acquirePooledLight === 'function'
-        ? city._acquirePooledLight(pi, poolTargetScene, 0xffa84c, initInt, 48, 1.05)
-        : new THREE.PointLight(0xffa84c, initInt, 48, 1.05);
+        ? city._acquirePooledLight(pi, poolTargetScene, 0xffad48, initInt, 58, 1.0)
+        : new THREE.PointLight(0xffad48, initInt, 58, 1.0);
       ptLight.position.set(lp.x, lp.y, lp.z + parentWorldZ);
       ptLight.visible = true; // NEVER toggle visible! Control strictly via intensity.
       ptLight.castShadow = false;
@@ -1431,8 +1452,110 @@
         baseIntensity: baseInt,
         kind: 'streetlamp',
         flicker: !!lp.flicker,
-        _distScale: 1.0
+        _distScale: 1.0,
+        _feederScale: plnInitiallyOn ? 1.0 : 0.0
       });
+    }
+
+    // Ensure bulb emissive starts strictly OFF when PLN is unpowered
+    if (typeof P.setLampBulbsPowered === 'function') {
+      P.setLampBulbsPowered(plnInitiallyOn, plnInitiallyOn ? 1.0 : 0.0);
+    }
+
+    // 1-draw-call InstancedMesh of warm sodium-vapor ground light pools + 1-draw-call lamp-head glow cones (0 extra PointLights!)
+    // Both stay strictly hidden (visible = false, opacity = 0) while PLN is OFF, and blaze across the entire street when PLN is restored!
+    if (city.litLampPositions.length > 0 && typeof document !== 'undefined') {
+      const poolCvs = document.createElement('canvas');
+      poolCvs.width = 128;
+      poolCvs.height = 128;
+      const pCtx = poolCvs.getContext('2d');
+      const grad = pCtx.createRadialGradient(64, 64, 2, 64, 64, 64);
+      grad.addColorStop(0.0, 'rgba(255, 224, 168, 1.0)');
+      grad.addColorStop(0.28, 'rgba(255, 186, 98, 0.68)');
+      grad.addColorStop(0.62, 'rgba(255, 148, 56, 0.24)');
+      grad.addColorStop(1.0, 'rgba(255, 132, 42, 0.0)');
+      pCtx.fillStyle = grad;
+      pCtx.fillRect(0, 0, 128, 128);
+      const poolTex = new THREE.CanvasTexture(poolCvs);
+      poolTex.colorSpace = THREE.SRGBColorSpace;
+      poolTex.needsUpdate = true;
+      city.disposableTextures.push(poolTex);
+
+      const poolGeo = new THREE.PlaneGeometry(15.2, 15.2);
+      poolGeo.rotateX(-Math.PI * 0.5);
+      city.disposableGeometries.push(poolGeo);
+
+      const initPoolOp = plnInitiallyOn ? (initialStreetFactor >= 0.8 ? 0.56 : 0.20) : 0.0;
+      const poolMat = new THREE.MeshBasicMaterial({
+        map: poolTex,
+        color: 0xffc67c,
+        transparent: true,
+        opacity: initPoolOp,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2
+      });
+      city.disposableMaterials.push(poolMat);
+
+      const poolInst = new THREE.InstancedMesh(poolGeo, poolMat, city.litLampPositions.length);
+      poolInst.name = 'StreetLampGroundPools';
+      poolInst.frustumCulled = false;
+      poolInst.renderOrder = 1;
+      poolInst.visible = initPoolOp > 0.01;
+      const pDummy = new THREE.Object3D();
+      for (let li = 0; li < city.litLampPositions.length; li++) {
+        const lp = city.litLampPositions[li];
+        pDummy.position.set(lp.x, STREET_GROUND_Y + 0.025, lp.z);
+        pDummy.rotation.set(0, 0, 0);
+        pDummy.scale.set(1, 1, 1);
+        pDummy.updateMatrix();
+        poolInst.setMatrixAt(li, pDummy.matrix);
+      }
+      poolInst.instanceMatrix.needsUpdate = true;
+      root.add(poolInst);
+      city._lampPoolMat = poolMat;
+      city._lampPoolMesh = poolInst;
+
+      // Crossed vertical warm-sodium halo planes right under each lamp head so every pole visibly lights up along the entire street!
+      const h1 = new THREE.PlaneGeometry(2.6, 2.4);
+      const h2 = new THREE.PlaneGeometry(2.6, 2.4);
+      h2.rotateY(Math.PI * 0.5);
+      const haloGeo = THREE_UTILS.mergeGeometries([h1, h2], false);
+      h1.dispose();
+      h2.dispose();
+      if (haloGeo) {
+        city.disposableGeometries.push(haloGeo);
+        const initHaloOp = plnInitiallyOn ? (initialStreetFactor >= 0.8 ? 0.42 : 0.18) : 0.0;
+        const haloMat = new THREE.MeshBasicMaterial({
+          map: poolTex,
+          color: 0xffcb82,
+          transparent: true,
+          opacity: initHaloOp,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          side: THREE.DoubleSide
+        });
+        city.disposableMaterials.push(haloMat);
+        const haloInst = new THREE.InstancedMesh(haloGeo, haloMat, city.litLampPositions.length);
+        haloInst.name = 'StreetLampHeadHalos';
+        haloInst.frustumCulled = false;
+        haloInst.renderOrder = 2;
+        haloInst.visible = initHaloOp > 0.01;
+        for (let li = 0; li < city.litLampPositions.length; li++) {
+          const lp = city.litLampPositions[li];
+          pDummy.position.set(lp.x, lp.y - 0.35, lp.z);
+          pDummy.rotation.set(0, 0, 0);
+          pDummy.scale.set(1, 1, 1);
+          pDummy.updateMatrix();
+          haloInst.setMatrixAt(li, pDummy.matrix);
+        }
+        haloInst.instanceMatrix.needsUpdate = true;
+        root.add(haloInst);
+        city._lampHaloMat = haloMat;
+        city._lampHaloMesh = haloInst;
+      }
     }
 
     // Helper for rotated vehicle colliders & BVH hulls
@@ -1552,8 +1675,8 @@
       // Overhead horizontal truss beam (y = 5.4..6.8m clear above street!)
       addBox(bGantryFrame, span + 0.6, 0.28, 0.36, cx, SIDEWALK_Y + 6.55, g.z);
       addBox(bGantryFrame, span + 0.6, 0.22, 0.32, cx, SIDEWALK_Y + 5.45, g.z);
-      // Green highway directional signboard mounted to truss
-      const signGeo = new THREE.BoxGeometry(Math.min(11.5, span - 1.8), 2.15, 0.16);
+      // Green highway directional signboard mounted CLEANLY OUTSIDE the truss beams (0.48m depth -> ZERO truss clipping through text!)
+      const signGeo = new THREE.BoxGeometry(Math.min(11.5, span - 1.8), 2.15, 0.48);
       if (g.signRotY) signGeo.rotateY(g.signRotY);
       signGeo.translate(cx, SIDEWALK_Y + 6.05, g.z);
       bGantrySign.push(prepGeo(signGeo, false));
@@ -1904,12 +2027,12 @@
       trashBagPlacements.push({ x: eastInnerSwMaxX - 1.45, y: SIDEWALK_Y, z: hz + 3.4, ry: rng() * 3 });
       trashBagPlacements.push({ x: eastOuterSwMinX + 1.2, y: SIDEWALK_Y, z: hz + 0.6, ry: rng() * 3 });
     }
-    // Grounded outer-curb PLN feeder pillars well clear of food carts / gerobak
-    for (const pbZ of [-56, -34, 34, 56]) {
-      powerBoxPlacements.push({ x: eastOuterSwMinX + 1.35, y: SIDEWALK_Y, z: pbZ, ry: -Math.PI * 0.5 });
-      powerBoxPlacements.push({ x: westOuterSwMaxX - 1.35, y: SIDEWALK_Y, z: pbZ - 4, ry: Math.PI * 0.5 });
-      city._addCollider(eastOuterSwMinX + 1.05, SIDEWALK_Y, pbZ - 0.42, eastOuterSwMinX + 1.65, SIDEWALK_Y + 1.5, pbZ + 0.42, 'metal', { blocksBullets: false });
-      city._addCollider(westOuterSwMaxX - 1.65, SIDEWALK_Y, pbZ - 4.42, westOuterSwMaxX - 1.05, SIDEWALK_Y + 1.5, pbZ - 3.58, 'metal', { blocksBullets: false });
+    // Grounded outer-curb PLN feeder pillars strictly at curb edge (clear of shopfront doorways!)
+    for (const pbZ of [-63, -29, 29, 63]) {
+      powerBoxPlacements.push({ x: eastOuterSwMinX + 0.58, y: SIDEWALK_Y, z: pbZ, ry: -Math.PI * 0.5 });
+      powerBoxPlacements.push({ x: westOuterSwMaxX - 0.58, y: SIDEWALK_Y, z: pbZ - 2, ry: Math.PI * 0.5 });
+      city._addCollider(eastOuterSwMinX + 0.28, SIDEWALK_Y, pbZ - 0.42, eastOuterSwMinX + 0.88, SIDEWALK_Y + 1.5, pbZ + 0.42, 'metal', { blocksBullets: false });
+      city._addCollider(westOuterSwMaxX - 0.88, SIDEWALK_Y, pbZ - 2.42, westOuterSwMaxX - 0.28, SIDEWALK_Y + 1.5, pbZ - 1.58, 'metal', { blocksBullets: false });
     }
 
     // East Pocket Park Plaza (Block E3 front apron at z in [-14..+6], x = eastOuterSwMinX + 1.5..+7.5)
@@ -1923,9 +2046,9 @@
     const treeSpots = [
       [eastInnerSwMaxX - 1.2, -52], [eastInnerSwMaxX - 1.2, -30], [eastInnerSwMaxX - 1.2, 30], [eastInnerSwMaxX - 1.2, 52],
       [westInnerSwMinX + 1.2, -52], [westInnerSwMinX + 1.2, -30], [westInnerSwMinX + 1.2, 30], [westInnerSwMinX + 1.2, 52],
-      [eastOuterSwMinX + 1.4, -60], [eastOuterSwMinX + 1.4, -36], [eastOuterSwMinX + 1.4, 36], [eastOuterSwMinX + 1.4, 60],
-      [westOuterSwMaxX - 1.4, -60], [westOuterSwMaxX - 1.4, -36], [westOuterSwMaxX - 1.4, 36], [westOuterSwMaxX - 1.4, 60],
-      [parkX + 2.0, -11.5], [parkX + 2.0, 5.2], [eastOuterSwMinX + 1.6, -90], [westOuterSwMaxX - 1.6, 90]
+      [eastOuterSwMinX + 0.68, -60], [eastOuterSwMinX + 0.68, -36], [eastOuterSwMinX + 0.68, 36], [eastOuterSwMinX + 0.68, 60],
+      [westOuterSwMaxX - 0.68, -60], [westOuterSwMaxX - 0.68, -36], [westOuterSwMaxX - 0.68, 36], [westOuterSwMaxX - 0.68, 60],
+      [parkX + 2.0, -11.5], [parkX + 2.0, 5.2], [eastOuterSwMinX + 0.72, -90], [westOuterSwMaxX - 0.72, 90]
     ];
     for (let t = 0; t < treeSpots.length; t++) {
       const [tx, tz] = treeSpots[t];
@@ -1934,12 +2057,15 @@
       city._addCollider(tx - 0.28, SIDEWALK_Y, tz - 0.28, tx + 0.28, SIDEWALK_Y + 3.5, tz + 0.28, 'wood', { blocksBullets: false });
       addCylinder(bCollHull, 0.20, 0.26, 3.2, 6, tx, SIDEWALK_Y + 1.6, tz);
 
-      // Understory Poly Haven tropical shrubs & ferns nestled in tree pits!
+      // Keep understory shrubs tight to tree pits on the inner promenade & park only (never blocking outer ruko shopfronts!)
+      const isOuterShopSidewalk = Math.abs(tx - eastOuterSwMinX) < 3.0 || Math.abs(tx - westOuterSwMaxX) < 3.0;
       const vP = t % 4;
-      pachiraPlacements[vP].push({ x: tx + (rng() - 0.5) * 1.4, y: SIDEWALK_Y, z: tz + 1.35, ry: rng() * Math.PI * 2, sx: 1, sy: 1, sz: 1 });
-      shrub2Placements[vP].push({ x: tx + (rng() - 0.5) * 0.9, y: SIDEWALK_Y, z: tz - 1.15, ry: rng() * Math.PI * 2 });
-      fernPlacements[vP].push({ x: tx + 0.75, y: SIDEWALK_Y, z: tz + 0.55, ry: rng() * Math.PI * 2 });
-      calatheaPlacements[t % 3].push({ x: tx - 0.7, y: SIDEWALK_Y, z: tz - 0.4, ry: rng() * Math.PI * 2 });
+      if (!isOuterShopSidewalk) {
+        pachiraPlacements[vP].push({ x: tx + (rng() - 0.5) * 0.9, y: SIDEWALK_Y, z: tz + 1.15, ry: rng() * Math.PI * 2, sx: 0.85, sy: 0.85, sz: 0.85 });
+        shrub2Placements[vP].push({ x: tx + (rng() - 0.5) * 0.7, y: SIDEWALK_Y, z: tz - 0.95, ry: rng() * Math.PI * 2, sx: 0.85, sy: 0.85, sz: 0.85 });
+      }
+      fernPlacements[vP].push({ x: tx + 0.45, y: SIDEWALK_Y, z: tz + 0.35, ry: rng() * Math.PI * 2 });
+      calatheaPlacements[t % 3].push({ x: tx - 0.45, y: SIDEWALK_Y, z: tz - 0.35, ry: rng() * Math.PI * 2 });
     }
     // Median/park hedge strips
     for (const pz of [-8.0, -2.0, 2.0, 8.0]) {

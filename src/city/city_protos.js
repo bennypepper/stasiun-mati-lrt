@@ -411,10 +411,11 @@
     if (!_angsanaCachedMatLeaf) {
       _angsanaCachedLeafTex = createAngsanaLeafTexture();
       _angsanaCachedMatLeaf = new THREE.MeshStandardMaterial({
+        color: 0x76926c,
         map: _angsanaCachedLeafTex,
         alphaTest: 0.42,
         side: THREE.DoubleSide,
-        roughness: 0.84,
+        roughness: 0.88,
         metalness: 0.0
       });
     }
@@ -848,16 +849,11 @@
 
   function getCityLodMaterial() {
     if (!_cityLodMat) {
-      const skyTex = (window.LRT && window.LRT.Materials && window.LRT.Materials.textures)
-        ? window.LRT.Materials.textures.skyline_facade
-        : null;
       _cityLodMat = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        map: skyTex && skyTex.map ? skyTex.map : null,
-        roughnessMap: skyTex && skyTex.roughnessMap ? skyTex.roughnessMap : null,
+        color: 0xd8dfe6,
         vertexColors: true,
-        roughness: 0.78,
-        metalness: 0.14
+        roughness: 0.86,
+        metalness: 0.08
       });
     }
     return _cityLodMat;
@@ -866,14 +862,29 @@
   function getLampBulbMaterial() {
     if (!_lampBulbMat) {
       _lampBulbMat = new THREE.MeshStandardMaterial({
-        color: 0xfff1cc,
-        emissive: new THREE.Color(0xffaa44),
-        emissiveIntensity: 2.4,
-        roughness: 0.2,
-        metalness: 0.0
+        color: 0x262d36,
+        emissive: new THREE.Color(0xffad42),
+        emissiveIntensity: 0.0,
+        roughness: 0.34,
+        metalness: 0.14
       });
     }
     return _lampBulbMat;
+  }
+
+  function setLampBulbsPowered(powered, boost) {
+    const mat = getLampBulbMaterial();
+    if (!mat) return;
+    if (powered) {
+      const b = (typeof boost === 'number' && Number.isFinite(boost)) ? Math.max(0.25, boost) : 1.0;
+      mat.color.setHex(0xfff3d4);
+      mat.emissive.setHex(0xffad42);
+      mat.emissiveIntensity = 3.8 * b;
+    } else {
+      mat.color.setHex(0x262d36);
+      mat.emissive.setHex(0xffad42);
+      mat.emissiveIntensity = 0.0;
+    }
   }
 
   function mergePartBuckets(partDefs) {
@@ -935,7 +946,8 @@
         addColoredBox(bRubber, 0.07, 0.06, wheelR * 2.12, sx * (w * 0.505), wheelR * 2.04, wz, 0, 0, 0, 0x1f242c, 0.80);
       }
     }
-    // Dark undercarriage + sculpted lower rocker sills + front air-dam bumper + rear diffuser bumper
+    // Ground-contact shadow AO apron + dark undercarriage + sculpted lower rocker sills
+    addColoredBox(bRubber, w * 1.06, 0.014, len * 0.98, 0, 0.008, 0, 0, 0, 0, 0x0a0c0f, 0.95);
     addColoredBox(bRubber, w * 0.88, 0.14, len * 0.90, 0, wheelR * 0.74, 0, 0, 0, 0, 0x14171b, 0.8);
     for (const sx of [-1, 1]) {
       addColoredBox(bRubber, 0.06, 0.12, wbZ * 1.48, sx * (w * 0.49), wheelR + 0.04, 0, 0, 0, 0, 0x1e2228, 0.78);
@@ -1061,7 +1073,8 @@
         addColoredBox(bRubber, 0.06, 0.05, wheelR * 2.05, sx * (w * 0.502), wheelR * 2.02, wz, 0, 0, 0, 0x1e2228, 0.80);
       }
     }
-    // Rubber bumpers & undercarriage + fog lamps + yellow public transport plates
+    // Ground-contact shadow AO apron + rubber bumpers & undercarriage + fog lamps + yellow public transport plates
+    addColoredBox(bRubber, w * 1.05, 0.014, len * 0.98, 0, 0.008, 0, 0, 0, 0, 0x0a0c0f, 0.95);
     addColoredBox(bRubber, w * 0.90, 0.14, len * 0.92, 0, wheelR * 0.78, 0, 0, 0, 0, 0x16181c, 0.8);
     addColoredBox(bRubber, w * 0.99, 0.24, 0.24, 0, wheelR + 0.08, len * 0.49, 0.06, 0, 0, 0x1e2226, 0.75);
     addColoredBox(bRubber, w * 0.98, 0.24, 0.22, 0, wheelR + 0.08, -len * 0.49, 0, 0, 0, 0x1e2226, 0.75);
@@ -1142,7 +1155,8 @@
         addColoredBox(bRubber, 0.08, 0.07, wheelR * 2.15, sx * (w * 0.505), wheelR * 2.08, wz, 0, 0, 0, 0x1e2228, 0.82);
       }
     }
-    // Heavy rubber chassis + sculpted front/rear bumpers + fog lamps + license plates
+    // Ground-contact shadow AO apron + heavy rubber chassis + sculpted front/rear bumpers
+    addColoredBox(bRubber, w * 1.06, 0.016, len * 1.00, 0, 0.009, 0, 0, 0, 0, 0x0a0c0f, 0.95);
     addColoredBox(bRubber, w * 0.94, 0.30, len * 0.96, 0, wheelR * 0.85, 0, 0, 0, 0, 0x16191d, 0.75);
     addColoredBox(bRubber, w * 1.02, 0.34, 0.28, 0.05, wheelR + 0.12, len * 0.50, 0.06, 0.03, -0.03, 0x22262b, 0.75);
     addColoredBox(bRubber, w * 1.00, 0.30, 0.24, 0, wheelR + 0.12, -len * 0.50, 0, 0, 0, 0x22262b, 0.75);
@@ -2350,7 +2364,7 @@
     _skylineSmokeMat = new THREE.MeshBasicMaterial({
       map: tex,
       transparent: true,
-      opacity: 0.78,
+      opacity: 0.30,
       depthWrite: false,
       side: THREE.DoubleSide,
       fog: true
@@ -2390,16 +2404,17 @@
       const tw = 20.0 + skylineRng() * 26.0;
       const td = 20.0 + skylineRng() * 26.0;
       const th = 48.0 + skylineRng() * 85.0;
-      addBox(bSkyline, tw, th, td, tx, STREET_GROUND_Y + th * 0.5, tz);
+      // Pass tileM = 48.0 so the 16-floor skyline_facade texture renders realistic ~3.0m floors (NEVER microscopic QR-code tiling!)
+      addBox(bSkyline, tw, th, td, tx, STREET_GROUND_Y + th * 0.5, tz, 0, 0, 0, 48.0);
 
       if (th > 75.0) {
         const sw = tw * 0.62;
         const sd = td * 0.62;
         const sh = 18.0 + skylineRng() * 32.0;
-        addBox(bSkyline, sw, sh, sd, tx, STREET_GROUND_Y + th + sh * 0.5, tz);
+        addBox(bSkyline, sw, sh, sd, tx, STREET_GROUND_Y + th + sh * 0.5, tz, 0, 0, 0, 48.0);
         if (sh > 28.0) {
           const spireH = 12.0 + skylineRng() * 15.0;
-          addBox(bSkyline, 2.5, spireH, 2.5, tx, STREET_GROUND_Y + th + sh + spireH * 0.5, tz);
+          addBox(bSkyline, 2.5, spireH, 2.5, tx, STREET_GROUND_Y + th + sh + spireH * 0.5, tz, 0, 0, 0, 48.0);
         }
       }
     }
@@ -2431,15 +2446,13 @@
       });
     }
 
-    // Distant Fresh Outbreak Smoke Plumes rising behind Jakarta skyscrapers (visible down track arch & through concourse curtain wall, 1 draw call!)
+    // Subtle Distant Horizon Outbreak Smoke Plumes placed WAY beyond the outer skyline ring (r ~ 195-235m)
+    // so they never loom overhead or smear blurry grey smudges across the playable boulevard sky!
     const plumeSpecs = [
-      { x: -12, z: -102, w: 34, h: 74, ry: 0.12 },
-      { x: 16, z: -122, w: 42, h: 88, ry: -0.18 },
-      { x: -10, z: 106, w: 36, h: 78, ry: 0.10 },
-      { x: 14, z: 128, w: 44, h: 92, ry: -0.15 },
-      { x: 74, z: -18, w: 38, h: 82, ry: Math.PI * 0.5 },
-      { x: 86, z: 24, w: 42, h: 86, ry: Math.PI * 0.46 },
-      { x: -84, z: 16, w: 40, h: 84, ry: Math.PI * 0.5 }
+      { x: -165, z: -185, w: 34, h: 68, ry: 0.45 },
+      { x: 185, z: -175, w: 38, h: 74, ry: -0.52 },
+      { x: 195, z: 160, w: 36, h: 72, ry: 0.65 },
+      { x: -180, z: 175, w: 34, h: 68, ry: -0.60 }
     ];
     const plumeGeos = [];
     for (let pi = 0; pi < plumeSpecs.length; pi++) {
@@ -2672,6 +2685,7 @@
     getHighwaySignMaterial,
     getCityLodMaterial,
     getLampBulbMaterial,
+    setLampBulbsPowered,
     getSedanMpvProto,
     getAngkotProto,
     getTransJakartaBusProto,
