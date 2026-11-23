@@ -589,7 +589,7 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
               </div>
               <span class="setting-readout" id="brightness-readout">100% DARK HORROR</span>
             </div>
-            <input type="range" id="brightness-slider" class="zenith-slider" min="0.4" max="1.8" step="0.05" value="1.0" aria-label="Atmosphere Brightness">
+            <input type="range" id="brightness-slider" class="zenith-slider" min="0.1" max="1.8" step="0.05" value="1.0" aria-label="Atmosphere Brightness">
           </div>
         </div>
 
@@ -839,7 +839,7 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
               </div>
               <span class="setting-readout" id="pause-brightness-readout">100% DARK HORROR</span>
             </div>
-            <input type="range" id="pause-brightness-slider" class="zenith-slider" min="0.4" max="1.8" step="0.05" value="1.0" aria-label="Pause Brightness">
+            <input type="range" id="pause-brightness-slider" class="zenith-slider" min="0.1" max="1.8" step="0.05" value="1.0" aria-label="Pause Brightness">
           </div>
         </div>
 

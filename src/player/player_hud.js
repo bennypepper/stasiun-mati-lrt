@@ -175,7 +175,9 @@
   function formatBrightnessLabel(val) {
     const pct = Math.round(val * 100);
     let tag = 'STANDARD';
-    if (val <= 0.7) tag = 'DEEP HORROR';
+    if (val <= 0.20) tag = 'PITCH BLACK';
+    else if (val <= 0.50) tag = 'ABYSS HORROR';
+    else if (val <= 0.80) tag = 'DEEP HORROR';
     else if (val <= 1.05) tag = 'DARK HORROR';
     else if (val <= 1.35) tag = 'ELEVATED';
     else tag = 'BRIGHT';
@@ -184,7 +186,7 @@
 
   function syncBrightnessUi(val) {
     const num = typeof val === 'number' && !Number.isNaN(val) ? val : currentBrightness;
-    currentBrightness = Math.max(0.4, Math.min(1.8, num));
+    currentBrightness = Math.max(0.1, Math.min(1.8, num));
     if (dom['brightness-slider']) dom['brightness-slider'].value = String(currentBrightness);
     if (dom['pause-brightness-slider']) dom['pause-brightness-slider'].value = String(currentBrightness);
     const label = formatBrightnessLabel(currentBrightness);
@@ -195,7 +197,7 @@
   function applyBrightness(val) {
     const parsed = parseFloat(val);
     if (Number.isNaN(parsed)) return;
-    const clamped = Math.max(0.4, Math.min(1.8, parsed));
+    const clamped = Math.max(0.1, Math.min(1.8, parsed));
     syncBrightnessUi(clamped);
     if (LRT.Main && typeof LRT.Main.setBrightness === 'function') {
       LRT.Main.setBrightness(clamped);

@@ -144,7 +144,7 @@
         CORE.difficultyKey = parsed.difficultyKey;
       }
       if (typeof parsed.brightness === 'number' && Number.isFinite(parsed.brightness)) {
-        CORE.currentBrightness = Math.round(Math.max(0.40, Math.min(1.80, parsed.brightness)) * 100) / 100;
+        CORE.currentBrightness = Math.round(Math.max(0.10, Math.min(1.80, parsed.brightness)) * 100) / 100;
       }
     } catch (_) {}
   }
@@ -656,7 +656,7 @@
     const isMenu = CORE.gameState === STATES.MENU;
     const b = CORE.currentBrightness;
     const bScale = (b <= 1.0
-      ? (0.28 + 0.72 * b)
+      ? (0.76 + 0.24 * b)
       : (1.0 + Math.max(0, b - 1.0) * 0.35)) * (isMenu ? 1.45 : 1.0);
     if (LRT.Station && typeof LRT.Station.setLightingFactor === 'function') {
       LRT.Station.setLightingFactor(bScale);
@@ -687,7 +687,7 @@
       const isMenu = CORE.gameState === STATES.MENU;
       const tubeInt = (baseMood && baseMood.tubeIntensity !== undefined) ? baseMood.tubeIntensity : 0.72;
       const bScale = (CORE.currentBrightness <= 1.0
-        ? (0.28 + 0.72 * CORE.currentBrightness)
+        ? (0.76 + 0.24 * CORE.currentBrightness)
         : (1.0 + Math.max(0, CORE.currentBrightness - 1.0) * 0.35)) * (isMenu ? 1.45 : 1.0);
       if (typeof LRT.Station.setLightingFactor === 'function') {
         LRT.Station.setLightingFactor(bScale);
@@ -762,8 +762,10 @@
       ? Math.max(0.0, Math.min(1.0, baseMood.daylightBlend))
       : (baseMood.isDaylight ? 1.0 : 0.0);
     const nightMix = 1.0 - dayMix;
-    const lsDay = b <= 1.0 ? Math.pow(b, 1.35) : 1.0;
-    const lsNight = b <= 1.0 ? Math.pow(b, 1.85) : 1.0;
+    // Steep non-linear darkness curve: under 50% feels genuinely dark; at 10% ambient/sky drops to near pitch-black!
+    const bNorm = Math.max(0.0, Math.min(1.0, (b - 0.08) / 0.92));
+    const lsDay = b <= 1.0 ? Math.pow(bNorm, 1.45) : 1.0;
+    const lsNight = b <= 1.0 ? Math.pow(bNorm, 2.55) : 1.0;
     const lightScale = lsNight + (lsDay - lsNight) * dayMix;
 
     syncMenuLights();
@@ -771,35 +773,42 @@
 
     if (CORE.hemiLight) {
       const baseHemi = baseMood.hemiIntensity * lightScale + over * (0.25 + (0.65 - 0.25) * dayMix);
-      CORE.hemiLight.intensity = (baseHemi + (isMenu ? 0.08 * nightMix : 0)) * (1.0 - 0.72 * tb);
+      CORE.hemiLight.intensity = (baseHemi + (isMenu ? 0.06 * nightMix : 0)) * (1.0 - 0.72 * tb);
     }
     if (CORE.sunLight) {
       const baseSun = baseMood.sunIntensity * lightScale + over * (0.35 + (0.95 - 0.35) * dayMix);
-      CORE.sunLight.intensity = (baseSun + (isMenu ? 0.14 * nightMix : 0)) * (1.0 - 0.90 * tb);
+      CORE.sunLight.intensity = (baseSun + (isMenu ? 0.10 * nightMix : 0)) * (1.0 - 0.90 * tb);
     }
     if (CORE.sky) {
       CORE.sky.visible = (dayMix > 0.02) && (tb < 0.72);
     }
     if (CORE.renderer) {
       const baseExp = baseMood.exposure || 1.05;
-      const expDay = b <= 1.0 ? Math.max(0.32, baseExp * (0.28 + b * 0.72)) : Math.min(1.65, baseExp + over * 0.55);
-      const expNight = b <= 1.0 ? Math.max(0.54, baseExp * (0.58 + b * 0.42)) : Math.min(1.45, baseExp + over * 0.42);
+      const expDay = b <= 1.0 ? Math.max(0.24, baseExp * (0.18 + b * 0.82)) : Math.min(1.65, baseExp + over * 0.55);
+      // Keep night exposure high enough that local streetlamps/station lights/flashlight stay crisp pools while unlit darkness hits pitch black!
+      const expNight = b <= 1.0 ? Math.max(0.46, baseExp * (0.44 + b * 0.56)) : Math.min(1.45, baseExp + over * 0.42);
       CORE.renderer.toneMappingExposure = expNight + (expDay - expNight) * dayMix;
     }
     if (CORE.scene) {
       if ('environmentIntensity' in CORE.scene) {
         const envDay = b <= 1.0
-          ? Math.max(0.03, baseMood.envIntensity * (0.22 + 0.78 * b))
+          ? Math.max(0.015, baseMood.envIntensity * (0.12 + 0.88 * bNorm))
           : Math.min(1.85, baseMood.envIntensity + over * 0.85);
         const envNight = b <= 1.0
-          ? Math.max(0.004, baseMood.envIntensity * Math.pow(b, 1.9))
+          ? baseMood.envIntensity * Math.pow(bNorm, 2.65)
           : Math.min(0.45, baseMood.envIntensity + over * 0.22);
         const envVal = envNight + (envDay - envNight) * dayMix;
-        CORE.scene.environmentIntensity = (envVal + (isMenu ? 0.06 * nightMix : 0)) * (1.0 - 0.75 * tb);
+        CORE.scene.environmentIntensity = (envVal + (isMenu ? 0.04 * nightMix : 0)) * (1.0 - 0.75 * tb);
       }
       if (CORE.scene.fog) {
         const fogLift = over > 0 ? Math.min(0.42, (over / 0.8) * 0.42) * nightMix : 0;
         CORE.scene.fog.color.copy(baseMood.fogColor).lerp(_brightFogTarget, fogLift);
+        // Darken night sky & atmospheric fog color smoothly into pure #000000 at low brightness (eliminates pink/blue sky glow at <=50%!)
+        if (b < 1.0 && nightMix > 0.01) {
+          const skyScale = Math.pow(bNorm, 1.95);
+          const blendScale = 1.0 + (skyScale - 1.0) * nightMix;
+          CORE.scene.fog.color.multiplyScalar(blendScale);
+        }
         if (tb > 0.001) {
           CORE.scene.fog.color.lerp(_tunnelFogColor, tb);
         }
@@ -813,7 +822,7 @@
         }
         if (CORE.scene.fog.isFogExp2) {
           const fogFactor = b <= 1.0
-            ? 1.0 + (1.0 - b) * 0.14
+            ? 1.0 + (1.0 - b) * 0.22
             : Math.max(0.55, 1.0 - over * 0.45);
           const baseDens = baseMood.fogDensity * fogFactor;
           // Dense atmospheric tunnel curtain (~45m visibility) seamlessly hides station disposal & incremental build!
@@ -822,16 +831,17 @@
       }
     }
     if (CORE.bloomPass) {
-      CORE.bloomPass.strength = baseMood.bloomStrength * (b <= 1.0 ? 0.88 + 0.12 * b : 1.0 + over * 0.25);
+      CORE.bloomPass.strength = baseMood.bloomStrength * (b <= 1.0 ? 0.85 + 0.15 * b : 1.0 + over * 0.25);
     }
     const lampDay = b <= 1.0 ? (0.30 + 0.70 * b) : 1.0;
-    const lampNight = b <= 1.0 ? Math.max(0.95, 0.92 + 0.08 * b) : 1.0 + over * 0.20;
+    // Boost local streetlamps slightly at ultra-low brightness so light pools under working poles stay vivid against pitch-black darkness!
+    const lampNight = b <= 1.0 ? (1.32 - 0.32 * b) : (1.0 + over * 0.20);
     const localLampScale = lampNight + (lampDay - lampNight) * dayMix;
     applyStreetLightsIntensity(baseMood.streetLampIntensity * localLampScale);
     if (LRT.Materials && LRT.Materials.mats) {
       const m = LRT.Materials.mats;
       const tubeDay = b <= 1.0 ? (0.30 + 0.70 * b) : (1.0 + over * 0.55);
-      const tubeNight = b <= 1.0 ? (0.72 + 0.28 * b) : (1.0 + over * 0.45);
+      const tubeNight = b <= 1.0 ? (0.85 + 0.15 * b) : (1.0 + over * 0.45);
       const tubeFactor = tubeNight + (tubeDay - tubeNight) * dayMix;
       if (m.flickerTube) {
         m.flickerTube.emissiveIntensity = 1.65 * baseMood.tubeIntensity * tubeFactor;
@@ -840,7 +850,7 @@
         m.tubeHalo.opacity = Math.min(0.28, 0.12 * baseMood.tubeIntensity * tubeFactor);
       }
       if (m.skylineBuilding) {
-        const skyNight = 0.14 + 0.14 * Math.min(1.2, b);
+        const skyNight = 0.03 + 0.21 * Math.pow(bNorm, 1.35);
         m.skylineBuilding.emissiveIntensity = skyNight + (0.08 - skyNight) * dayMix;
       }
     }
@@ -852,7 +862,7 @@
 
   function setBrightness(val) {
     const num = Number(val);
-    const clamped = Number.isFinite(num) ? Math.max(0.40, Math.min(1.80, num)) : 1.0;
+    const clamped = Number.isFinite(num) ? Math.max(0.10, Math.min(1.80, num)) : 1.0;
     CORE.currentBrightness = Math.round(clamped * 100) / 100;
     applyBrightness();
     saveSettings();
