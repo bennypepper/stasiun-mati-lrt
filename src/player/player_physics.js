@@ -599,6 +599,8 @@
         } else {
           triggerInteract();
         }
+      } else if (e.code === 'KeyQ') {
+        if (!e.repeat && PL.triggerTacticalPing) PL.triggerTacticalPing();
       } else if (e.code === 'KeyT') {
         if (!e.repeat && callbacks.onSummonTrain) callbacks.onSummonTrain(e.shiftKey ? -1 : 0);
       } else if (e.code === 'KeyV') {

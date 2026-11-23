@@ -71,6 +71,7 @@ REQUIRED_SRC_MODULES = [
     "render/materials_shaders.js",
     "city/city_protos.js",
     "city/city_clutter.js",
+    "city/city_mission_props.js",
     "city/city_district.js",
     "city/city_api.js",
     "station/station_geo.js",
@@ -223,7 +224,20 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
           <div id="objective-title">WAVE 1</div>
         </div>
         <div id="objective-detail">Clear Platform Infected</div>
+        <div id="hud-key-items" class="hidden" aria-live="polite"></div>
         <div id="fps-readout" class="hidden">FPS: -- | Calls: --</div>
+      </div>
+    </div>
+
+    <div id="hud-ping-compass" class="hidden" aria-hidden="true">
+      <div class="ping-track">
+        <div class="ping-center-tick"></div>
+        <div class="ping-chevron" id="ping-chevron"></div>
+      </div>
+      <div class="ping-meta">
+        <span id="ping-bearing">N</span>
+        <span id="ping-label">OBJEKTIF</span>
+        <span id="ping-dist">--m</span>
       </div>
     </div>
 
@@ -524,6 +538,17 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
             </div>
             <button class="zenith-toggle" id="btn-menu-dismember" type="button">ON</button>
           </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">WAYPOINTS</span>
+              <span class="setting-desc">Controls objective diamond HUD markers (Off, Proximity fade, or Always On).</span>
+            </div>
+            <div class="zenith-tabs" id="menu-waypoint-group">
+              <button class="zenith-tab" data-waypoint="off" type="button">OFF</button>
+              <button class="zenith-tab active" data-waypoint="proximity" type="button">PROXIMITY</button>
+              <button class="zenith-tab" data-waypoint="on" type="button">ON</button>
+            </div>
+          </div>
         </div>
 
         <div class="setting-group" data-cat="display">
@@ -654,6 +679,7 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
           <div class="ctrl-row"><span class="ctrl-key">R</span><span class="ctrl-desc">Reload</span></div>
           <div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-desc">Melee Shove</span></div>
           <div class="ctrl-row"><span class="ctrl-key">E</span><span class="ctrl-desc">Interact / Tap Kartu</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">Q</span><span class="ctrl-desc">Tactical Ping (Compass)</span></div>
           <div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-desc">Flashlight</span></div>
           <div class="ctrl-row"><span class="ctrl-key">L</span><span class="ctrl-desc">Cycle Lighting</span></div>
           <div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-desc">Summon Peron 1 / Depart LRT</span></div>
@@ -759,6 +785,18 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
               <span class="setting-desc">Enable or disable enemy limb severing and headshot decapitation.</span>
             </div>
             <button class="zenith-toggle" id="btn-pause-dismember" type="button">ON</button>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">WAYPOINTS</span>
+              <span class="setting-desc">Controls objective diamond HUD markers (Off, Proximity fade, or Always On).</span>
+            </div>
+            <div class="zenith-tabs" id="pause-waypoint-group">
+              <button class="zenith-tab" data-waypoint="off" type="button">OFF</button>
+              <button class="zenith-tab active" data-waypoint="proximity" type="button">PROXIMITY</button>
+              <button class="zenith-tab" data-waypoint="on" type="button">ON</button>
+            </div>
           </div>
         </div>
 
@@ -899,6 +937,7 @@ BODY_MARKUP = """  <canvas id="game-canvas"></canvas>
           <div class="ctrl-row"><span class="ctrl-key">R</span><span class="ctrl-desc">Reload</span></div>
           <div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-desc">Melee Shove</span></div>
           <div class="ctrl-row"><span class="ctrl-key">E</span><span class="ctrl-desc">Interact / Tap Kartu</span></div>
+          <div class="ctrl-row"><span class="ctrl-key">Q</span><span class="ctrl-desc">Tactical Ping (Compass)</span></div>
           <div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-desc">Flashlight</span></div>
           <div class="ctrl-row"><span class="ctrl-key">L</span><span class="ctrl-desc">Cycle Lighting</span></div>
           <div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-desc">Summon Peron 1 / Depart LRT</span></div>

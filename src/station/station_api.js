@@ -1123,6 +1123,8 @@
           label: it.label || it.prompt || it.id,
           kind: isLootbox ? 'lootbox' : (isTrain ? 'train' : 'supply'),
           used: !!it.used,
+          alwaysShow: !!it.alwaysShow,
+          revealDist: typeof it.revealDist === 'number' ? it.revealDist : undefined,
           item: it
         });
       }
@@ -1487,6 +1489,9 @@
         else if (isTrain) m.kind = 'train';
         else if (activeSet && activeSet.has(m.id)) m.kind = 'objective';
         else m.kind = 'supply';
+        const isOmegaEvac = isTrain && (this._stationIndex % 6 === 5) && activeSet && activeSet.has(m.id);
+        m.alwaysShow = !!it.alwaysShow || !!isOmegaEvac;
+        if (typeof it.revealDist === 'number') m.revealDist = it.revealDist;
       }
       return this._objectiveMarkersCache;
     },

@@ -38,6 +38,7 @@
         clearedStations: Array.from(campaignState.clearedStations),
         visitedStations: Array.from(campaignState.visitedStations),
         triggeredSurgeStations: Array.from(campaignState.triggeredSurgeStations),
+        keyItems: Array.from(campaignState.keyItems || []),
         stationObjectives: JSON.parse(JSON.stringify(campaignState.stationObjectives)),
         voTriggered: Array.from(campaignState.voTriggered),
         collectedLogs: campaignState.collectedLogs.slice(),
@@ -93,6 +94,8 @@
     campaignState.clearedStations = new Set(c.clearedStations || []);
     campaignState.visitedStations = new Set(c.visitedStations || [0]);
     campaignState.triggeredSurgeStations = new Set(c.triggeredSurgeStations || []);
+    campaignState.keyItems = new Set(Array.isArray(c.keyItems) ? c.keyItems : []);
+    if (typeof CORE.invalidateKeyItemsCache === 'function') CORE.invalidateKeyItemsCache();
     if (c.stationObjectives) campaignState.stationObjectives = c.stationObjectives;
     campaignState.voTriggered = new Set(c.voTriggered || []);
     campaignState.collectedLogs.length = 0;

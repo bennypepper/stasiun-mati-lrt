@@ -61,6 +61,7 @@ const SCRIPT_ORDER = [
   { path: 'src/render/materials_shaders.js', file: 'render/materials_shaders.js', optional: false },
   { path: 'src/city/city_protos.js', file: 'city/city_protos.js', optional: false },
   { path: 'src/city/city_clutter.js', file: 'city/city_clutter.js', optional: false },
+  { path: 'src/city/city_mission_props.js', file: 'city/city_mission_props.js', optional: false },
   { path: 'src/city/city_district.js', file: 'city/city_district.js', optional: false },
   { path: 'src/city/city_api.js', file: 'city/city_api.js', optional: false },
   { path: 'src/station/station_geo.js', file: 'station/station_geo.js', optional: false },

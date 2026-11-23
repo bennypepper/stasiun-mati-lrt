@@ -56,6 +56,8 @@
     _streetBeacons: null,
     _perimeterHalos: null,
     _hoveredInteractableId: null,
+    _activeObjectiveIds: null,
+    _missionPropsState: null,
     cornerHubs: null,
     layoutBounds: null,
     _fieldLogGlints: null,
@@ -158,6 +160,61 @@
         this.disposableMaterials.push(mat);
       }
       return mat;
+    },
+
+    _registerHaloTarget: function (id, targetObj, opts) {
+      if (!targetObj || !LRT.Render || typeof LRT.Render.attachPerimeterHalo !== 'function') return null;
+      const o = opts || {};
+      if (!this._perimeterHalos) this._perimeterHalos = [];
+      for (let i = this._perimeterHalos.length - 1; i >= 0; i--) {
+        if (this._perimeterHalos[i] && this._perimeterHalos[i].id === id) {
+          if (this._perimeterHalos[i].halo && this._perimeterHalos[i].halo !== o.halo && typeof this._perimeterHalos[i].halo.dispose === 'function') {
+            this._perimeterHalos[i].halo.dispose();
+          }
+          this._perimeterHalos.splice(i, 1);
+        }
+      }
+      const used = !!o.used;
+      const isObj = !!o.isObjective;
+      const halo = o.halo || LRT.Render.attachPerimeterHalo(targetObj, {
+        color: o.color !== undefined ? o.color : 0xfacc15,
+        hoverColor: o.hoverColor !== undefined ? o.hoverColor : 0xfacc15,
+        objectiveColor: o.objectiveColor !== undefined ? o.objectiveColor : 0xfde047,
+        thicknessScale: o.thicknessScale !== undefined ? o.thicknessScale : 0.95,
+        includeTransparent: o.includeTransparent,
+        initialMode: used ? 'off' : (o.initialMode || (isObj ? 'objective' : 'subtle'))
+      });
+      const rec = {
+        id: id,
+        halo: halo,
+        used: used,
+        isObjective: isObj,
+        x: o.x !== undefined ? o.x : (targetObj.position ? targetObj.position.x : 0),
+        y: o.y !== undefined ? o.y : (targetObj.position ? targetObj.position.y : 0),
+        z: o.z !== undefined ? o.z : (targetObj.position ? targetObj.position.z : 0)
+      };
+      this._perimeterHalos.push(rec);
+      return rec;
+    },
+
+    setActiveObjectiveIds: function (idsArray) {
+      if (!this._activeObjectiveIds) this._activeObjectiveIds = new Set();
+      this._activeObjectiveIds.clear();
+      if (Array.isArray(idsArray)) {
+        for (let i = 0; i < idsArray.length; i++) {
+          if (idsArray[i]) this._activeObjectiveIds.add(idsArray[i]);
+        }
+      }
+      if (this._perimeterHalos && this._perimeterHalos.length > 0) {
+        for (let i = 0; i < this._perimeterHalos.length; i++) {
+          const ph = this._perimeterHalos[i];
+          if (!ph) continue;
+          const it = this.interactables ? this.interactables.find((x) => x && x.id === ph.id) : null;
+          if (it && (it.isMissionProp || it.id === 'city_pln_box')) {
+            ph.isObjective = this._activeObjectiveIds.has(ph.id);
+          }
+        }
+      }
     },
 
     _addCollider: function (minX, minY, minZ, maxX, maxY, maxZ, tag, opts) {
@@ -299,6 +356,11 @@
       this._streetBeacons = null;
       this._perimeterHalos = null;
       this._hoveredInteractableId = null;
+      if (this._activeObjectiveIds) this._activeObjectiveIds.clear();
+      if (P.missionProps && typeof P.missionProps.disposeMissionProps === 'function') {
+        P.missionProps.disposeMissionProps(this);
+      }
+      this._missionPropsState = null;
       this.cornerHubs = null;
       this.layoutBounds = null;
       this._fieldLogGlints = null;
@@ -607,6 +669,9 @@
       this._timeAccum = t !== undefined ? t : (this._timeAccum + dt);
       if (typeof P.updateTrafficSignalTime === 'function') {
         P.updateTrafficSignalTime(this._timeAccum);
+      }
+      if (P.missionProps && typeof P.missionProps.updateMissionProps === 'function') {
+        P.missionProps.updateMissionProps(this, dt, this._timeAccum, camPos);
       }
       const oz = this.rootGroup ? (this.rootGroup.position.z || 0) : 0;
       this._hoveredInteractableId = (camPos && camForward) ? this._findCrosshairHoveredId(camPos, camForward, 8.0) : null;
@@ -1033,6 +1098,11 @@
       if (!this.interactables) return { ok: false };
       const it = this.interactables.find((x) => x.id === id);
       if (!it) return { ok: false };
+
+      if (it.isMissionProp && P.missionProps && typeof P.missionProps.interactMissionProp === 'function') {
+        const mRes = P.missionProps.interactMissionProp(this, it);
+        if (mRes) return mRes;
+      }
 
       if (it.type === 'field_log' || CORNER_NOTES_DATA[it.id]) {
         return this.interactNote(id);

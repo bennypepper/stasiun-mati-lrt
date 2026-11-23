@@ -371,13 +371,23 @@
       if (LRT.Station && typeof LRT.Station.setActiveObjectiveIds === 'function') {
         LRT.Station.setActiveObjectiveIds(activeIds);
       }
+      if (LRT.City && typeof LRT.City.setActiveObjectiveIds === 'function') {
+        LRT.City.setActiveObjectiveIds(activeIds);
+      }
     }
     if (LRT.PlayerUI && typeof LRT.PlayerUI.updateWaypoints === 'function') {
       if (CORE.tutorialActive && typeof CORE.getTutorialMarkers === 'function') {
         LRT.PlayerUI.updateWaypoints(CORE.getTutorialMarkers(), null, CORE.camera);
-      } else if (LRT.Station && typeof LRT.Station.getObjectiveMarkers === 'function') {
-        const markers = LRT.Station.getObjectiveMarkers();
-        LRT.PlayerUI.updateWaypoints(markers, activeIds, CORE.camera);
+      } else {
+        const trainMarkers = typeof CORE.getTrainBoardingMarkers === 'function'
+          ? CORE.getTrainBoardingMarkers(pState)
+          : null;
+        if (trainMarkers && trainMarkers.length > 0) {
+          LRT.PlayerUI.updateWaypoints(trainMarkers, null, CORE.camera);
+        } else if (LRT.Station && typeof LRT.Station.getObjectiveMarkers === 'function') {
+          const markers = LRT.Station.getObjectiveMarkers();
+          LRT.PlayerUI.updateWaypoints(markers, activeIds, CORE.camera);
+        }
       }
     }
 
@@ -389,6 +399,9 @@
         info.objectiveDetail = tInfo.detail;
       }
     }
+    info.keyItemsText = typeof CORE.getKeyItemsDisplayText === 'function'
+      ? CORE.getKeyItemsDisplayText()
+      : '';
     info.fps = currentFps;
     info.drawCalls = CORE.lastDrawCalls || (CORE.renderer ? CORE.renderer.info.render.calls : 0);
     LRT.PlayerUI.updateHud(info);
@@ -642,6 +655,11 @@
           if (typeof CORE.setDismembermentEnabled === 'function') CORE.setDismembermentEnabled(CORE.dismembermentEnabled === false);
           return;
         }
+        const wpBtn = e.target.closest('[data-waypoint]');
+        if (wpBtn) {
+          if (typeof CORE.setWaypointMode === 'function') CORE.setWaypointMode(wpBtn.dataset.waypoint);
+          return;
+        }
         const subLangBtn = e.target.closest('[data-sublang]');
         if (subLangBtn) {
           if (typeof CORE.setSubtitleLang === 'function') CORE.setSubtitleLang(subLangBtn.dataset.sublang);
@@ -892,12 +910,16 @@
             fogDensity: CORE.scene && CORE.scene.fog ? +CORE.scene.fog.density.toFixed(4) : null,
             campaignVictory: CORE.campaignState.campaignVictory,
             clearedStations: Array.from(CORE.campaignState.clearedStations),
+            keyItems: Array.from(CORE.campaignState.keyItems || []),
+            waypointMode: CORE.waypointMode || 'auto',
+            effectiveWaypointMode: typeof CORE.getEffectiveWaypointMode === 'function' ? CORE.getEffectiveWaypointMode() : 'proximity',
             consoleErrors: consoleErrors.slice()
           };
         },
         getCampaignState: () => ({
           clearedStations: Array.from(CORE.campaignState.clearedStations),
           visitedStations: Array.from(CORE.campaignState.visitedStations),
+          keyItems: Array.from(CORE.campaignState.keyItems || []),
           stationObjectives: JSON.parse(JSON.stringify(CORE.campaignState.stationObjectives)),
           voTriggered: Array.from(CORE.campaignState.voTriggered),
           collectedLogs: (CORE.campaignState.collectedLogs || []).slice(),
@@ -1045,6 +1067,15 @@
         setAoMode: CORE.setAoMode,
         setFpsCounterEnabled: CORE.setFpsCounterEnabled,
         setDismembermentEnabled: CORE.setDismembermentEnabled,
+        setWaypointMode: CORE.setWaypointMode,
+        getWaypointMode: CORE.getEffectiveWaypointMode,
+        triggerTacticalPing: () => (LRT.PlayerUI && typeof LRT.PlayerUI.triggerTacticalPing === 'function')
+          ? LRT.PlayerUI.triggerTacticalPing()
+          : null,
+        addKeyItem: CORE.addKeyItem,
+        hasKeyItem: CORE.hasKeyItem,
+        consumeKeyItem: CORE.consumeKeyItem,
+        getKeyItems: CORE.getKeyItems,
         executeCheat: (code) => (LRT.PlayerUI && typeof LRT.PlayerUI.executeCheat === 'function')
           ? LRT.PlayerUI.executeCheat(code)
           : null
@@ -1069,6 +1100,12 @@
     setAoMode: CORE.setAoMode,
     setFpsCounterEnabled: CORE.setFpsCounterEnabled,
     setDismembermentEnabled: CORE.setDismembermentEnabled,
+    setWaypointMode: CORE.setWaypointMode,
+    getWaypointMode: CORE.getEffectiveWaypointMode,
+    addKeyItem: CORE.addKeyItem,
+    hasKeyItem: CORE.hasKeyItem,
+    consumeKeyItem: CORE.consumeKeyItem,
+    getKeyItems: CORE.getKeyItems,
     setDifficulty: (k, notify) => applyDifficultySetting(k, !!notify),
     setAtmosphereMode: (m, notify) => applyAtmosphereSetting(m, !!notify),
     getAtmosphereMode: () => getAtmosphereMode(),
@@ -1085,6 +1122,7 @@
     getCampaignState: () => ({
       clearedStations: Array.from(CORE.campaignState.clearedStations),
       visitedStations: Array.from(CORE.campaignState.visitedStations),
+      keyItems: Array.from(CORE.campaignState.keyItems || []),
       stationObjectives: JSON.parse(JSON.stringify(CORE.campaignState.stationObjectives)),
       voTriggered: Array.from(CORE.campaignState.voTriggered),
       campaignVictory: CORE.campaignState.campaignVictory

@@ -52,7 +52,7 @@
     completedOverlayOpen: false
   };
 
-  const _marker = { id: 'tutorial_marker', pos: { x: 0, y: 0, z: 0 }, label: '', color: '#e0b422', active: true };
+  const _marker = { id: 'tutorial_marker', pos: { x: 0, y: 0, z: 0 }, label: '', color: '#e0b422', active: true, alwaysShow: true };
   const _markers = [_marker];
   const _noMarkers = [];
 

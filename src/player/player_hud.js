@@ -29,12 +29,27 @@
   const refreshContinueButton = (...args) => PL.refreshContinueButton && PL.refreshContinueButton(...args);
 
   const WAYPOINT_POOL_SIZE = 6;
+  const PING_DURATION = 2.5;
+  const PING_COOLDOWN = 10.0;
+  const CARDINALS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const hudState = {
+    pingTimer: 0,
+    pingCooldown: 0,
+    pingDuration: PING_DURATION,
+    pingCooldownMax: PING_COOLDOWN
+  };
   const _wpPool = [];
   const _wpList = [];
   const _wpProjVec = new THREE.Vector3();
   const _wpCamForward = new THREE.Vector3();
   const _wpCamPos = new THREE.Vector3();
   const _wpLabelCache = new Map();
+  let _pingCacheVisible = false;
+  let _pingCacheOpacity = null;
+  let _pingCacheX = null;
+  let _pingCacheBearing = null;
+  let _pingCacheLabel = null;
+  let _pingCacheDist = null;
   let _cachedVw = window.innerWidth || 1280;
   let _cachedVh = window.innerHeight || 720;
   window.addEventListener('resize', () => {
@@ -97,8 +112,10 @@
         lastDist: null,
         lastElev: null,
         lastColor: '',
+        lastOpacity: null,
         lastX: null,
-        lastY: null
+        lastY: null,
+        lastAnchor: null
       });
     }
   }
@@ -107,6 +124,7 @@
     const ids = [
       'damage-vignette', 'hud', 'hud-waypoints', 'hud-mode-badge', 'hud-station-code',
       'hud-station-name', 'hud-station-sub', 'objective-title', 'objective-detail',
+      'hud-key-items', 'hud-ping-compass', 'ping-chevron', 'ping-bearing', 'ping-label', 'ping-dist',
       'fps-readout', 'scope-overlay', 'crosshair', 'hitmarker', 'hud-notice', 'interact-prompt',
       'pill-stance',
       'interact-label', 'hud-subtitle-box', 'subtitle-speaker', 'subtitle-text-id', 'subtitle-text-en',
@@ -140,6 +158,7 @@
       'menu-ao-group', 'pause-ao-group',
       'btn-menu-fps', 'btn-pause-fps',
       'btn-menu-dismember', 'btn-pause-dismember',
+      'menu-waypoint-group', 'pause-waypoint-group',
       'menu-main-view', 'btn-menu-settings-back', 'btn-menu-controls-back',
       'pause-main-view', 'btn-pause-settings', 'btn-pause-controls', 'btn-pause-logs',
       'pause-settings-panel', 'pause-controls-panel', 'pause-logs-panel',
@@ -400,11 +419,22 @@
     syncToggleButtons([dom['btn-menu-dismember'], dom['btn-pause-dismember']], isOn, 'ON', 'OFF', 'is-off');
   }
 
+  function syncWaypointUi(mode) {
+    let val = mode;
+    if (val !== 'off' && val !== 'proximity' && val !== 'on') {
+      val = (I.core && typeof I.core.getEffectiveWaypointMode === 'function')
+        ? I.core.getEffectiveWaypointMode()
+        : 'proximity';
+    }
+    syncTabGroup([dom['menu-waypoint-group'], dom['pause-waypoint-group']], 'waypoint', val);
+  }
+
   function syncAllSettingsUi(settings) {
     const s = settings || {};
     syncDifficultyUi(s.difficultyKey || s.difficulty || 'medium');
     syncAtmosphereUi(s.atmosphereMode || 'night_horror');
     syncDismembermentUi(s.dismembermentEnabled !== undefined ? s.dismembermentEnabled : true);
+    syncWaypointUi(s.effectiveWaypointMode || s.waypointMode);
     syncQualityUi(s.qualityKey || s.quality || 'balanced');
     syncResScaleUi(s.resScaleMode || s.resScale || 'floor_720');
     syncShadowsUi(s.shadowsEnabled !== undefined ? s.shadowsEnabled : (s.shadows !== undefined ? s.shadows : true));
@@ -657,7 +687,43 @@
     // Field log toast timer
     if (PL.tickFieldLog) PL.tickFieldLog(dt);
 
+    // Tactical Ping active window & cooldown timers
+    if (!PL.flags.paused && !(PL.state && PL.state.docViewerOpen)) {
+      if (hudState.pingTimer > 0) {
+        hudState.pingTimer = Math.max(0, hudState.pingTimer - dt);
+      }
+      if (hudState.pingCooldown > 0) {
+        hudState.pingCooldown = Math.max(0, hudState.pingCooldown - dt);
+      }
+    }
+
     PL.updatePhysics(dt, worldCtx);
+  }
+
+  function triggerTacticalPing(silentCooldown) {
+    if (hudState.pingCooldown > 0) {
+      if (!silentCooldown) {
+        setNotice(`KOMPAS TAKTIS COOLDOWN (${Math.ceil(hudState.pingCooldown)}s)`, '#8b929a');
+        if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+          LRT.Audio.play('dry_fire', { gain: 0.25 });
+        }
+      }
+      return { ok: false, cooldown: hudState.pingCooldown };
+    }
+    hudState.pingTimer = PING_DURATION;
+    hudState.pingCooldown = PING_COOLDOWN;
+    if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+      LRT.Audio.play('turnstile_beep', { gain: 0.34, pitchVar: 0.03 });
+    }
+    return { ok: true, duration: PING_DURATION, cooldown: PING_COOLDOWN };
+  }
+
+  function hidePingCompass() {
+    if (_pingCacheVisible) {
+      _pingCacheVisible = false;
+      _pingCacheOpacity = null;
+      if (dom['hud-ping-compass']) dom['hud-ping-compass'].classList.add('hidden');
+    }
   }
 
   const _hudCache = {
@@ -674,6 +740,7 @@
     stationSub: null,
     objTitle: null,
     objDetail: null,
+    keyItemsText: null,
     fpsText: null,
     weaponName: null,
     skinTag: null,
@@ -712,8 +779,21 @@
       if (slot.visible) {
         slot.el.classList.add('hidden');
         slot.visible = false;
+        slot.lastOpacity = null;
       }
     }
+    hidePingCompass();
+  }
+
+  function cleanWaypointLabel(rawLabel) {
+    let labelText = _wpLabelCache.get(rawLabel);
+    if (labelText === undefined) {
+      const cleanLabel = String(rawLabel || 'WAYPOINT').replace(/^\[E\]\s*/i, '').replace(/\s*\([^)]*\)/g, '').trim();
+      labelText = cleanLabel.length > 26 ? `${cleanLabel.slice(0, 24)}…` : (cleanLabel || 'WAYPOINT');
+      if (_wpLabelCache.size > 128) _wpLabelCache.clear();
+      _wpLabelCache.set(rawLabel, labelText);
+    }
+    return labelText;
   }
 
   function updateWaypoints(markers, activeIds, camera) {
@@ -739,7 +819,7 @@
     _wpList.length = 0;
     const pushMarker = (m) => {
       if (!m || m.active === false || _wpList.length >= WAYPOINT_POOL_SIZE) return;
-      if (hasFilter) {
+      if (hasFilter && m.alwaysShow !== true) {
         const id = m.id;
         if (isFilterSet && !activeIds.has(id)) return;
         if (isFilterArr && activeIds.indexOf(id) === -1) return;
@@ -757,6 +837,12 @@
       for (const k of Object.keys(markers)) pushMarker(markers[k]);
     }
 
+    const effectiveMode = (I.core && typeof I.core.getEffectiveWaypointMode === 'function')
+      ? I.core.getEffectiveWaypointMode()
+      : 'proximity';
+    const pingActive = hudState.pingTimer > 0;
+    const pingFade = pingActive ? Math.min(1.0, hudState.pingTimer / 0.5) : 0.0;
+
     const vw = _cachedVw;
     const vh = _cachedVh;
     const marginX = 48;
@@ -767,12 +853,18 @@
     const maxY = Math.max(marginY, vh - marginY);
     const refY = (PL.state && PL.refs && PL.refs.camera === cam) ? (PL.state.pos.y + 1.0) : _wpCamPos.y;
 
+    let nearestPingMarker = null;
+    let nearestPingDist = Infinity;
+    let nearestPingDx = 0;
+    let nearestPingDz = 0;
+
     for (let i = 0; i < WAYPOINT_POOL_SIZE; i++) {
       const slot = _wpPool[i];
       if (i >= _wpList.length) {
         if (slot.visible) {
           slot.el.classList.add('hidden');
           slot.visible = false;
+          slot.lastOpacity = null;
         }
         continue;
       }
@@ -786,7 +878,46 @@
       const dx = mx - _wpCamPos.x;
       const dy = my - _wpCamPos.y;
       const dz = mz - _wpCamPos.z;
-      const distM = Math.round(Math.hypot(dx, dy, dz));
+      const distExact = Math.hypot(dx, dy, dz);
+      const distM = Math.round(distExact);
+
+      if (pingActive && distExact < nearestPingDist) {
+        nearestPingDist = distExact;
+        nearestPingMarker = m;
+        nearestPingDx = dx;
+        nearestPingDz = dz;
+      }
+
+      // Layer 2 & 3 visibility filtering (alwaysShow hard exception for train boarding / extraction)
+      let baseAlpha = 0.0;
+      if (m.alwaysShow === true) {
+        baseAlpha = 1.0;
+      } else if (effectiveMode === 'on') {
+        baseAlpha = 1.0;
+      } else if (effectiveMode === 'proximity') {
+        const revealFar = (typeof m.revealDist === 'number' && m.revealDist > 0) ? (m.revealDist + 2.0) : 22.0;
+        const revealNear = Math.max(4.0, revealFar - 6.0);
+        let proxAlpha = 0.0;
+        if (distExact <= revealNear) {
+          proxAlpha = 1.0;
+        } else if (distExact < revealFar) {
+          proxAlpha = (revealFar - distExact) / (revealFar - revealNear);
+        }
+        baseAlpha = pingActive ? Math.max(proxAlpha, pingFade * 0.88) : proxAlpha;
+      } else {
+        // 'off' mode: hide all non-alwaysShow floating diamonds (rely on landmarks, halos, and Q compass ping)
+        baseAlpha = 0.0;
+      }
+
+      if (baseAlpha <= 0.01) {
+        if (slot.visible) {
+          slot.el.classList.add('hidden');
+          slot.visible = false;
+          slot.lastOpacity = null;
+        }
+        continue;
+      }
+
       const deltaY = my - refY;
       const elev = deltaY > 2.2 ? '▲' : (deltaY < -2.2 ? '▼' : '');
 
@@ -841,14 +972,13 @@
         slot.lastOffscreen = offscreen;
       }
 
-      const rawLabel = m.label || m.title || m.text || 'WAYPOINT';
-      let labelText = _wpLabelCache.get(rawLabel);
-      if (labelText === undefined) {
-        const cleanLabel = String(rawLabel).replace(/^\[E\]\s*/i, '').replace(/\s*\([^)]*\)/g, '').trim();
-        labelText = cleanLabel.length > 26 ? `${cleanLabel.slice(0, 24)}…` : (cleanLabel || 'WAYPOINT');
-        if (_wpLabelCache.size > 128) _wpLabelCache.clear();
-        _wpLabelCache.set(rawLabel, labelText);
+      const finalOpacity = Math.round(baseAlpha * (offscreen ? 0.65 : 1.0) * 100) / 100;
+      if (slot.lastOpacity !== finalOpacity) {
+        slot.el.style.opacity = String(finalOpacity);
+        slot.lastOpacity = finalOpacity;
       }
+
+      const labelText = cleanWaypointLabel(m.label || m.title || m.text || 'WAYPOINT');
       if (slot.lastLabel !== labelText) {
         slot.labelEl.textContent = labelText;
         slot.lastLabel = labelText;
@@ -883,6 +1013,54 @@
         slot.lastAnchor = anchorX;
         slot.el.style.transform = `translate3d(${sx}px, ${sy}px, 0) translate(${anchorX}, -50%)`;
       }
+    }
+
+    // Update top-edge Tactical Ping directional compass chevron (2.5s active window)
+    const compassEl = dom['hud-ping-compass'];
+    if (compassEl && pingActive && nearestPingMarker) {
+      const fLen = Math.hypot(_wpCamForward.x, _wpCamForward.z) || 1;
+      const fx = _wpCamForward.x / fLen;
+      const fz = _wpCamForward.z / fLen;
+      const rx = -fz;
+      const rz = fx;
+      const fwdDot = nearestPingDx * fx + nearestPingDz * fz;
+      const rightDot = nearestPingDx * rx + nearestPingDz * rz;
+      const relAngle = Math.atan2(rightDot, fwdDot);
+      const normX = Math.max(-1, Math.min(1, relAngle / (Math.PI * 0.65)));
+      const chevX = Math.round(normX * 102);
+
+      const worldDeg = ((Math.atan2(nearestPingDx, nearestPingDz) * 180 / Math.PI) + 360) % 360;
+      const cardinal = CARDINALS[Math.round(worldDeg / 45) % 8];
+      const lbl = cleanWaypointLabel(nearestPingMarker.label || nearestPingMarker.title || 'OBJEKTIF');
+      const dTxt = `${Math.round(nearestPingDist)}m`;
+      const op = Math.round(pingFade * 100) / 100;
+
+      if (!_pingCacheVisible) {
+        compassEl.classList.remove('hidden');
+        _pingCacheVisible = true;
+      }
+      if (_pingCacheOpacity !== op) {
+        compassEl.style.opacity = String(op);
+        _pingCacheOpacity = op;
+      }
+      if (_pingCacheX !== chevX && dom['ping-chevron']) {
+        dom['ping-chevron'].style.transform = `translate3d(${chevX}px, 0, 0) rotate(45deg)`;
+        _pingCacheX = chevX;
+      }
+      if (_pingCacheBearing !== cardinal && dom['ping-bearing']) {
+        dom['ping-bearing'].textContent = cardinal;
+        _pingCacheBearing = cardinal;
+      }
+      if (_pingCacheLabel !== lbl && dom['ping-label']) {
+        dom['ping-label'].textContent = lbl;
+        _pingCacheLabel = lbl;
+      }
+      if (_pingCacheDist !== dTxt && dom['ping-dist']) {
+        dom['ping-dist'].textContent = dTxt;
+        _pingCacheDist = dTxt;
+      }
+    } else {
+      hidePingCompass();
     }
   }
 
@@ -991,6 +1169,16 @@
       if (_hudCache.objDetail !== objDetail) {
         _hudCache.objDetail = objDetail;
         if (dom['objective-detail']) dom['objective-detail'].textContent = objDetail;
+      }
+
+      const keyItemsText = info.keyItemsText || '';
+      if (_hudCache.keyItemsText !== keyItemsText) {
+        _hudCache.keyItemsText = keyItemsText;
+        const kiEl = dom['hud-key-items'];
+        if (kiEl) {
+          kiEl.textContent = keyItemsText;
+          kiEl.classList.toggle('hidden', !keyItemsText);
+        }
       }
 
       const fpsText = `FPS: ${info.fps || '--'} | Calls: ${info.drawCalls || '--'}`;
@@ -1173,6 +1361,13 @@
     _hudCache.godText = null;
     _hudCache.godPct = null;
     _hudCache.sprintActive = null;
+    _hudCache.keyItemsText = null;
+    hudState.pingTimer = 0;
+    hudState.pingCooldown = 0;
+    if (dom['hud-key-items']) {
+      dom['hud-key-items'].textContent = '';
+      dom['hud-key-items'].classList.add('hidden');
+    }
     if (dom['cheat-status-row']) dom['cheat-status-row'].classList.add('hidden');
     if (dom['cheat-pill-god']) dom['cheat-pill-god'].classList.add('hidden');
     if (dom['cheat-god-bar']) dom['cheat-god-bar'].style.width = '100%';
@@ -1199,6 +1394,9 @@
   PL.toggleHud = toggleHud;
   PL.syncMuteUi = syncMuteUi;
   PL.syncAtmosphereUi = syncAtmosphereUi;
+  PL.syncWaypointUi = syncWaypointUi;
+  PL.triggerTacticalPing = triggerTacticalPing;
+  PL.hudState = hudState;
 
   LRT.PlayerUI = {
     init,
@@ -1206,6 +1404,8 @@
     update,
     updateHud,
     updateWaypoints,
+    triggerTacticalPing,
+    getHudState: () => hudState,
     takeDamage: PL.takeDamage,
     heal: PL.heal,
     addArmor: PL.addArmor,
@@ -1225,6 +1425,7 @@
     syncSubtitlesUi,
     syncSubtitleLangUi,
     syncDismembermentUi,
+    syncWaypointUi,
     syncAllSettingsUi,
     syncBrightnessUi,
     syncLightingUi,

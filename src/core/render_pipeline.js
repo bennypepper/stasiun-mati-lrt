@@ -34,6 +34,7 @@
   CORE.subtitlesEnabled = true;
   CORE.subtitleLang = 'id';
   CORE.dismembermentEnabled = true;
+  CORE.waypointMode = 'auto';
   CORE.difficultyKey = 'medium';
   CORE.currentLightingKey = 'DAYLIGHT_CLEAR';
   CORE.lightingLockedByUser = false;
@@ -136,6 +137,9 @@
       if (typeof parsed.dismembermentEnabled === 'boolean') {
         CORE.dismembermentEnabled = parsed.dismembermentEnabled;
       }
+      if (parsed.waypointMode === 'auto' || parsed.waypointMode === 'off' || parsed.waypointMode === 'proximity' || parsed.waypointMode === 'on') {
+        CORE.waypointMode = parsed.waypointMode;
+      }
       if (parsed.difficultyKey && C.DIFFICULTY_TIERS && (parsed.difficultyKey in C.DIFFICULTY_TIERS)) {
         CORE.difficultyKey = parsed.difficultyKey;
       }
@@ -143,6 +147,20 @@
         CORE.currentBrightness = Math.round(Math.max(0.40, Math.min(1.80, parsed.brightness)) * 100) / 100;
       }
     } catch (_) {}
+  }
+
+  function getDefaultWaypointModeForDifficulty(diffKey) {
+    const d = String(diffKey || 'medium').toLowerCase();
+    if (d === 'easy') return 'on';
+    if (d === 'hard' || d === 'nightmare') return 'off';
+    return 'proximity';
+  }
+
+  function getEffectiveWaypointMode() {
+    if (CORE.waypointMode === 'off' || CORE.waypointMode === 'proximity' || CORE.waypointMode === 'on') {
+      return CORE.waypointMode;
+    }
+    return getDefaultWaypointModeForDifficulty(CORE.difficultyKey);
   }
 
   function saveSettings() {
@@ -158,6 +176,7 @@
         subtitlesEnabled: CORE.subtitlesEnabled,
         subtitleLang: CORE.subtitleLang,
         dismembermentEnabled: CORE.dismembermentEnabled,
+        waypointMode: CORE.waypointMode,
         difficultyKey: CORE.difficultyKey,
         brightness: CORE.currentBrightness
       }));
@@ -175,6 +194,8 @@
       subtitlesEnabled: CORE.subtitlesEnabled,
       subtitleLang: CORE.subtitleLang,
       dismembermentEnabled: CORE.dismembermentEnabled,
+      waypointMode: CORE.waypointMode,
+      effectiveWaypointMode: getEffectiveWaypointMode(),
       difficultyKey: CORE.difficultyKey,
       brightness: CORE.currentBrightness
     };
@@ -428,6 +449,15 @@
     syncSceneMatrices();
     requestPausedRender();
     return CORE.dismembermentEnabled;
+  }
+
+  function setWaypointMode(mode) {
+    const valid = (mode === 'auto' || mode === 'off' || mode === 'proximity' || mode === 'on') ? mode : 'auto';
+    CORE.waypointMode = valid;
+    saveSettings();
+    syncSettingsUi();
+    requestPausedRender();
+    return getEffectiveWaypointMode();
   }
 
   function setDifficulty(key) {
@@ -1272,6 +1302,9 @@
   CORE.setSubtitlesEnabled = setSubtitlesEnabled;
   CORE.setSubtitleLang = setSubtitleLang;
   CORE.setDismembermentEnabled = setDismembermentEnabled;
+  CORE.setWaypointMode = setWaypointMode;
+  CORE.getEffectiveWaypointMode = getEffectiveWaypointMode;
+  CORE.getDefaultWaypointModeForDifficulty = getDefaultWaypointModeForDifficulty;
   CORE.setDifficulty = setDifficulty;
   CORE.getSettings = getSettings;
   CORE.saveSettings = saveSettings;

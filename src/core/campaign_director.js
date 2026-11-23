@@ -84,11 +84,23 @@
     return nextMode;
   }
 
+  const KEY_ITEM_LABELS = {
+    fuel_can: 'JERIGEN SOLAR',
+    cawang_keycard: 'KARTU AKSES 750V',
+    harja_cryo: 'CRYO STABILIZER',
+    harja_pmi_key: 'KUNCI TRIAGE PMI',
+    c4_charge: 'MUATAN C4'
+  };
+
+  let _keyItemsDisplayCache = '';
+  let _keyItemsDirty = true;
+
   const campaignState = {
     stationUsedIds: new Map(),
     clearedStations: new Set(),
     visitedStations: new Set([0]),
     triggeredSurgeStations: new Set(),
+    keyItems: new Set(),
     stationObjectives: {
       0: { genOn: false, waveCleared: false },
       1: { fuseFound: false, waveCleared: false },
@@ -107,6 +119,58 @@
     trainCallTrickleStage: 0
   };
 
+  function invalidateKeyItemsCache() {
+    _keyItemsDirty = true;
+  }
+
+  function formatKeyItemLabel(id) {
+    const k = String(id || '').trim();
+    if (!k) return '';
+    return KEY_ITEM_LABELS[k] || k.replace(/_/g, ' ').toUpperCase();
+  }
+
+  function addKeyItem(id) {
+    const k = String(id || '').trim();
+    if (!k) return false;
+    const had = campaignState.keyItems.has(k);
+    campaignState.keyItems.add(k);
+    if (!had) _keyItemsDirty = true;
+    return !had;
+  }
+
+  function hasKeyItem(id) {
+    const k = String(id || '').trim();
+    return !!k && campaignState.keyItems.has(k);
+  }
+
+  function consumeKeyItem(id) {
+    const k = String(id || '').trim();
+    if (!k) return false;
+    const deleted = campaignState.keyItems.delete(k);
+    if (deleted) _keyItemsDirty = true;
+    return deleted;
+  }
+
+  function getKeyItems() {
+    return Array.from(campaignState.keyItems);
+  }
+
+  function getKeyItemsDisplayText() {
+    if (!_keyItemsDirty) return _keyItemsDisplayCache;
+    _keyItemsDirty = false;
+    if (!campaignState.keyItems || campaignState.keyItems.size === 0) {
+      _keyItemsDisplayCache = '';
+      return _keyItemsDisplayCache;
+    }
+    const labels = [];
+    campaignState.keyItems.forEach((id) => {
+      const lbl = formatKeyItemLabel(id);
+      if (lbl) labels.push(lbl);
+    });
+    _keyItemsDisplayCache = labels.length ? `ITEM: ${labels.join(' · ')}` : '';
+    return _keyItemsDisplayCache;
+  }
+
   const triggerObjectiveSurgeWave = (...args) => CORE.triggerObjectiveSurgeWave(...args);
   const triggerTrainCallSiegeWave = (...args) => CORE.triggerTrainCallSiegeWave(...args);
   const triggerTrainCallReinforcementTrickle = (...args) => CORE.triggerTrainCallReinforcementTrickle(...args);
@@ -121,6 +185,9 @@
     campaignState.visitedStations.clear();
     campaignState.visitedStations.add(0);
     campaignState.triggeredSurgeStations.clear();
+    campaignState.keyItems.clear();
+    _keyItemsDirty = true;
+    _keyItemsDisplayCache = '';
     campaignState.stationObjectives = {
       0: { genOn: false, waveCleared: false },
       1: { fuseFound: false, waveCleared: false },
@@ -349,6 +416,13 @@
 
     if (res.lurePos && LRT.Enemies && typeof LRT.Enemies.alertAllTo === 'function') {
       LRT.Enemies.alertAllTo(res.lurePos, 55.0);
+    }
+
+    if (res.keyItemId) {
+      addKeyItem(res.keyItemId);
+    }
+    if (res.consumeKeyItemId) {
+      consumeKeyItem(res.consumeKeyItemId);
     }
 
     if (item.id === 'portable_generator' || res.action === 'generator') {
@@ -1151,6 +1225,91 @@
     return waveRemaining > 0 ? [] : ['call_train', 'call_train_p2'];
   }
 
+  const _trainBoardingMarker = {
+    id: 'train_boarding_marker',
+    x: 1.5,
+    y: 1.5,
+    z: 0,
+    label: 'NAIK KE LRT',
+    kind: 'train',
+    type: 'train',
+    color: '#22c55e',
+    alwaysShow: true,
+    active: true
+  };
+  const _trainBoardingMarkers = [_trainBoardingMarker];
+
+  function getTrainBoardingMarkers(pState) {
+    if (CORE.gameState !== STATES.TRAIN_APPROACHING && CORE.gameState !== STATES.TRAIN_BOARDING) {
+      return null;
+    }
+    const rail = (LRT.Station && typeof LRT.Station.getRailConfig === 'function')
+      ? LRT.Station.getRailConfig()
+      : { isIsland: false, track1X: 0.0, track2X: -4.70, platEdge1X: 1.46, platEdge2X: -6.16 };
+    const isReturn = CORE.activeTravelDir === -1;
+    const stationOz = (LRT.Station && LRT.Station.rootGroup) ? (LRT.Station.rootGroup.position.z || 0) : 0;
+
+    if (CORE.gameState === STATES.TRAIN_APPROACHING) {
+      _trainBoardingMarker.x = isReturn ? (rail.platEdge2X - 0.65) : (rail.platEdge1X + 0.65);
+      _trainBoardingMarker.y = 1.55;
+      _trainBoardingMarker.z = stationOz;
+      _trainBoardingMarker.label = isReturn ? 'PERON 2 — LRT MENDEKAT' : 'PERON 1 — LRT MENDEKAT';
+      _trainBoardingMarker.color = isReturn ? '#f59e0b' : '#22c55e';
+      _trainBoardingMarker.alwaysShow = true;
+      _trainBoardingMarker.active = true;
+      return _trainBoardingMarkers;
+    }
+
+    const pos = pState && pState.pos ? pState.pos : null;
+    const inside = !!(pos && LRT.Train && typeof LRT.Train.isPlayerInside === 'function' && LRT.Train.isPlayerInside(pos));
+    const trackX = (LRT.Train && typeof LRT.Train.getTrackX === 'function')
+      ? LRT.Train.getTrackX()
+      : (isReturn ? rail.track2X : rail.track1X);
+    const tz = (LRT.Train && typeof LRT.Train.getOffsetZ === 'function') ? LRT.Train.getOffsetZ() : stationOz;
+
+    if (CORE.rideCompleteReady) {
+      _trainBoardingMarker.x = isReturn ? (rail.platEdge2X - 1.15) : (rail.platEdge1X + 1.15);
+      _trainBoardingMarker.y = 1.45;
+      _trainBoardingMarker.z = pos ? Math.max(-24, Math.min(24, pos.z)) : tz;
+      _trainBoardingMarker.label = 'TURUN KE PERON';
+      _trainBoardingMarker.color = '#38bdf8';
+      _trainBoardingMarker.alwaysShow = true;
+      _trainBoardingMarker.active = true;
+      return _trainBoardingMarkers;
+    }
+
+    if (!inside) {
+      const doors = (C.STATION_DIMS && C.STATION_DIMS.psdCentersZ) || [-17.55, -5.7, 0.0, 5.7, 17.55];
+      let bestZ = 0;
+      let bestD = Infinity;
+      const pzRel = pos ? (pos.z - tz) : 0;
+      for (let i = 0; i < doors.length; i++) {
+        const d = Math.abs(doors[i] - pzRel);
+        if (d < bestD) {
+          bestD = d;
+          bestZ = doors[i];
+        }
+      }
+      _trainBoardingMarker.x = isReturn ? (trackX - 1.35) : (trackX + 1.35);
+      _trainBoardingMarker.y = 1.45;
+      _trainBoardingMarker.z = bestZ + tz;
+      _trainBoardingMarker.label = 'NAIK KE LRT';
+      _trainBoardingMarker.color = isReturn ? '#f59e0b' : '#22c55e';
+      _trainBoardingMarker.alwaysShow = true;
+      _trainBoardingMarker.active = true;
+      return _trainBoardingMarkers;
+    }
+
+    _trainBoardingMarker.x = trackX;
+    _trainBoardingMarker.y = 1.35;
+    _trainBoardingMarker.z = tz + (isReturn ? -23.5 : 23.5);
+    _trainBoardingMarker.label = 'BERANGKAT [E/T]';
+    _trainBoardingMarker.color = '#22c55e';
+    _trainBoardingMarker.alwaysShow = true;
+    _trainBoardingMarker.active = true;
+    return _trainBoardingMarkers;
+  }
+
   function getActiveObjectiveTargetIds() {
     const ids = getBaseObjectiveTargetIds();
     if (
@@ -1567,6 +1726,13 @@
   CORE.getAtmosphereMode = getAtmosphereMode;
   CORE.campaignState = campaignState;
   CORE.resetCampaignState = resetCampaignState;
+  CORE.addKeyItem = addKeyItem;
+  CORE.hasKeyItem = hasKeyItem;
+  CORE.consumeKeyItem = consumeKeyItem;
+  CORE.getKeyItems = getKeyItems;
+  CORE.getKeyItemsDisplayText = getKeyItemsDisplayText;
+  CORE.invalidateKeyItemsCache = invalidateKeyItemsCache;
+  CORE.getTrainBoardingMarkers = getTrainBoardingMarkers;
   CORE.saveCurrentStationUsedIds = saveCurrentStationUsedIds;
   CORE.resetGameOverDom = resetGameOverDom;
   CORE.triggerExtractionVictory = triggerExtractionVictory;
@@ -1629,6 +1795,10 @@
   directorApi.summonTrain = summonTrain;
   directorApi.departTrainNow = departTrainNow;
   directorApi.getCampaignState = () => campaignState;
+  directorApi.addKeyItem = addKeyItem;
+  directorApi.hasKeyItem = hasKeyItem;
+  directorApi.consumeKeyItem = consumeKeyItem;
+  directorApi.getKeyItems = getKeyItems;
   Object.defineProperty(directorApi, 'stationIndex', {
     configurable: true,
     enumerable: true,

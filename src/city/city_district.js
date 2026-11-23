@@ -2030,6 +2030,19 @@
     ];
 
     P.clutter.buildStreetInteractablesAndLoot(_clutterCtx);
+
+    if (P.missionProps && typeof P.missionProps.buildStationMissionProps === 'function') {
+      P.missionProps.buildStationMissionProps({
+        city: city,
+        arch: arch,
+        rng: rng,
+        root: root,
+        cornerHubCoords: cornerHubCoords,
+        layoutBounds: city.layoutBounds,
+        usedSet: city._usedIds || new Set(),
+        opts: o
+      });
+    }
     }
 
     let stage = 0;
