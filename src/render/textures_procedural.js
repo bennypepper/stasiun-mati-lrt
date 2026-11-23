@@ -1850,6 +1850,242 @@
     return finalizeCanvasTexture(c, true, true, maxAniso);
   }
 
+  function buildJakartaShopfrontAtlas(maxAniso) {
+    // 1024x1024 atlas: 4 columns x 2 rows = 8 authentic Jakarta commercial shopfronts
+    // Each cell (256x512): top 110px = illuminated Indonesian signboard fascia,
+    // middle 44px = striped storefront awning band, bottom 358px = half-open rolling shutter / glass display window!
+    const W = 1024;
+    const H = 1024;
+    const cA = makeCanvas(W, H);
+    const ctx = cA.getContext('2d');
+    const cR = makeCanvas(W, H);
+    const rtx = cR.getContext('2d');
+    const cE = makeCanvas(W, H);
+    const etx = cE.getContext('2d');
+
+    ctx.fillStyle = '#2b3038';
+    ctx.fillRect(0, 0, W, H);
+    rtx.fillStyle = '#a8a8a8';
+    rtx.fillRect(0, 0, W, H);
+    etx.fillStyle = '#000000';
+    etx.fillRect(0, 0, W, H);
+
+    const shops = [
+      {
+        title: 'APOTEK K-24', sub: 'BUKA 24 JAM • OBAT & P3K',
+        signBg: '#0b6e4f', signAccent: '#f8fafc', titleCol: '#ffffff', subCol: '#bbf7d0',
+        awningA: '#0d8a63', awningB: '#e2e8f0', shutterFrac: 0.30, glassTint: '#163832',
+        glowCol: '#6ee7b7', badge: '+'
+      },
+      {
+        title: 'ALFAMART', sub: 'MINIMARKET • ATM • KOPI',
+        signBg: '#c81e1e', signAccent: '#facc15', titleCol: '#ffffff', subCol: '#fef08a',
+        awningA: '#dc2626', awningB: '#1d4ed8', shutterFrac: 0.22, glassTint: '#1c2c3d',
+        glowCol: '#fde68a', badge: '24J'
+      },
+      {
+        title: 'WARTEG BAHARI', sub: 'MASAKAN RUMAHAN • ES TEH',
+        signBg: '#0f766e', signAccent: '#fbbf24', titleCol: '#fef9c3', subCol: '#fed7aa',
+        awningA: '#d97706', awningB: '#f8fafc', shutterFrac: 0.18, glassTint: '#2b2419',
+        glowCol: '#fcd34d', badge: 'WB'
+      },
+      {
+        title: 'BANK MANDIRI', sub: 'ATM CENTER 24 JAM • TUNAI',
+        signBg: '#0f2b5b', signAccent: '#eab308', titleCol: '#fef08a', subCol: '#bfdbfe',
+        awningA: '#1e3a8a', awningB: '#eab308', shutterFrac: 0.0, glassTint: '#14273e',
+        glowCol: '#60a5fa', badge: 'ATM'
+      },
+      {
+        title: 'KLINIK 24 JAM', sub: 'UGD • DOKTER UMUM • LAB',
+        signBg: '#f1f5f9', signAccent: '#dc2626', titleCol: '#991b1b', subCol: '#334155',
+        awningA: '#dc2626', awningB: '#f8fafc', shutterFrac: 0.36, glassTint: '#1b2b34',
+        glowCol: '#fca5a5', badge: '+'
+      },
+      {
+        title: 'KEDAI KOPI', sub: 'KOPI SUSU GULA AREN • ROTI',
+        signBg: '#1c1917', signAccent: '#d97706', titleCol: '#fde68a', subCol: '#d6d3d1',
+        awningA: '#292524', awningB: '#b45309', shutterFrac: 0.15, glassTint: '#241c14',
+        glowCol: '#f59e0b', badge: 'KP'
+      },
+      {
+        title: 'FOTOKOPI & ATK', sub: 'PRINT • JILID • MATERAI',
+        signBg: '#1d4ed8', signAccent: '#facc15', titleCol: '#ffffff', subCol: '#fde047',
+        awningA: '#2563eb', awningB: '#e2e8f0', shutterFrac: 0.62, glassTint: '#1c2430',
+        glowCol: '#93c5fd', badge: 'ATK'
+      },
+      {
+        title: 'BENGKEL MOTOR', sub: 'SERVIS • OLI • TAMBAL BAN',
+        signBg: '#c2410c', signAccent: '#18181b', titleCol: '#fff7ed', subCol: '#fed7aa',
+        awningA: '#ea580c', awningB: '#27272a', shutterFrac: 0.48, glassTint: '#1f1d1b',
+        glowCol: '#fb923c', badge: 'OIL'
+      }
+    ];
+
+    const cellW = 256;
+    const cellH = 512;
+    const rng = mulberry32(4821);
+
+    for (let idx = 0; idx < shops.length; idx++) {
+      const s = shops[idx];
+      const col = idx % 4;
+      const row = Math.floor(idx / 4);
+      const x0 = col * cellW;
+      const y0 = row * cellH;
+
+      // 1) Signboard Fascia Box (top 108px)
+      ctx.fillStyle = '#181c22';
+      ctx.fillRect(x0, y0, cellW, 108);
+      ctx.fillStyle = s.signBg;
+      ctx.fillRect(x0 + 6, y0 + 8, cellW - 12, 92);
+      ctx.fillStyle = s.signAccent;
+      ctx.fillRect(x0 + 6, y0 + 90, cellW - 12, 10);
+      ctx.fillRect(x0 + 6, y0 + 8, cellW - 12, 5);
+
+      // Emissive signboard glow (hours-after-outbreak: emergency/backup power dim glow)
+      etx.fillStyle = s.signBg === '#f1f5f9' ? '#94a3b8' : s.signBg;
+      etx.globalAlpha = 0.42;
+      etx.fillRect(x0 + 10, y0 + 12, cellW - 20, 82);
+      etx.globalAlpha = 1.0;
+
+      // Badge emblem box on left
+      ctx.fillStyle = s.signAccent;
+      ctx.fillRect(x0 + 14, y0 + 22, 34, 34);
+      ctx.fillStyle = s.signBg === '#f1f5f9' ? '#ffffff' : '#111827';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(s.badge, x0 + 31, y0 + 39);
+
+      // Shop title & Indonesian subtitle
+      ctx.textAlign = 'left';
+      ctx.fillStyle = s.titleCol;
+      ctx.font = 'bold 21px sans-serif';
+      ctx.fillText(s.title, x0 + 56, y0 + 39);
+      ctx.fillStyle = s.subCol;
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(s.sub, x0 + 14, y0 + 75);
+
+      etx.textAlign = 'left';
+      etx.textBaseline = 'middle';
+      etx.fillStyle = s.glowCol;
+      etx.font = 'bold 21px sans-serif';
+      etx.fillText(s.title, x0 + 56, y0 + 39);
+
+      // 2) Striped Storefront Awning Band (y = 108..154)
+      const stripeCount = 8;
+      const sw = cellW / stripeCount;
+      for (let st = 0; st < stripeCount; st++) {
+        ctx.fillStyle = (st % 2 === 0) ? s.awningA : s.awningB;
+        ctx.fillRect(x0 + st * sw, y0 + 108, sw + 0.5, 44);
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.34)';
+      ctx.fillRect(x0, y0 + 144, cellW, 10);
+
+      // 3) Lower Display Shopfront & Aluminum Frame (y = 154..512)
+      ctx.fillStyle = '#374151';
+      ctx.fillRect(x0, y0 + 154, cellW, cellH - 154);
+
+      const winX = x0 + 14;
+      const winY = y0 + 168;
+      const winW = cellW - 28;
+      const winH = 296;
+
+      // Interior display glass backdrop + warm/cool fluorescent shelf silhouette
+      ctx.fillStyle = s.glassTint;
+      ctx.fillRect(winX, winY, winW, winH);
+      rtx.fillStyle = '#242424';
+      rtx.fillRect(winX, winY, winW, winH);
+
+      // Interior shelves / ATM kiosk / display counter silhouettes behind glass
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      for (let sh = 0; sh < 4; sh++) {
+        ctx.fillRect(winX + 10, winY + 42 + sh * 58, winW - 20, 6);
+        for (let prod = 0; prod < 7; prod++) {
+          ctx.fillStyle = (prod % 2 === 0) ? 'rgba(220,232,240,0.14)' : 'rgba(180,150,110,0.14)';
+          ctx.fillRect(winX + 16 + prod * 28, winY + 20 + sh * 58, 18, 20);
+        }
+      }
+      // Subtle interior emergency light strip on ceiling behind glass
+      ctx.fillStyle = s.glowCol;
+      ctx.globalAlpha = 0.30;
+      ctx.fillRect(winX + 20, winY + 12, winW - 40, 14);
+      ctx.globalAlpha = 1.0;
+      etx.fillStyle = s.glowCol;
+      etx.globalAlpha = 0.34;
+      etx.fillRect(winX + 20, winY + 14, winW - 40, 16);
+      etx.globalAlpha = 1.0;
+
+      // Aluminum door & window mullions
+      ctx.fillStyle = '#64748b';
+      ctx.fillRect(winX + winW * 0.52, winY, 8, winH);
+      ctx.fillRect(winX, winY + winH * 0.68, winW, 6);
+      // Chrome vertical door handle
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillRect(winX + winW * 0.52 + 16, winY + 135, 6, 48);
+
+      // Glass reflection sheen + a few fresh outbreak cracks on select bays
+      const gr = ctx.createLinearGradient(winX, winY, winX + winW, winY + winH);
+      gr.addColorStop(0, 'rgba(190,220,240,0.18)');
+      gr.addColorStop(0.5, 'rgba(255,255,255,0.03)');
+      gr.addColorStop(1, 'rgba(140,185,215,0.12)');
+      ctx.fillStyle = gr;
+      ctx.fillRect(winX, winY, winW, winH);
+
+      if (idx % 3 === 1) {
+        ctx.strokeStyle = 'rgba(225, 240, 250, 0.55)';
+        ctx.lineWidth = 1.5;
+        const cx = winX + 62, cy = winY + 150;
+        for (let cr = 0; cr < 7; cr++) {
+          const ang = cr * 0.92 + rng() * 0.4;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(cx + Math.cos(ang) * (24 + rng() * 42), cy + Math.sin(ang) * (24 + rng() * 48));
+          ctx.stroke();
+        }
+      }
+
+      // Corrugated steel rolling shutter pulled down to shutterFrac!
+      if (s.shutterFrac > 0.02) {
+        const shH = Math.floor(winH * s.shutterFrac);
+        ctx.fillStyle = '#737c88';
+        ctx.fillRect(winX - 2, winY, winW + 4, shH);
+        rtx.fillStyle = '#888888';
+        rtx.fillRect(winX - 2, winY, winW + 4, shH);
+        etx.fillStyle = '#000000';
+        etx.fillRect(winX - 2, winY, winW + 4, shH);
+        for (let slY = winY + 4; slY < winY + shH - 6; slY += 10) {
+          ctx.fillStyle = '#525b66';
+          ctx.fillRect(winX - 2, slY, winW + 4, 3);
+          ctx.fillStyle = '#9aa3b0';
+          ctx.fillRect(winX - 2, slY + 3, winW + 4, 2);
+        }
+        // Bottom heavy shutter rail + padlock loop
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(winX - 2, winY + shH - 8, winW + 4, 8);
+      }
+
+      // Ceramic tiled base kickplate (y = 464..512)
+      ctx.fillStyle = '#4b5563';
+      ctx.fillRect(x0, y0 + 464, cellW, 48);
+      ctx.fillStyle = '#333b45';
+      for (let tx = x0; tx < x0 + cellW; tx += 32) {
+        ctx.fillRect(tx, y0 + 464, 2, 48);
+      }
+      ctx.fillRect(x0, y0 + 488, cellW, 2);
+    }
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    etx.textAlign = 'left';
+    etx.textBaseline = 'alphabetic';
+
+    return {
+      map: finalizeCanvasTexture(cA, true, false, maxAniso),
+      roughnessMap: finalizeCanvasTexture(cR, false, false, maxAniso),
+      emissiveMap: finalizeCanvasTexture(cE, true, false, maxAniso)
+    };
+  }
+
   I.render = Object.assign(I.render || {}, {
     mulberry32,
     hash2i,
@@ -1877,6 +2113,7 @@
     buildScorchDecalTexture,
     buildBarricadeTexture,
     buildSkylineFacadeSet,
-    buildHighwayRoadSet
+    buildHighwayRoadSet,
+    buildJakartaShopfrontAtlas
   });
 })();

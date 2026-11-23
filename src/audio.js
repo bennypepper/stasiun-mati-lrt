@@ -25,6 +25,12 @@
     AMBIENT: 1
   };
   let currentVoice = null;
+  const voiceQueue = [];
+  const MAX_VOICE_QUEUE = 3;
+  const VOICE_GAP_SEC = 0.40;
+  let voiceGapRemainingSec = 0;
+  let voiceGapTimerId = null;
+  let voiceGapStartedAtMs = 0;
   let voiceCallbacks = { onStart: null, onEnd: null };
   let voiceDucked = false;
   let radioBus = null;
@@ -334,7 +340,7 @@
     }
 
     if (gameplayPaused) {
-      // Pause (do NOT stop!) active mission narrator voiceover timer so it resumes cleanly after closing note/pause
+      // Pause (do NOT stop!) active mission narrator voiceover timer or inter-line queue gap
       if (currentVoice && !currentVoice.ended) {
         const nowMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         if (currentVoice.timerStartedAtMs) {
@@ -346,6 +352,15 @@
           currentVoice.timerId = null;
         }
         currentVoice.paused = true;
+      }
+      if (voiceGapTimerId) {
+        clearTimeout(voiceGapTimerId);
+        voiceGapTimerId = null;
+        if (voiceGapStartedAtMs) {
+          const nowMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+          const elapsedSec = Math.max(0, (nowMs - voiceGapStartedAtMs) / 1000);
+          voiceGapRemainingSec = Math.max(0.05, voiceGapRemainingSec - elapsedSec);
+        }
       }
 
       const FADE_OUT_SEC = 0.20;
@@ -374,7 +389,7 @@
           masterGain.gain.setValueAtTime(0.0001, now);
           masterGain.gain.linearRampToValueAtTime(targetVol, now + FADE_IN_SEC);
         }
-        // Resume pending narrator voiceover or restart its remaining timer
+        // Resume pending narrator voiceover, remaining timer, or inter-line queue gap
         if (currentVoice && !currentVoice.ended) {
           currentVoice.paused = false;
           if (typeof currentVoice.pendingStartFn === 'function' && !currentVoice.src) {
@@ -386,6 +401,8 @@
             currentVoice.timerStartedAtMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
             currentVoice.timerId = setTimeout(currentVoice.finishVoice, remMs + 80);
           }
+        } else if (voiceQueue.length > 0 && voiceGapRemainingSec > 0 && !voiceGapTimerId) {
+          scheduleVoiceQueueDrain(voiceGapRemainingSec);
         }
       };
 
@@ -486,7 +503,46 @@
     };
   }
 
-  function stopVoice() {
+  function clearVoiceQueue() {
+    voiceQueue.length = 0;
+    voiceGapRemainingSec = 0;
+    if (voiceGapTimerId) {
+      clearTimeout(voiceGapTimerId);
+      voiceGapTimerId = null;
+    }
+  }
+
+  function scheduleVoiceQueueDrain(delaySec) {
+    if (voiceGapTimerId) {
+      clearTimeout(voiceGapTimerId);
+      voiceGapTimerId = null;
+    }
+    if (voiceQueue.length === 0) {
+      voiceGapRemainingSec = 0;
+      return;
+    }
+    const sec = Math.max(0.05, typeof delaySec === 'number' ? delaySec : VOICE_GAP_SEC);
+    voiceGapRemainingSec = sec;
+    if (gameplayPaused) return;
+    voiceGapStartedAtMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    voiceGapTimerId = setTimeout(() => {
+      voiceGapTimerId = null;
+      voiceGapRemainingSec = 0;
+      drainNextQueuedVoice();
+    }, Math.ceil(sec * 1000));
+  }
+
+  function drainNextQueuedVoice() {
+    if (gameplayPaused || (currentVoice && !currentVoice.ended)) return null;
+    if (voiceQueue.length === 0) return null;
+    const nextItem = voiceQueue.shift();
+    if (!nextItem) return null;
+    return startVoiceItemNow(nextItem.id, nextItem.entry, nextItem.priorityRank, nextItem.radioChime);
+  }
+
+  function stopVoice(opts) {
+    const clearQueue = !opts || opts.clearQueue !== false;
+    if (clearQueue) clearVoiceQueue();
     if (!currentVoice) return;
     const prev = currentVoice;
     currentVoice = null;
@@ -516,30 +572,19 @@
     }
   }
 
-  function playVoice(voId, opts) {
-    if (!voId) return null;
-    const entry = voiceManifest[voId];
-    if (!entry) return null;
-
-    const newPriority = PRIORITY_ORDER[entry.priority] || 1;
-    const force = !!(opts && opts.force);
-
-    if (currentVoice && !currentVoice.ended) {
-      const curPriority = currentVoice.priorityRank || 1;
-      if (!force && curPriority > newPriority) {
-        return null; // Skip cleanly when currently playing line has strictly higher priority
-      }
-      stopVoice();
-    }
-
+  function startVoiceItemNow(voId, entry, priorityRank, radioChime) {
     const durationSec = Math.max(0.5, typeof entry.duration_sec === 'number' ? entry.duration_sec : 5.0);
     const durationMs = durationSec * 1000;
     const nowMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
+    if (radioChime && !muted && !gameplayPaused) {
+      try { play('turnstile_beep', { gain: 0.14, pitchVar: 0.04 }); } catch (_) {}
+    }
+
     const handle = {
       id: voId,
       entry: entry,
-      priorityRank: newPriority,
+      priorityRank: priorityRank || 1,
       durationSec: durationSec,
       remainingMs: durationMs,
       timerStartedAtMs: nowMs,
@@ -584,6 +629,9 @@
             console.warn('[LRT.Audio] onVoiceEnd error:', err);
           }
         }
+        if (voiceQueue.length > 0) {
+          scheduleVoiceQueueDrain(VOICE_GAP_SEC);
+        }
       }
     };
     handle.finishVoice = finishVoice;
@@ -594,9 +642,9 @@
       handle.timerId = setTimeout(finishVoice, durationMs);
     }
 
-    // If audio is available and unmuted, play voice clip (or queue if currently reading a note / paused)
+    // If audio file is present and unmuted, play voice clip (or defer until unpaused)
     const c = ensureContext();
-    if (c && !muted) {
+    if (entry.file && c && !muted) {
       if (!gameplayPaused && c.state === 'suspended') {
         c.resume().catch(() => {});
       }
@@ -642,7 +690,7 @@
 
       if (voiceBuffers.has(voId)) {
         startPlayback(voiceBuffers.get(voId));
-      } else if (entry.file && typeof fetch === 'function') {
+      } else if (typeof fetch === 'function') {
         fetch(entry.file)
           .then((res) => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -655,7 +703,6 @@
           })
           .catch((fetchErr) => {
             console.warn('[LRT.Audio] Failed to load voice clip:', voId, fetchErr);
-            // Fallback timer already running ensures onVoiceEnd triggers
           });
       }
     }
@@ -663,13 +710,125 @@
     return handle;
   }
 
-  function tickVoice(dt) {
-    if (gameplayPaused || !currentVoice || currentVoice.ended) return;
-    if (currentVoice.src) return; // audio buffer is driving timing
-    currentVoice.elapsed += dt;
-    if (currentVoice.elapsed >= currentVoice.durationSec) {
-      stopVoice();
+  function enqueueOrPlayVoice(voId, entry, opts) {
+    const o = opts || {};
+    const newPriority = (typeof o.priorityRank === 'number')
+      ? o.priorityRank
+      : (PRIORITY_ORDER[o.priority || entry.priority] || 1);
+    const force = !!(o.force || o.interrupt);
+    const groupKey = o.groupKey || null;
+    const radioChime = !!o.radioChime;
+
+    if (force) {
+      stopVoice({ clearQueue: true });
+      return startVoiceItemNow(voId, entry, newPriority, radioChime);
     }
+
+    // Deduplicate if exact same line is already active or queued
+    if (currentVoice && !currentVoice.ended && currentVoice.id === voId) {
+      return currentVoice;
+    }
+    for (let i = 0; i < voiceQueue.length; i++) {
+      if (voiceQueue[i].id === voId) return { queued: true, id: voId, queueLength: voiceQueue.length };
+    }
+
+    // If a line is currently playing (or in the brief post-line radio gap), NEVER cut it off!
+    if ((currentVoice && !currentVoice.ended) || voiceGapRemainingSec > 0) {
+      const item = { id: voId, entry: entry, priorityRank: newPriority, groupKey: groupKey, radioChime: radioChime };
+
+      // Supersede stale queued hint in the same groupKey instead of stacking outdated reminders
+      if (groupKey) {
+        const existingIdx = voiceQueue.findIndex((q) => q.groupKey === groupKey);
+        if (existingIdx >= 0) {
+          voiceQueue[existingIdx] = item;
+          return { queued: true, id: voId, replaced: true, queueLength: voiceQueue.length };
+        }
+      }
+
+      // Enforce queue backlog cap (MAX_VOICE_QUEUE = 3)
+      if (voiceQueue.length >= MAX_VOICE_QUEUE) {
+        let lowestIdx = -1;
+        let lowestRank = Infinity;
+        for (let i = 0; i < voiceQueue.length; i++) {
+          if (voiceQueue[i].priorityRank < lowestRank) {
+            lowestRank = voiceQueue[i].priorityRank;
+            lowestIdx = i;
+          }
+        }
+        if (lowestIdx >= 0 && newPriority > lowestRank) {
+          voiceQueue.splice(lowestIdx, 1);
+        } else {
+          return null; // Drop stale/low-priority chatter rather than piling up a long backlog
+        }
+      }
+
+      // Insert after all items with >= priorityRank (strict FIFO within same priority)
+      let insertAt = voiceQueue.length;
+      for (let i = 0; i < voiceQueue.length; i++) {
+        if (newPriority > voiceQueue[i].priorityRank) {
+          insertAt = i;
+          break;
+        }
+      }
+      voiceQueue.splice(insertAt, 0, item);
+      return { queued: true, id: voId, queueLength: voiceQueue.length };
+    }
+
+    return startVoiceItemNow(voId, entry, newPriority, radioChime);
+  }
+
+  function playVoice(voId, opts) {
+    if (!voId) return null;
+    const entry = voiceManifest[voId];
+    if (!entry) return null;
+    return enqueueOrPlayVoice(voId, entry, opts);
+  }
+
+  function queueRadioSubtitle(speaker, textId, textEn, durationSec, opts) {
+    if (!textId && !textEn) return null;
+    const o = opts || {};
+    const id = o.id || (`RADIO_${Date.now()}_${Math.floor(Math.random() * 9999)}`);
+    const dur = Math.max(2.0, typeof durationSec === 'number' ? durationSec : 5.5);
+    const entry = {
+      id: id,
+      speaker: speaker || 'SARAH',
+      subtitle_id: textId || '',
+      subtitle_en: textEn || '',
+      duration_sec: dur,
+      priority: o.priority || 'MEDIUM',
+      file: null
+    };
+    return enqueueOrPlayVoice(id, entry, Object.assign({ radioChime: true }, o));
+  }
+
+  function tickVoice(dt) {
+    if (gameplayPaused) return;
+    if (currentVoice && !currentVoice.ended) {
+      if (currentVoice.src) return; // audio buffer is driving timing
+      currentVoice.elapsed += dt;
+      if (currentVoice.elapsed >= currentVoice.durationSec) {
+        if (typeof currentVoice.finishVoice === 'function') {
+          currentVoice.finishVoice();
+        } else {
+          stopVoice({ clearQueue: false });
+        }
+      }
+      return;
+    }
+    if (voiceGapRemainingSec > 0) {
+      voiceGapRemainingSec = Math.max(0, voiceGapRemainingSec - dt);
+      if (voiceGapRemainingSec <= 0) {
+        if (voiceGapTimerId) {
+          clearTimeout(voiceGapTimerId);
+          voiceGapTimerId = null;
+        }
+        drainNextQueuedVoice();
+      }
+    }
+  }
+
+  function getVoiceQueueLength() {
+    return voiceQueue.length;
   }
 
   function getStatus() {
@@ -684,7 +843,9 @@
       activeVoices: activeVoices.length,
       activeLoops: Array.from(activeLoops.keys()),
       voiceLoaded: voiceBuffers.size,
-      activeVoice: currentVoice ? currentVoice.id : null
+      activeVoice: currentVoice ? currentVoice.id : null,
+      voiceQueueLen: voiceQueue.length,
+      voiceQueuedIds: voiceQueue.map((q) => q.id)
     };
   }
 
@@ -709,7 +870,10 @@
     setVolumes,
     getStatus,
     playVoice,
+    queueRadioSubtitle,
     stopVoice,
+    clearVoiceQueue,
+    getVoiceQueueLength,
     setVoiceCallbacks,
     getVoiceManifest: () => voiceManifest,
     preloadVoice,

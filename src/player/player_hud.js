@@ -746,6 +746,41 @@
     }
   };
 
+  const WEAPON_VARIANT_SILHOUETTES = {
+    g2: {
+      caliber: '9mm',
+      svg: WEAPON_SILHOUETTES[1].svg
+    },
+    revolver: {
+      caliber: '.357',
+      svg: '<svg class="wsil-svg" viewBox="0 0 92 38" fill="currentColor"><path d="M14 14l4-4h16l2-2h42v4.5H48v2.5h-4v7.5H33l-1.5 3h-5l-4.5 9.5H12l6.5-14.5L14 17v-3zm19-2.5v8h11v-8H33z"/></svg>'
+    },
+    ss2v5: {
+      caliber: '5.56mm',
+      svg: WEAPON_SILHOUETTES[2].svg
+    },
+    m4: {
+      caliber: '5.56mm',
+      svg: '<svg class="wsil-svg" viewBox="0 0 112 38" fill="currentColor"><path d="M4 12h15l5-3h34l4 3h40v3.5H76l-2 3.5H60l2 14h-6.5l-2.5-13H41l-3 10h-7l2.5-10H19l-2 6H4V12zm27-5h18v2.5H31z"/></svg>'
+    },
+    ak47: {
+      caliber: '7.62mm',
+      svg: '<svg class="wsil-svg" viewBox="0 0 112 38" fill="currentColor"><path d="M4 15l15-3h12l4-3h32l6 2h33v3.5H74l-2 3.5H60l5 14.5-6.5 1.5-5.5-14H41l-3.5 10h-7l2.5-10H20l-14 4.5V15z"/></svg>'
+    },
+    pump12g: {
+      caliber: '12G',
+      svg: WEAPON_SILHOUETTES[3].svg
+    },
+    doublebarrel: {
+      caliber: '12G',
+      svg: '<svg class="wsil-svg" viewBox="0 0 112 38" fill="currentColor"><path d="M4 17l18-4h18l4-2h62v4H46l-4 3H30l-14 9-12-3.5V17z"/></svg>'
+    },
+    rpg7: {
+      caliber: 'PG-7V',
+      svg: WEAPON_SILHOUETTES[4].svg
+    }
+  };
+
   const _hudCache = {
     hpText: null,
     hpMaxText: null,
@@ -1288,9 +1323,11 @@
             });
           }
         }
-        if (_hudCache.silSlot !== activeSlot) {
-          _hudCache.silSlot = activeSlot;
-          const silDef = WEAPON_SILHOUETTES[activeSlot] || WEAPON_SILHOUETTES[1];
+        const silKey = `${activeSlot}|${wh.variantId || ''}`;
+        if (_hudCache.silSlot !== silKey) {
+          _hudCache.silSlot = silKey;
+          const varDef = wh.variantId ? WEAPON_VARIANT_SILHOUETTES[wh.variantId] : null;
+          const silDef = varDef || WEAPON_SILHOUETTES[activeSlot] || WEAPON_SILHOUETTES[1];
           if (dom['weapon-silhouette'] && silDef) {
             dom['weapon-silhouette'].innerHTML = silDef.svg;
           }
@@ -1478,6 +1515,16 @@
     toggleFlashlight: PL.toggleFlashlight,
     showSubtitle,
     hideSubtitle,
+    pulseObjectiveHint: (durationMs) => {
+      const el = dom['objective-detail'];
+      if (!el) return;
+      el.classList.add('hint-pulse');
+      if (PL._hintPulseTimer) clearTimeout(PL._hintPulseTimer);
+      PL._hintPulseTimer = setTimeout(() => {
+        PL._hintPulseTimer = null;
+        if (dom['objective-detail']) dom['objective-detail'].classList.remove('hint-pulse');
+      }, Math.max(1500, durationMs || 4500));
+    },
     showFieldLog,
     hideFieldLog,
     openDocViewer,

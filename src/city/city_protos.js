@@ -848,11 +848,16 @@
 
   function getCityLodMaterial() {
     if (!_cityLodMat) {
+      const skyTex = (window.LRT && window.LRT.Materials && window.LRT.Materials.textures)
+        ? window.LRT.Materials.textures.skyline_facade
+        : null;
       _cityLodMat = new THREE.MeshStandardMaterial({
         color: 0xffffff,
+        map: skyTex && skyTex.map ? skyTex.map : null,
+        roughnessMap: skyTex && skyTex.roughnessMap ? skyTex.roughnessMap : null,
         vertexColors: true,
-        roughness: 0.86,
-        metalness: 0.08
+        roughness: 0.78,
+        metalness: 0.14
       });
     }
     return _cityLodMat;
@@ -902,9 +907,9 @@
     addColoredBox(alloyBucket, 0.38, 0.09, 0.014, x, y, faceZ, 0, 0, 0, faceCol, 0.95);
   }
 
-  // Indonesian Sedan & MPV (Avanza/Innova) prototypes: paint part (for instanceColor) + PBR glass/rubber/alloy/lights
+  // Indonesian Sedan & MPV (Avanza/Innova) prototypes: sculpted sloped hood, recessed wheel wells, contoured roof, bumpers/fog lamps, wipers, spoiler
   function getSedanMpvProto(variant) {
-    const cacheKey = 'proc_veh_v2_' + variant;
+    const cacheKey = 'proc_veh_v3_' + variant;
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
 
     const isMpv = variant === 'mpv_ajar';
@@ -915,60 +920,105 @@
     const bHeadlight = [];
     const bTaillight = [];
 
-    const len = isMpv ? 4.42 : 4.24;
-    const w = isMpv ? 1.74 : 1.70;
+    const len = isMpv ? 4.46 : 4.28;
+    const w = isMpv ? 1.76 : 1.72;
     const wheelR = isMpv ? 0.34 : 0.31;
+    const wbZ = isMpv ? 1.36 : 1.32;
 
-    // 4 rubber tires + silver alloy rims + dark undercarriage + front/rear bumpers
-    addWheelPair(bRubber, bAlloy, wheelR, 0.22, wheelR, 1.32, w * 0.46);
-    addWheelPair(bRubber, bAlloy, wheelR, 0.22, wheelR, -1.32, w * 0.46);
-    addColoredBox(bRubber, w * 0.90, 0.16, len * 0.92, 0, wheelR * 0.75, 0, 0, 0, 0, 0x181a1d, 0.8);
-    addColoredBox(bRubber, w * 0.98, 0.25, 0.24, 0, wheelR + 0.11, len * 0.48, 0, 0, 0, 0x1f2328, 0.75);
-    addColoredBox(bRubber, w * 0.98, 0.25, 0.24, 0, wheelR + 0.11, -len * 0.48, 0, 0, 0, 0x1f2328, 0.75);
-    // Front & rear Indonesian license plates + chrome exhaust pipe
-    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.12, len * 0.505, false);
-    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.16, -len * 0.505, false);
-    addColoredCylinder(bAlloy, 0.032, 0.036, 0.22, 8, w * 0.28, wheelR * 0.58, -len * 0.49, Math.PI * 0.5, 0, 0, 0x9ca3af, 0.88);
-    // Emissive headlights & taillights
-    addBox(bHeadlight, 0.32, 0.13, 0.07, -w * 0.34, wheelR + 0.38, len * 0.492);
-    addBox(bHeadlight, 0.32, 0.13, 0.07, w * 0.34, wheelR + 0.38, len * 0.492);
-    addBox(bTaillight, 0.30, 0.13, 0.07, -w * 0.34, wheelR + 0.42, -len * 0.492);
-    addBox(bTaillight, 0.30, 0.13, 0.07, w * 0.34, wheelR + 0.42, -len * 0.492);
-    // Chrome-rimmed front grille + dark slats + door handles + side mirrors
-    addColoredBox(bAlloy, w * 0.48, 0.22, 0.05, 0, wheelR + 0.34, len * 0.488, 0, 0, 0, 0xb8c0cc, 0.9);
-    addColoredBox(bRubber, w * 0.42, 0.16, 0.06, 0, wheelR + 0.34, len * 0.492, 0, 0, 0, 0x16181c, 0.8);
-    for (const sx of [-1, 1]) {
-      addColoredBox(bAlloy, 0.10, 0.035, 0.04, sx * (w * 0.5 + 0.04), wheelR + 0.64, 0.66, 0, 0, 0, 0x374151, 0.9);
-      addColoredBox(bAlloy, 0.14, 0.09, 0.10, sx * (w * 0.5 + 0.10), wheelR + 0.66, 0.65, 0, sx * 0.12, 0, 0x9ca3af, 0.92);
-      if (!(isMpv && sx < 0)) {
-        addColoredBox(bAlloy, 0.03, 0.035, 0.14, sx * (w * 0.505), wheelR + 0.48, 0.18, 0, 0, 0, 0xcbd5e1, 0.9);
+    // 4 rubber tires + silver alloy rims + dark recessed wheel-well arches + rocker side skirts
+    addWheelPair(bRubber, bAlloy, wheelR, 0.22, wheelR, wbZ, w * 0.455);
+    addWheelPair(bRubber, bAlloy, wheelR, 0.22, wheelR, -wbZ, w * 0.455);
+    for (const wz of [wbZ, -wbZ]) {
+      for (const sx of [-1, 1]) {
+        // Dark recessed wheel well housing + flared matte fender arch lip
+        addColoredBox(bRubber, 0.16, wheelR * 1.18, wheelR * 2.15, sx * (w * 0.43), wheelR + 0.08, wz, 0, 0, 0, 0x101216, 0.72);
+        addColoredBox(bRubber, 0.07, 0.06, wheelR * 2.12, sx * (w * 0.505), wheelR * 2.04, wz, 0, 0, 0, 0x1f242c, 0.80);
       }
-      addColoredBox(bAlloy, 0.03, 0.035, 0.14, sx * (w * 0.505), wheelR + 0.48, -0.58, 0, 0, 0, 0xcbd5e1, 0.9);
+    }
+    // Dark undercarriage + sculpted lower rocker sills + front air-dam bumper + rear diffuser bumper
+    addColoredBox(bRubber, w * 0.88, 0.14, len * 0.90, 0, wheelR * 0.74, 0, 0, 0, 0, 0x14171b, 0.8);
+    for (const sx of [-1, 1]) {
+      addColoredBox(bRubber, 0.06, 0.12, wbZ * 1.48, sx * (w * 0.49), wheelR + 0.04, 0, 0, 0, 0, 0x1e2228, 0.78);
+    }
+    addColoredBox(bRubber, w * 0.99, 0.24, 0.28, 0, wheelR + 0.10, len * 0.48, 0.06, 0, 0, 0x1c2026, 0.76);
+    addColoredBox(bRubber, w * 0.82, 0.10, 0.14, 0, wheelR + 0.04, len * 0.505, 0, 0, 0, 0x111317, 0.72); // front air dam
+    addColoredBox(bRubber, w * 0.98, 0.25, 0.26, 0, wheelR + 0.11, -len * 0.48, -0.05, 0, 0, 0x1c2026, 0.76);
+    // Front fog-lamp chrome bezels + fog bulbs
+    for (const sx of [-1, 1]) {
+      addColoredBox(bAlloy, 0.20, 0.10, 0.06, sx * (w * 0.36), wheelR + 0.14, len * 0.505, 0, 0, 0, 0x64748b, 0.88);
+      addBox(bHeadlight, 0.12, 0.06, 0.04, sx * (w * 0.36), wheelR + 0.14, len * 0.522);
+    }
+    // Front & rear Indonesian license plates + twin chrome exhaust tip
+    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.12, len * 0.515, false);
+    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.16, -len * 0.512, false);
+    addColoredCylinder(bAlloy, 0.032, 0.036, 0.24, 8, w * 0.28, wheelR * 0.58, -len * 0.495, Math.PI * 0.5, 0, 0, 0xb4bcc8, 0.90);
+
+    // Swept wrap-around headlights & recessed rear taillight cluster housings
+    addColoredBox(bAlloy, 0.38, 0.16, 0.10, -w * 0.33, wheelR + 0.38, len * 0.478, 0, -0.14, 0, 0x334155, 0.85);
+    addColoredBox(bAlloy, 0.38, 0.16, 0.10, w * 0.33, wheelR + 0.38, len * 0.478, 0, 0.14, 0, 0x334155, 0.85);
+    addBox(bHeadlight, 0.34, 0.11, 0.08, -w * 0.33, wheelR + 0.38, len * 0.495, 0, -0.14, 0);
+    addBox(bHeadlight, 0.34, 0.11, 0.08, w * 0.33, wheelR + 0.38, len * 0.495, 0, 0.14, 0);
+    addColoredBox(bRubber, 0.38, 0.17, 0.09, -w * 0.33, wheelR + 0.43, -len * 0.482, 0, 0.12, 0, 0x1c2026, 0.85);
+    addColoredBox(bRubber, 0.38, 0.17, 0.09, w * 0.33, wheelR + 0.43, -len * 0.482, 0, -0.12, 0, 0x1c2026, 0.85);
+    addBox(bTaillight, 0.33, 0.12, 0.07, -w * 0.33, wheelR + 0.43, -len * 0.498, 0, 0.12, 0);
+    addBox(bTaillight, 0.33, 0.12, 0.07, w * 0.33, wheelR + 0.43, -len * 0.498, 0, -0.12, 0);
+
+    // Chrome-framed horizontal-slat front radiator grille + hood emblem
+    addColoredBox(bAlloy, w * 0.48, 0.22, 0.05, 0, wheelR + 0.35, len * 0.492, 0.08, 0, 0, 0xcbd5e1, 0.92);
+    addColoredBox(bRubber, w * 0.43, 0.17, 0.06, 0, wheelR + 0.35, len * 0.498, 0.08, 0, 0, 0x14171c, 0.80);
+    for (const gy of [-0.045, 0.0, 0.045]) {
+      addColoredBox(bAlloy, w * 0.41, 0.018, 0.07, 0, wheelR + 0.35 + gy, len * 0.502, 0, 0, 0, 0x94a3b8, 0.90);
     }
 
-    // Lower painted chassis body
-    addPaintBox(bPaint, w, 0.56, len * 0.96, 0, wheelR + 0.32, 0);
+    // Side mirrors + sculpted door handles + beltline chrome trim
+    for (const sx of [-1, 1]) {
+      addColoredBox(bRubber, 0.09, 0.035, 0.045, sx * (w * 0.49 + 0.04), wheelR + 0.63, 0.66, 0, 0, 0, 0x262c34, 0.9);
+      addColoredBox(bAlloy, 0.14, 0.095, 0.11, sx * (w * 0.49 + 0.10), wheelR + 0.66, 0.65, 0, sx * 0.16, 0, 0xb8c0cc, 0.92);
+      if (!(isMpv && sx < 0)) {
+        addColoredBox(bAlloy, 0.03, 0.032, 0.14, sx * (w * 0.505), wheelR + 0.49, 0.18, 0, 0, 0, 0xd4dbe4, 0.92);
+      }
+      addColoredBox(bAlloy, 0.03, 0.032, 0.14, sx * (w * 0.505), wheelR + 0.49, -0.58, 0, 0, 0, 0xd4dbe4, 0.92);
+    }
+
+    // Main lower painted body + tapered upper beltline shoulder (breaks flat-box slab!)
+    addPaintBox(bPaint, w, 0.44, len * 0.94, 0, wheelR + 0.28, 0);
+    addPaintBox(bPaint, w * 0.94, 0.16, len * 0.88, 0, wheelR + 0.54, -0.06);
 
     if (isMpv) {
-      // Avanza/Innova longer greenhouse + roof rack rails + ajar driver door & popped hood
-      addPaintBox(bPaint, w * 0.88, 0.58, 2.52, 0, wheelR + 0.86, -0.34);
+      // Avanza/Innova contoured greenhouse + sloped windshield + roof contour + roof rails + rear spoiler
+      addPaintBox(bPaint, w * 0.86, 0.50, 2.38, 0, wheelR + 0.84, -0.38);
+      addPaintBox(bPaint, w * 0.78, 0.10, 2.26, 0, wheelR + 1.12, -0.40); // contoured roof crown
+      addPaintBox(bPaint, w * 0.86, 0.08, 0.22, 0, wheelR + 1.10, -1.64, -0.20, 0, 0); // rear roof spoiler
       // Popped hood (+Z front) tilted up ~14 deg + dark engine bay underneath
-      addColoredBox(bRubber, w * 0.78, 0.24, 1.05, 0, wheelR + 0.50, 1.38, 0, 0, 0, 0x1d1f23, 0.7);
-      addPaintBox(bPaint, w * 0.92, 0.07, 1.12, 0, wheelR + 0.72, 1.34, -0.24, 0, 0);
+      addColoredBox(bRubber, w * 0.78, 0.22, 1.05, 0, wheelR + 0.50, 1.38, 0, 0, 0, 0x1b1e23, 0.72);
+      addPaintBox(bPaint, w * 0.90, 0.07, 1.14, 0, wheelR + 0.72, 1.34, -0.24, 0, 0);
       // Slightly ajar front-left door
       addPaintBox(bPaint, 0.08, 0.54, 0.92, -w * 0.5 - 0.18, wheelR + 0.34, 0.22, 0, -0.38, 0);
       addBox(bGlass, 0.06, 0.42, 0.78, -w * 0.5 - 0.18, wheelR + 0.80, 0.22, 0, -0.38, 0);
-      // Glossy dark cabin glass & alloy roof rails
-      addBox(bGlass, w * 0.80, 0.44, 0.12, 0, wheelR + 0.84, 0.92, -0.35, 0, 0);
-      addBox(bGlass, w * 0.90, 0.42, 2.25, 0, wheelR + 0.85, -0.38);
-      addColoredBox(bAlloy, 0.06, 0.06, 2.10, -w * 0.36, wheelR + 1.18, -0.35, 0, 0, 0, 0x9ca3af, 0.9);
-      addColoredBox(bAlloy, 0.06, 0.06, 2.10, w * 0.36, wheelR + 1.18, -0.35, 0, 0, 0, 0x9ca3af, 0.9);
+      // Sloped windshield + side panoramic glass + rear tailgate glass + wipers + shark-fin antenna
+      addBox(bGlass, w * 0.79, 0.50, 0.10, 0, wheelR + 0.84, 0.90, -0.48, 0, 0);
+      addBox(bGlass, w * 0.88, 0.40, 2.18, 0, wheelR + 0.85, -0.40);
+      addBox(bGlass, w * 0.78, 0.38, 0.08, 0, wheelR + 0.85, -1.58, 0.18, 0, 0);
+      // Windshield wipers & alloy roof rails
+      addColoredBox(bRubber, 0.46, 0.025, 0.025, -0.24, wheelR + 0.65, 1.02, 0, 0, 0.14, 0x14171c, 0.9);
+      addColoredBox(bRubber, 0.46, 0.025, 0.025, 0.26, wheelR + 0.65, 1.02, 0, 0, 0.14, 0x14171c, 0.9);
+      addColoredBox(bAlloy, 0.055, 0.06, 2.10, -w * 0.35, wheelR + 1.19, -0.38, 0, 0, 0, 0x9ca3af, 0.9);
+      addColoredBox(bAlloy, 0.055, 0.06, 2.10, w * 0.35, wheelR + 1.19, -0.38, 0, 0, 0, 0x9ca3af, 0.9);
+      addColoredBox(bRubber, 0.04, 0.09, 0.16, 0, wheelR + 1.20, -1.25, -0.35, 0, 0, 0x1e2228, 0.9);
     } else {
-      // Compact Indonesian sedan greenhouse + trunk + glossy dark glass
-      addPaintBox(bPaint, w * 0.86, 0.48, 1.85, 0, wheelR + 0.82, -0.10);
-      addBox(bGlass, w * 0.78, 0.38, 0.12, 0, wheelR + 0.78, 0.84, -0.45, 0, 0);
-      addBox(bGlass, w * 0.78, 0.36, 0.12, 0, wheelR + 0.78, -1.04, 0.45, 0, 0);
-      addBox(bGlass, w * 0.88, 0.34, 1.56, 0, wheelR + 0.80, -0.10);
+      // Compact Indonesian sedan: sloped hood, fastback sloped windshield/rear glass, contoured roof & trunk lip spoiler
+      addPaintBox(bPaint, w * 0.92, 0.12, 1.24, 0, wheelR + 0.58, 1.32, 0.09, 0, 0); // sloped hood
+      addPaintBox(bPaint, w * 0.84, 0.40, 1.72, 0, wheelR + 0.80, -0.10);
+      addPaintBox(bPaint, w * 0.74, 0.09, 1.48, 0, wheelR + 1.03, -0.10); // crowned roof
+      addPaintBox(bPaint, w * 0.86, 0.05, 0.18, 0, wheelR + 0.63, -1.92, 0.12, 0, 0); // rear trunk lip spoiler
+      // Sloped windshield + rear fastback glass + side greenhouse glass + B-pillar dividers
+      addBox(bGlass, w * 0.77, 0.48, 0.10, 0, wheelR + 0.80, 0.84, -0.56, 0, 0);
+      addBox(bGlass, w * 0.77, 0.46, 0.10, 0, wheelR + 0.80, -1.04, 0.56, 0, 0);
+      addBox(bGlass, w * 0.86, 0.34, 1.54, 0, wheelR + 0.80, -0.10);
+      // Windshield wipers & roof shark-fin antenna
+      addColoredBox(bRubber, 0.44, 0.025, 0.025, -0.22, wheelR + 0.64, 0.98, 0, 0, 0.14, 0x14171c, 0.9);
+      addColoredBox(bRubber, 0.44, 0.025, 0.025, 0.24, wheelR + 0.64, 0.98, 0, 0, 0.14, 0x14171c, 0.9);
+      addColoredBox(bRubber, 0.035, 0.08, 0.14, 0, wheelR + 1.11, -0.68, -0.35, 0, 0, 0x1e2228, 0.9);
     }
 
     const proto = {
@@ -980,15 +1030,15 @@
         { bucket: bHeadlight, mat: getHeadlightEmissiveMaterial() },
         { bucket: bTaillight, mat: getTaillightEmissiveMaterial() }
       ]),
-      size: { x: w, y: isMpv ? 1.66 : 1.44, z: len }
+      size: { x: w, y: isMpv ? 1.68 : 1.46, z: len }
     };
     _cityProtoCache.set(cacheKey, proto);
     return proto;
   }
 
-  // Blue Bird / JakLingko Angkot Minivan (crisp PBR paint, glossy glass, alloy rims, mirrors & yellow plate)
+  // Blue Bird / JakLingko Mikrotrans Angkot Minivan (sloped nose, wheel arches, cyan/yellow livery, wipers & route sign)
   function getAngkotProto() {
-    const cacheKey = 'proc_veh_angkot_v2';
+    const cacheKey = 'proc_veh_angkot_v3';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
 
     const bBody = [];
@@ -999,42 +1049,57 @@
     const bTaillight = [];
     const bAmber = [];
 
-    const len = 3.92;
-    const w = 1.62;
+    const len = 3.96;
+    const w = 1.64;
     const wheelR = 0.31;
 
     addWheelPair(bRubber, bAlloy, wheelR, 0.20, wheelR, 1.24, w * 0.45);
     addWheelPair(bRubber, bAlloy, wheelR, 0.20, wheelR, -1.24, w * 0.45);
-    // Rubber bumpers & undercarriage + yellow public transport plates
-    addColoredBox(bRubber, w * 0.90, 0.14, len * 0.92, 0, wheelR * 0.78, 0, 0, 0, 0, 0x16181c, 0.8);
-    addColoredBox(bRubber, w * 0.98, 0.24, 0.20, 0, wheelR + 0.08, len * 0.49, 0, 0, 0, 0x1e2226, 0.75);
-    addColoredBox(bRubber, w * 0.98, 0.24, 0.20, 0, wheelR + 0.08, -len * 0.49, 0, 0, 0, 0x1e2226, 0.75);
-    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.09, len * 0.515, true);
-    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.11, -len * 0.515, true);
-    // Emissive headlights & taillights
-    addBox(bHeadlight, 0.26, 0.14, 0.06, -w * 0.34, wheelR + 0.34, len * 0.495);
-    addBox(bHeadlight, 0.26, 0.14, 0.06, w * 0.34, wheelR + 0.34, len * 0.495);
-    addBox(bTaillight, 0.24, 0.16, 0.06, -w * 0.36, wheelR + 0.38, -len * 0.495);
-    addBox(bTaillight, 0.24, 0.16, 0.06, w * 0.36, wheelR + 0.38, -len * 0.495);
-
-    // Sky-blue lower skirt & body + white JakLingko band + upper cabin
-    addColoredBox(bBody, w, 0.68, len * 0.96, 0, wheelR + 0.34, 0, 0, 0, 0, 0x1e82cc, 0.82);
-    addColoredBox(bBody, w + 0.02, 0.14, len * 0.96, 0, wheelR + 0.66, 0, 0, 0, 0, 0xe8edf2, 0.92);
-    addColoredBox(bBody, w * 0.94, 0.58, len * 0.88, 0, wheelR + 0.98, -0.08, 0, 0, 0, 0xe6ebf0, 0.90);
-    // Glossy dark cabin glass (front windshield, side & rear windows)
-    addBox(bGlass, w * 0.84, 0.42, 0.10, 0, wheelR + 0.96, len * 0.42, -0.18, 0, 0);
-    addBox(bGlass, w * 0.96, 0.38, len * 0.68, 0, wheelR + 0.96, -0.14);
-    addBox(bGlass, w * 0.78, 0.36, 0.08, 0, wheelR + 0.96, -len * 0.46);
-    // Chrome grille, twin side mirrors & alloy roof luggage rack
-    addColoredBox(bAlloy, w * 0.44, 0.16, 0.04, 0, wheelR + 0.32, len * 0.49, 0, 0, 0, 0xb8c0cc, 0.9);
-    for (const sx of [-1, 1]) {
-      addColoredBox(bAlloy, 0.12, 0.11, 0.08, sx * (w * 0.5 + 0.08), wheelR + 0.82, len * 0.35, 0, 0, 0, 0x9ca3af, 0.9);
+    for (const wz of [1.24, -1.24]) {
+      for (const sx of [-1, 1]) {
+        addColoredBox(bRubber, 0.14, wheelR * 1.12, wheelR * 2.10, sx * (w * 0.43), wheelR + 0.06, wz, 0, 0, 0, 0x111317, 0.72);
+        addColoredBox(bRubber, 0.06, 0.05, wheelR * 2.05, sx * (w * 0.502), wheelR * 2.02, wz, 0, 0, 0, 0x1e2228, 0.80);
+      }
     }
-    addColoredBox(bAlloy, w * 0.74, 0.05, 2.20, 0, wheelR + 1.31, -0.35, 0, 0, 0, 0x94a3b8, 0.88);
-    addColoredBox(bAlloy, 0.05, 0.10, 2.20, -w * 0.36, wheelR + 1.35, -0.35, 0, 0, 0, 0x94a3b8, 0.88);
-    addColoredBox(bAlloy, 0.05, 0.10, 2.20, w * 0.36, wheelR + 1.35, -0.35, 0, 0, 0, 0x94a3b8, 0.88);
+    // Rubber bumpers & undercarriage + fog lamps + yellow public transport plates
+    addColoredBox(bRubber, w * 0.90, 0.14, len * 0.92, 0, wheelR * 0.78, 0, 0, 0, 0, 0x16181c, 0.8);
+    addColoredBox(bRubber, w * 0.99, 0.24, 0.24, 0, wheelR + 0.08, len * 0.49, 0.06, 0, 0, 0x1e2226, 0.75);
+    addColoredBox(bRubber, w * 0.98, 0.24, 0.22, 0, wheelR + 0.08, -len * 0.49, 0, 0, 0, 0x1e2226, 0.75);
+    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.09, len * 0.52, true);
+    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.11, -len * 0.515, true);
+    // Emissive headlights, fog lamps & wrap-around taillights
+    addBox(bHeadlight, 0.28, 0.14, 0.07, -w * 0.34, wheelR + 0.34, len * 0.495);
+    addBox(bHeadlight, 0.28, 0.14, 0.07, w * 0.34, wheelR + 0.34, len * 0.495);
+    addBox(bHeadlight, 0.12, 0.06, 0.04, -w * 0.36, wheelR + 0.12, len * 0.515);
+    addBox(bHeadlight, 0.12, 0.06, 0.04, w * 0.36, wheelR + 0.12, len * 0.515);
+    addBox(bTaillight, 0.24, 0.22, 0.07, -w * 0.38, wheelR + 0.40, -len * 0.495);
+    addBox(bTaillight, 0.24, 0.22, 0.07, w * 0.38, wheelR + 0.40, -len * 0.495);
+
+    // JakLingko / Mikrotrans cyan-blue lower body + yellow & navy livery stripes + tapered upper cabin + contoured roof
+    addColoredBox(bBody, w, 0.64, len * 0.94, 0, wheelR + 0.34, -0.02, 0, 0, 0, 0x0ea5e9, 0.84);
+    addColoredBox(bBody, w * 0.96, 0.42, 0.52, 0, wheelR + 0.42, len * 0.40, 0.18, 0, 0, 0x0ea5e9, 0.84); // sloped cab nose
+    addColoredBox(bBody, w + 0.025, 0.10, len * 0.95, 0, wheelR + 0.62, -0.02, 0, 0, 0, 0xfacc15, 0.94); // yellow Mikrotrans stripe
+    addColoredBox(bBody, w + 0.02, 0.06, len * 0.95, 0, wheelR + 0.53, -0.02, 0, 0, 0, 0x0f2f60, 0.90); // navy trim stripe
+    addColoredBox(bBody, w * 0.92, 0.52, len * 0.86, 0, wheelR + 0.94, -0.10, 0, 0, 0, 0xeef2f6, 0.92);
+    addColoredBox(bBody, w * 0.82, 0.10, len * 0.80, 0, wheelR + 1.24, -0.12, 0, 0, 0, 0xe2e8f0, 0.90); // contoured roof crown
+    // Glossy dark cabin glass (sloped front windshield, side & rear windows) + wipers
+    addBox(bGlass, w * 0.84, 0.46, 0.10, 0, wheelR + 0.94, len * 0.38, -0.32, 0, 0);
+    addBox(bGlass, w * 0.94, 0.36, len * 0.68, 0, wheelR + 0.94, -0.16);
+    addBox(bGlass, w * 0.78, 0.36, 0.08, 0, wheelR + 0.94, -len * 0.47);
+    addColoredBox(bRubber, 0.42, 0.024, 0.024, -0.22, wheelR + 0.74, len * 0.44, 0, 0, 0.14, 0x14171c, 0.9);
+    addColoredBox(bRubber, 0.42, 0.024, 0.024, 0.24, wheelR + 0.74, len * 0.44, 0, 0, 0.14, 0x14171c, 0.9);
+    // Chrome grille, sliding door track rail, twin side mirrors & alloy roof luggage rack
+    addColoredBox(bAlloy, w * 0.46, 0.17, 0.05, 0, wheelR + 0.32, len * 0.495, 0, 0, 0, 0xcbd5e1, 0.92);
+    addColoredBox(bRubber, w * 0.40, 0.12, 0.06, 0, wheelR + 0.32, len * 0.50, 0, 0, 0, 0x16181c, 0.82);
+    addColoredBox(bRubber, 0.03, 0.03, 1.30, w * 0.505, wheelR + 0.58, -0.45, 0, 0, 0, 0x1f242c, 0.88); // sliding door rail
+    for (const sx of [-1, 1]) {
+      addColoredBox(bAlloy, 0.12, 0.12, 0.09, sx * (w * 0.5 + 0.08), wheelR + 0.82, len * 0.34, 0, 0, 0, 0x9ca3af, 0.9);
+    }
+    addColoredBox(bAlloy, w * 0.72, 0.05, 2.20, 0, wheelR + 1.31, -0.35, 0, 0, 0, 0x94a3b8, 0.88);
+    addColoredBox(bAlloy, 0.05, 0.10, 2.20, -w * 0.35, wheelR + 1.35, -0.35, 0, 0, 0, 0x94a3b8, 0.88);
+    addColoredBox(bAlloy, 0.05, 0.10, 2.20, w * 0.35, wheelR + 1.35, -0.35, 0, 0, 0, 0x94a3b8, 0.88);
     // Illuminated amber JakLingko route sign on roof brow
-    addBox(bAmber, 0.78, 0.16, 0.18, 0, wheelR + 1.34, len * 0.30);
+    addBox(bAmber, 0.84, 0.16, 0.18, 0, wheelR + 1.33, len * 0.28);
 
     const proto = {
       parts: mergePartBuckets([
@@ -1052,9 +1117,9 @@
     return proto;
   }
 
-  // TransJakarta BRT Bus Wreck (crisp PBR paint, glossy glass, coach mirrors, AC rooftop unit, LED brow)
+  // TransJakarta BRT Bus Wreck (aerodynamic nose, wheel wells, BRT curb doors, crisp livery, wipers, AC unit)
   function getTransJakartaBusProto() {
-    const cacheKey = 'proc_veh_tj_bus_v2';
+    const cacheKey = 'proc_veh_tj_bus_v3';
     if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
 
     const bBody = [];
@@ -1071,47 +1136,69 @@
 
     addWheelPair(bRubber, bAlloy, wheelR, 0.32, wheelR, 3.15, w * 0.45);
     addWheelPair(bRubber, bAlloy, wheelR, 0.32, wheelR, -2.85, w * 0.45);
-    // Heavy rubber chassis + crumpled front bumper + rear bumper + license plates
-    addColoredBox(bRubber, w * 0.94, 0.32, len * 0.96, 0, wheelR * 0.85, 0, 0, 0, 0, 0x16191d, 0.75);
-    addColoredBox(bRubber, w * 1.02, 0.34, 0.26, 0.06, wheelR + 0.12, len * 0.50, 0.06, 0.04, -0.04, 0x22262b, 0.75);
-    addColoredBox(bRubber, w * 1.00, 0.30, 0.22, 0, wheelR + 0.12, -len * 0.50, 0, 0, 0, 0x22262b, 0.75);
-    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.14, len * 0.52, true);
-    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.18, -len * 0.515, true);
+    for (const wz of [3.15, -2.85]) {
+      for (const sx of [-1, 1]) {
+        addColoredBox(bRubber, 0.18, wheelR * 1.15, wheelR * 2.20, sx * (w * 0.44), wheelR + 0.10, wz, 0, 0, 0, 0x111317, 0.72);
+        addColoredBox(bRubber, 0.08, 0.07, wheelR * 2.15, sx * (w * 0.505), wheelR * 2.08, wz, 0, 0, 0, 0x1e2228, 0.82);
+      }
+    }
+    // Heavy rubber chassis + sculpted front/rear bumpers + fog lamps + license plates
+    addColoredBox(bRubber, w * 0.94, 0.30, len * 0.96, 0, wheelR * 0.85, 0, 0, 0, 0, 0x16191d, 0.75);
+    addColoredBox(bRubber, w * 1.02, 0.34, 0.28, 0.05, wheelR + 0.12, len * 0.50, 0.06, 0.03, -0.03, 0x22262b, 0.75);
+    addColoredBox(bRubber, w * 1.00, 0.30, 0.24, 0, wheelR + 0.12, -len * 0.50, 0, 0, 0, 0x22262b, 0.75);
+    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.14, len * 0.525, true);
+    addLicensePlate(bRubber, bAlloy, 0, wheelR + 0.18, -len * 0.518, true);
 
-    // Lower TransJakarta sky-blue body + upper white hull + navy/red livery bands
-    addColoredBox(bBody, w, 1.05, len, 0, wheelR + 0.52, 0, 0, 0, 0, 0x1b74c4, 0.84);
-    addColoredBox(bBody, w * 0.99, 1.38, len * 0.98, 0, wheelR + 1.72, 0, 0, 0, 0, 0xe8edf2, 0.90);
-    addColoredBox(bBody, w + 0.02, 0.16, len + 0.02, 0, wheelR + 1.08, 0, 0, 0, 0, 0x0e2f5c, 0.9);
-    addColoredBox(bBody, w + 0.02, 0.08, len * 0.96, 0, wheelR + 0.24, 0, 0, 0, 0, 0xc82428, 0.9);
+    // Lower TransJakarta sky-blue body + upper white hull + tapered roof cap + navy/crimson livery bands
+    addColoredBox(bBody, w, 1.02, len * 0.98, 0, wheelR + 0.52, -0.02, 0, 0, 0, 0x1b74c4, 0.86);
+    addColoredBox(bBody, w * 0.98, 1.32, len * 0.96, 0, wheelR + 1.68, -0.04, 0, 0, 0, 0xedf2f7, 0.92);
+    addColoredBox(bBody, w * 0.88, 0.12, len * 0.92, 0, wheelR + 2.38, -0.06, 0, 0, 0, 0xdbe4ee, 0.90); // contoured roof crown
+    // Aerodynamic sloped front cab brow
+    addColoredBox(bBody, w * 0.96, 0.32, 0.42, 0, wheelR + 2.24, len * 0.46, 0.22, 0, 0, 0x1b74c4, 0.88);
+    addColoredBox(bBody, w + 0.025, 0.16, len * 0.98, 0, wheelR + 1.06, -0.02, 0, 0, 0, 0x0e2f5c, 0.92);
+    addColoredBox(bBody, w + 0.025, 0.09, len * 0.95, 0, wheelR + 0.24, -0.02, 0, 0, 0, 0xd42428, 0.92);
 
-    // Glossy dark panoramic side windows + split front windshield + rear window
-    addBox(bGlass, w + 0.02, 0.86, len * 0.84, 0, wheelR + 1.78, -0.25);
-    addBox(bGlass, w * 0.88, 1.02, 0.12, 0, wheelR + 1.64, len * 0.49);
-    addBox(bGlass, w * 0.82, 0.74, 0.10, 0, wheelR + 1.82, -len * 0.49);
-    // Front center wiper mullion & twin tall coach side mirrors
-    addColoredBox(bAlloy, 0.08, 1.04, 0.14, 0, wheelR + 1.64, len * 0.495, 0, 0, 0, 0x64748b, 0.9);
+    // Glossy dark panoramic side windows + window pillars + double BRT boarding doors + sloped windshield + rear window
+    addBox(bGlass, w + 0.02, 0.86, len * 0.84, 0, wheelR + 1.76, -0.24);
+    for (let pz = -3.8; pz <= 3.6; pz += 1.48) {
+      addColoredBox(bRubber, w + 0.035, 0.88, 0.08, 0, wheelR + 1.76, pz, 0, 0, 0, 0x181c22, 0.88);
+    }
+    // Mid-bus BRT elevated boarding double-door frame on both sides
     for (const sx of [-1, 1]) {
-      addColoredBox(bAlloy, 0.28, 0.05, 0.05, sx * (w * 0.5 + 0.12), wheelR + 1.98, len * 0.49, 0, 0, 0, 0x94a3b8, 0.9);
-      addColoredBox(bAlloy, 0.08, 0.34, 0.14, sx * (w * 0.5 + 0.24), wheelR + 1.82, len * 0.51, 0, 0, 0, 0x334155, 0.9);
+      addColoredBox(bAlloy, 0.05, 1.88, 1.38, sx * (w * 0.502), wheelR + 1.24, 0.45, 0, 0, 0, 0x94a3b8, 0.90);
+      addBox(bGlass, 0.06, 1.56, 1.18, sx * (w * 0.505), wheelR + 1.30, 0.45);
+      addColoredBox(bRubber, 0.07, 1.88, 0.06, sx * (w * 0.508), wheelR + 1.24, 0.45, 0, 0, 0, 0x14171c, 0.90);
+    }
+    addBox(bGlass, w * 0.88, 1.06, 0.12, 0, wheelR + 1.62, len * 0.485, -0.10, 0, 0);
+    addBox(bGlass, w * 0.82, 0.74, 0.10, 0, wheelR + 1.80, -len * 0.485);
+    // Front wipers, center mullion & twin tall coach side mirrors
+    addColoredBox(bAlloy, 0.07, 1.06, 0.14, 0, wheelR + 1.62, len * 0.492, -0.10, 0, 0, 0x64748b, 0.9);
+    addColoredBox(bRubber, 0.68, 0.03, 0.03, -0.46, wheelR + 1.16, len * 0.50, 0, 0, 0.12, 0x14171c, 0.9);
+    addColoredBox(bRubber, 0.68, 0.03, 0.03, 0.46, wheelR + 1.16, len * 0.50, 0, 0, 0.12, 0x14171c, 0.9);
+    for (const sx of [-1, 1]) {
+      addColoredBox(bAlloy, 0.28, 0.05, 0.05, sx * (w * 0.5 + 0.12), wheelR + 1.98, len * 0.48, 0, 0, 0, 0x94a3b8, 0.9);
+      addColoredBox(bAlloy, 0.08, 0.36, 0.14, sx * (w * 0.5 + 0.24), wheelR + 1.82, len * 0.50, 0, 0, 0, 0x334155, 0.9);
     }
 
-    // Emissive headlights, taillights & front orange LED destination brow
+    // Emissive headlights, fog lamps, taillights & front orange LED destination brow
     addBox(bHeadlight, 0.38, 0.16, 0.08, -w * 0.34, wheelR + 0.46, len * 0.502);
     addBox(bHeadlight, 0.38, 0.16, 0.08, w * 0.34, wheelR + 0.46, len * 0.502);
-    addBox(bTaillight, 0.36, 0.22, 0.08, -w * 0.36, wheelR + 0.56, -len * 0.502);
-    addBox(bTaillight, 0.36, 0.22, 0.08, w * 0.36, wheelR + 0.56, -len * 0.502);
-    addBox(bAmber, 1.65, 0.22, 0.14, 0, wheelR + 2.26, len * 0.495);
+    addBox(bHeadlight, 0.16, 0.08, 0.06, -w * 0.38, wheelR + 0.20, len * 0.512);
+    addBox(bHeadlight, 0.16, 0.08, 0.06, w * 0.38, wheelR + 0.20, len * 0.512);
+    addBox(bTaillight, 0.36, 0.24, 0.08, -w * 0.36, wheelR + 0.56, -len * 0.502);
+    addBox(bTaillight, 0.36, 0.24, 0.08, w * 0.36, wheelR + 0.56, -len * 0.502);
+    addBox(bAmber, 1.72, 0.22, 0.14, 0, wheelR + 2.24, len * 0.488);
 
     // Detailed Rooftop AC / HVAC Unit (painted shroud + alloy rails + dark fan intake louvers)
-    addColoredBox(bAlloy, 1.56, 0.06, 3.72, 0, wheelR + 2.43, 0.4, 0, 0, 0, 0x94a3b8, 0.88);
-    addColoredBox(bBody, 1.48, 0.32, 3.60, 0, wheelR + 2.60, 0.4, 0, 0, 0, 0xd1d5db, 0.88);
+    addColoredBox(bAlloy, 1.56, 0.06, 3.72, 0, wheelR + 2.45, 0.4, 0, 0, 0, 0x94a3b8, 0.88);
+    addColoredBox(bBody, 1.48, 0.32, 3.60, 0, wheelR + 2.62, 0.4, 0, 0, 0, 0xd1d5db, 0.88);
     for (const fz of [-0.65, 0.40, 1.45]) {
-      addColoredBox(bRubber, 1.06, 0.06, 0.72, 0, wheelR + 2.77, fz, 0, 0, 0, 0x1e2228, 0.85);
-      addColoredBox(bAlloy, 1.12, 0.04, 0.78, 0, wheelR + 2.76, fz, 0, 0, 0, 0x64748b, 0.90);
+      addColoredBox(bRubber, 1.06, 0.06, 0.72, 0, wheelR + 2.79, fz, 0, 0, 0, 0x1e2228, 0.85);
+      addColoredBox(bAlloy, 1.12, 0.04, 0.78, 0, wheelR + 2.78, fz, 0, 0, 0, 0x64748b, 0.90);
     }
-    addColoredBox(bAlloy, 1.52, 0.14, 3.20, 0, wheelR + 2.60, 0.4, 0, 0, 0, 0x475569, 0.85);
-    addColoredBox(bBody, 1.32, 0.26, 2.20, 0, wheelR + 2.55, -3.2, 0, 0, 0, 0xcbd5e1, 0.86);
-    addColoredBox(bRubber, 0.94, 0.05, 1.40, 0, wheelR + 2.69, -3.2, 0, 0, 0, 0x1e2228, 0.85);
+    addColoredBox(bAlloy, 1.52, 0.14, 3.20, 0, wheelR + 2.62, 0.4, 0, 0, 0, 0x475569, 0.85);
+    addColoredBox(bBody, 1.32, 0.26, 2.20, 0, wheelR + 2.57, -3.2, 0, 0, 0, 0xcbd5e1, 0.86);
+    addColoredBox(bRubber, 0.94, 0.05, 1.40, 0, wheelR + 2.71, -3.2, 0, 0, 0, 0x1e2228, 0.85);
 
     const proto = {
       parts: mergePartBuckets([
@@ -1123,7 +1210,7 @@
         { bucket: bTaillight, mat: getTaillightEmissiveMaterial() },
         { bucket: bAmber, mat: getAmberAccentEmissiveMaterial() }
       ]),
-      size: { x: w, y: 3.24, z: len }
+      size: { x: w, y: 3.26, z: len }
     };
     _cityProtoCache.set(cacheKey, proto);
     return proto;
@@ -1541,6 +1628,113 @@
     const proto = {
       parts: mergePartBuckets([{ bucket: bTrim, mat: getVehicleTrimMaterial() }]),
       size: { x: 0.62, y: 0.46, z: 0.54 }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
+  // Modern Jakarta TransJakarta Halte Shelter (blue BRT fascia, glass shelter back, route board & stainless bench)
+  function getTransJakartaHalteProto() {
+    const cacheKey = 'proc_prop_tj_halte_v1';
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+    const bAlloy = [];
+    const bPaint = [];
+    const bGlass = [];
+    const bAmber = [];
+
+    // Grounded concrete/steel threshold pad + 4 steel shelter columns
+    addColoredBox(bAlloy, 5.2, 0.14, 1.85, 0, 0.07, 0, 0, 0, 0, 0x475569, 0.84);
+    for (const px of [-2.35, -0.78, 0.78, 2.35]) {
+      addColoredBox(bAlloy, 0.12, 2.75, 0.12, px, 1.44, -0.72, 0, 0, 0, 0x334155, 0.88);
+    }
+    // Cantilevered steel roof canopy + TransJakarta blue/white fascia header + route light strip
+    addColoredBox(bAlloy, 5.5, 0.14, 2.25, 0, 2.86, 0.08, -0.05, 0, 0, 0x64748b, 0.90);
+    addColoredBox(bPaint, 5.46, 0.34, 0.10, 0, 2.68, 1.15, 0, 0, 0, 0x1b74c4, 0.90);
+    addColoredBox(bPaint, 5.46, 0.07, 0.12, 0, 2.52, 1.15, 0, 0, 0, 0xeef2f6, 0.95);
+    addBox(bAmber, 1.45, 0.14, 0.08, -1.55, 2.70, 1.19); // glowing HALTE TJ sign box
+    // Glass wind-screen back panel + side end panel + BRT corridor map frame
+    addBox(bGlass, 4.70, 2.10, 0.06, 0, 1.38, -0.72);
+    addBox(bGlass, 0.06, 2.05, 1.55, -2.38, 1.36, 0.05);
+    addColoredBox(bPaint, 1.25, 1.35, 0.12, 1.62, 1.45, -0.64, 0, 0, 0, 0x0f2f60, 0.90);
+    addColoredBox(bPaint, 1.10, 1.12, 0.14, 1.62, 1.45, -0.62, 0, 0, 0, 0xe2e8f0, 0.92);
+    // Stainless waiting bench inside shelter
+    addColoredBox(bAlloy, 2.65, 0.07, 0.44, -0.45, 0.50, -0.35, 0, 0, 0, 0x94a3b8, 0.92);
+    for (const bx of [-1.55, -0.45, 0.65]) {
+      addColoredBox(bAlloy, 0.08, 0.44, 0.38, bx, 0.25, -0.35, 0, 0, 0, 0x334155, 0.88);
+    }
+
+    const proto = {
+      parts: mergePartBuckets([
+        { bucket: bAlloy, mat: getAlloyMetalMaterial() },
+        { bucket: bPaint, mat: getVehiclePaintedVertexMaterial() },
+        { bucket: bGlass, mat: getCabinGlassMaterial() },
+        { bucket: bAmber, mat: getAmberAccentEmissiveMaterial() }
+      ]),
+      size: { x: 5.5, y: 2.95, z: 2.25 }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
+  // Green Indonesian Arterial Directional Street Sign (Rambu Penunjuk Arah Hijau)
+  function getJakartaStreetSignProto() {
+    const cacheKey = 'proc_prop_jakarta_street_sign_v1';
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+    const bAlloy = [];
+    const bSign = [];
+    // Twin galvanized steel posts
+    for (const px of [-0.62, 0.62]) {
+      addColoredCylinder(bAlloy, 0.045, 0.055, 3.65, 8, px, 1.825, 0, 0, 0, 0, 0x94a3b8, 0.90);
+      addColoredBox(bAlloy, 0.22, 0.10, 0.22, px, 0.05, 0, 0, 0, 0, 0x475569, 0.85);
+    }
+    // Backing plate
+    addColoredBox(bAlloy, 1.98, 1.06, 0.05, 0, 3.12, -0.02, 0, 0, 0, 0x64748b, 0.88);
+    // Front textured highway green directional sign face (reuses cached highway sign canvas!)
+    const signGeo = new THREE.PlaneGeometry(1.94, 1.02);
+    signGeo.translate(0, 3.12, 0.012);
+    bSign.push(signGeo);
+    const signBack = new THREE.PlaneGeometry(1.94, 1.02);
+    signBack.rotateY(Math.PI);
+    signBack.translate(0, 3.12, -0.052);
+    bSign.push(signBack);
+
+    const proto = {
+      parts: mergePartBuckets([
+        { bucket: bAlloy, mat: getAlloyMetalMaterial() },
+        { bucket: bSign, mat: getHighwaySignMaterial() }
+      ]),
+      size: { x: 2.0, y: 3.7, z: 0.26 }
+    };
+    _cityProtoCache.set(cacheKey, proto);
+    return proto;
+  }
+
+  // Police Quarantine Sawhorse Barricade with Yellow Caution Tape & Amber Reflector
+  function getPoliceBarricadeProto() {
+    const cacheKey = 'proc_prop_police_barricade_v1';
+    if (_cityProtoCache.has(cacheKey)) return _cityProtoCache.get(cacheKey);
+    const bAlloy = [];
+    const bPaint = [];
+    const bAmber = [];
+    for (const lx of [-0.72, 0.72]) {
+      addColoredBox(bAlloy, 0.06, 1.05, 0.06, lx, 0.50, -0.22, 0.24, 0, 0, 0x334155, 0.88);
+      addColoredBox(bAlloy, 0.06, 1.05, 0.06, lx, 0.50, 0.22, -0.24, 0, 0, 0x334155, 0.88);
+    }
+    // Top black-and-yellow striped quarantine rail + police line ribbon band
+    addColoredBox(bPaint, 1.88, 0.22, 0.07, 0, 0.84, 0, 0, 0, 0, 0xfacc15, 0.94);
+    for (const sx of [-0.62, -0.18, 0.26, 0.70]) {
+      addColoredBox(bPaint, 0.18, 0.23, 0.08, sx, 0.84, 0, 0, 0, 0.22, 0x18181b, 0.92);
+    }
+    addColoredBox(bPaint, 1.98, 0.08, 0.04, 0, 0.52, 0.14, 0, 0, 0, 0xeab308, 0.96); // GARIS POLISI tape
+    addBox(bAmber, 0.16, 0.16, 0.10, 0, 1.04, 0); // top quarantine flasher
+
+    const proto = {
+      parts: mergePartBuckets([
+        { bucket: bAlloy, mat: getAlloyMetalMaterial() },
+        { bucket: bPaint, mat: getVehiclePaintedVertexMaterial() },
+        { bucket: bAmber, mat: getAmberAccentEmissiveMaterial() }
+      ]),
+      size: { x: 1.98, y: 1.14, z: 0.62 }
     };
     _cityProtoCache.set(cacheKey, proto);
     return proto;
@@ -2023,13 +2217,20 @@
       const targetGroup = customGroup || city.rootGroup;
       targetGroup.add(inst);
 
-      const isStructuralProp = /^(StreetLamp|PowerPole|TrafficSignal|WeldedWireFence)/.test(namePrefix || '');
-      const isVehicleOrProp = /^(StreetBench|JakartaSedan|JakartaMpvAjar|JakartaAngkot|TransJakartaBus|OjolMotorbike|GerobakKakiLima|CornerAmbulance|CornerMilitaryTruck|CornerCargoPallet)/.test(namePrefix || '');
-      const isClutter = /^(ManholeCover|TrashBag|TrashCan|Fern|Calathea|PowerBox|Shrub|Pachira|PlanterBox|AirconUnit|FireEscape|RoadBarrier|FireHydrant|MonoblocChair|OutdoorTableSet|Chalkboard|PlasticCrate|MilitaryCrate|Jerrycan|FuelBarrel|OldTyre|CardboardBox|BermudaGrass|HandTruck)/.test(namePrefix);
-      if (isStructuralProp) inst.userData._alwaysStructural = true;
-      if (isClutter || isStructuralProp || isVehicleOrProp) {
+      const isStructuralProp = /^(StreetLamp|PowerPole|TrafficSignal|WeldedWireFence|Angsana|Halte|StreetSign|BarricadeGate)/.test(namePrefix || '');
+      const isMajorProp = /^(StreetBench|JakartaSedan|JakartaMpvAjar|JakartaAngkot|TransJakartaBus|OjolMotorbike|GerobakKakiLima|CornerAmbulance|CornerMilitaryTruck|CornerCargoPallet|RoadBarrier|PlanterBox|PoliceBarricade|KioskBooth)/.test(namePrefix || '');
+      const isClutter = /^(ManholeCover|TrashBag|TrashCan|Fern|Calathea|PowerBox|Shrub|Pachira|FireHydrant|MonoblocChair|OutdoorTableSet|Chalkboard|PlasticCrate|MilitaryCrate|Jerrycan|FuelBarrel|OldTyre|CardboardBox|BermudaGrass|HandTruck|AirconUnit|FireEscape)/.test(namePrefix || '');
+      if (isStructuralProp) {
+        inst.userData._alwaysStructural = true;
+        inst.userData._propTier = 'structural';
+      } else if (isMajorProp) {
+        inst.userData._propTier = 'major';
+      } else {
+        inst.userData._propTier = 'micro';
+      }
+      if (isClutter || isStructuralProp || isMajorProp) {
         city.clutterMeshes.push(inst);
-        const qMatch = namePrefix.match(/_(NW|NE|SW|SE)/);
+        const qMatch = (namePrefix || '').match(/_(NW|NE|SW|SE)/);
         const qKey = qMatch ? qMatch[1] : null;
         if (qKey && city.clutterByQuadrant && city.clutterByQuadrant[qKey]) {
           city.clutterByQuadrant[qKey].push(inst);
@@ -2085,9 +2286,11 @@
         inst.userData._localBox = sharedBox.clone();
         inst.userData._worldBox = sharedBox.clone();
         inst.userData._lodTier = t;
-        inst.userData._lod1Dist = 22;
-        inst.userData._lod2Dist = 46;
+        inst.userData._lod1Dist = 44;
+        inst.userData._lod2Dist = 92;
         inst.userData._alwaysStructural = !!isStructural;
+        const isMajorLod = /^(CoveredCar|CoffeeCart|FacadeModule|FireEscape|AirconUnit|OutdoorTableSet|Chalkboard)/.test(namePrefix || '');
+        inst.userData._propTier = isStructural ? 'structural' : (isMajorLod ? 'major' : 'micro');
         inst.visible = (t === 0);
 
         const targetGroup = customGroup || city.rootGroup;
@@ -2478,6 +2681,9 @@
     getPalletProto,
     getParkBenchProto,
     getRoadBarrierProto,
+    getTransJakartaHalteProto,
+    getJakartaStreetSignProto,
+    getPoliceBarricadeProto,
     getWeldedWireFenceProto,
     getWeldedWireMeshMaterial,
     getGalvanizedFenceFrameMaterial,

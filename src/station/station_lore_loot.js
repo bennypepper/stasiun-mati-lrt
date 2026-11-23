@@ -237,48 +237,91 @@
       const gunMetalMat = new THREE.MeshStandardMaterial({ color: 0x27303b, roughness: 0.36, metalness: 0.78 });
       station.disposableMaterials.push(caseMat, rubberMat, foamMat, latchMat, steelMat, redMat, whiteMat, medGreenMat, gunMetalMat);
 
-      // 1) Pelican / military polymer-steel lower tub, rubber corner bumpers, reinforced ribs & steel carry handles
-      addPbrPart(station, grp, new THREE.BoxGeometry(1.12, 0.38, 0.66), caseMat, 0, 0.20, 0);
+      const RBG = window.THREE_JSM && window.THREE_JSM.RoundedBoxGeometry;
+      const makeBox = (w, h, d, r) => (typeof RBG === 'function'
+        ? new RBG(w, h, d, 2, Math.min(r || 0.015, Math.min(w, h, d) * 0.35))
+        : new THREE.BoxGeometry(w, h, d));
+
+      // Crisp stenciled military logistics plaque texture (cached once on station!)
+      if (!station._pelicanStencilMat) {
+        const sc = document.createElement('canvas');
+        sc.width = 256;
+        sc.height = 64;
+        const sctx = sc.getContext('2d');
+        sctx.fillStyle = '#2f3728';
+        sctx.fillRect(0, 0, 256, 64);
+        sctx.strokeStyle = '#d4a338';
+        sctx.lineWidth = 4;
+        sctx.strokeRect(4, 4, 248, 56);
+        sctx.fillStyle = '#eab308';
+        sctx.font = 'bold 18px monospace';
+        sctx.textAlign = 'center';
+        sctx.fillText('LOGISTIK DARURAT', 128, 30);
+        sctx.fillStyle = '#cbd5e1';
+        sctx.font = 'bold 12px monospace';
+        sctx.fillText('TNI-AD // KAI JABODEBEK', 128, 49);
+        const sTex = new THREE.CanvasTexture(sc);
+        sTex.colorSpace = THREE.SRGBColorSpace;
+        station._pelicanStencilMat = new THREE.MeshStandardMaterial({
+          map: sTex, roughness: 0.52, metalness: 0.24
+        });
+        station.disposableMaterials.push(station._pelicanStencilMat);
+      }
+
+      // 1) Rugged beveled Pelican polymer-steel lower tub, recessed panels, corner bumpers, ribs & carry handles
+      addPbrPart(station, grp, makeBox(1.12, 0.38, 0.66, 0.025), caseMat, 0, 0.20, 0);
+      addPbrPart(station, grp, makeBox(1.16, 0.05, 0.70, 0.012), rubberMat, 0, 0.03, 0); // molded bottom skid feet rim
       for (const bx of [-0.54, 0.54]) {
         for (const bz of [-0.31, 0.31]) {
-          addPbrPart(station, grp, new THREE.BoxGeometry(0.08, 0.42, 0.08), rubberMat, bx, 0.21, bz);
+          addPbrPart(station, grp, makeBox(0.095, 0.42, 0.095, 0.018), rubberMat, bx, 0.21, bz);
         }
       }
       for (const cx of [-0.57, 0.57]) {
-        addPbrPart(station, grp, new THREE.BoxGeometry(0.05, 0.36, 0.56), rubberMat, cx, 0.21, 0);
-        addPbrPart(station, grp, new THREE.CylinderGeometry(0.015, 0.015, 0.24, 8), steelMat, cx * 1.07, 0.23, 0, Math.PI * 0.5, 0, 0);
+        addPbrPart(station, grp, makeBox(0.05, 0.34, 0.54, 0.010), rubberMat, cx, 0.21, 0);
+        // Fold-down heavy-duty carry handle + twin steel pivot brackets
+        addPbrPart(station, grp, new THREE.CylinderGeometry(0.016, 0.016, 0.26, 10), rubberMat, cx * 1.075, 0.23, 0, Math.PI * 0.5, 0, 0);
+        for (const hz of [-0.13, 0.13]) {
+          addPbrPart(station, grp, new THREE.BoxGeometry(0.055, 0.04, 0.035), steelMat, cx * 1.03, 0.23, hz);
+        }
       }
-      for (const rxPos of [-0.36, -0.18, 0.18, 0.36]) {
-        addPbrPart(station, grp, new THREE.BoxGeometry(0.036, 0.35, 0.69), rubberMat, rxPos, 0.20, 0);
+      // Vertical structural reinforcement ribs across front & back faces
+      for (const rxPos of [-0.38, -0.22, 0.22, 0.38]) {
+        addPbrPart(station, grp, makeBox(0.036, 0.34, 0.695, 0.008), rubberMat, rxPos, 0.20, 0);
       }
-      // Upper perimeter lip & rubber gasket seal + dual brass draw-latches + stencil plate
-      addPbrPart(station, grp, new THREE.BoxGeometry(1.16, 0.045, 0.70), rubberMat, 0, 0.415, 0);
-      for (const lxPos of [-0.32, 0.32]) {
-        addPbrPart(station, grp, new THREE.BoxGeometry(0.08, 0.14, 0.045), latchMat, lxPos, 0.34, 0.345);
-        addPbrPart(station, grp, new THREE.BoxGeometry(0.045, 0.06, 0.055), rubberMat, lxPos, 0.28, 0.35);
+      // Upper waterproof rubber gasket rim + twin dual-stage metallic clasp latches + pressure purge valve + stencil plate
+      addPbrPart(station, grp, makeBox(1.16, 0.048, 0.70, 0.012), rubberMat, 0, 0.415, 0);
+      for (const lxPos of [-0.30, 0.30]) {
+        addPbrPart(station, grp, makeBox(0.088, 0.15, 0.048, 0.008), rubberMat, lxPos, 0.34, 0.346);
+        addPbrPart(station, grp, makeBox(0.068, 0.11, 0.036, 0.006), latchMat, lxPos, 0.35, 0.362);
+        addPbrPart(station, grp, new THREE.CylinderGeometry(0.008, 0.008, 0.08, 8), steelMat, lxPos, 0.28, 0.365, 0, 0, Math.PI * 0.5);
       }
-      addPbrPart(station, grp, new THREE.BoxGeometry(0.32, 0.055, 0.02), latchMat, 0, 0.23, 0.335);
+      // Center pressure-equalization valve dial + stenciled logistics ID plaque
+      addPbrPart(station, grp, new THREE.CylinderGeometry(0.026, 0.028, 0.024, 12), steelMat, -0.14, 0.14, 0.336, Math.PI * 0.5, 0, 0);
+      addPbrPart(station, grp, new THREE.BoxGeometry(0.36, 0.095, 0.018), station._pelicanStencilMat, 0.04, 0.24, 0.338);
 
-      // Recessed charcoal foam interior tray + 3 divider ribs
-      addPbrPart(station, grp, new THREE.BoxGeometry(1.02, 0.045, 0.58), foamMat, 0, 0.405, 0);
+      // Recessed charcoal foam interior tray + 3 contoured divider ribs
+      addPbrPart(station, grp, new THREE.BoxGeometry(1.04, 0.048, 0.58), foamMat, 0, 0.405, 0);
       for (const divX of [-0.17, 0.17]) {
-        addPbrPart(station, grp, new THREE.BoxGeometry(0.028, 0.035, 0.54), rubberMat, divX, 0.432, 0);
+        addPbrPart(station, grp, makeBox(0.032, 0.040, 0.54, 0.006), rubberMat, divX, 0.432, 0);
       }
 
-      // 2) Hinged Pelican lid anchored at back edge (y = 0.44, z = -0.34)
+      // 2) Hinged beveled Pelican lid anchored at back edge (y = 0.44, z = -0.34) with rear knuckle hinges
       const lidPivot = new THREE.Group();
       lidPivot.name = id + '_LidPivot';
       lidPivot.position.set(0, 0.44, -0.34);
       lidPivot.rotation.x = used ? -1.72 : 0.0;
       grp.add(lidPivot);
-      addPbrPart(station, lidPivot, new THREE.BoxGeometry(1.16, 0.09, 0.70), rubberMat, 0, 0.045, 0.34);
-      addPbrPart(station, lidPivot, new THREE.BoxGeometry(1.04, 0.05, 0.58), caseMat, 0, 0.105, 0.34);
-      addPbrPart(station, lidPivot, new THREE.BoxGeometry(0.98, 0.02, 0.52), foamMat, 0, 0.005, 0.34);
-      for (const lxPos of [-0.34, 0, 0.34]) {
-        addPbrPart(station, lidPivot, new THREE.BoxGeometry(0.055, 0.03, 0.56), rubberMat, lxPos, 0.135, 0.34);
+      addPbrPart(station, lidPivot, makeBox(1.16, 0.095, 0.70, 0.018), rubberMat, 0, 0.048, 0.34);
+      addPbrPart(station, lidPivot, makeBox(1.04, 0.055, 0.58, 0.014), caseMat, 0, 0.108, 0.34);
+      addPbrPart(station, lidPivot, new THREE.BoxGeometry(0.98, 0.024, 0.52), foamMat, 0, 0.006, 0.34);
+      for (const lxPos of [-0.36, -0.12, 0.12, 0.36]) {
+        addPbrPart(station, lidPivot, makeBox(0.048, 0.032, 0.56, 0.008), rubberMat, lxPos, 0.140, 0.34);
       }
-      addPbrPart(station, lidPivot, new THREE.BoxGeometry(0.74, 0.024, 0.06), latchMat, 0, 0.138, 0.58);
-      addPbrPart(station, lidPivot, new THREE.BoxGeometry(0.24, 0.03, 0.036), steelMat, 0, 0.145, 0.34);
+      for (const hx of [-0.36, 0.36]) {
+        addPbrPart(station, lidPivot, new THREE.CylinderGeometry(0.020, 0.020, 0.11, 8), steelMat, hx, 0.015, 0.00, 0, 0, Math.PI * 0.5);
+      }
+      addPbrPart(station, lidPivot, new THREE.BoxGeometry(0.74, 0.024, 0.06), latchMat, 0, 0.142, 0.58);
+      addPbrPart(station, lidPivot, new THREE.BoxGeometry(0.36, 0.020, 0.095), station._pelicanStencilMat, 0, 0.140, 0.34);
 
       // Attach outer Pelican case perimeter halo BEFORE adding interior item slots
       const crateHalo = (LRT.Render && typeof LRT.Render.attachPerimeterHalo === 'function')

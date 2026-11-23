@@ -41,7 +41,7 @@
     // Resolve Poly Haven PBR materials (using LRT.Materials.mats when present, AssetLoader PBR fallback otherwise)
     const matAsphalt = city._getMat('asphaltRoad', 'asphalt_road', { color: 0x3b3d42, roughness: 0.82, metalness: 0.04 });
     const matSidewalk = city._getMat('sidewalkPaver', 'sidewalk_paver', { color: 0x9c978d, roughness: 0.88, metalness: 0.02 });
-    const matCurb = city._getMat('concreteRough', 'concrete_rough', { color: 0x96938c, roughness: 0.90, metalness: 0.02 });
+    const matCurb = city._getMat('concreteRough', 'concrete_station', { color: 0x96938c, roughness: 0.90, metalness: 0.02 });
     const matTactile = city._getMat('tactile', null, { color: 0xe0b422, roughness: 0.72, metalness: 0.02 });
     const matFacadeModern = city._getMat('facadeModern', 'building_facade_1', { color: 0xc2cbd4, roughness: 0.64, metalness: 0.16 });
     const matFacadePlaster = city._getMat('facadePlaster', 'building_facade_2', { color: 0xd0d4d8, roughness: 0.86, metalness: 0.02 });
@@ -58,6 +58,8 @@
     });
     const matMarkWhite = city._getMat('cityStripeWhite', null, { color: 0xe2e6ec, roughness: 0.75, metalness: 0.02 });
     const matMarkYellow = city._getMat('cityStripeYellow', null, { color: 0xe2b424, roughness: 0.72, metalness: 0.02 });
+    const matJakartaShopfront = city._getMat('jakartaShopfront', null, { color: 0xd4d8de, roughness: 0.56, metalness: 0.16 });
+    const matTowerCurtain = city._getMat('towerCurtainWall', null, { color: 0x8ea0b2, roughness: 0.34, metalness: 0.36 });
     const matInvisColl = city._getInvisCollMat();
 
     // Geometry buckets (roads/street infra vs spatial building sectors)
@@ -108,6 +110,8 @@
         truss: [],
         steelDark: [],
         amber: [],
+        shopfront: [],
+        towerCurtain: [],
         lod: []
       };
     }
@@ -298,6 +302,8 @@
       { key: 'truss', mat: matTruss, canShadow: false, receiveShadow: true, prefix: 'BuildingTrim' },
       { key: 'steelDark', mat: matSteelDark, canShadow: false, receiveShadow: true, prefix: 'BuildingSteel' },
       { key: 'amber', mat: matAmber, canShadow: false, receiveShadow: false, prefix: 'BuildingBeacons' },
+      { key: 'shopfront', mat: matJakartaShopfront, canShadow: false, receiveShadow: true, prefix: 'JakartaShopfronts' },
+      { key: 'towerCurtain', mat: matTowerCurtain, canShadow: true, receiveShadow: true, prefix: 'TowerCurtainWalls' },
       { key: 'glass', mat: matGlassBldg, canShadow: false, receiveShadow: true, prefix: 'BuildingGlass' }
     ];
 
@@ -431,17 +437,51 @@
     // =========================================================
     // 2. ROAD LANE MARKINGS & ZEBRA CROSSWALKS
     // =========================================================
+    const BLVD_CROSSWALK_ZS = [-82.5, -65.5, 0.0, 65.5, 82.5];
     const addRoadMarkingsNS = (roadMinX, roadMaxX, isMajor) => {
       const cx = (roadMinX + roadMaxX) * 0.5;
       const laneW = (roadMaxX - roadMinX) * 0.25;
-      for (let z = DIST_Z_MIN + 2; z <= DIST_Z_MAX - 2; z += 6.0) {
-        // Skip markings inside cross-street intersections
-        if ((z > southCrossZ0 - 2 && z < southCrossZ1 + 2) || (z > northCrossZ0 - 2 && z < northCrossZ1 + 2)) continue;
-        addBox(bYellowMark, 0.14, 0.010, 4.8, cx - 0.12, STREET_GROUND_Y + 0.010, z);
-        addBox(bYellowMark, 0.14, 0.010, 4.8, cx + 0.12, STREET_GROUND_Y + 0.010, z);
+      const pushClippedStrip = (bucket, w, x, z0, z1) => {
+        // Clip segment [z0, z1] cleanly against intersections & zebra crosswalk exclusion zones
+        let segs = [[z0, z1]];
+        const cuts = [
+          [southCrossZ0 - 1.2, southCrossZ1 + 1.2],
+          [northCrossZ0 - 1.2, northCrossZ1 + 1.2]
+        ];
         if (isMajor) {
-          addBox(bWhiteMark, 0.12, 0.010, 2.8, cx - laneW, STREET_GROUND_Y + 0.010, z);
-          addBox(bWhiteMark, 0.12, 0.010, 2.8, cx + laneW, STREET_GROUND_Y + 0.010, z);
+          for (let ci = 0; ci < BLVD_CROSSWALK_ZS.length; ci++) {
+            const cz = BLVD_CROSSWALK_ZS[ci];
+            cuts.push([cz - 2.35, cz + 2.35]);
+          }
+        }
+        for (let k = 0; k < cuts.length; k++) {
+          const [c0, c1] = cuts[k];
+          const next = [];
+          for (let s = 0; s < segs.length; s++) {
+            const [a, b] = segs[s];
+            if (b <= c0 || a >= c1) {
+              next.push([a, b]);
+            } else {
+              if (a < c0) next.push([a, c0]);
+              if (b > c1) next.push([c1, b]);
+            }
+          }
+          segs = next;
+        }
+        for (let s = 0; s < segs.length; s++) {
+          const [a, b] = segs[s];
+          const len = b - a;
+          if (len >= 0.45) {
+            addBox(bucket, w, 0.010, len, x, STREET_GROUND_Y + 0.010, (a + b) * 0.5);
+          }
+        }
+      };
+      for (let z = DIST_Z_MIN + 2; z <= DIST_Z_MAX - 2; z += 6.0) {
+        pushClippedStrip(bYellowMark, 0.14, cx - 0.12, z - 2.4, z + 2.4);
+        pushClippedStrip(bYellowMark, 0.14, cx + 0.12, z - 2.4, z + 2.4);
+        if (isMajor) {
+          pushClippedStrip(bWhiteMark, 0.12, cx - laneW, z - 1.4, z + 1.4);
+          pushClippedStrip(bWhiteMark, 0.12, cx + laneW, z - 1.4, z + 1.4);
         }
       }
     };
@@ -452,12 +492,25 @@
 
     const addRoadMarkingsEW = (z0, z1, x0, x1) => {
       const cz = (z0 + z1) * 0.5;
+      const ewCrossXs = [
+        westInnerSwMinX + 2.5,
+        westOuterSwMaxX - 2.5,
+        eastInnerSwMaxX - 2.5,
+        eastOuterSwMinX + 2.5,
+        cMinX - 2.0,
+        cMaxX + 2.0
+      ];
       for (let x = x0 + 2; x <= x1 - 2; x += 6.0) {
         if (x > westInnerSwMinX - 3.0 && x < eastInnerSwMaxX + 3.0) continue;
         if (x > westRoadMinX - 2.5 && x < westRoadMaxX + 2.5) continue;
         if (x > eastRoadMinX - 2.5 && x < eastRoadMaxX + 2.5) continue;
         if (x > westOuterSwMinX - 2.0 && x < westOuterSwMaxX + 2.0) continue;
         if (x > eastOuterSwMinX - 2.0 && x < eastOuterSwMaxX + 2.0) continue;
+        let hitsCw = false;
+        for (let ci = 0; ci < ewCrossXs.length; ci++) {
+          if (Math.abs(x - ewCrossXs[ci]) < 3.4) { hitsCw = true; break; }
+        }
+        if (hitsCw) continue;
         addBox(bYellowMark, 3.2, 0.010, 0.14, x, STREET_GROUND_Y + 0.010, cz - 0.11);
         addBox(bYellowMark, 3.2, 0.010, 0.14, x, STREET_GROUND_Y + 0.010, cz + 0.11);
       }
@@ -673,7 +726,59 @@
       }
     };
 
-    // A) Indonesian 2-3 Story Ruko (Shophouse) Row with Ground Colonnade Arcade, Recessed Shopfronts & Pitched Roofs
+    // Atlas-mapped Jakarta shopfront / signboard quad helper (4x2 atlas in mats.jakartaShopfront)
+    // vSub0..vSub1 in [0..1] selects full storefront (0..1), signboard fascia (0.79..1.0), or lower display+shutter (0..0.79)
+    const addShopfrontQuad = (bucket, shopIdx, w, h, x, y, z, ry, vSub0, vSub1) => {
+      const idx = ((shopIdx | 0) % 8 + 8) % 8;
+      const col = idx % 4;
+      const row = Math.floor(idx / 4); // row 0 = top half (v 0.5..1.0), row 1 = bottom half (v 0.0..0.5)
+      const u0 = col * 0.25 + 0.004;
+      const u1 = (col + 1) * 0.25 - 0.004;
+      const rowV0 = row === 0 ? 0.50 : 0.0;
+      const rowV1 = row === 0 ? 1.00 : 0.50;
+      const vs0 = vSub0 !== undefined ? vSub0 : 0.0;
+      const vs1 = vSub1 !== undefined ? vSub1 : 1.0;
+      const v0 = rowV0 + (rowV1 - rowV0) * vs0 + 0.002;
+      const v1 = rowV0 + (rowV1 - rowV0) * vs1 - 0.002;
+      const geo = new THREE.PlaneGeometry(w, h);
+      const uv = geo.attributes.uv;
+      for (let i = 0; i < uv.count; i++) {
+        const u = uv.getX(i);
+        const v = uv.getY(i);
+        uv.setXY(i, u0 + u * (u1 - u0), v0 + v * (v1 - v0));
+      }
+      uv.needsUpdate = true;
+      if (ry) geo.rotateY(ry);
+      geo.translate(x, y, z);
+      bucket.push(prepGeo(geo, false));
+    };
+
+    // Double-sided protruding vertical/horizontal Indonesian blade signboard over sidewalk!
+    const addBladeSign = (sb, shopIdx, x, y, z, dirSign, alongZ) => {
+      const signW = 0.88;
+      const signH = 1.45;
+      if (alongZ) {
+        // Protrudes along X out from front wall, faces +/-Z down the boulevard!
+        const cx = x + dirSign * (signW * 0.5 + 0.14);
+        addBuildingBox(sb, 'steelDark', signW + 0.18, 0.08, 0.08, cx - dirSign * 0.06, y + signH * 0.42, z, 0, 0, 0, 1.0, false);
+        addBuildingBox(sb, 'steelDark', signW + 0.18, 0.08, 0.08, cx - dirSign * 0.06, y - signH * 0.42, z, 0, 0, 0, 1.0, false);
+        addBuildingBox(sb, 'steelDark', signW, signH, 0.10, cx, y, z, 0, 0, 0, 1.0, false);
+        addShopfrontQuad(sb.shopfront, shopIdx, signW - 0.06, signH - 0.08, cx, y, z + 0.056, 0, 0.78, 1.0);
+        addShopfrontQuad(sb.shopfront, shopIdx, signW - 0.06, signH - 0.08, cx, y, z - 0.056, Math.PI, 0.78, 1.0);
+      } else {
+        // Protrudes along Z out from front wall, faces +/-X along cross street!
+        const cz = z + dirSign * (signW * 0.5 + 0.14);
+        addBuildingBox(sb, 'steelDark', 0.08, 0.08, signW + 0.18, x, y + signH * 0.42, cz - dirSign * 0.06, 0, 0, 0, 1.0, false);
+        addBuildingBox(sb, 'steelDark', 0.10, signH, signW, x, y, cz, 0, 0, 0, 1.0, false);
+        addShopfrontQuad(sb.shopfront, shopIdx, signW - 0.06, signH - 0.08, x + 0.056, y, cz, Math.PI * 0.5, 0.78, 1.0);
+        addShopfrontQuad(sb.shopfront, shopIdx, signW - 0.06, signH - 0.08, x - 0.056, y, cz, -Math.PI * 0.5, 0.78, 1.0);
+      }
+    };
+
+    const _archId = (arch && arch.id) ? arch.id : 'dukuh_atas';
+    let _shopCounter = (_archId === 'cawang' ? 2 : _archId === 'cikoko' ? 5 : _archId === 'kuningan' ? 3 : 0);
+
+    // A) Indonesian 2-3 Story Ruko (Shophouse) Row with Ground Colonnade Arcade, Real Jakarta Shopfronts, Signboards, Awnings & Pitched Roofs
     const buildRukoRow = (sb, x0, z0, x1, z1, faceSide, bays, hasThreeFloors) => {
       // faceSide: 'east' (+X street face), 'west' (-X street face), 'south' (+Z), 'north' (-Z)
       const minX = Math.min(x0, x1);
@@ -690,20 +795,25 @@
       const ufH = hasThreeFloors ? 6.60 : 3.40;
       const baseY = SIDEWALK_Y - 0.04;
 
-      if (sb.isFar) {
+      {
         const totH = gfH + ufH + 1.4;
-        addColoredBox(sb.lod, w, totH, d, (minX + maxX) * 0.5, baseY + totH * 0.5, (minZ + maxZ) * 0.5, 0, 0, 0, 0xa89282, 0.78);
+        addColoredBox(sb.lod, w, totH, d, (minX + maxX) * 0.5, baseY + totH * 0.5, (minZ + maxZ) * 0.5, 0, 0, 0, 0xb8a392, 0.80);
       }
 
       for (let b = 0; b < bayCount; b++) {
+        const shopIdx = (_shopCounter++) % 8;
         const b0 = (alongZ ? minZ : minX) + b * baySpan + 0.08;
         const b1 = b0 + baySpan - 0.16;
+        const bMid = (b0 + b1) * 0.5;
+        const bW = Math.max(2.2, b1 - b0);
         const depthVar = (b % 2 === 1 ? -0.45 : 0.0);
         const hVar = (b % 3 === 0 ? 0.35 : 0.0);
         const wallKey = b % 3 === 0 ? 'facadePlaster' : (b % 3 === 1 ? 'brick' : 'facadeModern');
         const roofKey = b % 2 === 0 ? 'roofTerra' : 'roofOchre';
 
         if (alongZ) {
+          const dirX = faceSide === 'east' ? 1 : -1;
+          const faceRy = faceSide === 'east' ? Math.PI * 0.5 : -Math.PI * 0.5;
           const frontX = faceSide === 'east' ? maxX : minX;
           const backX = faceSide === 'east' ? minX - depthVar : maxX + depthVar;
           const coreX0 = faceSide === 'east' ? Math.min(backX, frontX - overhangDepth) : frontX + overhangDepth;
@@ -714,10 +824,17 @@
           const gfPts = [[coreX0, b0], [coreX1, b0], [coreX1, b1], [coreX0, b1]];
           addExtrudedTier(sb, wallKey, gfPts, baseY, gfH, 3.6, true, 'building', true);
 
-          // Recessed glazed shopfront & wood fascia signage beam
-          const shopFaceX = faceSide === 'east' ? coreX1 + 0.04 : coreX0 - 0.04;
-          addBuildingBox(sb, 'glass', 0.12, 2.55, baySpan - 0.85, shopFaceX, SIDEWALK_Y + 1.40, (b0 + b1) * 0.5, 0, 0, 0, 2.0, false);
-          addBuildingBox(sb, 'darkWood', 0.28, 0.58, baySpan - 0.2, colX, SIDEWALK_Y + gfH - 0.28, (b0 + b1) * 0.5, 0, 0, 0, 2.5, false);
+          // Authentic Jakarta recessed shopfront (rolling shutter + lit display glass + interior shelves)
+          const shopFaceX = (faceSide === 'east' ? coreX1 : coreX0) + dirX * 0.05;
+          addShopfrontQuad(sb.shopfront, shopIdx, bW - 0.32, 2.95, shopFaceX, SIDEWALK_Y + 1.48, bMid, faceRy, 0.0, 0.78);
+          // Front illuminated Indonesian signboard fascia along colonnade lintel + sloped corrugated awning
+          addBuildingBox(sb, 'steelDark', 0.26, 0.78, bW - 0.08, colX + dirX * 0.08, SIDEWALK_Y + gfH - 0.36, bMid, 0, 0, 0, 2.0, false);
+          addShopfrontQuad(sb.shopfront, shopIdx, bW - 0.14, 0.72, colX + dirX * 0.22, SIDEWALK_Y + gfH - 0.36, bMid, faceRy, 0.79, 1.0);
+          // Sloped storefront awning projecting over sidewalk edge
+          addBuildingBox(sb, b % 2 === 0 ? 'roofTerra' : 'roofOchre', 1.12, 0.07, bW - 0.16, frontX + dirX * 0.46, SIDEWALK_Y + gfH - 0.86, bMid, 0, 0, dirX * -0.28, 1.8, false);
+          if (sb.isNear && b % 2 === 1) {
+            addBladeSign(sb, shopIdx, frontX, SIDEWALK_Y + gfH + 1.25, bMid, dirX, true);
+          }
 
           // Colonnade arcade columns supporting overhanging 2nd floor
           for (const cz of [b0 + 0.22, b1 - 0.22]) {
@@ -731,32 +848,46 @@
             : [[Math.min(coreX0, frontX), b0], [Math.max(coreX1, frontX), b0], [Math.max(coreX1, frontX), b1], [Math.min(coreX0, frontX), b1]];
           addExtrudedTier(sb, wallKey, ufPts, baseY + gfH, ufH + hVar, 3.8, true, 'building', true);
 
-          // Upper recessed windows & metal balcony rail
-          const winX = faceSide === 'east' ? frontX + 0.03 : frontX - 0.03;
-          addBuildingBox(sb, 'glass', 0.10, 1.55, baySpan * 0.62, winX, SIDEWALK_Y + gfH + 1.55, (b0 + b1) * 0.5, 0, 0, 0, 2.0, false);
-          if (sb.isNear) {
-            addBuildingBox(sb, 'steelDark', 0.55, 0.90, baySpan * 0.72, faceSide === 'east' ? frontX + 0.24 : frontX - 0.24, SIDEWALK_Y + gfH + 0.55, (b0 + b1) * 0.5, 0, 0, 0, 2.0, false);
+          // Upper recessed window grids with concrete sills, lintels, mullions & balcony rails (both 2nd & 3rd floors!)
+          const winX = frontX + dirX * 0.04;
+          const floorCount = hasThreeFloors ? 2 : 1;
+          for (let fl = 0; fl < floorCount; fl++) {
+            const wy = SIDEWALK_Y + gfH + 1.55 + fl * 3.15;
+            const winSpan = bW * 0.72;
+            addBuildingBox(sb, 'glass', 0.10, 1.55, winSpan, winX, wy, bMid, 0, 0, 0, 2.0, false);
+            // Concrete sill & sun-shade brow ledge + center steel mullion
+            addBuildingBox(sb, 'curb', 0.28, 0.14, winSpan + 0.28, frontX + dirX * 0.12, wy - 0.82, bMid, 0, 0, 0, 2.0, false);
+            addBuildingBox(sb, 'curb', 0.42, 0.12, winSpan + 0.34, frontX + dirX * 0.18, wy + 0.84, bMid, 0, 0, 0, 2.0, false);
+            addBuildingBox(sb, 'steelDark', 0.14, 1.58, 0.08, frontX + dirX * 0.06, wy, bMid, 0, 0, 0, 1.0, false);
+            if (sb.isNear && fl === 0) {
+              // Steel balcony slab + tubular safety railing
+              addBuildingBox(sb, 'curb', 0.62, 0.14, winSpan + 0.30, frontX + dirX * 0.28, SIDEWALK_Y + gfH + 0.08, bMid, 0, 0, 0, 2.0, false);
+              addBuildingBox(sb, 'steelDark', 0.06, 0.86, winSpan + 0.26, frontX + dirX * 0.56, SIDEWALK_Y + gfH + 0.54, bMid, 0, 0, 0, 1.5, false);
+            }
           }
 
           // Hipped corrugated metal / terracotta roof
           const roofBaseY = baseY + gfH + ufH + hVar;
           addHippedRoof(sb[roofKey], Math.min(coreX0, frontX), b0, Math.max(coreX1, frontX), b1, roofBaseY, 1.75 + (b % 2) * 0.35, 0.48, 2.8);
 
-          // Rooftop blue/steel water tank ("toren") & AC outdoor unit (skip AC clutter on far blocks!)
+          // Rooftop orange/steel water tank ("toren air") & AC outdoor unit
           if (sb.isNear) {
             const torenX = (coreX0 + coreX1) * 0.5;
-            addCylinder(sb.steelDark, 0.45, 0.45, 1.10, 10, torenX, roofBaseY + 1.55, (b0 + b1) * 0.5);
+            addCylinder(sb.steelDark, 0.48, 0.48, 1.15, 10, torenX, roofBaseY + 1.58, bMid);
+            addCylinder(sb.truss, 0.52, 0.52, 0.16, 10, torenX, roofBaseY + 2.20, bMid);
             if (b % 2 === 0) {
               airconPlacements.push({
-                x: faceSide === 'east' ? frontX + 0.18 : frontX - 0.18,
+                x: frontX + dirX * 0.20,
                 y: SIDEWALK_Y + gfH + 0.55,
-                z: (b0 + b1) * 0.5 + baySpan * 0.28,
-                ry: faceSide === 'east' ? Math.PI * 0.5 : -Math.PI * 0.5
+                z: bMid + baySpan * 0.28,
+                ry: faceRy
               });
             }
           }
         } else {
           // Oriented along X facing North/South cross-street
+          const dirZ = faceSide === 'south' ? 1 : -1;
+          const faceRy = faceSide === 'south' ? 0 : Math.PI;
           const frontZ = faceSide === 'south' ? maxZ : minZ;
           const backZ = faceSide === 'south' ? minZ - depthVar : maxZ + depthVar;
           const coreZ0 = faceSide === 'south' ? Math.min(backZ, frontZ - overhangDepth) : frontZ + overhangDepth;
@@ -764,16 +895,25 @@
           const colZ = faceSide === 'south' ? frontZ - 0.24 : frontZ + 0.24;
 
           addExtrudedTier(sb, wallKey, [[b0, coreZ0], [b1, coreZ0], [b1, coreZ1], [b0, coreZ1]], baseY, gfH, 3.6, true, 'building', true);
-          const shopFaceZ = faceSide === 'south' ? coreZ1 + 0.04 : coreZ0 - 0.04;
-          addBuildingBox(sb, 'glass', baySpan - 0.85, 2.55, 0.12, (b0 + b1) * 0.5, SIDEWALK_Y + 1.40, shopFaceZ, 0, 0, 0, 2.0, false);
-          addBuildingBox(sb, 'darkWood', baySpan - 0.2, 0.58, 0.28, (b0 + b1) * 0.5, SIDEWALK_Y + gfH - 0.28, colZ, 0, 0, 0, 2.5, false);
+          const shopFaceZ = (faceSide === 'south' ? coreZ1 : coreZ0) + dirZ * 0.05;
+          addShopfrontQuad(sb.shopfront, shopIdx, bW - 0.32, 2.95, bMid, SIDEWALK_Y + 1.48, shopFaceZ, faceRy, 0.0, 0.78);
+          addBuildingBox(sb, 'steelDark', bW - 0.08, 0.78, 0.26, bMid, SIDEWALK_Y + gfH - 0.36, colZ + dirZ * 0.08, 0, 0, 0, 2.0, false);
+          addShopfrontQuad(sb.shopfront, shopIdx, bW - 0.14, 0.72, bMid, SIDEWALK_Y + gfH - 0.36, colZ + dirZ * 0.22, faceRy, 0.79, 1.0);
+          addBuildingBox(sb, b % 2 === 0 ? 'roofTerra' : 'roofOchre', bW - 0.16, 0.07, 1.12, bMid, SIDEWALK_Y + gfH - 0.86, frontZ + dirZ * 0.46, dirZ * 0.28, 0, 0, 1.8, false);
+          if (sb.isNear && b % 2 === 1) {
+            addBladeSign(sb, shopIdx, bMid, SIDEWALK_Y + gfH + 1.25, frontZ, dirZ, false);
+          }
+
           for (const cx of [b0 + 0.22, b1 - 0.22]) {
             addBuildingBox(sb, 'curb', 0.34, gfH, 0.34, cx, baseY + gfH * 0.5, colZ, 0, 0, 0, 2.0, true);
             self._addCollider(cx - 0.19, baseY, colZ - 0.19, cx + 0.19, baseY + gfH, colZ + 0.19, 'concrete', { blocksBullets: false });
           }
           addExtrudedTier(sb, wallKey, [[b0, Math.min(coreZ0, frontZ)], [b1, Math.min(coreZ0, frontZ)], [b1, Math.max(coreZ1, frontZ)], [b0, Math.max(coreZ1, frontZ)]], baseY + gfH, ufH + hVar, 3.8, true, 'building', true);
-          const winZ = faceSide === 'south' ? frontZ + 0.03 : frontZ - 0.03;
-          addBuildingBox(sb, 'glass', baySpan * 0.62, 1.55, 0.10, (b0 + b1) * 0.5, SIDEWALK_Y + gfH + 1.55, winZ, 0, 0, 0, 2.0, false);
+          const winZ = frontZ + dirZ * 0.04;
+          const winSpan = bW * 0.72;
+          addBuildingBox(sb, 'glass', winSpan, 1.55, 0.10, bMid, SIDEWALK_Y + gfH + 1.55, winZ, 0, 0, 0, 2.0, false);
+          addBuildingBox(sb, 'curb', winSpan + 0.28, 0.14, 0.28, bMid, SIDEWALK_Y + gfH + 0.73, frontZ + dirZ * 0.12, 0, 0, 0, 2.0, false);
+          addBuildingBox(sb, 'curb', winSpan + 0.34, 0.12, 0.42, bMid, SIDEWALK_Y + gfH + 2.39, frontZ + dirZ * 0.18, 0, 0, 0, 2.0, false);
           const roofBaseY = baseY + gfH + ufH + hVar;
           addHippedRoof(sb[roofKey], b0, Math.min(coreZ0, frontZ), b1, Math.max(coreZ1, frontZ), roofBaseY, 1.75, 0.48, 2.8);
         }
@@ -836,14 +976,18 @@
         self._addCollider(wg[0], baseY, wg[1], wg[2], baseY + totalH, wg[3], 'building', {
           blocksWalk: true, blocksBullets: false
         });
-        if (sb.isFar) {
-          addColoredBox(sb.lod, wg[2] - wg[0], totalH, wg[3] - wg[1], (wg[0] + wg[2]) * 0.5, baseY + totalH * 0.5, (wg[1] + wg[3]) * 0.5, 0, 0, 0, 0x7b8998, 0.72);
-        }
+        addColoredBox(sb.lod, wg[2] - wg[0], totalH, wg[3] - wg[1], (wg[0] + wg[2]) * 0.5, baseY + totalH * 0.5, (wg[1] + wg[3]) * 0.5, 0, 0, 0, 0x8d9cab, 0.74);
       }
 
       const shaftH = Math.max(12.0, totalH - podH - 0.15);
       const shaftPts = insetTowardCenter(lPts, 0.45);
-      addExtrudedTier(sb, 'facadeModern', shaftPts, baseY + podH + 0.15, shaftH, 5.0, false, 'building', true);
+      // Multi-story glazed curtain-wall tower shaft (windows + aluminum mullions + emergency lit office floors!)
+      addExtrudedTier(sb, 'towerCurtain', shaftPts, baseY + podH + 0.15, shaftH, 16.0, false, 'building', true);
+      // Ground-floor podium commercial fascia signboard facing the main boulevard
+      const faceEast = (minX + maxX) * 0.5 < 0;
+      const lobbyFaceX = faceEast ? maxX + 0.06 : minX - 0.06;
+      const lobbyRy = faceEast ? Math.PI * 0.5 : -Math.PI * 0.5;
+      addShopfrontQuad(sb.shopfront, 3, Math.min(8.0, d * 0.42), 1.05, lobbyFaceX, SIDEWALK_Y + podH - 1.15, (minZ + maxZ) * 0.5, lobbyRy, 0.79, 1.0);
 
       // Horizontal architectural sun-shading fins every ~7m (only on near/detailed towers)
       if (!sb.isFar) {
@@ -879,9 +1023,7 @@
       const ch = Math.min(w, d) * 0.26;
       const baseY = SIDEWALK_Y - 0.04;
 
-      if (sb.isFar) {
-        addColoredBox(sb.lod, w * 0.86, totalH + 5.0, d * 0.86, cx, baseY + (totalH + 5.0) * 0.5, cz, 0, 0, 0, 0x8996a4, 0.72);
-      }
+      addColoredBox(sb.lod, w * 0.86, totalH + 5.0, d * 0.86, cx, baseY + (totalH + 5.0) * 0.5, cz, 0, 0, 0, 0x95a4b3, 0.74);
 
       const makeOct = (ox, oz, ow, od, oc) => [
         [ox - ow * 0.5 + oc, oz - od * 0.5],
@@ -901,9 +1043,9 @@
       addExtrudedTier(sb, 'curb', podPts, baseY, 0.9, 4.0, true, 'building', true);
       addExtrudedTier(sb, 'glass', makeOct(cx, cz, w * 0.94, d * 0.94, ch), baseY + 0.9, 3.5, 3.0, false, 'building', true);
       addExtrudedTier(sb, 'curb', makeOct(cx, cz, w * 0.98, d * 0.98, ch), baseY + 4.4, 0.8, 4.0, false, 'building', false);
-      addExtrudedTier(sb, 'facadeModern', midPts, baseY + 5.2, totalH * 0.62, 4.8, false, 'building', true);
+      addExtrudedTier(sb, 'towerCurtain', midPts, baseY + 5.2, totalH * 0.62, 16.0, false, 'building', true);
       addExtrudedTier(sb, 'glass', makeOct(cx, cz, w * 0.74, d * 0.74, ch * 0.85), baseY + 5.2 + totalH * 0.62, totalH * 0.24, 4.0, false, 'building', false);
-      addExtrudedTier(sb, 'facadePlaster', topPts, baseY + 5.2 + totalH * 0.86, totalH * 0.14, 3.5, false, 'building', false);
+      addExtrudedTier(sb, 'towerCurtain', topPts, baseY + 5.2 + totalH * 0.86, totalH * 0.14, 14.0, false, 'building', false);
 
       if (sb.isNear) {
         const marqShape = new THREE.Shape();
@@ -956,15 +1098,19 @@
       }
 
       addExtrudedTier(sb, 'brick', uPts, baseY, 3.4, 3.2, false, 'building', true);
-      addExtrudedTier(sb, 'facadePlaster', uPts, baseY + 3.4, Math.max(4.0, h - 3.4), 4.2, false, 'building', true);
+      addExtrudedTier(sb, 'towerCurtain', uPts, baseY + 3.4, Math.max(4.0, h - 3.4), 14.0, false, 'building', true);
+      // Ground-floor commercial shopfront bays along the U-courtyard street wings
+      const uDirX = openSide === 'east' ? 1 : -1;
+      const uFaceRy = openSide === 'east' ? Math.PI * 0.5 : -Math.PI * 0.5;
+      const uFrontX = openSide === 'east' ? maxX + 0.06 : minX - 0.06;
+      addShopfrontQuad(sb.shopfront, (_shopCounter++) % 8, wingT * 0.84, 3.0, uFrontX, SIDEWALK_Y + 1.55, minZ + wingT * 0.5, uFaceRy, 0.0, 1.0);
+      addShopfrontQuad(sb.shopfront, (_shopCounter++) % 8, wingT * 0.84, 3.0, uFrontX, SIDEWALK_Y + 1.55, maxZ - wingT * 0.5, uFaceRy, 0.0, 1.0);
       for (let bi = 0; bi < boxes.length; bi++) {
         const bx = boxes[bi];
         self._addCollider(bx[0], baseY, bx[1], bx[2], baseY + h, bx[3], 'building', {
           blocksWalk: true, blocksBullets: false
         });
-        if (sb.isFar) {
-          addColoredBox(sb.lod, bx[2] - bx[0], h, bx[3] - bx[1], (bx[0] + bx[2]) * 0.5, baseY + h * 0.5, (bx[1] + bx[3]) * 0.5, 0, 0, 0, 0xb0a99f, 0.78);
-        }
+        addColoredBox(sb.lod, bx[2] - bx[0], h, bx[3] - bx[1], (bx[0] + bx[2]) * 0.5, baseY + h * 0.5, (bx[1] + bx[3]) * 0.5, 0, 0, 0, 0xbab2a6, 0.78);
         addBuildingBox(sb, 'curb', bx[2] - bx[0] + 0.24, 0.55, bx[3] - bx[1] + 0.24, (bx[0] + bx[2]) * 0.5, baseY + h + 0.275, (bx[1] + bx[3]) * 0.5, 0, 0, 0, 3.0, false);
       }
 
@@ -1012,9 +1158,7 @@
       addExtrudedTier(sb, 'brick', trapPts, baseY, 4.0, 3.5, true, 'building', true);
       const diagCX = (minX + maxX) * 0.5;
       const diagCZ = (minZ + maxZ) * 0.5;
-      if (sb.isFar) {
-        addColoredBox(sb.lod, (maxX - minX) * 0.90, h + 1.5, (maxZ - minZ) * 0.90, diagCX, baseY + (h + 1.5) * 0.5, diagCZ, 0, 0, 0, 0x9b8677, 0.78);
-      }
+      addColoredBox(sb.lod, (maxX - minX) * 0.90, h + 1.5, (maxZ - minZ) * 0.90, diagCX, baseY + (h + 1.5) * 0.5, diagCZ, 0, 0, 0, 0xa89282, 0.78);
       const glassTrap = trapPts.map(([px, pz]) => [
         diagCX + (px - diagCX) * 0.88,
         diagCZ + (pz - diagCZ) * 0.88
@@ -1025,7 +1169,7 @@
       ]);
       addExtrudedTier(sb, 'glass', glassTrap, baseY + 4.0, 2.5, 3.0, false, 'building', true);
       addExtrudedTier(sb, 'curb', midTrap, baseY + 6.5, 0.45, 3.5, false, 'building', false);
-      addExtrudedTier(sb, 'facadeModern', midTrap, baseY + 6.95, Math.max(4.0, h - 6.95), 4.2, false, 'building', true);
+      addExtrudedTier(sb, 'towerCurtain', midTrap, baseY + 6.95, Math.max(4.0, h - 6.95), 14.0, false, 'building', true);
       addHippedRoof(sb.roofTerra, diagCX - (maxX - minX) * 0.42, diagCZ - (maxZ - minZ) * 0.42, diagCX + (maxX - minX) * 0.42, diagCZ + (maxZ - minZ) * 0.42, baseY + h, 2.2, 0.5, 3.0);
     };
 
@@ -1036,6 +1180,17 @@
     };
 
     function buildInnerBlocksStage() {
+    // Station-specific Jakarta exterior district character (6 distinct urban silhouettes!)
+    const districtProfile = {
+      dukuh_atas: { towerScale: 1.25, rukoThreeFloor: true, preferHighrise: true, outerBaseH: 38 },
+      cawang:     { towerScale: 0.92, rukoThreeFloor: true, preferHighrise: false, outerBaseH: 26 },
+      harjamukti: { towerScale: 0.62, rukoThreeFloor: false, preferHighrise: false, outerBaseH: 16 },
+      kuningan:   { towerScale: 1.18, rukoThreeFloor: true, preferHighrise: true, outerBaseH: 36 },
+      cikoko:     { towerScale: 0.86, rukoThreeFloor: true, preferHighrise: false, outerBaseH: 24 },
+      setiabudi:  { towerScale: 1.38, rukoThreeFloor: true, preferHighrise: true, outerBaseH: 44 }
+    }[_archId] || { towerScale: 1.0, rukoThreeFloor: true, preferHighrise: false, outerBaseH: 32 };
+    const tScale = districtProfile.towerScale;
+
     // Populate Inner West Blocks (facing West Boulevard)
     for (let i = 0; i < innerWestBlocks.length; i++) {
       const blk = innerWestBlocks[i];
@@ -1047,18 +1202,24 @@
       const midX = (bx0 + bx1) * 0.5;
       if (blk.zi === 0) {
         // Leave outer SW corner half open for SW Military Checkpoint & Convoy Hub
-        buildUCourtyardComplex(sb, midX + 1.0, bz0, bx1, bz1, 'east', 14.5);
+        buildUCourtyardComplex(sb, midX + 1.0, bz0, bx1, bz1, 'east', 14.5 * Math.max(0.8, tScale * 0.9));
       } else if (blk.zi === 1) {
-        buildRukoRow(sb, midX + 1.5, bz0, bx1, bz1, 'east', 5, false);
-        buildChamferedTower(sb, bx0, bz0 + 1.5, midX - 0.5, bz1 - 1.5, 28.0);
+        buildRukoRow(sb, midX + 1.5, bz0, bx1, bz1, 'east', 5, districtProfile.rukoThreeFloor);
+        buildChamferedTower(sb, bx0, bz0 + 1.5, midX - 0.5, bz1 - 1.5, 28.0 * tScale);
       } else if (blk.zi === 2) {
-        buildLShapedTower(sb, bx0 + 1.0, bz0 + 1.0, bx1 - 1.0, bz1 - 1.0, 2, 34.0);
+        if (districtProfile.preferHighrise) {
+          buildLShapedTower(sb, bx0 + 1.0, bz0 + 1.0, bx1 - 1.0, bz1 - 1.0, 2, 36.0 * tScale);
+        } else {
+          // Cawang / Cikoko / Harjamukti: lively street-facing Jakarta ruko strip directly across West Blvd!
+          buildRukoRow(sb, midX + 1.5, bz0, bx1, bz1, 'east', 5, districtProfile.rukoThreeFloor);
+          buildLShapedTower(sb, bx0, bz0 + 1.0, midX - 0.5, bz1 - 1.0, 2, 24.0 * tScale);
+        }
       } else if (blk.zi === 3) {
         buildRukoRow(sb, midX + 1.5, bz0, bx1, bz1, 'east', 5, true);
-        buildDiagonalCivic(sb, bx0, bz0 + 1.0, midX - 0.5, bz1 - 1.0, 14.0);
+        buildDiagonalCivic(sb, bx0, bz0 + 1.0, midX - 0.5, bz1 - 1.0, 14.0 * Math.max(0.85, tScale));
       } else {
         // Leave outer NW corner half open for NW PMI Emergency Medical Hub & Ambulance
-        buildChamferedTower(sb, midX + 1.0, bz0 + 1.5, bx1 - 1.0, bz1 - 1.5, 24.0);
+        buildChamferedTower(sb, midX + 1.0, bz0 + 1.5, bx1 - 1.0, bz1 - 1.5, 24.0 * tScale);
       }
     }
 
@@ -1073,26 +1234,32 @@
       const midX = (bx0 + bx1) * 0.5;
       if (blk.zi === 0) {
         // Leave outer SE corner half open for SE Pos Ronda & Warung Kopi Hub
-        buildLShapedTower(sb, bx0 + 1.0, bz0 + 1.0, midX - 1.0, bz1 - 1.0, 0, 26.0);
+        buildLShapedTower(sb, bx0 + 1.0, bz0 + 1.0, midX - 1.0, bz1 - 1.0, 0, 26.0 * tScale);
       } else if (blk.zi === 1) {
-        buildRukoRow(sb, bx0, bz0, midX - 1.5, bz1, 'west', 5, true);
-        buildLShapedTower(sb, midX + 0.5, bz0 + 1.0, bx1, bz1 - 1.0, 1, 26.0);
+        buildRukoRow(sb, bx0, bz0, midX - 1.5, bz1, 'west', 5, districtProfile.rukoThreeFloor);
+        buildLShapedTower(sb, midX + 0.5, bz0 + 1.0, bx1, bz1 - 1.0, 1, 26.0 * tScale);
       } else if (blk.zi === 2) {
         // Hero Block E3 directly across East Boulevard from Main Concourse Entrance:
-        // Leave front 10m open as a walkable pocket plaza & build iconic Chamfered Tower + Café Ruko behind it!
-        buildChamferedTower(sb, bx0 + 9.0, bz0 + 1.5, bx1 - 0.5, bz1 - 8.5, 38.0);
+        // Walkable pocket plaza + Jakarta commercial ruko arcade + iconic Chamfered Tower behind it!
+        buildChamferedTower(sb, bx0 + 9.0, bz0 + 1.5, bx1 - 0.5, bz1 - 8.5, 38.0 * tScale);
         buildRukoRow(sb, bx0 + 1.0, bz1 - 7.5, bx1 - 1.0, bz1, 'north', 4, false);
       } else if (blk.zi === 3) {
-        buildUCourtyardComplex(sb, bx0, bz0, bx1, bz1, 'west', 15.5);
+        if (_archId === 'cawang' || _archId === 'cikoko') {
+          buildRukoRow(sb, bx0, bz0, midX - 1.5, bz1, 'west', 5, true);
+          buildUCourtyardComplex(sb, midX + 0.5, bz0, bx1, bz1, 'west', 16.5);
+        } else {
+          buildUCourtyardComplex(sb, bx0, bz0, bx1, bz1, 'west', 15.5 * Math.max(0.85, tScale));
+        }
       } else {
         // Leave outer NE corner half open for NE Expedition Logistics Yard & Security Booth
-        buildDiagonalCivic(sb, bx0 + 1.0, bz0 + 1.0, midX - 1.0, bz1 - 1.0, 18.0);
+        buildDiagonalCivic(sb, bx0 + 1.0, bz0 + 1.0, midX - 1.0, bz1 - 1.0, 18.0 * Math.max(0.85, tScale));
       }
     }
     }
 
     function buildOuterBlocksStage() {
     // Populate Outer West & East Jakarta CBD Skyline Blocks (tall non-square towers > 80m -> Far Sectors w/ LOD1!)
+    const outerBaseH = (_archId === 'harjamukti' ? 16 : _archId === 'setiabudi' ? 44 : _archId === 'dukuh_atas' ? 38 : _archId === 'kuningan' ? 36 : 28);
     const outerSets = [
       { blks: outerWestBlocks, sb: sectorBuckets.Sector_W_Far, openSide: 'east' },
       { blks: outerEastBlocks, sb: sectorBuckets.Sector_E_Far, openSide: 'west' }
@@ -1105,7 +1272,7 @@
         const bx1 = blk.x1 - 2.5;
         const bz0 = blk.z0 + 2.5;
         const bz1 = blk.z1 - 2.5;
-        const h = (arch && arch.id === 'harjamukti' ? 18 : 32) + rng() * 26;
+        const h = outerBaseH + rng() * 26;
         const kind = (i + s) % 4;
         if (kind === 0) buildLShapedTower(sb, bx0, bz0, bx1, bz1, (i + s) % 4, h);
         else if (kind === 1) buildChamferedTower(sb, bx0, bz0, bx1, bz1, h);
@@ -1884,7 +2051,7 @@
       root.add(sectorGroup);
 
       let lodMesh = null;
-      if (sb.isFar && sb.lod.length > 0) {
+      if (sb.lod.length > 0) {
         const lodGeo = THREE_UTILS.mergeGeometries(sb.lod, false);
         for (let li = 0; li < sb.lod.length; li++) sb.lod[li].dispose();
         if (lodGeo) {
@@ -1897,8 +2064,6 @@
           lodMesh.name = `${sk}_LOD1`;
           root.add(lodMesh);
         }
-      } else {
-        for (let li = 0; li < sb.lod.length; li++) sb.lod[li].dispose();
       }
 
       const chunkEntry = {
@@ -1907,13 +2072,13 @@
         mesh: sectorGroup,
         box: localBox.clone(),
         localBox: localBox,
-        maxDist: 200,
+        maxDist: 280,
         isFar: !!sb.isFar,
         isSkyline: false
       };
       if (lodMesh) {
         chunkEntry.lodMesh = lodMesh;
-        chunkEntry.lodDist = 80;
+        chunkEntry.lodDist = sb.isFar ? 78 : 108;
       }
       city.cullChunks.push(chunkEntry);
     }

@@ -479,6 +479,42 @@
     city._emitInstancedProto(P.getMilitaryTruckProto(), militaryTruckPlacements, true, true, 'CornerMilitaryTruck');
     city._emitInstancedProto(P.getPalletProto(), palletPlacements, false, true, 'CornerCargoPallet');
 
+    // Living Jakarta Street Furniture: TransJakarta Halte Shelters, Green Directional Signs & Police Quarantine Barricades
+    const haltePlacements = [
+      { x: eastInnerSwMaxX - 1.55, y: SIDEWALK_Y, z: -24.5, ry: Math.PI * 0.5 },
+      { x: westInnerSwMinX + 1.55, y: SIDEWALK_Y, z: 24.5, ry: -Math.PI * 0.5 }
+    ];
+    if (arch && (arch.id === 'cawang' || arch.id === 'dukuh_atas')) {
+      haltePlacements.push({ x: eastOuterSwMinX + 1.65, y: SIDEWALK_Y, z: 24.5, ry: -Math.PI * 0.5 });
+    }
+    city._emitInstancedProto(P.getTransJakartaHalteProto(), haltePlacements, false, true, 'HalteTransJakarta');
+    for (let hi = 0; hi < haltePlacements.length; hi++) {
+      const hp = haltePlacements[hi];
+      city._addCollider(hp.x - 1.05, SIDEWALK_Y, hp.z - 2.65, hp.x + 1.05, SIDEWALK_Y + 2.85, hp.z + 2.65, 'metal', { blocksBullets: false });
+    }
+
+    const streetSignPlacements = [
+      { x: eastInnerSwMaxX - 1.4, y: SIDEWALK_Y, z: -61.5, ry: 0 },
+      { x: eastInnerSwMaxX - 1.4, y: SIDEWALK_Y, z: 61.5, ry: Math.PI },
+      { x: westInnerSwMinX + 1.4, y: SIDEWALK_Y, z: -61.5, ry: 0 },
+      { x: westInnerSwMinX + 1.4, y: SIDEWALK_Y, z: 61.5, ry: Math.PI },
+      { x: eastOuterSwMinX + 1.8, y: SIDEWALK_Y, z: 7.5, ry: -Math.PI * 0.5 }
+    ];
+    city._emitInstancedProto(P.getJakartaStreetSignProto(), streetSignPlacements, false, true, 'StreetSignJakarta');
+
+    const policeBarricadePlacements = [
+      { x: eastRoadCX - 2.6, y: STREET_GROUND_Y, z: -58.5, ry: 0.14 },
+      { x: eastRoadCX + 2.4, y: STREET_GROUND_Y, z: 58.5, ry: -0.18 },
+      { x: westRoadCX + 2.6, y: STREET_GROUND_Y, z: -54.0, ry: -0.22 },
+      { x: westRoadCX - 2.4, y: STREET_GROUND_Y, z: 56.0, ry: 0.16 },
+      { x: eastInnerSwMaxX - 2.2, y: SIDEWALK_Y, z: -7.5, ry: Math.PI * 0.5 + 0.12 }
+    ];
+    city._emitInstancedProto(P.getPoliceBarricadeProto(), policeBarricadePlacements, false, true, 'PoliceBarricade');
+    for (let pi = 0; pi < policeBarricadePlacements.length; pi++) {
+      const pb = policeBarricadePlacements[pi];
+      city._addCollider(pb.x - 0.92, pb.y, pb.z - 0.36, pb.x + 0.92, pb.y + 1.05, pb.z + 0.36, 'metal', { blocksBullets: false });
+    }
+
     // Register destructible/reactive environment prop anchors for ballistic & RPG impacts
     city.destructibleProps = [];
     const regDestruct = (list, kind, rad) => {
@@ -530,12 +566,13 @@
       outdoorTablePlacements.push({ x: eastOuterSwMinX + 2.75, y: SIDEWALK_Y, z: tz, ry: -Math.PI * 0.5 + (rng() - 0.5) * 0.2 });
       outdoorTablePlacements.push({ x: westOuterSwMaxX - 2.75, y: SIDEWALK_Y, z: tz + 3.0, ry: Math.PI * 0.5 + (rng() - 0.5) * 0.2 });
     }
-    // Monobloc warung plastic chairs clustered beside all 3 Gerobaks and along shopfronts
+    // Monobloc warung plastic chairs clustered beside all 3 Gerobaks (including overturned stools from evacuation panic!)
     for (let gi = 0; gi < gerobakPlacements.length; gi++) {
       const gs = gerobakPlacements[gi];
       const offX = gi === 0 ? 1.85 : (gi === 1 ? -1.45 : 1.45);
       monoblocChairPlacements.push({ x: gs.x + offX, y: SIDEWALK_Y, z: gs.z - 0.85, ry: gs.ry + 0.6 });
-      monoblocChairPlacements.push({ x: gs.x + offX, y: SIDEWALK_Y, z: gs.z + 0.95, ry: gs.ry + 2.2 });
+      // Toppled monobloc chair (hours-after-outbreak evacuation chaos!)
+      monoblocChairPlacements.push({ x: gs.x + offX + 0.35, y: SIDEWALK_Y + 0.24, z: gs.z + 0.95, rx: 1.42, ry: gs.ry + 2.2, rz: 0.25 });
       plasticCratePlacements.push({ x: gs.x + offX * 0.65, y: SIDEWALK_Y, z: gs.z - 1.55, ry: 0.2 + gi });
       plasticCratePlacements.push({ x: gs.x + offX * 0.65, y: SIDEWALK_Y + 0.25, z: gs.z - 1.55, ry: 0.35 + gi });
     }
@@ -1107,6 +1144,80 @@
         used: nUsed
       });
       placeCityFieldLogProp(city, root, cn.id, cn.x, cn.y, cn.z, cn.ry, nUsed);
+    }
+
+    // 3 Interactive Exterior Micro-Spots (Apotek K-24 Med Bag, Halte TransJakarta Emergency Kit, Ruko ATM Security Satchel)
+    const microSpots = [
+      {
+        id: 'city_halte_kit',
+        type: 'street_micro_spot',
+        x: eastInnerSwMaxX - 1.85,
+        y: SIDEWALK_Y + 0.52,
+        z: -24.5,
+        col: 0xdc2626,
+        accent: 0xf8fafc,
+        labelOpen: '[E] Ambil Tas P3K Halte TransJakarta (+25 HP & +8 Peluru 12G)',
+        labelUsed: '[E] Tas P3K Halte TransJakarta (Kosong)'
+      },
+      {
+        id: 'city_apotek_shelf',
+        type: 'street_micro_spot',
+        x: eastOuterSwMinX + 4.4,
+        y: SIDEWALK_Y + 0.04,
+        z: -43.5,
+        col: 0x059669,
+        accent: 0xf8fafc,
+        labelOpen: '[E] Ambil Paket Medis Apotek K-24 (+35 HP)',
+        labelUsed: '[E] Paket Medis Apotek K-24 (Sudah Diambil)'
+      },
+      {
+        id: 'city_atm_cache',
+        type: 'street_micro_spot',
+        x: westOuterSwMaxX - 4.2,
+        y: SIDEWALK_Y + 0.04,
+        z: 42.5,
+        col: 0x1e3a8a,
+        accent: 0xfacc15,
+        labelOpen: '[E] Ambil Tas Satpam ATM Mandiri (+20 Armor & +24 Peluru)',
+        labelUsed: '[E] Tas Satpam ATM Mandiri (Kosong)'
+      }
+    ];
+    city._perimeterHalos = city._perimeterHalos || [];
+    for (let mi = 0; mi < microSpots.length; mi++) {
+      const ms = microSpots[mi];
+      const mUsed = usedSet.has(ms.id);
+      const mGrp = new THREE.Group();
+      mGrp.name = 'StreetMicroSpot_' + ms.id;
+      mGrp.position.set(ms.x, ms.y, ms.z);
+      root.add(mGrp);
+      const bodyMat = new THREE.MeshStandardMaterial({ color: ms.col, roughness: 0.48, metalness: 0.14 });
+      const accMat = new THREE.MeshStandardMaterial({ color: ms.accent, roughness: 0.42, metalness: 0.12 });
+      const strapMat = new THREE.MeshStandardMaterial({ color: 0x1e2228, roughness: 0.78, metalness: 0.16 });
+      city.disposableMaterials.push(bodyMat, accMat, strapMat);
+      const gBag = new THREE.BoxGeometry(0.46, 0.24, 0.30);
+      const gStripe = new THREE.BoxGeometry(0.48, 0.055, 0.32);
+      const gHandle = new THREE.BoxGeometry(0.18, 0.05, 0.06);
+      city.disposableGeometries.push(gBag, gStripe, gHandle);
+      const mBag = new THREE.Mesh(gBag, bodyMat); mBag.position.y = 0.12; mGrp.add(mBag);
+      const mStr = new THREE.Mesh(gStripe, accMat); mStr.position.y = 0.14; mGrp.add(mStr);
+      const mHnd = new THREE.Mesh(gHandle, strapMat); mHnd.position.y = 0.26; mGrp.add(mHnd);
+      if (typeof LRT !== 'undefined' && LRT.Render && typeof LRT.Render.attachPerimeterHalo === 'function') {
+        const halo = LRT.Render.attachPerimeterHalo(mGrp, {
+          color: 0xfacc15, hoverColor: 0xfacc15, thicknessScale: 0.92, initialMode: mUsed ? 'off' : 'subtle'
+        });
+        city._perimeterHalos.push({ id: ms.id, halo: halo, used: mUsed, x: ms.x, y: ms.y, z: ms.z });
+      }
+      city.interactables.push({
+        id: ms.id,
+        type: 'street_micro_spot',
+        x: ms.x,
+        y: ms.y + 0.18,
+        z: ms.z,
+        label: mUsed ? ms.labelUsed : ms.labelOpen,
+        prompt: mUsed ? ms.labelUsed : ms.labelOpen,
+        _usedLabel: ms.labelUsed,
+        used: mUsed
+      });
     }
     if (typeof city._syncStreetBeacons === 'function') {
       city._syncStreetBeacons();

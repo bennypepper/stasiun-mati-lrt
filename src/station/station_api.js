@@ -446,7 +446,7 @@
       } : null;
 
       const matConcrete = this._resolveMat('concrete', 'concrete_station', { color: 0x9c9890, roughness: 0.90 });
-      const matConcreteRough = this._resolveMat('concreteRough', 'concrete_rough', { color: 0x8d8982, roughness: 0.92 });
+      const matConcreteRough = this._resolveMat('concreteRough', 'concrete_station', { color: 0x8d8982, roughness: 0.92 });
       const matDarkWood = this._resolveMat('darkWood', 'dark_wood', { color: 0x6f513d, roughness: 0.78 });
       const matCanopy = this._resolveCanopyMat(arch, mats);
 

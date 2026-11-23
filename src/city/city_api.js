@@ -840,31 +840,38 @@
       const isBalanced = qKey === 'balanced' || qKey === 'low';
       const tierCfg = (LRT.Config && LRT.Config.QUALITY_TIERS && LRT.Config.QUALITY_TIERS[qKey]) || null;
 
-      let bldgMaxDist = (tierCfg && typeof tierCfg.bldgMaxDist === 'number')
+      const bldgMaxDist = (tierCfg && typeof tierCfg.bldgMaxDist === 'number')
         ? tierCfg.bldgMaxDist
-        : (isPotato ? 75 : (isBalanced ? 115 : 165));
+        : (isPotato ? 235 : (isBalanced ? 255 : 280));
+      let bldgLodDist = (tierCfg && typeof tierCfg.bldgLodDist === 'number')
+        ? tierCfg.bldgLodDist
+        : (isPotato ? 72 : (isBalanced ? 105 : 145));
+      const majorPropMaxDist = (tierCfg && typeof tierCfg.majorPropMaxDist === 'number')
+        ? tierCfg.majorPropMaxDist
+        : (isPotato ? 145 : (isBalanced ? 175 : 210));
       const clutterMaxDist = (tierCfg && typeof tierCfg.clutterMaxDist === 'number')
         ? tierCfg.clutterMaxDist
-        : (isPotato ? 34 : (isBalanced ? 56 : 86));
+        : (isPotato ? 64 : (isBalanced ? 92 : 120));
 
       const ctx = playerContext || null;
       const trainCruising = !!(ctx && ctx.trainCruising);
       const insideConcourse = !!(ctx && ctx.insideConcourse);
 
-      // Deep enclosed concourse occlusion: hide far outer blocks > 75m when away from open street portals
+      // Inside concourse: NEVER pop out visible buildings seen through East glass curtain wall or open arches!
+      // Instead, gently shift distant sectors to 1-draw-call LOD1 slightly sooner to preserve 60 FPS.
       if (insideConcourse && !trainCruising) {
         let nearOpenPortal = false;
         if (camPos && this._concourseBounds) {
           const cb = this._concourseBounds;
           const lx = camPos.x - worldOffset.x;
           const lz = camPos.z - worldOffset.z;
-          const halfPortal = cb.portalHalfW || 5.5;
-          if (Math.abs(lx - cb.concMaxX) <= 4.0 && Math.abs(lz - cb.concMidZ) <= halfPortal) {
+          const halfPortal = cb.portalHalfW || 6.5;
+          if (Math.abs(lx - cb.concMaxX) <= 5.5 && Math.abs(lz - cb.concMidZ) <= halfPortal) {
             nearOpenPortal = true;
           }
         }
         if (!nearOpenPortal) {
-          bldgMaxDist = Math.min(bldgMaxDist, 75);
+          bldgLodDist = Math.max(58, Math.round(bldgLodDist * 0.82));
         }
       }
 
@@ -875,12 +882,12 @@
 
       const hasFrustum = !!(frustum && typeof frustum.intersectsBox === 'function');
 
-      // 1. Cull building/skyline spatial chunks (FOV + distance + concourse occlusion + trainCruising + LOD1 swap)
+      // 1. Building & skyline spatial chunks: frustum culling + smooth LOD0 -> LOD1 swap out to fog horizon
       for (let i = 0; i < this.cullChunks.length; i++) {
         const chunk = this.cullChunks[i];
         let vis = true;
 
-        if (trainCruising && (chunk.isFar || chunk.isSkyline)) {
+        if (trainCruising && chunk.isSkyline) {
           vis = false;
         }
         if (vis && hasFrustum && chunk.box && !frustum.intersectsBox(chunk.box)) {
@@ -888,7 +895,9 @@
         }
 
         const dist = (camPos && chunk.box) ? chunk.box.distanceToPoint(camPos) : 0;
-        const effMaxDist = Math.min(bldgMaxDist, chunk.maxDist || bldgMaxDist);
+        const effMaxDist = chunk.isSkyline
+          ? Math.max(360, chunk.maxDist || 420)
+          : Math.max(bldgMaxDist, chunk.maxDist || bldgMaxDist);
         if (vis && camPos && dist > effMaxDist) {
           vis = false;
         }
@@ -897,7 +906,10 @@
           if (chunk.mesh) chunk.mesh.visible = false;
           if (chunk.lodMesh) chunk.lodMesh.visible = false;
         } else if (chunk.lodMesh) {
-          const useLod = camPos ? (dist > (chunk.lodDist || 80)) : false;
+          const lodThreshold = trainCruising
+            ? 45
+            : Math.min(bldgLodDist, chunk.lodDist || bldgLodDist);
+          const useLod = camPos ? (dist > lodThreshold) : false;
           if (chunk.mesh) chunk.mesh.visible = !useLod;
           chunk.lodMesh.visible = useLod;
         } else if (chunk.mesh) {
@@ -905,12 +917,14 @@
         }
       }
 
-      // 2. Cull & dynamically switch 3-tier LODs on instanced props (FOV + distance + structural preservation)
+      // 2. Instanced props & vehicles: frustum culling + 3-tier distance LOD cascade (no 30m vanishing!)
       for (let i = 0; i < this.clutterMeshes.length; i++) {
         const cm = this.clutterMeshes[i];
         const ud = cm.userData || {};
-        const isStruct = !!ud._alwaysStructural;
-        if (trainCruising) {
+        const tier = ud._propTier || (ud._alwaysStructural ? 'structural' : 'micro');
+        const isStruct = tier === 'structural' || !!ud._alwaysStructural;
+        const isMajor = tier === 'major';
+        if (trainCruising && !isStruct) {
           cm.visible = false;
           continue;
         }
@@ -920,22 +934,22 @@
           continue;
         }
         const dist = (camPos && wBox) ? wBox.distanceToPoint(camPos) : 0;
-        const maxD = isStruct ? bldgMaxDist : clutterMaxDist;
+        const maxD = isStruct ? bldgMaxDist : (isMajor ? majorPropMaxDist : clutterMaxDist);
         if (camPos && wBox && dist > maxD) {
           cm.visible = false;
           continue;
         }
-        if (isPotato && !isStruct && camPos && wBox) {
-          wBox.getCenter(_tmpLocalCam);
-          if (_tmpLocalCam.distanceTo(camPos) > clutterMaxDist + 28) {
-            cm.visible = false;
-            continue;
-          }
-        }
         if (ud._lodTier !== undefined) {
-          const d1 = ud._lod1Dist || 22;
-          const d2 = ud._lod2Dist || 46;
-          const activeTier = isPotato ? (dist <= 10 ? 1 : 2) : (dist <= d1 ? 0 : (dist <= d2 ? 1 : 2));
+          const d1Base = ud._lod1Dist || 44;
+          const d2Base = ud._lod2Dist || 92;
+          let activeTier;
+          if (isPotato && !isStruct && !isMajor) {
+            activeTier = dist <= 14 ? 1 : 2;
+          } else {
+            const d1 = isPotato ? d1Base * 0.58 : (isBalanced ? d1Base * 0.85 : d1Base);
+            const d2 = isPotato ? d2Base * 0.65 : (isBalanced ? d2Base * 0.88 : d2Base);
+            activeTier = dist <= d1 ? 0 : (dist <= d2 ? 1 : 2);
+          }
           cm.visible = (ud._lodTier === activeTier);
           continue;
         }
@@ -1247,6 +1261,40 @@
           healAmount: fresh ? 25 : 0,
           fastSprint: fresh ? 45 : 0,
           message: fresh ? 'Termos Kopi & Bekal Pos Ronda: +25 HP & Fast Sprint 45s aktif!' : 'Termos Kopi & Bekal Pos Ronda sudah habis.'
+        };
+      }
+
+      if (it.type === 'street_micro_spot') {
+        if (LRT.Audio && typeof LRT.Audio.play === 'function') {
+          LRT.Audio.play('crate_open', { gain: 0.72 });
+          if (!it.used) LRT.Audio.play('loot_chime', { gain: 0.62 });
+        }
+        const fresh = !it.used;
+        it.used = true;
+        it.label = it._usedLabel || '[E] Suplai Trotoar (Kosong)';
+        it.prompt = it.label;
+        if (this._usedIds) this._usedIds.add(it.id);
+        this._syncStreetBeacons();
+        if (it.id === 'city_apotek_shelf') {
+          return {
+            ok: true, type: 'street_micro_spot', action: 'street_stash',
+            heal: fresh ? 35 : 0, healAmount: fresh ? 35 : 0,
+            message: fresh ? 'Paket Medis Apotek K-24: +35 HP!' : 'Paket Medis Apotek K-24 sudah diambil.'
+          };
+        }
+        if (it.id === 'city_atm_cache') {
+          return {
+            ok: true, type: 'street_micro_spot', action: 'street_stash',
+            armor: fresh ? 20 : 0, armorBonus: fresh ? 20 : 0,
+            ammo: fresh ? { type: 'all', amount: 24 } : null,
+            message: fresh ? 'Tas Satpam ATM Mandiri: +20 Armor & +24 Peluru!' : 'Tas Satpam ATM Mandiri sudah kosong.'
+          };
+        }
+        return {
+          ok: true, type: 'street_micro_spot', action: 'street_stash',
+          heal: fresh ? 25 : 0, healAmount: fresh ? 25 : 0,
+          ammo: fresh ? { type: 'shotgun', amount: 8 } : null,
+          message: fresh ? 'Tas P3K Halte TransJakarta: +25 HP & +8 Peluru 12G!' : 'Tas P3K Halte TransJakarta sudah kosong.'
         };
       }
 

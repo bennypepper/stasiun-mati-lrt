@@ -362,7 +362,9 @@
 
       // 2. Real Poly Haven PBR Texture Cache (with fast fallback ONLY if AssetLoader didn't load a key)
       const concrete = getPolySet('concrete_station', 1, 1, () => R.buildConcreteSet(maxAniso));
-      const concreteRough = getPolySet('concrete_rough', 1, 1, () => concrete);
+      // Use clean brushed/weathered architectural concrete for curbs, trims, and concrete pilings
+      // (never Poly Haven's circular-stud anti_slip_concrete!)
+      const concreteRough = R.buildConcreteSet(maxAniso) || concrete;
       const terrazzo = getPolySet('platform_granite', 1, 1, () => R.buildTerrazzoSet(maxAniso, false));
       const checker = getPolySet('concourse_tile', 1, 1, () => R.buildTerrazzoSet(maxAniso, true));
       const asphalt = getPolySet('asphalt_road', 1, 1, () => ({ map: R.buildHighwayRoadSet(maxAniso) }));
@@ -394,6 +396,9 @@
       const decalScorch = R.buildScorchDecalTexture(maxAniso);
       const barricadeTex = R.buildBarricadeTexture(maxAniso);
       const skylineFacade = R.buildSkylineFacadeSet(maxAniso);
+      const jakartaShopfront = typeof R.buildJakartaShopfrontAtlas === 'function'
+        ? R.buildJakartaShopfrontAtlas(maxAniso)
+        : null;
 
       // Reusable 1024x256 Station Banner CanvasTexture (high-res crisp sign!)
       const bCanvas = R.makeCanvas(1024, 256);
@@ -430,6 +435,7 @@
         decal_scorch: decalScorch,
         barricade: barricadeTex,
         skyline_facade: skylineFacade,
+        jakarta_shopfront: jakartaShopfront,
         highway_road: asphalt.map || asphalt
       };
 
@@ -640,6 +646,26 @@
           emissive: new THREE.Color(0xffffff),
           emissiveMap: bannerEmissive,
           emissiveIntensity: 0.62
+        }),
+
+        jakartaShopfront: new THREE.MeshStandardMaterial({
+          map: jakartaShopfront ? jakartaShopfront.map : stall.map,
+          roughnessMap: jakartaShopfront ? jakartaShopfront.roughnessMap : null,
+          roughness: 0.56,
+          metalness: 0.16,
+          emissive: new THREE.Color(0xffffff),
+          emissiveMap: jakartaShopfront ? jakartaShopfront.emissiveMap : null,
+          emissiveIntensity: 0.55
+        }),
+
+        towerCurtainWall: new THREE.MeshStandardMaterial({
+          map: skylineFacade.map,
+          roughnessMap: skylineFacade.roughnessMap,
+          roughness: 0.32,
+          metalness: 0.38,
+          emissive: new THREE.Color(0xffffff),
+          emissiveMap: skylineFacade.emissiveMap,
+          emissiveIntensity: 0.42
         }),
 
         glassPsd: new THREE.MeshPhysicalMaterial({

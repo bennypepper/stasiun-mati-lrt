@@ -93,7 +93,7 @@
 
       const bEl = document.createElement('div');
       bEl.className = 'pause-log-body';
-      bEl.textContent = item.body || '';
+      bEl.textContent = stripDocBoldMarkers(item.body || '');
 
       row.appendChild(head);
       row.appendChild(bEl);
@@ -134,6 +134,31 @@
     };
   }
 
+  function stripDocBoldMarkers(text) {
+    return String(text || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*\*/g, '');
+  }
+
+  function renderFormattedDocText(targetEl, rawText) {
+    if (!targetEl) return;
+    while (targetEl.firstChild) targetEl.removeChild(targetEl.firstChild);
+    const src = String(rawText || '');
+    const re = /\*\*(.+?)\*\*/g;
+    let lastIdx = 0;
+    let m;
+    while ((m = re.exec(src)) !== null) {
+      if (m.index > lastIdx) {
+        targetEl.appendChild(document.createTextNode(src.slice(lastIdx, m.index).replace(/\*\*/g, '')));
+      }
+      const strongEl = document.createElement('strong');
+      strongEl.textContent = m[1];
+      targetEl.appendChild(strongEl);
+      lastIdx = m.index + m[0].length;
+    }
+    if (lastIdx < src.length) {
+      targetEl.appendChild(document.createTextNode(src.slice(lastIdx).replace(/\*\*/g, '')));
+    }
+  }
+
   function openDocViewer(title, body, opts) {
     const dom = PL.dom || {};
     const o = opts || {};
@@ -168,7 +193,7 @@
       dom['doc-viewer-title'].textContent = title || 'Catatan';
     }
     if (dom['doc-viewer-body']) {
-      dom['doc-viewer-body'].textContent = body || '';
+      renderFormattedDocText(dom['doc-viewer-body'], body || '');
     }
     const bodyWrap = modal.querySelector('.doc-body-wrap');
     if (bodyWrap) bodyWrap.scrollTop = 0;
@@ -228,7 +253,7 @@
     const banner = dom['hud-log-banner'];
     if (!banner) return;
     if (dom['hud-log-title']) dom['hud-log-title'].textContent = title || 'Catatan';
-    if (dom['hud-log-body']) dom['hud-log-body'].textContent = body || '';
+    if (dom['hud-log-body']) renderFormattedDocText(dom['hud-log-body'], body || '');
     banner.classList.remove('hidden');
     banner.style.opacity = '1';
     logTimer = Math.max(3.5, typeof o.durationSec === 'number' ? o.durationSec : 8.0);

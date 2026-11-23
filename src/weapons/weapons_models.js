@@ -1004,16 +1004,24 @@
         blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
       }),
       gloveDark: new THREE.MeshStandardMaterial({
-        color: 0x15181e, map: texCache.knurlTex || whiteTex,
-        bumpMap: texCache.knurlBump || null, bumpScale: 0.0020,
-        roughness: 0.90, metalness: 0.02, envMapIntensity: 0.35
+        color: 0x1c2129, map: texCache.knurlTex || whiteTex,
+        bumpMap: texCache.knurlBump || null, bumpScale: 0.0024,
+        roughness: 0.86, metalness: 0.03, envMapIntensity: 0.45
+      }),
+      gloveLeather: new THREE.MeshStandardMaterial({
+        color: 0x14171c, map: texCache.knurlTex || whiteTex,
+        bumpMap: texCache.knurlBump || null, bumpScale: 0.0014,
+        roughness: 0.62, metalness: 0.06, envMapIntensity: 0.62
       }),
       gloveKnuckle: new THREE.MeshStandardMaterial({
-        color: 0x1f242c, roughness: 0.80, metalness: 0.05, envMapIntensity: 0.40
+        color: 0x2a303a, map: texCache.carbonWeaveTex || whiteTex,
+        bumpMap: texCache.carbonWeaveBump || null, bumpScale: 0.0018,
+        roughness: 0.46, metalness: 0.18, envMapIntensity: 0.78
       }),
       sleeveTactical: new THREE.MeshStandardMaterial({
-        color: 0x1a2029, map: texCache.knurlTex || whiteTex,
-        roughness: 0.92, metalness: 0.02, envMapIntensity: 0.32
+        color: 0x20272e, map: texCache.knurlTex || whiteTex,
+        bumpMap: texCache.knurlBump || null, bumpScale: 0.0028,
+        roughness: 0.92, metalness: 0.02, envMapIntensity: 0.34
       }),
       tritiumGreen: new THREE.MeshBasicMaterial({ color: 0x55ff77 }),
       redDot: new THREE.MeshBasicMaterial({ color: 0xff2a2a }),
@@ -1031,7 +1039,7 @@
     const base = createViewmodelMaterials();
     const cloned = {};
     for (const key of Object.keys(base)) {
-      if (key === 'rpgReticle' || key === 'holoReticleSS2' || key === 'holoReticleM4' || key === 'muzzleFlash' || key === 'gloveDark' || key === 'gloveKnuckle' || key === 'sleeveTactical') {
+      if (key === 'rpgReticle' || key === 'holoReticleSS2' || key === 'holoReticleM4' || key === 'muzzleFlash' || key === 'gloveDark' || key === 'gloveLeather' || key === 'gloveKnuckle' || key === 'sleeveTactical') {
         cloned[key] = base[key];
       } else if (base[key] && typeof base[key].clone === 'function') {
         cloned[key] = base[key].clone();
@@ -1050,7 +1058,7 @@
     const base = createViewmodelMaterials();
     const cloned = {};
     for (const key of Object.keys(base)) {
-      if (key === 'rpgReticle' || key === 'holoReticleSS2' || key === 'holoReticleM4' || key === 'muzzleFlash' || key === 'gloveDark' || key === 'gloveKnuckle' || key === 'sleeveTactical') {
+      if (key === 'rpgReticle' || key === 'holoReticleSS2' || key === 'holoReticleM4' || key === 'muzzleFlash' || key === 'gloveDark' || key === 'gloveLeather' || key === 'gloveKnuckle' || key === 'sleeveTactical') {
         cloned[key] = base[key];
       } else if (base[key] && typeof base[key].clone === 'function') {
         cloned[key] = base[key].clone();
@@ -1129,7 +1137,9 @@
   }
 
   // ===========================================================================
-  // Anatomical first-person hands & forearms (rounded limb segments, per-weapon grips)
+  // Anatomical first-person tactical-gloved hands & forearms
+  // Sculpted beveled metacarpals, articulated 3-phalanx fingers, carbon knuckle
+  // armor, tactile leather palm/fingertips, BDU jacket cuffs & field watch.
   // All coordinates are in the weapon group's local space (metres, barrel along -Z).
   // ===========================================================================
   const _hUp = new THREE.Vector3(0, 1, 0);
@@ -1137,6 +1147,18 @@
   const _hB = new THREE.Vector3();
   const _hD = new THREE.Vector3();
   const _hQ = new THREE.Quaternion();
+  const _hRight = new THREE.Vector3();
+  const _hFwd = new THREE.Vector3();
+  const _hBasis = new THREE.Matrix4();
+
+  function makeRoundedBox(w, h, d, radius, segs) {
+    const RBG = window.THREE_JSM && window.THREE_JSM.RoundedBoxGeometry;
+    if (typeof RBG === 'function') {
+      const r = Math.min(radius || 0.003, Math.min(w, h, d) * 0.44);
+      return new RBG(w, h, d, segs || 2, r);
+    }
+    return new THREE.BoxGeometry(w, h, d);
+  }
 
   function handMesh(parent, geo, mat) {
     geo.computeBoundingSphere();
@@ -1148,8 +1170,15 @@
     return m;
   }
 
-  // Rounded tapered limb segment between two points (optional ball joints at either end)
-  function addSeg(parent, mat, a, b, r0, r1, capA, capB, oval) {
+  function addBevelPart(parent, mat, w, h, d, r, x, y, z, rx, ry, rz) {
+    const m = handMesh(parent, makeRoundedBox(w, h, d, r, 2), mat);
+    m.position.set(x || 0, y || 0, z || 0);
+    if (rx || ry || rz) m.rotation.set(rx || 0, ry || 0, rz || 0);
+    return m;
+  }
+
+  // Sculpted tapered limb segment between two points (with anatomical oval cross-section)
+  function addSeg(parent, mat, a, b, r0, r1, capA, capB, ovalX, ovalZ) {
     _hA.set(a[0], a[1], a[2]);
     _hB.set(b[0], b[1], b[2]);
     _hD.subVectors(_hB, _hA);
@@ -1157,35 +1186,46 @@
     if (len < 1e-4) return;
     _hD.divideScalar(len);
     _hQ.setFromUnitVectors(_hUp, _hD);
-    const geo = new THREE.CylinderGeometry(r1, r0, len, 10, 1, false);
-    if (oval) geo.scale(oval, 1.0, 1.05);
+    const geo = new THREE.CylinderGeometry(r1, r0, len, 12, 1, false);
+    const ox = ovalX || 1.0;
+    const oz = ovalZ || 1.0;
+    if (ox !== 1.0 || oz !== 1.0) geo.scale(ox, 1.0, oz);
     const m = handMesh(parent, geo, mat);
     m.quaternion.copy(_hQ);
     m.position.set((a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5, (a[2] + b[2]) * 0.5);
     if (capA) {
-      const s = handMesh(parent, new THREE.SphereGeometry(r0, 10, 8), mat);
+      const sGeo = new THREE.SphereGeometry(r0, 10, 8);
+      if (ox !== 1.0 || oz !== 1.0) sGeo.scale(ox, 1.0, oz);
+      const s = handMesh(parent, sGeo, mat);
+      s.quaternion.copy(_hQ);
       s.position.set(a[0], a[1], a[2]);
     }
     if (capB) {
-      const s = handMesh(parent, new THREE.SphereGeometry(r1, 10, 8), mat);
+      const sGeo = new THREE.SphereGeometry(r1, 10, 8);
+      if (ox !== 1.0 || oz !== 1.0) sGeo.scale(ox, 1.0, oz);
+      const s = handMesh(parent, sGeo, mat);
+      s.quaternion.copy(_hQ);
       s.position.set(b[0], b[1], b[2]);
     }
   }
 
-  function addBlob(parent, mat, x, y, z, rx, ry, rz) {
-    const geo = new THREE.SphereGeometry(1, 12, 9);
-    geo.scale(rx, ry, rz);
-    const m = handMesh(parent, geo, mat);
-    m.position.set(x, y, z);
-    return m;
-  }
-
-  // Finger / thumb chain: polyline of joint points with matching radii, ball joints between phalanges
-  function addDigit(parent, mat, knuckleMat, pts, radii) {
+  // Articulated 3-segment finger / 2-segment thumb with dorsal flex pads & leather fingertip
+  function addDigit(parent, mat, knuckleMat, leatherMat, pts, radii) {
+    const tipMat = leatherMat || mat;
+    const lastSeg = pts.length - 2;
     for (let i = 0; i < pts.length - 1; i++) {
-      addSeg(parent, mat, pts[i], pts[i + 1], radii[i], radii[i + 1], i > 0, i === pts.length - 2);
+      const segMat = (i === lastSeg) ? tipMat : mat;
+      addSeg(parent, segMat, pts[i], pts[i + 1], radii[i], radii[i + 1], i > 0, i === lastSeg, 0.96, 0.88);
+      // Dorsal PIP flex-joint armor band on proximal-to-middle knuckle
+      if (knuckleMat && i === 1 && pts.length >= 4) {
+        const j = pts[1];
+        addBevelPart(parent, knuckleMat, radii[1] * 1.85, radii[1] * 1.45, radii[1] * 1.65, 0.0025, j[0], j[1], j[2]);
+      }
     }
-    if (knuckleMat) addBlob(parent, knuckleMat, pts[0][0], pts[0][1], pts[0][2], radii[0] * 1.08, radii[0] * 1.05, radii[0] * 1.08);
+    if (knuckleMat) {
+      const p0 = pts[0];
+      addBevelPart(parent, knuckleMat, radii[0] * 1.95, radii[0] * 1.60, radii[0] * 1.75, 0.003, p0[0], p0[1], p0[2]);
+    }
   }
 
   function rotXv(v, t) {
@@ -1193,19 +1233,54 @@
     return [v[0], v[1] * c - v[2] * s, v[1] * s + v[2] * c];
   }
 
-  // Glove gauntlet -> wrist cuff -> tapering oval BDU sleeve running off the bottom of the screen
-  function addForearm(parent, mats, w, dirVec) {
+  // Tapered glove gauntlet -> velcro wrist strap -> tactical watch (left wrist) -> BDU jacket cuff & forearm
+  function addForearm(parent, mats, w, dirVec, side) {
     const len = Math.hypot(dirVec[0], dirVec[1], dirVec[2]) || 1;
     const d = [dirVec[0] / len, dirVec[1] / len, dirVec[2] / len];
     const at = (t) => [w[0] + d[0] * t, w[1] + d[1] * t, w[2] + d[2] * t];
-    addSeg(parent, mats.gloveDark, at(-0.012), at(0.052), 0.026, 0.0295, true, false, 0.92);
-    addSeg(parent, mats.gloveKnuckle, at(0.046), at(0.066), 0.0315, 0.0315, false, false, 0.92); // velcro cuff
-    addSeg(parent, mats.sleeveTactical, at(0.060), at(0.200), 0.0325, 0.043, false, false, 0.90);
-    addSeg(parent, mats.sleeveTactical, at(0.198), at(0.420), 0.043, 0.052, false, true, 0.90);
-    addSeg(parent, mats.gloveKnuckle, at(0.150), at(0.162), 0.0445, 0.0445, false, false, 0.90); // rolled sleeve fold
+    const leather = mats.gloveLeather || mats.gloveDark;
+
+    // Anatomical wrist (flatter dorso-palmar oval) -> neoprene gauntlet -> velcro wrist cinch
+    addSeg(parent, mats.gloveDark, at(-0.014), at(0.044), 0.024, 0.0275, true, false, 0.84, 1.06);
+    addSeg(parent, leather, at(0.036), at(0.056), 0.0292, 0.0296, false, false, 0.85, 1.06); // velcro strap band
+    addSeg(parent, mats.gloveKnuckle, at(0.052), at(0.064), 0.0305, 0.0300, false, false, 0.85, 1.06); // rubberized cuff trim
+
+    // Tactical field watch on left wrist (oriented along forearm axis)
+    if (side === -1) {
+      _hD.set(d[0], d[1], d[2]).normalize();
+      _hRight.crossVectors(_hUp, _hD);
+      if (_hRight.lengthSq() < 1e-4) _hRight.set(1, 0, 0);
+      else _hRight.normalize();
+      _hFwd.crossVectors(_hD, _hRight).normalize();
+      _hBasis.makeBasis(_hRight, _hD, _hFwd);
+      const watchGrp = new THREE.Group();
+      const wp = at(0.066);
+      watchGrp.position.set(wp[0], wp[1], wp[2]);
+      watchGrp.quaternion.setFromRotationMatrix(_hBasis);
+      parent.add(watchGrp);
+      // Matte watch band + chamfered bezel + dark dial + subtle luminous marker
+      const strapGeo = new THREE.CylinderGeometry(0.0318, 0.0318, 0.015, 14);
+      strapGeo.scale(0.85, 1.0, 1.06);
+      handMesh(watchGrp, strapGeo, leather);
+      const caseY = 0;
+      const caseZ = 0.029;
+      addBevelPart(watchGrp, mats.gloveKnuckle, 0.026, 0.024, 0.009, 0.003, 0, caseY, caseZ);
+      addBevelPart(watchGrp, mats.boreDark || mats.polymerBlack, 0.019, 0.018, 0.003, 0.001, 0, caseY, caseZ + 0.004);
+      if (mats.tritiumGreen) {
+        addBevelPart(watchGrp, mats.tritiumGreen, 0.0025, 0.006, 0.0015, 0.0005, 0.002, caseY + 0.002, caseZ + 0.0056);
+        addBevelPart(watchGrp, mats.tritiumGreen, 0.0055, 0.002, 0.0015, 0.0005, -0.002, caseY - 0.001, caseZ + 0.0056);
+      }
+    }
+
+    // Layered tactical jacket cuff collar + folded sleeve seams + tapered forearm
+    addSeg(parent, mats.sleeveTactical, at(0.066), at(0.092), 0.0338, 0.0352, false, false, 0.88, 1.04); // cuff collar lip
+    addSeg(parent, mats.gloveKnuckle, at(0.084), at(0.094), 0.0358, 0.0356, false, false, 0.88, 1.04); // cuff button strap
+    addSeg(parent, mats.sleeveTactical, at(0.090), at(0.220), 0.0342, 0.0435, false, false, 0.88, 1.02); // lower forearm
+    addSeg(parent, mats.sleeveTactical, at(0.165), at(0.180), 0.0422, 0.0430, false, false, 0.89, 1.03); // natural fabric crease fold
+    addSeg(parent, mats.sleeveTactical, at(0.218), at(0.430), 0.0435, 0.0515, false, true, 0.89, 1.00); // upper forearm
   }
 
-  // Pistol-grip style hand (trigger hand, pistol support hand, foregrip, stock wrist)
+  // Pistol-grip style anatomical hand (trigger hand, thumbs-forward support hand, foregrip, RPG grip)
   // g: { cx, cy, cz, tilt, w, d, trig:[ty,tz]|null, arm:[x,y,z], support, thumbDy }
   function addGripHand(parent, mats, g, side) {
     const sx = side;
@@ -1217,91 +1292,108 @@
     parent.add(grp);
 
     const glove = mats.gloveDark;
+    const leather = mats.gloveLeather || mats.gloveDark;
     const knuck = mats.gloveKnuckle;
     const X = (x) => sx * x;
-    const zOff = g.support ? -0.009 : 0.0;
+    const zOff = g.support ? -0.011 : 0.0;
+    const yOff = g.support ? -0.006 : 0.0;
 
-    // Palm on the side face, backstrap heel, thumb web, padded back-of-hand
-    addBlob(grp, glove, X(hw + 0.011), 0.004, 0.008, 0.012, 0.040, 0.029);
-    addBlob(grp, glove, X(0.003), 0.0, hd + 0.011, 0.020, 0.040, 0.011);
-    addBlob(grp, glove, X(0.002), 0.040, hd + 0.004, 0.019, 0.014, 0.014);
-    addBlob(grp, knuck, X(hw + 0.025), 0.006, 0.010, 0.0075, 0.034, 0.023);
+    // 1. Contoured beveled metacarpal body hugging grip side (NO protruding sideways oval discs!)
+    addBevelPart(grp, glove, 0.015, 0.066, 0.048, 0.0055, X(hw + 0.008), 0.002 + yOff, 0.007 + zOff * 0.35, 0, 0, sx * -0.05);
+    // 2. Sculpted inner leather palm cushion & backstrap heel wrapping behind the grip
+    addBevelPart(grp, leather, g.w + 0.012, 0.064, 0.017, 0.006, X(0.004), 0.000 + yOff, hd + 0.008 + zOff * 0.25);
+    // 3. Thumb-web saddle (beavertail contact) + thenar muscle contour
+    addBevelPart(grp, leather, 0.024, 0.022, 0.022, 0.007, X(hw * 0.25), 0.036 + yOff * 0.5, hd + 0.003);
+    addBevelPart(grp, glove, 0.014, 0.026, 0.024, 0.005, X(hw + 0.006), -0.022 + yOff, hd + 0.006); // hypothenar palm heel
 
-    // Fingers wrap around the front of the grip
-    const rows = g.trig ? (g.support ? [0.012, -0.004, -0.020, -0.036] : [0.008, -0.009, -0.026])
-                        : [0.026, 0.008, -0.010, -0.028];
+    // 4. Low-profile contoured carbon knuckle guard bar sitting flush across the dorsal MCP knuckles
+    addBevelPart(grp, knuck, 0.007, 0.054, 0.016, 0.003, X(hw + 0.0145), 0.004 + yOff, -hd + 0.009 + zOff * 0.5, 0, 0, sx * -0.06);
+
+    // 5. Articulated 3-segment fingers wrapping cleanly around the front strap
+    const rows = g.trig ? (g.support ? [0.006, -0.009, -0.024, -0.038] : [0.006, -0.010, -0.026])
+                        : [0.024, 0.008, -0.009, -0.025];
+    const baseRadii = [0.0082, 0.0078, 0.0074, 0.0066];
     for (let i = 0; i < rows.length; i++) {
       const y = rows[i];
       const fz = -hd + zOff;
-      addDigit(grp, glove, knuck, [
-        [X(hw + 0.010), y, fz + 0.004],
-        [X(hw + 0.002), y, fz - 0.009],
-        [X(-0.003), y, fz - 0.011],
-        [X(-hw + 0.001), y, fz - 0.005]
-      ], [0.0095, 0.0090, 0.0085, 0.0078]);
+      const rScale = (i === rows.length - 1) ? 0.88 : 1.0;
+      const rads = [baseRadii[0] * rScale, baseRadii[1] * rScale, baseRadii[2] * rScale, baseRadii[3] * rScale];
+      const wrapIn = g.support ? -hw - 0.005 : -hw + 0.001;
+      addDigit(grp, glove, knuck, leather, [
+        [X(hw + 0.009), y + 0.001, fz + 0.006],
+        [X(hw + 0.002), y, fz - 0.008],
+        [X(-0.002), y - 0.001, fz - 0.010],
+        [X(wrapIn), y - 0.001, fz - 0.003]
+      ], rads);
     }
 
-    // Trigger finger extended along the frame and resting on the trigger
+    // 6. Trigger finger: extends along frame above trigger guard, bends naturally onto trigger face
     if (g.trig && !g.support) {
       const ty = g.trig[0];
       const tz = g.trig[1];
-      addDigit(grp, glove, knuck, [
-        [X(hw + 0.010), ty + 0.004, -hd + 0.004],
-        [X(hw + 0.004), ty + 0.004, tz + 0.022],
-        [X(0.004), ty + 0.002, tz + 0.008],
-        [X(0.0), ty - 0.001, tz + 0.001]
-      ], [0.0090, 0.0085, 0.0078, 0.0070]);
+      addDigit(grp, glove, knuck, leather, [
+        [X(hw + 0.009), ty + 0.003, -hd + 0.008],
+        [X(hw + 0.006), ty + 0.003, tz + 0.024],
+        [X(hw * 0.55), ty + 0.001, tz + 0.009],
+        [X(0.001), ty - 0.001, tz + 0.001]
+      ], [0.0080, 0.0074, 0.0067, 0.0060]);
     }
 
-    // Thumb lies forward along the left face of the frame
+    // 7. Articulated thumb (thumbs-forward tactical posture along left side of frame)
     const tdy = g.thumbDy || 0;
-    const tx = (v) => -v; // always the weapon's left face (world -X)
-    addDigit(grp, glove, null, [
-      [X(0.012), 0.038 + tdy, hd + 0.010],
-      [tx(hw + 0.002 + (g.support ? 0.006 : 0)), 0.042 + tdy, hd - 0.002],
-      [tx(hw + 0.005 + (g.support ? 0.006 : 0)), 0.046 + tdy, -0.012],
-      [tx(hw + 0.006 + (g.support ? 0.006 : 0)), 0.048 + tdy, -0.034]
-    ], [0.0105, 0.0095, 0.0088, 0.0078]);
+    const tx = (v) => -v; // weapon's left side (-X)
+    const thumbOut = g.support ? 0.009 : 0.002;
+    addDigit(grp, glove, null, leather, [
+      [X(g.support ? hw + 0.006 : 0.008), 0.032 + tdy, hd + 0.008],
+      [tx(hw + thumbOut), 0.036 + tdy, hd - 0.004],
+      [tx(hw + thumbOut + 0.003), 0.041 + tdy, -0.014],
+      [tx(hw + thumbOut + 0.003), 0.043 + tdy, -0.038]
+    ], [0.0092, 0.0084, 0.0076, 0.0068]);
 
-    // Forearm leaves from the wrist behind the palm (computed in parent space)
-    const wLocal = [X(hw + 0.008), -0.010, hd + 0.030];
+    // 8. Forearm leaving from anatomical wrist behind palm heel
+    const wLocal = [X(hw + 0.006), -0.012 + yOff * 0.5, hd + 0.026];
     const wr = rotXv(wLocal, g.tilt || 0);
     const w = [g.cx + wr[0], g.cy + wr[1], g.cz + wr[2]];
-    addForearm(parent, mats, w, g.arm || [sx * 0.10, -0.14, 0.38]);
+    addForearm(parent, mats, w, g.arm || [sx * 0.10, -0.14, 0.38], side);
   }
 
-  // Support hand cradling a handguard / pump / break-action forend from below
+  // Support hand cradling a rifle handguard / shotgun pump / coach-gun forend from below
   // f: { cx, cy, cz, hx, hy, arm:[x,y,z] }
   function addForendHand(target, mats, f) {
     const glove = mats.gloveDark;
+    const leather = mats.gloveLeather || mats.gloveDark;
     const knuck = mats.gloveKnuckle;
     const cx = f.cx, cy = f.cy, cz = f.cz;
     const hx = f.hx, hy = f.hy;
-    const by = cy - (hy + 0.012);
+    const by = cy - (hy + 0.010);
 
-    addBlob(target, glove, cx - 0.002, by, cz + 0.014, 0.027, 0.011, 0.036);
-    addBlob(target, glove, cx - 0.012, cy - (hy + 0.004), cz + 0.046, 0.024, 0.020, 0.020);
-    addBlob(target, knuck, cx - hx - 0.012, cy - hy * 0.55, cz + 0.014, 0.008, 0.026, 0.030);
+    // Contoured cupped palm under handguard + heel transitioning to wrist + slim dorsal knuckle guard
+    addBevelPart(target, leather, hx * 2.0 + 0.014, 0.015, 0.062, 0.0055, cx - 0.002, by, cz + 0.012);
+    addBevelPart(target, glove, 0.040, 0.026, 0.034, 0.007, cx - 0.010, cy - (hy + 0.006), cz + 0.046);
+    addBevelPart(target, glove, 0.014, 0.034, 0.056, 0.005, cx - hx - 0.008, cy - hy * 0.55, cz + 0.012, 0, 0, 0.18);
+    addBevelPart(target, knuck, 0.0065, 0.014, 0.052, 0.0025, cx + hx + 0.010, cy - (hy + 0.005), cz + 0.004);
 
+    // 4 articulated fingers wrapping snugly up the right side of the forend
     for (let i = 0; i < 4; i++) {
-      const z = cz - 0.020 + i * 0.0145;
-      const r = 0.0095 - (i === 3 ? 0.0012 : 0);
-      addDigit(target, glove, knuck, [
-        [cx - 0.014, by, z],
-        [cx + 0.006, cy - (hy + 0.015), z],
-        [cx + hx + 0.011, cy - (hy + 0.004), z],
-        [cx + hx + 0.012, cy + 0.004, z]
-      ], [r, r - 0.0005, r - 0.001, r - 0.0017]);
+      const z = cz - 0.020 + i * 0.0142;
+      const r = 0.0082 - (i === 3 ? 0.0010 : 0);
+      addDigit(target, glove, knuck, leather, [
+        [cx - 0.010, by - 0.001, z],
+        [cx + hx * 0.55, by - 0.002, z],
+        [cx + hx + 0.009, cy - (hy * 0.65), z],
+        [cx + hx + 0.009, cy + 0.006, z]
+      ], [r, r - 0.0005, r - 0.0010, r - 0.0016]);
     }
 
-    addDigit(target, glove, null, [
-      [cx - hx - 0.010, cy - hy * 0.4, cz + 0.036],
-      [cx - hx - 0.011, cy + 0.002, cz + 0.014],
-      [cx - hx - 0.004, cy + hy * 0.5, cz - 0.010],
-      [cx - hx + 0.002, cy + hy * 0.8, cz - 0.026]
-    ], [0.0105, 0.0095, 0.0088, 0.0078]);
+    // Left thumb resting forward along left rail / handguard in natural C-clamp support grip
+    addDigit(target, glove, null, leather, [
+      [cx - hx - 0.009, cy - hy * 0.38, cz + 0.034],
+      [cx - hx - 0.010, cy + 0.002, cz + 0.012],
+      [cx - hx - 0.004, cy + hy * 0.52, cz - 0.012],
+      [cx - hx + 0.002, cy + hy * 0.78, cz - 0.030]
+    ], [0.0092, 0.0084, 0.0076, 0.0068]);
 
-    addForearm(target, mats, [cx - 0.010, cy - (hy + 0.010), cz + 0.062], f.arm || [-0.11, -0.17, 0.36]);
+    addForearm(target, mats, [cx - 0.010, cy - (hy + 0.010), cz + 0.060], f.arm || [-0.11, -0.17, 0.36], -1);
   }
 
   // Entry point: cfg.right = trigger hand grip, cfg.left = { grip } | { forend, parent } support hand
@@ -1383,12 +1475,12 @@
     const g = new THREE.Group();
 
     // Polymer frame + sculpted beavertail tang + dust cover + flared magwell + knurled grip panels
-    addPart(g, new THREE.BoxGeometry(0.029, 0.020, 0.208), mats.polymerBlack, 0, 0.000, -0.042);
-    addPart(g, new THREE.BoxGeometry(0.024, 0.009, 0.028), mats.polymerBlack, 0, 0.006, 0.068, -0.22, 0, 0); // Beavertail
-    addPart(g, new THREE.BoxGeometry(0.028, 0.112, 0.044), mats.polymerBlack, 0, -0.060, 0.040, 0.24, 0, 0);
-    addPart(g, new THREE.BoxGeometry(0.0315, 0.078, 0.034), mats.polymerGrip, 0, -0.060, 0.040, 0.24, 0, 0);
+    addPart(g, makeRoundedBox(0.029, 0.020, 0.208, 0.003, 2), mats.polymerBlack, 0, 0.000, -0.042);
+    addPart(g, makeRoundedBox(0.024, 0.009, 0.030, 0.0025, 2), mats.polymerBlack, 0, 0.006, 0.068, -0.22, 0, 0); // Beavertail
+    addPart(g, makeRoundedBox(0.028, 0.112, 0.044, 0.005, 2), mats.polymerBlack, 0, -0.060, 0.040, 0.24, 0, 0);
+    addPart(g, makeRoundedBox(0.0315, 0.078, 0.034, 0.0035, 2), mats.polymerGrip, 0, -0.060, 0.040, 0.24, 0, 0);
     // Flared magwell lip + lanyard swivel
-    addPart(g, new THREE.BoxGeometry(0.032, 0.009, 0.048), mats.gunSteelDark, 0, -0.112, 0.052, 0.24, 0, 0);
+    addPart(g, makeRoundedBox(0.033, 0.010, 0.049, 0.0025, 2), mats.gunSteelDark, 0, -0.112, 0.052, 0.24, 0, 0);
     addSlingSwivel(g, mats, 0, -0.118, 0.066);
 
     // Under-barrel Picatinny accessory rail
@@ -1401,18 +1493,21 @@
     addPart(g, new THREE.BoxGeometry(0.004, 0.006, 0.024), mats.gunSteelLight, -0.016, 0.005, 0.008);
     addPart(g, new THREE.BoxGeometry(0.005, 0.007, 0.012), mats.gunSteelLight, -0.016, 0.003, -0.034);
 
-    // Stainless match barrel + recessed dark bore + recoil guide rod tip
+    // Stainless match barrel + recessed dark bore + crowned muzzle lip + recoil guide rod tip
     addPart(g, new THREE.CylinderGeometry(0.0078, 0.0078, 0.208, 12), mats.gunSteelLight, 0, 0.024, -0.056, Math.PI / 2, 0, 0);
+    addPart(g, new THREE.TorusGeometry(0.0064, 0.0014, 6, 14), mats.gunSteelLight, 0, 0.024, -0.160);
     addPart(g, new THREE.CylinderGeometry(0.0046, 0.0046, 0.012, 10), mats.boreDark, 0, 0.024, -0.156, Math.PI / 2, 0, 0);
-    addPart(g, new THREE.BoxGeometry(0.022, 0.014, 0.038), mats.gunSteelLight, 0, 0.033, -0.028); // Barrel hood
+    addPart(g, makeRoundedBox(0.022, 0.014, 0.036, 0.002, 2), mats.gunSteelLight, 0, 0.033, -0.028); // Barrel hood
     addPart(g, new THREE.CylinderGeometry(0.0045, 0.0045, 0.095, 8), mats.gunSteelLight, 0, 0.005, -0.104, Math.PI / 2, 0, 0);
 
-    // Articulated beveled 2-tone slide (chamfered top flat + angled serrations + ejection port)
+    // Articulated beveled 2-tone slide (chamfered top flat + angled serrations + recessed ejection port)
     const slide = new THREE.Group();
-    addPart(slide, new THREE.BoxGeometry(0.030, 0.023, 0.214), mats.gunSteelMid, 0, 0.024, -0.042);
+    addPart(slide, makeRoundedBox(0.030, 0.023, 0.214, 0.0032, 2), mats.gunSteelMid, 0, 0.024, -0.042);
     // Chamfered upper bevel & crown flat (eliminates boxy square slide look in ADS!)
-    addPart(slide, new THREE.BoxGeometry(0.024, 0.006, 0.208), mats.gunSteelMid, 0, 0.037, -0.042);
-    addPart(slide, new THREE.BoxGeometry(0.017, 0.0025, 0.204), mats.gunSteelLight, 0, 0.0398, -0.042);
+    addPart(slide, makeRoundedBox(0.024, 0.0065, 0.208, 0.0022, 2), mats.gunSteelMid, 0, 0.0368, -0.042);
+    addPart(slide, new THREE.BoxGeometry(0.0165, 0.0024, 0.204), mats.gunSteelLight, 0, 0.0398, -0.042);
+    // Recessed ejection port darkening strip along right/top of chamber
+    addPart(slide, new THREE.BoxGeometry(0.004, 0.011, 0.040), mats.boreDark, 0.0138, 0.030, -0.028);
     // Angled rear & front serrations
     for (let i = 0; i < 6; i++) {
       addPart(slide, new THREE.BoxGeometry(0.0315, 0.017, 0.0025), mats.gunSteelDark, 0, 0.024, 0.022 + i * 0.0065, -0.18, 0, 0);
@@ -1497,8 +1592,8 @@
     g.add(hammer);
 
     // Tapered sculpted walnut grip angled cleanly below topstrap (eliminates boxy wood slab in ADS!)
-    addPart(g, new THREE.BoxGeometry(0.025, 0.098, 0.036), mats.rpgWood, 0, -0.062, 0.056, 0.36, 0, 0);
-    addPart(g, new THREE.BoxGeometry(0.014, 0.096, 0.034), mats.gunSteelLight, 0, -0.062, 0.056, 0.36, 0, 0); // Steel backstrap spine
+    addPart(g, makeRoundedBox(0.026, 0.098, 0.036, 0.0055, 2), mats.rpgWood, 0, -0.062, 0.056, 0.36, 0, 0);
+    addPart(g, makeRoundedBox(0.014, 0.096, 0.035, 0.003, 2), mats.gunSteelLight, 0, -0.062, 0.056, 0.36, 0, 0); // Steel backstrap spine
     addPart(g, new THREE.CylinderGeometry(0.005, 0.005, 0.027, 10), mats.brass, 0, -0.048, 0.052, 0, 0, Math.PI * 0.5);
     addSlingSwivel(g, mats, 0, -0.114, 0.072);
 
@@ -1584,16 +1679,17 @@
   function buildRifleSS2V5(mats, isWorld) {
     const g = new THREE.Group();
 
-    // Chamfered upper & lower receiver + brass deflector + ejection port
-    addPart(g, new THREE.BoxGeometry(0.042, 0.028, 0.228), mats.gunSteelDark, 0, -0.012, 0.0);
-    addPart(g, new THREE.BoxGeometry(0.043, 0.028, 0.232), mats.gunSteelMid, 0, 0.014, 0.0);
-    addPart(g, new THREE.BoxGeometry(0.032, 0.007, 0.228), mats.gunSteelLight, 0, 0.031, 0.0);
+    // Chamfered upper & lower receiver + brass deflector + recessed ejection port
+    addPart(g, makeRoundedBox(0.042, 0.028, 0.228, 0.0035, 2), mats.gunSteelDark, 0, -0.012, 0.0);
+    addPart(g, makeRoundedBox(0.043, 0.028, 0.232, 0.0035, 2), mats.gunSteelMid, 0, 0.014, 0.0);
+    addPart(g, makeRoundedBox(0.032, 0.007, 0.228, 0.002, 2), mats.gunSteelLight, 0, 0.031, 0.0);
+    addPart(g, new THREE.BoxGeometry(0.004, 0.014, 0.068), mats.boreDark, 0.0205, 0.017, -0.010);
     addPart(g, new THREE.BoxGeometry(0.010, 0.014, 0.016), mats.gunSteelDark, 0.024, 0.016, 0.032);
     // Top Picatinny rail
     addPicatinnyRail(g, mats, 0, 0.033, 0.09, -0.29, 0.020, 22);
 
     // Ergonomic knurled pistol grip + trigger guard + curved trigger + selector
-    addPart(g, new THREE.BoxGeometry(0.031, 0.104, 0.042), mats.polymerGrip, 0, -0.064, 0.072, 0.28, 0, 0);
+    addPart(g, makeRoundedBox(0.031, 0.104, 0.042, 0.0055, 2), mats.polymerGrip, 0, -0.064, 0.072, 0.28, 0, 0);
     addPart(g, new THREE.BoxGeometry(0.012, 0.005, 0.044), mats.gunSteelDark, 0, -0.042, 0.020);
     addPart(g, new THREE.BoxGeometry(0.005, 0.018, 0.005), mats.gunSteelLight, 0, -0.032, 0.026, -0.35, 0, 0);
     addPart(g, new THREE.BoxGeometry(0.005, 0.006, 0.020), mats.gunSteelLight, -0.023, -0.006, 0.064, -0.35, 0, 0);

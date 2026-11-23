@@ -854,8 +854,10 @@
       propCastShadow: true,
       enableSubtleHalos: true,
       vfxScale: 1.0,
-      bldgMaxDist: 165,
-      clutterMaxDist: 86,
+      bldgMaxDist: 280,
+      bldgLodDist: 145,
+      majorPropMaxDist: 210,
+      clutterMaxDist: 120,
       animThrottleDist: 30
     },
     balanced: {
@@ -874,8 +876,10 @@
       propCastShadow: false,
       enableSubtleHalos: true,
       vfxScale: 0.75,
-      bldgMaxDist: 115,
-      clutterMaxDist: 56,
+      bldgMaxDist: 255,
+      bldgLodDist: 105,
+      majorPropMaxDist: 175,
+      clutterMaxDist: 92,
       animThrottleDist: 22
     },
     potato: {
@@ -894,8 +898,10 @@
       propCastShadow: false,
       enableSubtleHalos: false,
       vfxScale: 0.4,
-      bldgMaxDist: 75,
-      clutterMaxDist: 34,
+      bldgMaxDist: 235,
+      bldgLodDist: 52,
+      majorPropMaxDist: 135,
+      clutterMaxDist: 36,
       animThrottleDist: 14
     }
   };

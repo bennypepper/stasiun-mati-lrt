@@ -202,6 +202,11 @@
     campaignState.trainCallActive = false;
     campaignState.trainCallWaitElapsed = 0;
     campaignState.trainCallTrickleStage = 0;
+    campaignState.objectiveIdleTimer = 0;
+    campaignState.lastObjectiveIdleKey = '';
+    campaignState.idleHintCount = 0;
+    campaignState.onboardingHintDone = false;
+    campaignState.stationElapsedSec = 0;
     if (LRT.Station && typeof LRT.Station.setBarrelCueActive === 'function') {
       LRT.Station.setBarrelCueActive(false);
     }
@@ -495,6 +500,18 @@
         s1.keycardFound = true;
       }
       if (res.fresh !== false) {
+        queueVariantRadioLine('STEP_KEYCARD', [
+          {
+            speaker: 'ARYA',
+            id: 'Kartu akses 750V dapat dari Pos Sekuriti. Tapi area ini mulai ramai—balik ke Jalur 4 sekarang!',
+            en: 'Got the 750V bypass keycard from the Security Booth. Place is crawling—heading back to Track 4!'
+          },
+          {
+            speaker: 'SARAH',
+            id: 'Bagus, Arya! Kode kartu cocok. Waspada Brute di jalur pulang menuju bangkai kereta Jalur 4.',
+            en: 'Nice work, Arya! Card code matches. Watch for a Brute blocking the way back to the Track 4 wreck.'
+          }
+        ], { priority: 'HIGH' });
         triggerStreetReturnAmbush(['brute', 'walker', 'walker', 'walker'], { x: item.x, z: item.z }, {
           notice: 'RIOT BRUTE MENJAGA GUDANG LOGISTIK — KEMBALI KE KABIN JALUR 4!'
         });
@@ -530,6 +547,18 @@
         campaignState.stationObjectives[2].pmiKeyFound = true;
       }
       if (res.fresh !== false) {
+        queueVariantRadioLine('STEP_PMI_KEY', [
+          {
+            speaker: 'ARYA',
+            id: 'Kunci Triage PMI di tangan. Ambulans ini sudah ditinggal panik—aku kembali ke Depo Harjamukti.',
+            en: 'PMI Triage Key secured. This ambulance was abandoned mid-evac—moving back to Harjamukti Depot.'
+          },
+          {
+            speaker: 'SARAH',
+            id: 'Kunci terverifikasi, Arya. Bawa langsung ke lemari pendingin vaksin di Depo selatan—hati-hati Screamer!',
+            en: 'Key verified, Arya. Bring it straight to the south Depot vaccine cooler—watch for Screamers!'
+          }
+        ], { priority: 'HIGH' });
         triggerStreetReturnAmbush(['screamer', 'runner', 'runner'], { x: item.x, z: item.z }, {
           notice: 'SCREAMER & RUNNER MENYERGAP JALAN BARAT — KEMBALI KE DEPO HARJAMUKTI!'
         });
@@ -592,6 +621,18 @@
         }
       }
       if (res.fresh !== false) {
+        queueVariantRadioLine('STEP_FEEDER_W', [
+          {
+            speaker: 'SARAH',
+            id: 'Feeder Barat menyala! Sekarang seberangi boulevard ke Gardu Timur sebelum menarik sakelar induk di Concourse.',
+            en: 'West Feeder is live! Now cross the boulevard to the East Feeder before throwing the Concourse main breaker.'
+          },
+          {
+            speaker: 'ARYA',
+            id: 'Gardu Barat aktif. Suaranya menarik perhatian mereka—lanjut ke sisi timur!',
+            en: 'West Feeder online. The hum is drawing them in—pushing to the east side!'
+          }
+        ], { priority: 'HIGH' });
         triggerStreetReturnAmbush(['runner', 'walker', 'walker'], { x: item.x, z: item.z }, {
           notice: 'TRAFO BARAT MENYALA — INFECTED JALANAN TERTARIK SUARA GARDU!'
         });
@@ -1672,6 +1713,71 @@
     }
   }
 
+  function queueVariantRadioLine(baseId, variants, opts) {
+    if (!Array.isArray(variants) || variants.length === 0) return null;
+    const pickIdx = Math.abs((CORE.campaignSeed | 0) + (CORE.stationIndex | 0) * 7 + (campaignState.idleHintCount | 0)) % variants.length;
+    const line = variants[pickIdx];
+    if (!line) return null;
+    const o = Object.assign({ id: baseId + '_' + pickIdx, priority: 'MEDIUM' }, opts || {});
+    if (LRT.Audio && typeof LRT.Audio.queueRadioSubtitle === 'function') {
+      return LRT.Audio.queueRadioSubtitle(line.speaker || 'SARAH', line.id, line.en, line.dur || 6.2, o);
+    }
+    if (LRT.PlayerUI && typeof LRT.PlayerUI.showSubtitle === 'function') {
+      LRT.PlayerUI.showSubtitle(line.speaker || 'SARAH', line.id, line.en, line.dur || 6.2);
+    }
+    return null;
+  }
+
+  const IDLE_DIRECTIONAL_HINTS = {
+    0: [
+      { speaker: 'SARAH', id: 'Arya, kalau butuh arah ke Jerigen Solar: keluar pintu timur menuju Pos Ronda di Pojok Tenggara (SE), atau tekan [Q] untuk Kompas Taktis.', en: 'Arya, if you need a bearing on the Diesel Can: head out the east exit toward the SE Poskamling Watchpost, or tap [Q] for Tactical Ping.' },
+      { speaker: 'SARAH', id: 'Cek rambu arah hijau di persimpangan, Arya. Jerigen Solar ada di Pos Ronda Pojok SE — setelah itu balik nyalakan Genset dekat Concourse.', en: 'Check the green street signs at the intersection, Arya. The Diesel Can is at the SE Watchpost — bring it back to the Concourse generator.' }
+    ],
+    1: [
+      { speaker: 'SARAH', id: 'Arya, ikuti jalan timur ke utara menuju Gudang Logistik Pojok Timur Laut (NE) untuk mengambil Kartu Akses 750V di Pos Sekuriti. Tekan [Q] untuk ping arah.', en: 'Arya, follow the east boulevard north to the NE Logistics Depot Security Booth for the 750V Keycard. Press [Q] for a bearing ping.' },
+      { speaker: 'SARAH', id: 'Panel 750V di kabin Jalur 4 masih menunggu kartu bypass. Pos Sekuriti Pojok NE ditandai lampu kuning gudang — gunakan [Q] jika perlu arah.', en: 'The Track 4 cab 750V panel is still waiting on the bypass card. Look for the amber warehouse floodlights at the NE Security Booth, or tap [Q].' }
+    ],
+    2: [
+      { speaker: 'SARAH', id: 'Arya, ingat dua komponen segel Depo Harjamukti: Cryo Stabilizer di Kebun Atap utara dan Kunci PMI di ambulans Pojok Barat Laut (NW). Tekan [Q] untuk arah.', en: 'Arya, remember both Harjamukti Depot pieces: Cryo Stabilizer on the north Garden Terrace and PMI Key at the NW ambulance. Press [Q] for bearing.' },
+      { speaker: 'SARAH', id: 'Cek tenda putih palang merah di Pojok NW untuk Kunci PMI, lalu bawa bersama Cryo Stabilizer ke lemari vaksin di Depo selatan.', en: 'Check the white PMI medical tent in the NW corner for the key, then bring it with the Cryo Stabilizer to the south Depot cooler.' }
+    ],
+    3: [
+      { speaker: 'SARAH', id: 'Ikuti garis kabel kuning di aspal, Arya — satu ke Gardu Feeder Barat, satu ke Gardu Feeder Timur. Setelah keduanya hijau, tarik Sakelar Induk Concourse. [Q] untuk arah.', en: 'Follow the yellow asphalt feeder cables, Arya — one to the West Feeder, one to the East Feeder. Once both show green, throw the Concourse Main Breaker. [Q] for ping.' },
+      { speaker: 'SARAH', id: 'Gardu listrik Kuningan masih berbunyi dengung di sisi jalan timur dan barat. Tekan [Q] jika badai membuat lampu strobo oranye sulit terlihat.', en: 'Kuningan street feeders are humming along both the west and east boulevards. Tap [Q] if the storm obscures the amber strobe beacons.' }
+    ],
+    4: [
+      { speaker: 'SARAH', id: 'Muatan C4 ada di Konvoi Militer Pojok Barat Daya (SW) — cari truk militer dan karung pasir, lalu pasang di Barikade Karantina. Tekan [Q] untuk arah.', en: 'The C4 charge is at the SW Military Convoy — look for the army truck and sandbags, then plant it on the Quarantine Barricade. Press [Q] for bearing.' },
+      { speaker: 'SARAH', id: 'Kalau kehabisan peluru berat, ambil C4 dari peti konvoi di Pojok SW dekat barikade selatan — tekan [Q] untuk Kompas Taktis.', en: 'If you are out of heavy ordnance, grab the C4 from the SW convoy crate near the south checkpoint — tap [Q] for the Tactical Compass.' }
+    ],
+    5: [
+      { speaker: 'SARAH', id: 'Tiga pemancar Setiabudi: Gardu Jalan Rasuna Said, Konsol JPO atas, dan Terminal Peron Tengah. Aktifkan semua lalu tahan gelombang Omega! [Q] untuk arah.', en: 'Three Setiabudi relays: Rasuna Said Street Feeder, upper JPO Console, and Central Platform Terminal. Bring all online to trigger Omega extraction! [Q] for ping.' },
+      { speaker: 'SARAH', id: 'Pantau lampu suar oranye di JPO atas, jalan timur, dan peron tengah — tekan [Q] untuk menandai pemancar berikutnya yang masih padam.', en: 'Watch for the amber beacons on the upper JPO, east street, and central platform — tap [Q] to ping the next offline relay.' }
+    ]
+  };
+
+  const STATION_ARRIVAL_BANTER = {
+    1: [
+      { speaker: 'ARYA', id: 'Cawang... simpang ini biasanya padat jam pulang kantor. Sekarang cuma kereta anjlok di Jalur 4.', en: 'Cawang... this interchange is usually packed at rush hour. Now it is just a derailed train on Track 4.' },
+      { speaker: 'SARAH', id: 'Sinyal kita masih tembus di Cawang, Arya. Sisir Pos Sekuriti Pojok NE dulu, jangan biarkan mereka mengepung di terowongan.', en: 'Our comms still reach Cawang, Arya. Hit the NE Security Booth first and do not let them box you in.' }
+    ],
+    2: [
+      { speaker: 'ARYA', id: 'Harjamukti terasa lebih sepi... tapi darah di tenda PMI luar masih basah. Wabah ini baru hitungan jam.', en: 'Harjamukti is eerily quiet... but the triage chaos outside is only hours old.' },
+      { speaker: 'SARAH', id: 'Pendingin vaksin di Depo selatan masih bertahan pakai baterai cadangan. Ambil Cryo Stabilizer dan Kunci PMI sebelum terlambat.', en: 'The south Depot vaccine cooler is still running on backup battery. Get the Cryo Stabilizer and PMI Key before it warms up.' }
+    ],
+    3: [
+      { speaker: 'ARYA', id: 'Langit Kuningan gelap sekali—kabel PLN di jalan sampai putus. Aku cari Gardu Barat dan Timur dulu.', en: 'Kuningan sky is pitch dark—half the street feeders blew out. Tracking down the West and East feeders.' },
+      { speaker: 'SARAH', id: 'Ikuti suar oranye di boulevard Kuningan, Arya. Begitu dua feeder aktif, tarik Sakelar Induk Concourse untuk buka jalur kereta.', en: 'Follow the amber strobes along Kuningan boulevard, Arya. Once both feeders are live, throw the Concourse Main Breaker.' }
+    ],
+    4: [
+      { speaker: 'ARYA', id: 'Cikoko diblokade total oleh barikade karantina. Aku perlu C4 dari konvoi militer barat daya.', en: 'Cikoko is completely sealed off by a quarantine barricade. Heading for C4 at the southwest military convoy.' },
+      { speaker: 'SARAH', id: 'Hati-hati di pasar ruko Cikoko, Arya — kepadatan di sini bikin Infected cepat berkumpul begitu dengar ledakan.', en: 'Stay sharp around the Cikoko ruko strip, Arya — dense alleys mean infected converge fast once you blow that barricade.' }
+    ],
+    5: [
+      { speaker: 'ARYA', id: 'Setiabudi... pemberhentian terakhir sebelum ekstraksi. Semua pemancar harus nyala sekarang.', en: 'Setiabudi... last stop before extraction. Time to bring every relay online.' },
+      { speaker: 'SARAH', id: 'Helikopter dan kereta evakuasi menunggu sinyal Omega, Arya. Nyalakan pemancar Jalan, JPO, dan Peron — aku kawal dari radio!', en: 'Extraction is standing by for the Omega lock, Arya. Power up the Street, JPO, and Platform relays — I am with you on comms!' }
+    ]
+  };
+
   const MID_RIDE_BRIEFINGS = {
     1: {
       id: 'Arya, kita mendekati Cawang Interchange. Panel 750V di kabin bangkai Jalur 4 terkunci magnetik — siapkan diri menyisir Pos Sekuriti Gudang Logistik (Pojok NE) untuk kartu akses.',
@@ -1871,11 +1977,16 @@
         CORE._rideBriefingSent = true;
         const upcomingIdx = CORE.rideCompleteReady ? CORE.stationIndex : (CORE.stationIndex + 1);
         const brief = MID_RIDE_BRIEFINGS[upcomingIdx];
-        if (brief && LRT.PlayerUI && typeof LRT.PlayerUI.showSubtitle === 'function') {
-          if (LRT.Audio && typeof LRT.Audio.play === 'function') {
-            LRT.Audio.play('station_chime', { gain: 0.28 });
+        if (brief) {
+          if (LRT.Audio && typeof LRT.Audio.queueRadioSubtitle === 'function') {
+            LRT.Audio.queueRadioSubtitle('SARAH', brief.id, brief.en, 6.8, {
+              id: 'MID_RIDE_BRIEF_' + upcomingIdx,
+              priority: 'HIGH',
+              radioChime: true
+            });
+          } else if (LRT.PlayerUI && typeof LRT.PlayerUI.showSubtitle === 'function') {
+            LRT.PlayerUI.showSubtitle('SARAH', brief.id, brief.en, 6.8);
           }
-          LRT.PlayerUI.showSubtitle('SARAH', brief.id, brief.en, 6.8);
         }
       }
 
@@ -1905,10 +2016,18 @@
           CORE.prevTrainState = 'AWAY';
           CORE.gameState = STATES.STATION_ACTIVE;
           if (CORE.gameMode === MODES.SURVIVAL) {
+            campaignState.objectiveIdleTimer = 0;
+            campaignState.stationElapsedSec = 0;
             if (campaignState.clearedStations.has(CORE.stationIndex)) {
               LRT.PlayerUI.setNotice('STASIUN SUDAH DIBERSIHKAN — LOGISTIK TERSEDIA', '#4ade80');
             } else {
               spawnCurrentWave();
+              const banterPool = STATION_ARRIVAL_BANTER[CORE.stationIndex % 6];
+              const banterKey = 'ARRIVAL_BANTER_' + (CORE.stationIndex % 6);
+              if (banterPool && !campaignState.voTriggered.has(banterKey)) {
+                campaignState.voTriggered.add(banterKey);
+                queueVariantRadioLine(banterKey, banterPool, { priority: 'MEDIUM' });
+              }
             }
           } else {
             LRT.PlayerUI.setNotice('JELAJAHI STASIUN — TEKAN [T] UNTUK PANGGIL LRT', '#e0b422');
@@ -2037,6 +2156,48 @@
             LRT.Audio.playVoice('VO_03_STREET_HINT');
           }
         }
+      }
+
+      // Station 01 unobtrusive onboarding tip teaching landmark clues & [Q] Tactical Ping
+      campaignState.stationElapsedSec = (campaignState.stationElapsedSec || 0) + dt;
+      if (CORE.stationIndex === 0 && !campaignState.onboardingHintDone && campaignState.stationElapsedSec >= 8.5) {
+        campaignState.onboardingHintDone = true;
+        if (LRT.PlayerUI && typeof LRT.PlayerUI.setNotice === 'function') {
+          LRT.PlayerUI.setNotice('TIPS: BACA PETUNJUK MISI & RAMBU JALAN — TEKAN [Q] UNTUK KOMPAS TAKTIS', '#e0b422');
+        }
+        if (LRT.PlayerUI && typeof LRT.PlayerUI.pulseObjectiveHint === 'function') {
+          LRT.PlayerUI.pulseObjectiveHint(4500);
+        }
+      }
+
+      // Idle / wandering directional hint nudge on Medium/Hard (PROXIMITY/OFF waypoints) after 50s without objective progress
+      if (CORE.gameState === STATES.STATION_ACTIVE && !isStationPrimaryObjectiveComplete(CORE.stationIndex)) {
+        const wpMode = (typeof CORE.getWaypointMode === 'function') ? CORE.getWaypointMode() : 'proximity';
+        const curTargets = getActiveObjectiveTargetIds(CORE.stationIndex);
+        const objIdleKey = `${CORE.stationIndex}|${curTargets.join(',')}`;
+        if (campaignState.lastObjectiveIdleKey !== objIdleKey) {
+          campaignState.lastObjectiveIdleKey = objIdleKey;
+          campaignState.objectiveIdleTimer = 0;
+        } else if (wpMode !== 'on') {
+          campaignState.objectiveIdleTimer = (campaignState.objectiveIdleTimer || 0) + dt;
+          const threshold = campaignState.idleHintCount === 0 ? 50.0 : 65.0;
+          if (campaignState.objectiveIdleTimer >= threshold) {
+            campaignState.objectiveIdleTimer = 0;
+            campaignState.idleHintCount = (campaignState.idleHintCount || 0) + 1;
+            const hints = IDLE_DIRECTIONAL_HINTS[CORE.stationIndex % 6];
+            if (hints && hints.length) {
+              queueVariantRadioLine(`IDLE_HINT_S${CORE.stationIndex % 6}_${campaignState.idleHintCount}`, hints, {
+                priority: 'MEDIUM',
+                groupKey: 'idle_hint'
+              });
+            }
+            if (LRT.PlayerUI && typeof LRT.PlayerUI.pulseObjectiveHint === 'function') {
+              LRT.PlayerUI.pulseObjectiveHint(5200);
+            }
+          }
+        }
+      } else {
+        campaignState.objectiveIdleTimer = 0;
       }
 
       // Station 5 holdout progression

@@ -105,6 +105,14 @@
     station.disposableGeometries.push(glassGeo);
     const glassInst = new THREE.InstancedMesh(glassGeo, mats.glassPsd, Math.max(1, glassRecords.length));
     glassInst.renderOrder = 3;
+    glassInst.count = glassRecords.length;
+    glassInst.visible = glassRecords.length > 0;
+    if (glassRecords.length === 0) {
+      _tmpDummy.position.set(0, -100, 0);
+      _tmpDummy.scale.set(0, 0, 0);
+      _tmpDummy.updateMatrix();
+      glassInst.setMatrixAt(0, _tmpDummy.matrix);
+    }
     root.add(glassInst);
     station._glassInst = glassInst;
     station.glassPanes = [];
@@ -131,10 +139,21 @@
     station.disposableGeometries.push(tubeGeo);
     const tubeStateArr = new Float32Array(Math.max(1, tubeCoords.length) * 2);
     const tubeInst = new THREE.InstancedMesh(tubeGeo, mats.flickerTube, Math.max(1, tubeCoords.length));
+    tubeInst.count = tubeCoords.length;
+    tubeInst.visible = tubeCoords.length > 0;
     const haloGeo = new THREE.PlaneGeometry(0.72, 2.15);
     haloGeo.rotateX(-Math.PI * 0.5);
     station.disposableGeometries.push(haloGeo);
     const haloInst = new THREE.InstancedMesh(haloGeo, mats.tubeHalo, Math.max(1, tubeCoords.length));
+    haloInst.count = tubeCoords.length;
+    haloInst.visible = tubeCoords.length > 0;
+    if (tubeCoords.length === 0) {
+      _tmpDummy.position.set(0, -100, 0);
+      _tmpDummy.scale.set(0, 0, 0);
+      _tmpDummy.updateMatrix();
+      tubeInst.setMatrixAt(0, _tmpDummy.matrix);
+      haloInst.setMatrixAt(0, _tmpDummy.matrix);
+    }
 
     station.tubes = [];
     for (let t = 0; t < tubeCoords.length; t++) {
@@ -236,12 +255,30 @@
     const propsPaintInst = new THREE.InstancedMesh(propBoxGeo, mats.propsPaint, Math.max(1, paintPropSpecs.length));
     propsPaintInst.castShadow = false;
     propsPaintInst.receiveShadow = true;
+    propsPaintInst.count = paintPropSpecs.length;
+    propsPaintInst.visible = paintPropSpecs.length > 0;
+    if (paintPropSpecs.length === 0) {
+      _tmpDummy.position.set(0, -100, 0);
+      _tmpDummy.scale.set(0, 0, 0);
+      _tmpDummy.updateMatrix();
+      propsPaintInst.setMatrixAt(0, _tmpDummy.matrix);
+      propsPaintInst.instanceMatrix.needsUpdate = true;
+    }
     root.add(propsPaintInst);
     station._propsPaintInst = propsPaintInst;
 
     const propsMetalInst = new THREE.InstancedMesh(propBoxGeo, mats.propsMetal, Math.max(1, metalPropSpecs.length));
     propsMetalInst.castShadow = false;
     propsMetalInst.receiveShadow = true;
+    propsMetalInst.count = metalPropSpecs.length;
+    propsMetalInst.visible = metalPropSpecs.length > 0;
+    if (metalPropSpecs.length === 0) {
+      _tmpDummy.position.set(0, -100, 0);
+      _tmpDummy.scale.set(0, 0, 0);
+      _tmpDummy.updateMatrix();
+      propsMetalInst.setMatrixAt(0, _tmpDummy.matrix);
+      propsMetalInst.instanceMatrix.needsUpdate = true;
+    }
     root.add(propsMetalInst);
     station._propsMetalInst = propsMetalInst;
 
@@ -250,6 +287,15 @@
     const barricadeInst = new THREE.InstancedMesh(barricadeGeo, mats.barricade, Math.max(1, barricadePropSpecs.length));
     barricadeInst.castShadow = false;
     barricadeInst.receiveShadow = true;
+    barricadeInst.count = barricadePropSpecs.length;
+    barricadeInst.visible = barricadePropSpecs.length > 0;
+    if (barricadePropSpecs.length === 0) {
+      _tmpDummy.position.set(0, -100, 0);
+      _tmpDummy.scale.set(0, 0, 0);
+      _tmpDummy.updateMatrix();
+      barricadeInst.setMatrixAt(0, _tmpDummy.matrix);
+      barricadeInst.instanceMatrix.needsUpdate = true;
+    }
     root.add(barricadeInst);
     station._barricadeInst = barricadeInst;
 
