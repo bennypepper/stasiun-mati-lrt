@@ -9,27 +9,47 @@
     c.width = 128;
     c.height = 256;
     const ctx = c.getContext('2d');
-    const grad = ctx.createLinearGradient(0, 0, 0, 256);
-    grad.addColorStop(0, '#a3287b');
-    grad.addColorStop(0.45, '#7c2988');
-    grad.addColorStop(1, '#51206b');
+    // Grounded brushed stainless-steel industrial turnstile housing (matching Jakarta LRT concourse aesthetic)
+    const grad = ctx.createLinearGradient(0, 0, 128, 256);
+    grad.addColorStop(0, '#9aa2ab');
+    grad.addColorStop(0.45, '#7e8790');
+    grad.addColorStop(1, '#5d656e');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 128, 256);
-    ctx.fillStyle = 'rgba(255,255,255,0.14)';
-    ctx.fillRect(0, 0, 128, 10);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 20px sans-serif';
+    // Subtle vertical brushed-metal grain & panel seam
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    for (let x = 4; x < 128; x += 6) ctx.fillRect(x, 0, 2, 256);
+    ctx.fillStyle = 'rgba(18,22,28,0.28)';
+    ctx.fillRect(0, 118, 128, 3);
+    // KAI LRT navy/purple accent fascia band at top
+    const band = ctx.createLinearGradient(0, 16, 128, 84);
+    band.addColorStop(0, '#1e325c');
+    band.addColorStop(0.65, '#4b266d');
+    band.addColorStop(1, '#7a2564');
+    ctx.fillStyle = band;
+    ctx.fillRect(0, 18, 128, 62);
+    ctx.fillStyle = '#e5c038';
+    ctx.fillRect(0, 78, 128, 4);
+    ctx.fillStyle = '#f1f5f9';
+    ctx.font = 'bold 18px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Access', 64, 72);
-    ctx.font = 'bold 14px sans-serif';
-    ctx.fillStyle = '#f3d8f7';
-    ctx.fillText('by KAI', 64, 92);
-    ctx.fillStyle = 'rgba(255,255,255,0.20)';
-    ctx.fillRect(18, 108, 92, 3);
-    ctx.fillStyle = 'rgba(20,24,34,0.38)';
-    for (let y = 148; y < 224; y += 12) {
-      ctx.fillRect(24, y, 80, 5);
+    ctx.fillText('Access', 64, 46);
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillStyle = '#dbeafe';
+    ctx.fillText('by KAI LRT', 64, 65);
+    // Recessed crimson flap indicator accent & lower service louver vents
+    ctx.fillStyle = '#5c191e';
+    ctx.fillRect(16, 134, 96, 26);
+    ctx.fillStyle = 'rgba(15,20,26,0.45)';
+    for (let y = 176; y < 236; y += 11) {
+      ctx.fillRect(22, y, 84, 4);
     }
+    // Hours-after-outbreak boot scuffs & grime along kickplate
+    ctx.fillStyle = 'rgba(24,22,20,0.34)';
+    ctx.fillRect(0, 232, 128, 24);
+    ctx.fillStyle = 'rgba(32,28,24,0.18)';
+    ctx.fillRect(12, 198, 28, 14);
+    ctx.fillRect(76, 152, 24, 10);
     const tex = new THREE.CanvasTexture(c);
     if ('colorSpace' in tex && THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 4;
@@ -47,8 +67,8 @@
 
     const kaiBodyMat = new THREE.MeshStandardMaterial({
       map: kaiTex,
-      roughness: 0.34,
-      metalness: 0.24
+      roughness: 0.36,
+      metalness: 0.66
     });
     const stainlessMat = new THREE.MeshStandardMaterial({
       color: 0xd8dde3,
@@ -879,6 +899,28 @@
         c.font = 'bold 15px sans-serif';
         c.fillText(btns[i], bx + 52, by + 34);
       }
+      // Fresh panic-evacuation spiderweb impact crack on glass touchscreen
+      const ix = 152, iy = 128;
+      c.fillStyle = 'rgba(5, 8, 14, 0.86)';
+      c.beginPath();
+      c.arc(ix, iy, 16, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = 'rgba(226, 240, 255, 0.82)';
+      c.lineWidth = 1.6;
+      const rays = [0.2, 0.85, 1.55, 2.25, 2.95, 3.65, 4.35, 5.15, 5.85];
+      for (let r = 0; r < rays.length; r++) {
+        const a = rays[r];
+        const len = 42 + (r % 3) * 26;
+        c.beginPath();
+        c.moveTo(ix, iy);
+        c.lineTo(ix + Math.cos(a) * len, iy + Math.sin(a) * len);
+        c.stroke();
+      }
+      c.strokeStyle = 'rgba(186, 230, 253, 0.55)';
+      c.lineWidth = 1.0;
+      c.beginPath();
+      c.arc(ix, iy, 28, 0, Math.PI * 2);
+      c.stroke();
     }, false);
 
     const brushedMat = new THREE.MeshStandardMaterial({ color: 0xd0d7e0, roughness: 0.24, metalness: 0.88 });

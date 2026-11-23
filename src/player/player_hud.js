@@ -131,11 +131,12 @@
       'hud-log-banner', 'log-title', 'log-body',
       'document-viewer-modal', 'doc-viewer-sheet', 'doc-viewer-kicker', 'doc-viewer-submeta',
       'doc-viewer-stamp', 'doc-viewer-title', 'doc-viewer-body', 'btn-doc-close-x', 'btn-doc-close',
-      'vitals-card', 'hp-value', 'hp-bar-fill', 'armor-row', 'armor-value', 'armor-bar-fill',
+      'vitals-card', 'hp-value', 'hp-max', 'hp-bar-fill', 'armor-row', 'armor-value', 'armor-bar-fill',
       'cheat-console', 'cheat-input', 'btn-cheat-apply', 'cheat-status-row',
       'cheat-pill-god', 'cheat-god-timer', 'cheat-god-bar', 'cheat-pill-sprint',
       'pill-flashlight', 'pill-lighting', 'pill-hud',
-      'pill-mute', 'pill-fast-travel', 'weapon-name', 'weapon-skin-tag', 'ammo-mag', 'ammo-reserve', 'weapon-slots',
+      'pill-mute', 'pill-fast-travel', 'weapon-silhouette', 'weapon-name', 'weapon-skin-tag',
+      'ammo-mag', 'ammo-reserve', 'weapon-slots', 'weapon-caliber-label',
       'menu-overlay', 'pause-overlay', 'gameover-overlay', 'gameover-stats',
       'tutorial-complete-overlay', 'btn-tut-start-survival', 'btn-tut-back-menu',
       'fast-travel-modal', 'ft-active-meta', 'ft-atmos-group', 'btn-fast-travel-close',
@@ -726,9 +727,30 @@
     }
   }
 
+  const WEAPON_SILHOUETTES = {
+    1: {
+      caliber: '9mm',
+      svg: '<svg class="wsil-svg" viewBox="0 0 88 38" fill="currentColor"><path d="M12 8h54l4 3v5l-3 2H44l-2 4h-9l-3 12H18l5-16h-5l-4-3V9zM35 18h7l-1.5 3.5h-6.5z"/></svg>'
+    },
+    2: {
+      caliber: '5.56mm',
+      svg: '<svg class="wsil-svg" viewBox="0 0 112 38" fill="currentColor"><path d="M4 13h16l5-4h38l5 3h36v4H72l-2 4h-12l3 14h-7l-3.5-13H40l-3 10h-7l2.5-10H18l-2 7H4V13zM34 6h14v2.5H34z"/></svg>'
+    },
+    3: {
+      caliber: '12G',
+      svg: '<svg class="wsil-svg" viewBox="0 0 112 38" fill="currentColor"><path d="M4 15h20l6-3h76v4.5H68v3.5H44l-4 11H28l4.5-11H16l-2 5H4V15z"/></svg>'
+    },
+    4: {
+      caliber: 'PG-7V',
+      svg: '<svg class="wsil-svg" viewBox="0 0 116 38" fill="currentColor"><path d="M4 15h10l6-3h48l10-6 28 11.5L78 29l-10-6H44l-2 11h-6l2-11H20l-6-3H4v-5z"/></svg>'
+    }
+  };
+
   const _hudCache = {
     hpText: null,
+    hpMaxText: null,
     hpPct: null,
+    warn: null,
     critical: null,
     armorVal: null,
     armorPct: null,
@@ -748,6 +770,7 @@
     ammoMag: null,
     ammoRes: null,
     slotKey: null,
+    silSlot: null,
     hmActive: null,
     hmCrit: null,
     chPx: null,
@@ -1074,6 +1097,12 @@
       if (dom['hp-value']) dom['hp-value'].textContent = hpText;
     }
 
+    const hpMaxText = ` / ${Math.round(state.maxHealth || 100)}`;
+    if (_hudCache.hpMaxText !== hpMaxText) {
+      _hudCache.hpMaxText = hpMaxText;
+      if (dom['hp-max']) dom['hp-max'].textContent = hpMaxText;
+    }
+
     const hpPct = Math.max(0, Math.min(100, Math.round((state.health / state.maxHealth) * 100)));
     if (_hudCache.hpPct !== hpPct) {
       _hudCache.hpPct = hpPct;
@@ -1081,6 +1110,11 @@
     }
 
     const critical = state.health < 35;
+    const warn = !critical && state.health < 60;
+    if (_hudCache.warn !== warn) {
+      _hudCache.warn = warn;
+      if (dom['vitals-card']) dom['vitals-card'].classList.toggle('hp-warn', warn);
+    }
     if (_hudCache.critical !== critical) {
       _hudCache.critical = critical;
       if (dom['vitals-card']) dom['vitals-card'].classList.toggle('hp-critical', critical);
@@ -1252,6 +1286,16 @@
               el.classList.toggle('active', sn === activeSlot);
               el.classList.toggle('locked', (lockedMask & (1 << sn)) !== 0);
             });
+          }
+        }
+        if (_hudCache.silSlot !== activeSlot) {
+          _hudCache.silSlot = activeSlot;
+          const silDef = WEAPON_SILHOUETTES[activeSlot] || WEAPON_SILHOUETTES[1];
+          if (dom['weapon-silhouette'] && silDef) {
+            dom['weapon-silhouette'].innerHTML = silDef.svg;
+          }
+          if (dom['weapon-caliber-label'] && silDef) {
+            dom['weapon-caliber-label'].textContent = silDef.caliber;
           }
         }
 

@@ -87,6 +87,41 @@
       bRoof, bTruss, bSteelDark, bJpo, bStall, bSign, bBanner,
       bStairStepsConc, bStairStepsSteel, bStairSlopeBvh
     } = buckets;
+    const bGlassCurtain = (ctx.bGlassCurtain = []);
+    const bGlassShards = (ctx.bGlassShards = []);
+    const bTrackBallast = (ctx.bTrackBallast = []);
+    const shatteredWallZs = (ctx.shatteredWallZs = []);
+
+    // Helper: append crisp jagged triangular glass shard prisms clinging to a shattered curtain-wall mullion frame
+    const addShatteredPaneShards = (bucket, wallX, y0, y1, z0, z1, seedIdx) => {
+      const h = y1 - y0;
+      const w = z1 - z0;
+      const pushTriShard = (p0y, p0z, p1y, p1z, p2y, p2z) => {
+        const dx = 0.014;
+        const v = [
+          // Front face (+X)
+          wallX + dx, p0y, p0z,  wallX + dx, p1y, p1z,  wallX + dx, p2y, p2z,
+          // Back face (-X)
+          wallX - dx, p0y, p0z,  wallX - dx, p2y, p2z,  wallX - dx, p1y, p1z
+        ];
+        const uv = [0, 0, 1, 0, 0.5, 1, 0, 0, 0.5, 1, 1, 0];
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+        g.computeVertexNormals();
+        bucket.push(prepGeo(g, false));
+      };
+      const k = (seedIdx * 37) % 10;
+      // Top-left & top-right jagged hanging shards
+      pushTriShard(y1, z0, y1, z0 + w * (0.42 + k * 0.03), y1 - h * (0.28 + (k % 4) * 0.06), z0 + w * 0.08);
+      pushTriShard(y1, z1 - w * (0.36 + (k % 3) * 0.06), y1, z1, y1 - h * (0.24 + (k % 5) * 0.04), z1 - w * 0.05);
+      // Bottom corner shards clinging to sill
+      pushTriShard(y0, z0, y0, z0 + w * (0.48 - (k % 3) * 0.05), y0 + h * (0.22 + (k % 4) * 0.05), z0 + w * 0.06);
+      pushTriShard(y0, z1 - w * (0.34 + (k % 4) * 0.04), y0, z1, y0 + h * (0.30 + (k % 3) * 0.06), z1 - w * 0.10);
+      // Side edge teeth
+      pushTriShard(y0 + h * 0.35, z0, y0 + h * 0.72, z0, y0 + h * 0.52, z0 + w * (0.16 + (k % 3) * 0.04));
+      pushTriShard(y0 + h * 0.28, z1, y0 + h * 0.68, z1, y0 + h * 0.46, z1 - w * (0.18 + (k % 2) * 0.05));
+    };
 
     const buildTacticalSupplyCabinet = (x, y, z, yaw, style) => {
       const st = style || 'tactical';
@@ -189,19 +224,21 @@
     // =========================================================
     const trackXs = isCawang ? [-4.70, 0.0, track2X, track2X + 4.70] : [0.0, track2X];
     const buildAtGradeTrack = (tx) => {
-      // Ballast bed trough inside station bounds (pausing cleanly at z = ±74 level crossings!)
+      // Ballast bed trough inside station bounds (crushed basalt railway gravel, pausing cleanly at z = ±74 level crossings!)
       const segLen = (CROSSING_Z_NORTH - CROSSING_HALF_W) - (CROSSING_Z_SOUTH + CROSSING_HALF_W); // -68 .. +68
       const segCZ = 0.0;
-      addBox(bConcreteRough, 3.30, 0.08, segLen, tx, TRACK_BED_Y + 0.04, segCZ, 0, 0, 0, 1.5, segLen * 0.25);
+      addBox(bTrackBallast, 3.30, 0.08, segLen, tx, TRACK_BED_Y + 0.04, segCZ, 0, 0, 0, 1.0, segLen * 0.35);
       // Continuous steel running rails (1.435m gauge, rail top flush at -1.00!)
       const railSpanLen = (CROSSING_Z_NORTH + CROSSING_HALF_W) - (CROSSING_Z_SOUTH - CROSSING_HALF_W); // -80 .. +80
       addBox(bSteelDark, 0.10, 0.14, railSpanLen, tx - 0.7175, RAIL_TOP_Y - 0.07, 0, 0, 0, 0, 1, railSpanLen * 0.3);
       addBox(bSteelDark, 0.10, 0.14, railSpanLen, tx + 0.7175, RAIL_TOP_Y - 0.07, 0, 0, 0, 0, 1, railSpanLen * 0.3);
       // 750V DC third rail coverboard (inside platform bounds only, pausing before crossings!)
       addBox(bSteelDark, 0.20, 0.14, platLen - 2.0, tx - 1.15, RAIL_TOP_Y + 0.05, 0, 0, 0, 0, 1, platLen * 0.25);
-      // Concrete sleepers along ballasted bed (-67 .. +67)
+      // Concrete sleepers & dark steel rail fastener clips along ballasted bed (-67 .. +67)
       for (let sz = -66.6; sz <= 66.6; sz += 1.2) {
         addBox(bConcrete, 2.25, 0.10, 0.24, tx, TRACK_BED_Y + 0.09, sz, 0, 0, 0, 1, 1);
+        addBox(bSteelDark, 0.22, 0.04, 0.18, tx - 0.7175, TRACK_BED_Y + 0.15, sz);
+        addBox(bSteelDark, 0.22, 0.04, 0.18, tx + 0.7175, TRACK_BED_Y + 0.15, sz);
       }
     };
     for (let ti = 0; ti < trackXs.length; ti++) {
@@ -688,36 +725,66 @@
       addBox(bChecker, cw, 0.04, concLen, cx, -0.02, cz, 0, 0, 0, cw / 2.4, concLen / 2.4);
       station._addCollider(concMinX, -1.18, concMinZ, concMaxX, 0.0, concMaxZ, 'floor', { isFloor: true, blocksWalk: true, blocksBullets: true });
 
-      // OPEN 10m EAST CONCOURSE PORTAL (z in [concMidZ - 5.0 .. concMidZ + 5.0]) + Grand Stairs + ADA Ramp!
+      // OPEN 10m EAST CONCOURSE PORTAL (z in [concMidZ - 5.0 .. concMidZ + 5.0]) + Floor-to-Ceiling Mullioned Glass Curtain Wall!
       const portalZ0 = concMidZ - 5.0;
       const portalZ1 = concMidZ + 5.0;
       const sWallLen = Math.max(0.5, portalZ0 - concMinZ);
       const nWallLen = Math.max(0.5, concMaxZ - portalZ1);
-      addBox(bConcrete, 0.4, 7.10, sWallLen, concMaxX - 0.2, 3.55, concMinZ + sWallLen * 0.5, 0, 0, 0, 4, 2.5);
-      addBox(bConcrete, 0.4, 7.10, nWallLen, concMaxX - 0.2, 3.55, portalZ1 + nWallLen * 0.5, 0, 0, 0, 4, 2.5);
+      // Low concrete knee-wall plinth (y = 0..0.95) & top cornice spandrel (y = 6.65..7.10), leaving y = 0.95..6.65 as tall glass curtain wall!
+      addBox(bConcrete, 0.4, 0.95, sWallLen, concMaxX - 0.2, 0.475, concMinZ + sWallLen * 0.5, 0, 0, 0, 4, 0.5);
+      addBox(bConcrete, 0.4, 0.95, nWallLen, concMaxX - 0.2, 0.475, portalZ1 + nWallLen * 0.5, 0, 0, 0, 4, 0.5);
+      addBox(bConcrete, 0.42, 0.48, sWallLen, concMaxX - 0.2, 6.86, concMinZ + sWallLen * 0.5, 0, 0, 0, 4, 0.3);
+      addBox(bConcrete, 0.42, 0.48, nWallLen, concMaxX - 0.2, 6.86, portalZ1 + nWallLen * 0.5, 0, 0, 0, 4, 0.3);
       // Header lintel above 4.25m portal (keeps 0..4.25m doorway completely wide open!)
       addBox(bConcrete, 0.45, 2.85, 10.0, concMaxX - 0.2, 5.68, concMidZ, 0, 0, 0, 3, 1.0);
-      // Exterior architectural articulation (pilasters, base plinth, dark steel belly/cornice bands, louver bays & portal banner)
-      addBox(bConcreteRough, 0.16, 1.15, sWallLen, concMaxX + 0.04, 0.15, concMinZ + sWallLen * 0.5, 0, 0, 0, sWallLen * 0.2, 0.5);
-      addBox(bConcreteRough, 0.16, 1.15, nWallLen, concMaxX + 0.04, 0.15, portalZ1 + nWallLen * 0.5, 0, 0, 0, nWallLen * 0.2, 0.5);
-      addBox(bSteelDark, 0.14, 0.22, concLen + 0.2, concMaxX + 0.05, 3.15, concMidZ);
+      // Exterior architectural articulation (plinth trim, dark steel cornice, tall mullion curtain-wall grid & freshly shattered panes)
+      addBox(bConcreteRough, 0.16, 0.95, sWallLen, concMaxX + 0.04, 0.10, concMinZ + sWallLen * 0.5, 0, 0, 0, sWallLen * 0.2, 0.4);
+      addBox(bConcreteRough, 0.16, 0.95, nWallLen, concMaxX + 0.04, 0.10, portalZ1 + nWallLen * 0.5, 0, 0, 0, nWallLen * 0.2, 0.4);
       addBox(bSteelDark, 0.22, 0.36, concLen + 0.3, concMaxX + 0.06, 6.95, concMidZ);
-      for (const [wStart, wEnd] of [[concMinZ + 0.6, portalZ0 - 0.6], [portalZ1 + 0.6, concMaxZ - 0.6]]) {
+      const cwTransomYs = [0.98, 2.86, 4.74, 6.62];
+      let cwPaneIdx = 0;
+      for (const [wStart, wEnd] of [[concMinZ + 0.25, portalZ0 - 0.25], [portalZ1 + 0.25, concMaxZ - 0.25]]) {
         const span = wEnd - wStart;
-        if (span <= 1.2) continue;
-        const bays = Math.max(1, Math.round(span / 6.5));
+        if (span <= 1.0) continue;
+        const bays = Math.max(2, Math.round(span / 2.25));
         const step = span / bays;
+        const wallMidZ = (wStart + wEnd) * 0.5;
+        // Horizontal curtain-wall transom bars
+        for (let ty = 0; ty < cwTransomYs.length; ty++) {
+          addBox(bSteelDark, 0.14, 0.09, span + 0.1, concMaxX - 0.16, cwTransomYs[ty], wallMidZ);
+        }
+        // Interior waist-high stainless safety guardrail in front of glass curtain wall
+        addBox(bTruss, 0.05, 0.05, span, concMaxX - 0.56, 1.12, wallMidZ);
+        addBox(bTruss, 0.03, 0.03, span, concMaxX - 0.56, 0.62, wallMidZ);
         for (let bi = 0; bi <= bays; bi++) {
           const pz = wStart + bi * step;
-          addBox(bConcreteRough, 0.28, 7.20, 0.48, concMaxX + 0.08, 3.55, pz, 0, 0, 0, 0.5, 2.5);
-        }
-        for (let bi = 0; bi < bays; bi++) {
-          const bayMidZ = wStart + (bi + 0.5) * step;
-          const bayLen = Math.max(0.8, step - 0.85);
-          addBox(bSteelDark, 0.10, 1.45, bayLen, concMaxX + 0.03, 5.15, bayMidZ);
-          for (const slY of [4.65, 5.00, 5.35, 5.70]) {
-            addBox(bTruss, 0.14, 0.06, bayLen - 0.12, concMaxX + 0.06, slY, bayMidZ);
+          if (bi % 3 === 0 || bi === bays) {
+            addBox(bConcreteRough, 0.34, 7.10, 0.42, concMaxX - 0.12, 3.55, pz, 0, 0, 0, 0.5, 2.5);
+          } else {
+            addBox(bSteelDark, 0.12, 5.72, 0.09, concMaxX - 0.16, 3.80, pz);
           }
+          addBox(bTruss, 0.04, 1.12, 0.04, concMaxX - 0.56, 0.56, pz);
+        }
+        // Glass panes (alternating intact panes and freshly shattered evacuation panes with jagged edge shards!)
+        for (let bi = 0; bi < bays; bi++) {
+          const z0 = wStart + bi * step + 0.07;
+          const z1 = wStart + (bi + 1) * step - 0.07;
+          const pMidZ = (z0 + z1) * 0.5;
+          const pW = Math.max(0.3, z1 - z0);
+          let bayHasShattered = false;
+          for (let row = 0; row < cwTransomYs.length - 1; row++) {
+            const y0 = cwTransomYs[row] + 0.05;
+            const y1 = cwTransomYs[row + 1] - 0.05;
+            const isShattered = ((cwPaneIdx * 7 + row * 3 + bi) % 5 === 0) || (row === 0 && (bi % 2 === 1));
+            cwPaneIdx++;
+            if (isShattered) {
+              addShatteredPaneShards(bGlassShards, concMaxX - 0.16, y0, y1, z0, z1, cwPaneIdx);
+              if (row === 0) bayHasShattered = true;
+            } else {
+              addBox(bGlassCurtain, 0.025, y1 - y0, pW, concMaxX - 0.16, (y0 + y1) * 0.5, pMidZ);
+            }
+          }
+          if (bayHasShattered) shatteredWallZs.push(pMidZ);
         }
       }
       addAtlasQuad(bBanner, 8.2, 1.05, concMaxX + 0.125, 5.45, concMidZ, 0, Math.PI * 0.5, 0, [0, 0, 1, 1]);
@@ -850,6 +917,59 @@
       station._addCollider(stairWellMinX, UPPER_FLOOR_Y, cStairFootZ - 0.08, concMaxX - 0.4, UPPER_FLOOR_Y + 1.15, cStairFootZ + 0.08, 'metal');
 
       buildStairRamp(cStairX, cStairFootZ, cStairTopZ, UPPER_FLOOR_Y, 0.0);
+
+      // Sleek stopped stainless-steel escalator cladding flanking the concourse grand staircase (visual architecture matching Image 2)
+      {
+        const escFootDir = cStairTopZ > cStairFootZ ? 1 : -1;
+        for (const sideSign of [-1, 1]) {
+          const bx = cStairX + sideSign * 1.38;
+          // Brushed stainless inclined escalator skirt & dark rubber handrail belt
+          addSlopedBeam(bTruss, 0.24, 0.56, bx, cStairFootZ, 0.0, cStairTopZ, UPPER_FLOOR_Y - 0.12);
+          addSlopedBeam(bSteelDark, 0.14, 0.09, bx, cStairFootZ, 0.94, cStairTopZ, UPPER_FLOOR_Y + 0.94);
+          // Rounded landing newels at foot & top
+          addBox(bTruss, 0.28, 0.92, 0.56, bx, 0.46, cStairFootZ - escFootDir * 0.28);
+          addBox(bSteelDark, 0.16, 0.10, 0.62, bx, 0.94, cStairFootZ - escFootDir * 0.28);
+          addBox(bTruss, 0.28, 0.92, 0.56, bx, UPPER_FLOOR_Y + 0.46, cStairTopZ + escFootDir * 0.28);
+          addBox(bSteelDark, 0.16, 0.10, 0.62, bx, UPPER_FLOOR_Y + 0.94, cStairTopZ + escFootDir * 0.28);
+        }
+        // Yellow caution landing comb-plates at top & bottom of grand stairs
+        addBox(bTactile, 2.30, 0.016, 0.42, cStairX, 0.008, cStairFootZ - escFootDir * 0.26);
+        addBox(bTactile, 2.30, 0.016, 0.42, cStairX, UPPER_FLOOR_Y + 0.008, cStairTopZ + escFootDir * 0.26);
+      }
+
+      // Exposed dark-steel architectural ceiling baffle grid under concourse balcony soffit
+      {
+        const gridY = UPPER_FLOOR_Y - 0.31;
+        const gridMinX = concMinX + 0.6;
+        const gridMaxX = stairWellMinX - 0.4;
+        const gridW = Math.max(2.0, gridMaxX - gridMinX);
+        const gridCX = (gridMinX + gridMaxX) * 0.5;
+        for (let gz = concMinZ + 2.5; gz <= concMaxZ - 2.5; gz += 3.2) {
+          addBox(bSteelDark, gridW, 0.07, 0.06, gridCX, gridY, gz);
+        }
+        for (let gx = gridMinX; gx <= gridMaxX; gx += 3.2) {
+          addBox(bSteelDark, 0.06, 0.07, concLen - 2.0, gx, gridY, cz);
+        }
+      }
+
+      // Prominent Concourse Hanging Dual-Color Wayfinding Sign ("Ke Peron ↓ / To Platforms" Navy | "Pintu Keluar ↗ / Exit" Mustard)
+      {
+        const signX = concMinX + Math.min(5.2, cw * 0.34);
+        const signY = 3.24;
+        const signZ = concMidZ - 1.6;
+        const sw = 4.6, sh = 0.72, sd = 0.10;
+        const soffitY = UPPER_FLOOR_Y - 0.28;
+        const rodLen = Math.max(0.25, soffitY - (signY + sh * 0.5));
+        addBox(bSteelDark, sw + 0.10, sh + 0.06, sd, signX, signY, signZ);
+        for (const rx of [-1.65, 1.65]) {
+          addBox(bSteelDark, 0.04, rodLen, 0.04, signX + rx, signY + sh * 0.5 + rodLen * 0.5, signZ);
+        }
+        // Left half: Navy Blue "Ke Peron ↓ / To Platforms", Right half: Mustard Yellow "Pintu Keluar ↗ / Exit"
+        addAtlasQuad(bSign, sw * 0.56, sh, signX - sw * 0.22, signY, signZ + sd * 0.5 + 0.01, 0, 0, 0, SIGN_UV.peron1);
+        addAtlasQuad(bSign, sw * 0.44, sh, signX + sw * 0.28, signY, signZ + sd * 0.5 + 0.01, 0, 0, 0, SIGN_UV.exitYellow);
+        addAtlasQuad(bSign, sw * 0.56, sh, signX + sw * 0.22, signY, signZ - sd * 0.5 - 0.01, 0, Math.PI, 0, SIGN_UV.peron1);
+        addAtlasQuad(bSign, sw * 0.44, sh, signX - sw * 0.28, signY, signZ - sd * 0.5 - 0.01, 0, Math.PI, 0, SIGN_UV.exitYellow);
+      }
 
       // Beveled Concourse Columns supporting Balcony
       const balcColZs = [concMinZ + 1.5, concMidZ + 4.0, concMaxZ - 1.5];
@@ -1445,8 +1565,9 @@
         if (fw < 0.12 || fd < 0.12) continue;
         const fcx = (fr.x0 + fr.x1) * 0.5;
         const fcz = (fr.z0 + fr.z1) * 0.5;
+        const isTrackMedian = fcx >= (Math.min.apply(null, trackXs) - 2.0) && fcx <= (Math.max.apply(null, trackXs) + 2.0);
         addBox(bConcrete, fw, 0.34, fd, fcx, SIDEWALK_Y - 0.21, fcz, 0, 0, 0, fw * 0.35, fd * 0.35);
-        addBox(bConcreteRough, fw, 0.04, fd, fcx, SIDEWALK_Y - 0.02, fcz, 0, 0, 0, fw * 0.35, fd * 0.35);
+        addBox(isTrackMedian ? bTrackBallast : bConcrete, fw, 0.04, fd, fcx, SIDEWALK_Y - 0.02, fcz, 0, 0, 0, fw * 0.35, fd * 0.35);
         station._addCollider(fr.x0, -1.24, fr.z0, fr.x1, SIDEWALK_Y, fr.z1, 'floor', {
           isFloor: true, blocksWalk: true, blocksBullets: false
         });
@@ -1454,13 +1575,14 @@
     }
 
     // =========================================================
-    // 4. CURVED RIBBED CANOPY & BEVELED COLUMN PLINTHS
+    // 4. CURVED BARREL-VAULT TERRACOTTA-TIMBER CANOPY & DOUBLE-CHORD STEEL ARCH RIBS
     // =========================================================
-    const bayStep = 12;
+    const bayStep = 8;
     const canBays = Math.round((platLen - 4) / bayStep);
     const canStartZ = -(canBays * bayStep) * 0.5;
     const canEndZ = -canStartZ;
     for (let z = canStartZ; z <= canEndZ + 0.01; z += bayStep) {
+      const bayIndex = Math.round((z - canStartZ) / bayStep);
       for (let k = 0; k < segs; k++) {
         const t0 = k / segs;
         const t1 = (k + 1) / segs;
@@ -1472,23 +1594,31 @@
         const dy = y1 - y0;
         const len = Math.hypot(dx, dy);
         const ang = Math.atan2(dy, dx);
-        addCylinder(bTruss, 0.11, 0.11, len + 0.1, 6, (x0 + x1) * 0.5, (y0 + y1) * 0.5, z, 0, 0, ang - Math.PI * 0.5);
+        const midX = (x0 + x1) * 0.5;
+        const midY = (y0 + y1) * 0.5;
+        // Double-chord curved galvanized steel tubular arch ribs (iconic Jakarta LRT vaulted truss silhouette!)
+        addCylinder(bTruss, 0.11, 0.11, len + 0.12, 6, midX, midY, z, 0, 0, ang - Math.PI * 0.5);
+        addCylinder(bTruss, 0.075, 0.075, len + 0.12, 6, midX, midY - 0.34, z, 0, 0, ang - Math.PI * 0.5);
+        if (k % 2 === 0) {
+          addBox(bTruss, 0.06, 0.34, 0.06, x0, y0 - 0.17, z);
+        }
 
         if (z < canEndZ - 0.5) {
-          const isSkylight = (k === 4 || k === 5) && (Math.round(Math.abs(z)) % 24 === 0);
+          // Intact architectural barrel-vault roof with crisp crown skylight glazing strips (hours after outbreak — NOT collapsed!)
+          const isSkylight = (k === 4 || k === 5) && (bayIndex % 3 === 1);
           if (!isSkylight) {
-            addBox(bRoof, len + 0.14, 0.14, bayStep, (x0 + x1) * 0.5, (y0 + y1) * 0.5 + 0.16, z + bayStep * 0.5, 0, 0, ang, 1.5, 2.5);
+            addBox(bRoof, len + 0.14, 0.14, bayStep, midX, midY + 0.16, z + bayStep * 0.5, 0, 0, ang, 1.8, 2.2);
           } else {
-            addBox(bTruss, len + 0.12, 0.08, 0.18, (x0 + x1) * 0.5, (y0 + y1) * 0.5 + 0.14, z + bayStep * 0.33, 0, 0, ang);
-            addBox(bTruss, len + 0.12, 0.08, 0.18, (x0 + x1) * 0.5, (y0 + y1) * 0.5 + 0.14, z + bayStep * 0.67, 0, 0, ang);
-            const midK = (t0 + t1) * 0.5;
-            const mx = canopyCenterX + (midK - 0.5) * canopySpanX;
-            const my = (y0 + y1) * 0.5 + 0.14;
-            addBox(bTruss, 0.10, 0.08, bayStep, mx, my, z + bayStep * 0.5, 0, 0, ang);
+            // Skylight steel mullions + translucent skylight glazing panel
+            addBox(bTruss, len + 0.12, 0.08, 0.14, midX, midY + 0.14, z + bayStep * 0.33, 0, 0, ang);
+            addBox(bTruss, len + 0.12, 0.08, 0.14, midX, midY + 0.14, z + bayStep * 0.67, 0, 0, ang);
+            addBox(bTruss, 0.09, 0.08, bayStep, midX, midY + 0.14, z + bayStep * 0.5, 0, 0, ang);
+            addBox(bGlassCurtain, len + 0.04, 0.03, bayStep - 0.16, midX, midY + 0.18, z + bayStep * 0.5, 0, 0, ang);
           }
         }
       }
-      // Full-height canopy columns with beveled concrete plinth bases (skipping/flanking all stair exclusions)!
+      // Full-height canopy columns with beveled concrete plinth bases (every 2nd bay = 16m, keeping platform open & clear!)
+      if (bayIndex % 2 !== 0 && z < canEndZ - 0.5) continue;
       const emitCanopyColumn = (colX, cz, baseY, topY, allowFlankPair) => {
         if (!isInStairExclusion(colX, cz, 0.9, 0.9)) {
           const plinthH = 0.45;
@@ -2062,6 +2192,20 @@
       mergeBucket(bStairStepsConc, matConcrete, false, true, station.disposableGeometries, root, 'StationStairStepsConc', null);
       mergeBucket(bStairStepsSteel, mats.steelDark || matConcrete, false, true, station.disposableGeometries, root, 'StationStairStepsSteel', null);
       mergeBucket(bStairSlopeBvh, getInvisStairSlopeMat(), false, false, station.disposableGeometries, root, 'StationStairSlopes', station.bvhMeshes);
+
+      if (ctx.bTrackBallast && ctx.bTrackBallast.length > 0) {
+        mergeBucket(ctx.bTrackBallast, mats.trackBallast || matConcreteRough, false, true, station.disposableGeometries, root, 'StationTrackBallast', station.bvhMeshes);
+      }
+
+      if (ctx.bGlassCurtain && ctx.bGlassCurtain.length > 0) {
+        const glassMesh = mergeBucket(ctx.bGlassCurtain, mats.glassClear || mats.glassPsd || matConcrete, false, false, station.disposableGeometries, root, 'StationCurtainGlass', null);
+        if (glassMesh) glassMesh.renderOrder = 3;
+      }
+
+      if (ctx.bGlassShards && ctx.bGlassShards.length > 0) {
+        const shardMesh = mergeBucket(ctx.bGlassShards, mats.glassCurtainShattered || mats.glassClear || matConcrete, false, false, station.disposableGeometries, root, 'StationCurtainShards', null);
+        if (shardMesh) shardMesh.renderOrder = 4;
+      }
 
       if (ctx.cawangSignBucket && ctx.cawangSignBucket.length > 0) {
         const cSignMat = buildCawangTrackSignMaterial(station);

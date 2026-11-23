@@ -287,39 +287,251 @@
     registerProps(metalPropSpecs, propsMetalInst, true);
     registerProps(barricadePropSpecs, barricadeInst, false);
 
-    // Overgrown Canopy Vines (anchored cleanly onto canopy purlins above platform!)
-    const vineCount = arch.heavyOvergrowth ? 34 : 16;
-    const vPlane1 = new THREE.PlaneGeometry(1.4, 2.4);
-    vPlane1.translate(0, -1.2, 0);
-    const vPlane2 = new THREE.PlaneGeometry(1.4, 2.4);
-    vPlane2.rotateY(Math.PI * 0.5);
-    vPlane2.translate(0, -1.2, 0);
-    const vineGeo = THREE_UTILS.mergeGeometries([prepGeo(vPlane1, false), prepGeo(vPlane2, false)], false);
-    vPlane1.dispose();
-    vPlane2.dispose();
-    station.disposableGeometries.push(vineGeo);
-    const vinesInst = new THREE.InstancedMesh(vineGeo, mats.foliageVine, vineCount);
-    const purlinXs = [];
-    for (let k = 0; k <= segs; k++) {
-      const candX = canopyMinX + (k / segs) * canopySpanX;
-      const nearTrack = trackXs.some((tx) => Math.abs(candX - tx) < 2.15);
-      if (!nearTrack) purlinXs.push(candX);
+    // Botanical Vines ONLY on Harjamukti's garden station (regular stations are hours after outbreak — NO months-old overgrowth!)
+    const vineCount = arch.heavyOvergrowth ? 24 : 0;
+    if (vineCount > 0) {
+      const vPlane1 = new THREE.PlaneGeometry(1.4, 2.4);
+      vPlane1.translate(0, -1.2, 0);
+      const vPlane2 = new THREE.PlaneGeometry(1.4, 2.4);
+      vPlane2.rotateY(Math.PI * 0.5);
+      vPlane2.translate(0, -1.2, 0);
+      const vineGeo = THREE_UTILS.mergeGeometries([prepGeo(vPlane1, false), prepGeo(vPlane2, false)], false);
+      vPlane1.dispose();
+      vPlane2.dispose();
+      station.disposableGeometries.push(vineGeo);
+      const vinesInst = new THREE.InstancedMesh(vineGeo, mats.foliageVine, vineCount);
+      const purlinXs = [];
+      for (let k = 0; k <= segs; k++) {
+        const candX = canopyMinX + (k / segs) * canopySpanX;
+        const nearTrack = trackXs.some((tx) => Math.abs(candX - tx) < 2.15);
+        if (!nearTrack) purlinXs.push(candX);
+      }
+      if (purlinXs.length === 0) purlinXs.push(p1MinX + 2.2);
+      for (let v = 0; v < vineCount; v++) {
+        const px = purlinXs[v % purlinXs.length];
+        const roofY = getCanopyArchY(px) + 0.04;
+        _tmpDummy.position.set(px, roofY, (rng() - 0.5) * (platLen - 14));
+        _tmpDummy.rotation.set(0, rng() * Math.PI, 0);
+        const sc = 0.65 + rng() * 0.65;
+        const maxSafeSy = Math.max(0.35, (roofY - 4.35) / 2.4);
+        const sy = Math.min(maxSafeSy, sc * (0.85 + rng() * 0.5));
+        _tmpDummy.scale.set(sc, sy, sc);
+        _tmpDummy.updateMatrix();
+        vinesInst.setMatrixAt(v, _tmpDummy.matrix);
+      }
+      vinesInst.instanceMatrix.needsUpdate = true;
+      root.add(vinesInst);
     }
-    if (purlinXs.length === 0) purlinXs.push(p1MinX + 2.2);
-    for (let v = 0; v < vineCount; v++) {
-      const px = purlinXs[v % purlinXs.length];
-      const roofY = getCanopyArchY(px) + 0.04;
-      _tmpDummy.position.set(px, roofY, (rng() - 0.5) * (platLen - 14));
-      _tmpDummy.rotation.set(0, rng() * Math.PI, 0);
-      const sc = 0.65 + rng() * 0.65;
-      const maxSafeSy = Math.max(0.35, (roofY - 4.35) / 2.4);
-      const sy = Math.min(maxSafeSy, sc * (0.85 + rng() * 0.5));
-      _tmpDummy.scale.set(sc, sy, sc);
-      _tmpDummy.updateMatrix();
-      vinesInst.setMatrixAt(v, _tmpDummy.matrix);
+
+    // =========================================================
+    // 8B. HOURS-AFTER-OUTBREAK EVACUATION CHAOS (SHATTERED GLASS, DROPPED BAGS, PAPERS)
+    // =========================================================
+    {
+      const shardGeos = [];
+      const addGlassShardTri = (gx, gy, gz, sz, rotY) => {
+        const c = Math.cos(rotY), s = Math.sin(rotY);
+        const a0x = -sz * 0.6, a0z = -sz * 0.35;
+        const a1x = sz * 0.75, a1z = -sz * 0.15;
+        const a2x = sz * 0.05, a2z = sz * 0.65;
+        const r = (lx, lz) => [gx + lx * c - lz * s, gy, gz + lx * s + lz * c];
+        const p0 = r(a0x, a0z), p1 = r(a1x, a1z), p2 = r(a2x, a2z);
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute([p0[0], p0[1], p0[2], p1[0], p1[1], p1[2], p2[0], p2[1], p2[2]], 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0.5, 1], 2));
+        g.computeVertexNormals();
+        shardGeos.push(prepGeo(g, false));
+      };
+
+      // Shattered curtain-wall glass scatter on concourse floor right below broken window bays
+      const wallZs = Array.isArray(ctx.shatteredWallZs) ? ctx.shatteredWallZs : [];
+      if (!isIsland && wallZs.length > 0) {
+        for (let wi = 0; wi < wallZs.length; wi++) {
+          const wz = wallZs[wi];
+          for (let sc = 0; sc < 10; sc++) {
+            const sx = concMaxX - 0.55 - rng() * 2.35;
+            const sz = wz + (rng() - 0.5) * 2.1;
+            if (isInStairExclusion(sx, sz, 0.4, 0.4)) continue;
+            addGlassShardTri(sx, 0.012 + (sc % 3) * 0.003, sz, 0.09 + rng() * 0.14, rng() * Math.PI * 2);
+          }
+        }
+      }
+      // Fresh broken glass near Platform 1 PSD & turnstile panic choke points
+      const platGlassSpots = [
+        [p1MinX + 0.65, -8.5], [p1MinX + 0.75, 4.2], [p1MinX + 0.70, 16.5],
+        !isIsland ? [concMinX + 3.4, concMidZ - 2.4] : [p1MinX + 2.8, 2.2]
+      ];
+      for (let pi = 0; pi < platGlassSpots.length; pi++) {
+        const [bx, bz] = platGlassSpots[pi];
+        for (let sc = 0; sc < 11; sc++) {
+          const sx = bx + (rng() - 0.5) * 1.9;
+          const sz = bz + (rng() - 0.5) * 2.2;
+          if (isInStairExclusion(sx, sz, 0.3, 0.3)) continue;
+          addGlassShardTri(sx, 0.012 + (sc % 3) * 0.003, sz, 0.07 + rng() * 0.13, rng() * Math.PI * 2);
+        }
+      }
+      if (shardGeos.length > 0) {
+        const mergedShards = THREE_UTILS.mergeGeometries(shardGeos, false);
+        for (let i = 0; i < shardGeos.length; i++) shardGeos[i].dispose();
+        if (mergedShards) {
+          station.disposableGeometries.push(mergedShards);
+          const shardMat = new THREE.MeshPhysicalMaterial({
+            color: 0xbce6f5,
+            roughness: 0.06,
+            metalness: 0.15,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.04,
+            envMapIntensity: 1.85,
+            transparent: true,
+            opacity: 0.62,
+            depthWrite: false,
+            side: THREE.DoubleSide
+          });
+          station.disposableMaterials.push(shardMat);
+          const shardMesh = new THREE.Mesh(mergedShards, shardMat);
+          shardMesh.name = 'StationBrokenGlassScatter';
+          shardMesh.renderOrder = 3;
+          root.add(shardMesh);
+        }
+      }
+
+      // Abandoned Commuter Luggage, Backpacks & Knocked-Over Suitcases (Platform 1 train side + Concourse)
+      const lugGeos = [];
+      const addTintedBox = (w, h, d, x, y, z, rx, ry, rz, hexCol) => {
+        const g = prepGeo(new THREE.BoxGeometry(w, h, d), true);
+        if (rx) g.rotateX(rx);
+        if (ry) g.rotateY(ry);
+        if (rz) g.rotateZ(rz);
+        g.translate(x, y, z);
+        _tmpColor.setHex(hexCol);
+        const colAttr = g.attributes.color;
+        for (let ci = 0; ci < colAttr.count; ci++) colAttr.setXYZ(ci, _tmpColor.r, _tmpColor.g, _tmpColor.b);
+        colAttr.needsUpdate = true;
+        lugGeos.push(g);
+      };
+      const addBackpack = (x, z, yaw, hexCol, fallen) => {
+        const cy = fallen ? 0.12 : 0.23;
+        const rx = fallen ? Math.PI * 0.48 : 0.12;
+        addTintedBox(0.32, 0.44, 0.20, x, cy, z, rx, yaw, 0, hexCol);
+        addTintedBox(0.24, 0.22, 0.07, x + Math.sin(yaw) * 0.12, cy - 0.03, z + Math.cos(yaw) * 0.12, rx, yaw, 0, 0x1e242b);
+      };
+      const addSuitcase = (x, z, yaw, hexCol) => {
+        // Overturned hardshell rolling suitcase with extended handle
+        addTintedBox(0.46, 0.24, 0.66, x, 0.12, z, 0, yaw, 0, hexCol);
+        addTintedBox(0.03, 0.03, 0.36, x + Math.sin(yaw) * 0.46, 0.13, z + Math.cos(yaw) * 0.46, 0, yaw, 0, 0x94a3b8);
+        addTintedBox(0.20, 0.035, 0.04, x + Math.sin(yaw) * 0.64, 0.13, z + Math.cos(yaw) * 0.64, 0, yaw, 0, 0x181c22);
+      };
+
+      const bagColors = [0x2a3542, 0x4b3b2e, 0x6b2626, 0x2a3d31, 0x3b3d42, 0x544432];
+      const bagSpots = [
+        [p1MinX + 1.15, -15.2, 0.5, false],
+        [p1MinX + 1.45, -14.5, 2.1, true],
+        [p1MinX + 1.25, -4.8, -0.7, true],
+        [p1MinX + 2.15, 2.6, 1.3, false],
+        [p1MinX + 1.30, 11.4, -1.9, true],
+        [p1MinX + 1.85, 19.2, 0.8, false]
+      ];
+      if (!isIsland) {
+        bagSpots.push(
+          [concMinX + 3.8, concMidZ - 4.2, 0.6, true],
+          [concMinX + 5.6, concMidZ + 1.8, -1.2, false],
+          [concMaxX - 2.1, concMidZ - 6.8, 2.3, true],
+          [concMaxX - 2.4, concMidZ + 7.2, -0.4, false]
+        );
+      }
+      for (let bi = 0; bi < bagSpots.length; bi++) {
+        const [bx, bz, yaw, fallen] = bagSpots[bi];
+        if (isInStairExclusion(bx, bz, 0.6, 0.6)) continue;
+        const col = bagColors[bi % bagColors.length];
+        if (bi % 3 === 1) addSuitcase(bx, bz, yaw, col);
+        else addBackpack(bx, bz, yaw, col, fallen);
+      }
+      // Knocked-over stainless crowd stanchions & tipped cardboard supply boxes near turnstiles & curtain wall
+      if (!isIsland) {
+        const sx = concMinX + 4.4, sz = concMidZ - 1.2;
+        if (!isInStairExclusion(sx, sz, 0.7, 0.7)) {
+          addTintedBox(0.28, 0.28, 0.04, sx, 0.14, sz, 0, 0.4, 0, 0x262b33);
+          addTintedBox(0.045, 0.045, 0.88, sx + 0.36, 0.04, sz + 0.18, 0, 0.45, 0, 0x9ca3af);
+        }
+        const bx1 = concMaxX - 1.85, bz1 = concMidZ - 7.8;
+        if (!isInStairExclusion(bx1, bz1, 0.8, 0.8)) {
+          addTintedBox(0.48, 0.36, 0.42, bx1, 0.18, bz1, 0, 0.32, 0, 0x8c6844);
+          addTintedBox(0.44, 0.30, 0.38, bx1 - 0.52, 0.15, bz1 + 0.42, 0.25, -0.55, 0.18, 0x7a5838);
+        }
+        const bx2 = concMinX + 5.2, bz2 = concMidZ + 4.6;
+        if (!isInStairExclusion(bx2, bz2, 0.8, 0.8)) {
+          addTintedBox(0.46, 0.34, 0.40, bx2, 0.17, bz2, 0, -0.4, 0, 0x856240);
+          addTintedBox(0.28, 0.28, 0.04, bx2 + 0.65, 0.14, bz2 - 0.35, 0, 1.1, 0, 0x262b33);
+          addTintedBox(0.045, 0.045, 0.86, bx2 + 0.96, 0.04, bz2 - 0.12, 0, 1.15, 0, 0x9ca3af);
+        }
+      }
+      if (lugGeos.length > 0) {
+        const mergedLug = THREE_UTILS.mergeGeometries(lugGeos, false);
+        for (let i = 0; i < lugGeos.length; i++) lugGeos[i].dispose();
+        if (mergedLug) {
+          station.disposableGeometries.push(mergedLug);
+          const lugMat = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            vertexColors: true,
+            roughness: 0.76,
+            metalness: 0.10
+          });
+          station.disposableMaterials.push(lugMat);
+          const lugMesh = new THREE.Mesh(mergedLug, lugMat);
+          lugMesh.name = 'StationEvacLuggage';
+          lugMesh.castShadow = false;
+          lugMesh.receiveShadow = true;
+          root.add(lugMesh);
+        }
+      }
+
+      // Scattered Evacuation Flyers, Transit Maps & Newspapers on Concourse & Platform Floor
+      const paperGeos = [];
+      const paperZones = [
+        [p1MinX + 2.2, -12.0, 2.2, 8.0, 12],
+        [p1MinX + 2.2, 8.0, 2.2, 8.0, 10]
+      ];
+      if (!isIsland) {
+        paperZones.push(
+          [concMinX + 5.2, concMidZ, 6.5, 14.0, 26],
+          [concMaxX - 2.2, concMidZ - 8.5, 2.6, 5.5, 10],
+          [concMaxX - 2.2, concMidZ + 8.5, 2.6, 5.5, 10]
+        );
+      }
+      for (let zi = 0; zi < paperZones.length; zi++) {
+        const [zx, zz, zw, zd, cnt] = paperZones[zi];
+        for (let k = 0; k < cnt; k++) {
+          const px = zx + (rng() - 0.5) * zw;
+          const pz = zz + (rng() - 0.5) * zd;
+          if (isInStairExclusion(px, pz, 0.3, 0.3)) continue;
+          const pw = 0.18 + rng() * 0.14;
+          const pd = 0.24 + rng() * 0.16;
+          const g = prepGeo(new THREE.PlaneGeometry(pw, pd), false);
+          g.rotateX(-Math.PI * 0.5);
+          g.rotateY(rng() * Math.PI * 2);
+          g.translate(px, 0.009 + (k % 3) * 0.002, pz);
+          paperGeos.push(g);
+        }
+      }
+      if (paperGeos.length > 0) {
+        const mergedPapers = THREE_UTILS.mergeGeometries(paperGeos, false);
+        for (let i = 0; i < paperGeos.length; i++) paperGeos[i].dispose();
+        if (mergedPapers) {
+          station.disposableGeometries.push(mergedPapers);
+          const paperMat = new THREE.MeshStandardMaterial({
+            color: 0xd8d6ce,
+            roughness: 0.90,
+            metalness: 0.0,
+            polygonOffset: true,
+            polygonOffsetFactor: -1
+          });
+          station.disposableMaterials.push(paperMat);
+          const paperMesh = new THREE.Mesh(mergedPapers, paperMat);
+          paperMesh.name = 'StationEvacPapers';
+          paperMesh.receiveShadow = true;
+          root.add(paperMesh);
+        }
+      }
     }
-    vinesInst.instanceMatrix.needsUpdate = true;
-    root.add(vinesInst);
 
     // Roti'O Warm Plinth Glow
     const amberPositions = [

@@ -368,9 +368,17 @@
       const asphalt = getPolySet('asphalt_road', 1, 1, () => ({ map: R.buildHighwayRoadSet(maxAniso) }));
       const sidewalkPaver = getPolySet('sidewalk_paver', 1, 1, () => concrete);
       const roofPoly = getPolySet('roof_corrugated', 1, 1, null);
-      const roofTerra = roofPoly || R.buildCorrugatedRoofSet(maxAniso, [168, 94, 50], 601);
-      const roofOchre = roofPoly || R.buildCorrugatedRoofSet(maxAniso, [194, 124, 40], 613);
+      // Warm architectural terracotta/cedar slatted ceiling soffit for the barrel-vault LRT canopy (matching Reference Image 1!)
+      const roofTerra = typeof R.buildCanopyWoodSlatSet === 'function'
+        ? R.buildCanopyWoodSlatSet(maxAniso, [164, 96, 52], 601)
+        : (roofPoly || R.buildCorrugatedRoofSet(maxAniso, [168, 94, 50], 601));
+      const roofOchre = typeof R.buildCanopyWoodSlatSet === 'function'
+        ? R.buildCanopyWoodSlatSet(maxAniso, [186, 120, 48], 613)
+        : (roofPoly || R.buildCorrugatedRoofSet(maxAniso, [194, 124, 40], 613));
       const roofSteel = roofPoly || R.buildCorrugatedRoofSet(maxAniso, [142, 148, 154], 629);
+      const trackBallast = typeof R.buildTrackBallastSet === 'function'
+        ? R.buildTrackBallastSet(maxAniso)
+        : concreteRough;
       const rustMetal = getPolySet('rust_metal', 1, 1, () => roofSteel);
       const facadeModern = getPolySet('building_facade_1', 1, 1, () => concrete);
       const facadePlaster = getPolySet('building_facade_2', 1, 1, () => concrete);
@@ -453,23 +461,33 @@
       const u = this.uGlobals;
       this.mats = {
         concrete: applyWorldWeatheringShader(new THREE.MeshStandardMaterial(makePbrProps(concrete, {
+          color: 0xb8bdc2,
           normalScale: new THREE.Vector2(1.0, 1.0),
-          roughness: 0.88,
+          roughness: 0.86,
           metalness: 0.0
-        })), u, { minRough: 0.62, mossStrength: 0.30 }),
+        })), u, { minRough: 0.62, mossStrength: 0.02 }),
 
         concreteRough: applyWorldWeatheringShader(new THREE.MeshStandardMaterial(makePbrProps(concreteRough, {
+          color: 0xaab0b6,
           normalScale: new THREE.Vector2(1.15, 1.15),
-          roughness: 0.92,
+          roughness: 0.90,
           metalness: 0.0
-        })), u, { minRough: 0.68, mossStrength: 0.32 }),
+        })), u, { minRough: 0.66, mossStrength: 0.03 }),
+
+        trackBallast: applyWorldWeatheringShader(new THREE.MeshStandardMaterial(makePbrProps(trackBallast, {
+          color: 0xffffff,
+          normalScale: new THREE.Vector2(1.35, 1.35),
+          roughness: 0.92,
+          metalness: 0.04
+        })), u, { minRough: 0.72, mossStrength: 0.0 }),
 
         concretePillar: applyWorldWeatheringShader(new THREE.MeshStandardMaterial(makePbrProps(concrete, {
+          color: 0xb2b8be,
           normalScale: new THREE.Vector2(1.05, 1.05),
-          roughness: 0.90,
+          roughness: 0.88,
           metalness: 0.0,
           vertexColors: true
-        })), u, { minRough: 0.64, mossStrength: 0.36 }),
+        })), u, { minRough: 0.62, mossStrength: 0.02 }),
 
         concreteRebar: applyWorldWeatheringShader(new THREE.MeshStandardMaterial(makePbrProps(concreteRough, {
           color: 0xc8c2b8,
@@ -477,25 +495,27 @@
           roughness: 0.86,
           metalness: 0.24,
           vertexColors: true
-        })), u, { minRough: 0.58, mossStrength: 0.08 }),
+        })), u, { minRough: 0.58, mossStrength: 0.0 }),
 
         terrazzo: applyWorldWeatheringShader(new THREE.MeshPhysicalMaterial(makePbrProps(terrazzo, {
+          color: 0xbac0c6,
           normalScale: new THREE.Vector2(0.85, 0.85),
-          roughness: 0.42,
+          roughness: 0.34,
           metalness: 0.04,
-          clearcoat: 0.45,
-          clearcoatRoughness: 0.24,
-          envMapIntensity: 0.72
-        })), u, { wetTerrazzo: true, minRough: 0.26 }),
+          clearcoat: 0.62,
+          clearcoatRoughness: 0.16,
+          envMapIntensity: 0.92
+        })), u, { wetTerrazzo: true, minRough: 0.18 }),
 
         checkerFloor: applyWorldWeatheringShader(new THREE.MeshPhysicalMaterial(makePbrProps(checker, {
+          color: 0xb8c0c8,
           normalScale: new THREE.Vector2(0.85, 0.85),
-          roughness: 0.36,
+          roughness: 0.28,
           metalness: 0.04,
-          clearcoat: 0.58,
-          clearcoatRoughness: 0.18,
-          envMapIntensity: 0.78
-        })), u, { wetTerrazzo: true, minRough: 0.22 }),
+          clearcoat: 0.74,
+          clearcoatRoughness: 0.12,
+          envMapIntensity: 1.05
+        })), u, { wetTerrazzo: true, minRough: 0.14 }),
 
         asphaltRoad: applyWorldWeatheringShader(new THREE.MeshStandardMaterial(makePbrProps(asphalt, {
           color: 0x454a52,
@@ -530,18 +550,18 @@
         }), u, { minRough: 0.52, mossStrength: 0.05 }),
 
         roofTerracotta: applyWorldWeatheringShader(new THREE.MeshStandardMaterial(makePbrProps(roofTerra, {
-          color: roofPoly ? 0xbd6e42 : 0xffffff,
-          roughness: 0.54,
-          metalness: 0.42,
+          color: 0xffffff,
+          roughness: 0.52,
+          metalness: 0.14,
           side: THREE.DoubleSide
-        })), u, { minRough: 0.44, mossStrength: 0.16 }),
+        })), u, { minRough: 0.42, mossStrength: 0.0 }),
 
         roofOchre: applyWorldWeatheringShader(new THREE.MeshStandardMaterial(makePbrProps(roofOchre, {
-          color: roofPoly ? 0xd28e3c : 0xffffff,
-          roughness: 0.54,
-          metalness: 0.42,
+          color: 0xffffff,
+          roughness: 0.52,
+          metalness: 0.14,
           side: THREE.DoubleSide
-        })), u, { minRough: 0.44, mossStrength: 0.16 }),
+        })), u, { minRough: 0.42, mossStrength: 0.0 }),
 
         rustMetal: applyWorldWeatheringShader(new THREE.MeshStandardMaterial(makePbrProps(rustMetal, {
           roughness: 0.68,
@@ -644,6 +664,21 @@
           transparent: true,
           opacity: 0.28,
           depthWrite: false
+        }),
+
+        glassCurtainShattered: new THREE.MeshPhysicalMaterial({
+          color: 0xd0e8f4,
+          roughness: 0.04,
+          metalness: 0.20,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.03,
+          envMapIntensity: 1.9,
+          emissive: new THREE.Color(0x3a4c58),
+          emissiveIntensity: 0.18,
+          transparent: true,
+          opacity: 0.52,
+          depthWrite: false,
+          side: THREE.DoubleSide
         }),
 
         glassBuilding: new THREE.MeshPhysicalMaterial({

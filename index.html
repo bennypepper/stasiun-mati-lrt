@@ -103,6 +103,22 @@
 
   <div id="hud" class="hidden">
     <div id="hud-top">
+      <div id="objective-pill">
+        <div class="obj-bar" aria-hidden="true"></div>
+        <div class="obj-content">
+          <div class="obj-row">
+            <svg class="hud-icon obj-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" aria-hidden="true">
+              <path d="M8 1.6L14.4 8L8 14.4L1.6 8Z"/>
+              <path d="M8 4.8L11.2 8L8 11.2L4.8 8Z" fill="currentColor" fill-opacity="0.28"/>
+            </svg>
+            <span class="obj-prefix">MISI:</span>
+            <div id="objective-title">CARI JALAN KE PERON</div>
+          </div>
+          <div id="objective-detail">Clear Platform Infected</div>
+          <div id="hud-key-items" class="hidden" aria-live="polite"></div>
+        </div>
+      </div>
+
       <div class="transit-card">
         <div class="transit-badges">
           <svg class="hud-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M8 1.8a4.4 4.4 0 0 0-4.4 4.4c0 3.2 4.4 8 4.4 8s4.4-4.8 4.4-8A4.4 4.4 0 0 0 8 1.8zm0 6a1.6 1.6 0 1 1 0-3.2 1.6 1.6 0 0 1 0 3.2z"/></svg>
@@ -113,21 +129,12 @@
         </div>
         <div class="station-title" id="hud-station-name">Dukuh Atas BSI</div>
         <div class="station-sub" id="hud-station-sub">Stasiun LRT Jabodebek</div>
+        <div id="fps-readout" class="hidden">FPS: -- | Calls: --</div>
         <div class="route-bar" aria-hidden="true">
           <span class="route-seg seg-cb"></span>
           <span class="route-seg seg-bk"></span>
           <span class="route-seg seg-gold"></span>
         </div>
-      </div>
-
-      <div id="objective-pill">
-        <div class="obj-row">
-          <svg class="hud-icon obj-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M8 2L14 8L8 14L2 8Z"/></svg>
-          <div id="objective-title">WAVE 1</div>
-        </div>
-        <div id="objective-detail">Clear Platform Infected</div>
-        <div id="hud-key-items" class="hidden" aria-live="polite"></div>
-        <div id="fps-readout" class="hidden">FPS: -- | Calls: --</div>
       </div>
     </div>
 
@@ -225,10 +232,8 @@
     <div id="hud-bottom">
       <div id="vitals-card">
         <div class="vital-row">
-          <span class="vital-label" aria-label="Health">
-            <svg class="hud-icon ecg-icon" viewBox="0 0 24 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 8h5l2.2-5.5 3.6 11 2.4-5.5H23"/></svg>
-          </span>
-          <span id="hp-value">100</span>
+          <span class="vital-label" aria-label="Health">HP</span>
+          <span class="hp-num-group"><span id="hp-value">100</span><span id="hp-max"> / 100</span></span>
         </div>
         <div class="hp-bar-track"><div id="hp-bar-fill"></div></div>
         <div class="armor-row hidden" id="armor-row">
@@ -244,7 +249,7 @@
           <span class="pill-ind active" id="pill-lighting">L Cahaya</span>
           <span class="pill-ind active" id="pill-hud">H Layar</span>
           <span class="pill-ind" id="pill-mute">M Suara</span>
-          <span class="pill-ind" id="pill-fast-travel">Tab Peta &amp; Fast Travel</span>
+          <span class="pill-ind" id="pill-fast-travel">Tab Peta</span>
         </div>
       </div>
 
@@ -260,16 +265,32 @@
           <div class="cheat-pill cheat-pill-sprint hidden" id="cheat-pill-sprint">Fast Sprint</div>
         </div>
         <div id="ammo-card">
+          <div id="weapon-silhouette" aria-hidden="true">
+            <svg class="wsil-svg" viewBox="0 0 88 38" fill="currentColor"><path d="M10 8h54l4 3v5l-3 2H42l-2 4h-9l-3 12H16l5-16h-5l-4-3V9zM33 18h7l-1.5 3.5h-6.5z"/></svg>
+          </div>
           <div id="weapon-name">Pindad G2 9mm</div>
           <div id="weapon-skin-tag" class="hidden"></div>
           <div id="ammo-readout"><span id="ammo-mag">15</span> <span id="ammo-reserve">/ INF</span></div>
         </div>
         <div id="weapon-slots">
-          <div class="w-slot active" data-slot="1">1 G2</div>
-          <div class="w-slot" data-slot="2">2 SS2</div>
-          <div class="w-slot" data-slot="3">3 12G</div>
-          <div class="w-slot" data-slot="4">4 RPG</div>
+          <div class="w-slot active" data-slot="1" title="Pindad G2 9mm">
+            <svg class="wslot-icon" viewBox="0 0 36 22" fill="currentColor" aria-hidden="true"><path d="M5 4h22l2 2v3l-1.5 1H18l-1 2.2h-4l-1.5 6.8H6.5l2.3-8.5H6.5L5 9V4z"/></svg>
+            <span class="wslot-num">1</span>
+          </div>
+          <div class="w-slot" data-slot="2" title="Pindad SS2-V4">
+            <svg class="wslot-icon" viewBox="0 0 36 22" fill="currentColor" aria-hidden="true"><path d="M2 9h6l2-2h14l2 1.5h8v2h-8l-1 1.5h-5l1.2 6h-3.2l-1.4-5.5h-4.5L8.5 17H5.5l1.2-5H2V9z"/></svg>
+            <span class="wslot-num">2</span>
+          </div>
+          <div class="w-slot" data-slot="3" title="Shotgun 12G">
+            <svg class="wslot-icon" viewBox="0 0 36 22" fill="currentColor" aria-hidden="true"><path d="M2 10h8l2-1.5h22v2H22v1.8h-9l-2 4.7H6l1.5-4.5H2V10z"/></svg>
+            <span class="wslot-num">3</span>
+          </div>
+          <div class="w-slot" data-slot="4" title="RPG-7">
+            <svg class="wslot-icon" viewBox="0 0 36 22" fill="currentColor" aria-hidden="true"><path d="M2 10h4l2-1.2h16l3-2.3 7 3.5-7 3.5-3-2.3H15l-.8 4.8h-2.5l.8-4.8H8l-2 1.2H2V10z"/></svg>
+            <span class="wslot-num">4</span>
+          </div>
         </div>
+        <div id="weapon-caliber-label">9mm</div>
       </div>
     </div>
   </div>

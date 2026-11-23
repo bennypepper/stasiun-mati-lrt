@@ -385,6 +385,103 @@
     };
   }
 
+  function buildCanopyWoodSlatSet(maxAniso, baseRGB, seed) {
+    // Warm architectural terracotta/cedar slatted soffit panels (matching modern Jakarta LRT vaulted canopy!)
+    const size = 512;
+    const fbm = makeTileableFbmBuffer(size, 6, 4, seed);
+    const fine = makeTileableFbmBuffer(size, 28, 2, seed + 53);
+    const hBuf = new Float32Array(size * size);
+    const rBuf = new Float32Array(size * size);
+    const cCanvas = makeCanvas(size, size);
+    const ctx = cCanvas.getContext('2d');
+    const img = ctx.createImageData(size, size);
+    const d = img.data;
+
+    const slats = 16; // 16 crisp architectural slats per tile
+    const slatW = size / slats;
+    for (let y = 0; y < size; y++) {
+      const jointY = (y % 256) < 3 ? 1.0 : 0.0;
+      for (let x = 0; x < size; x++) {
+        const i = y * size + x;
+        const slatIdx = Math.floor(x / slatW);
+        const localU = (x % slatW) / slatW;
+        const groove = (localU < 0.11 || localU > 0.91) ? 1.0 : 0.0;
+        const bevel = (!groove && (localU < 0.17 || localU > 0.85)) ? 0.5 : 0.0;
+        const plankTone = 0.91 + 0.16 * hash2i(slatIdx + seed, Math.floor(y / 256));
+        const grain = (fine[i] - 0.5) * 0.10 + (fbm[i] - 0.5) * 0.14;
+        const shade = plankTone * (1.0 - groove * 0.52 - jointY * 0.34 - bevel * 0.08) + grain;
+
+        const r = clamp255(baseRGB[0] * shade);
+        const g = clamp255(baseRGB[1] * shade);
+        const b = clamp255(baseRGB[2] * shade);
+
+        const o = i * 4;
+        d[o] = r;
+        d[o + 1] = g;
+        d[o + 2] = b;
+        d[o + 3] = 255;
+
+        hBuf[i] = clamp01(groove ? 0.12 : (0.76 - jointY * 0.38 - bevel * 0.18 + (fine[i] - 0.5) * 0.06));
+        rBuf[i] = clamp01(groove ? 0.86 : (0.48 + (fbm[i] - 0.5) * 0.14));
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+
+    return {
+      map: finalizeCanvasTexture(cCanvas, true, true, maxAniso),
+      normalMap: heightToNormalDataTexture(hBuf, size, 3.0, true, maxAniso),
+      roughnessMap: makeScalarGrayTexture(rBuf, size, true, maxAniso)
+    };
+  }
+
+  function buildTrackBallastSet(maxAniso) {
+    // Crushed dark basalt/granite railway track ballast with weathered grease/oil centerline (replaces anti_slip_concrete!)
+    const size = 512;
+    const fbm = makeTileableFbmBuffer(size, 10, 4, 811);
+    const stones = makeTileableFbmBuffer(size, 42, 3, 829);
+    const grit = makeTileableFbmBuffer(size, 96, 2, 853);
+    const hBuf = new Float32Array(size * size);
+    const rBuf = new Float32Array(size * size);
+    const cCanvas = makeCanvas(size, size);
+    const ctx = cCanvas.getContext('2d');
+    const img = ctx.createImageData(size, size);
+    const d = img.data;
+
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const i = y * size + x;
+        const u = x / size;
+        // Darker oil/brake-dust track centerline
+        const centerBand = Math.exp(-Math.pow((u - 0.5) / 0.24, 2.0));
+        const pebble = clamp01(stones[i] * 0.65 + grit[i] * 0.35);
+        const sharpStone = smoothstep(0.28, 0.78, pebble);
+        const base = lerp(56, 106, sharpStone) * (0.86 + 0.26 * fbm[i]);
+        const oilDark = 1.0 - centerBand * 0.26;
+        // Warm iron-oxide brake dust tint mixed into dark grey basalt
+        const rustTint = clamp01((fbm[i] - 0.45) * 1.4) * centerBand;
+        const r = clamp255(base * oilDark * (1.03 + rustTint * 0.16));
+        const g = clamp255(base * oilDark * (1.00 + rustTint * 0.04));
+        const b = clamp255(base * oilDark * (0.96 - rustTint * 0.08));
+
+        const o = i * 4;
+        d[o] = r;
+        d[o + 1] = g;
+        d[o + 2] = b;
+        d[o + 3] = 255;
+
+        hBuf[i] = clamp01(sharpStone * 0.78 + grit[i] * 0.22);
+        rBuf[i] = clamp01(0.84 + (1.0 - sharpStone) * 0.14 - centerBand * 0.06);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+
+    return {
+      map: finalizeCanvasTexture(cCanvas, true, true, maxAniso),
+      normalMap: heightToNormalDataTexture(hBuf, size, 3.6, true, maxAniso),
+      roughnessMap: makeScalarGrayTexture(rBuf, size, true, maxAniso)
+    };
+  }
+
   function buildTrainLiveryAtlas(maxAniso) {
     const w = 2048;
     const h = 1024;
@@ -417,8 +514,8 @@
     ctx.fillRect(0, 74, 512, 74);
     rtx.fillStyle = '#242424';
     rtx.fillRect(0, 74, 512, 74);
-    // Signal red belt stripe + diagonal dynamic swoosh
-    ctx.fillStyle = '#C81E24';
+    // Signal red belt stripe + diagonal dynamic swoosh (rich high-contrast INKA crimson!)
+    ctx.fillStyle = '#B81920';
     ctx.fillRect(0, 148, 512, 34);
     ctx.beginPath();
     ctx.moveTo(350, 74);
@@ -427,9 +524,21 @@
     ctx.lineTo(295, 182);
     ctx.closePath();
     ctx.fill();
-    // Lower skirt dark grey
-    ctx.fillStyle = '#5B6066';
+    // Crisp window mullion dividers & roof crimson brow trim
+    ctx.fillStyle = '#A8161C';
+    ctx.fillRect(0, 10, 512, 14);
+    ctx.fillStyle = '#0D1014';
+    for (let wx = 42; wx < 512; wx += 84) {
+      ctx.fillRect(wx, 74, 8, 74);
+    }
+    // Lower skirt dark charcoal + subtle rain/soot road spray (hours-old grit)
+    ctx.fillStyle = '#383D44';
     ctx.fillRect(0, 214, 512, 42);
+    const grimeGrad = ctx.createLinearGradient(0, 198, 0, 256);
+    grimeGrad.addColorStop(0, 'rgba(20, 22, 24, 0)');
+    grimeGrad.addColorStop(1, 'rgba(18, 20, 22, 0.42)');
+    ctx.fillStyle = grimeGrad;
+    ctx.fillRect(0, 198, 512, 58);
     // Panel seam lines & grime drips
     ctx.strokeStyle = 'rgba(40,44,48,0.28)';
     ctx.lineWidth = 2;
@@ -985,17 +1094,21 @@
     etx.fillStyle = '#243C66';
     etx.fillRect(0, 0, 512, 160);
 
-    // TILE 2 (512..1024, 0..160): Yellow Overhead Exit Wayfinding + Green Evakuasi
-    ctx.fillStyle = '#E5D429';
+    // TILE 2 (512..1024, 0..160): Mustard Yellow Overhead Exit Wayfinding + Green Evakuasi
+    ctx.fillStyle = '#C9A426';
     ctx.fillRect(512, 0, 384, 160);
-    ctx.fillStyle = '#181A1C';
-    ctx.font = 'bold 30px sans-serif';
-    ctx.fillText('← Keluar / Exit A', 534, 52);
-    ctx.font = 'bold 19px sans-serif';
-    ctx.fillText('Stasiun KRL • Transjakarta', 534, 88);
-    ctx.font = 'bold 22px sans-serif';
-    ctx.fillText('Peron 1 / Peron 2 →', 534, 132);
-    etx.fillStyle = '#9E9018';
+    ctx.fillStyle = 'rgba(20,22,26,0.10)';
+    ctx.fillRect(512, 0, 384, 10);
+    ctx.fillStyle = '#14171A';
+    ctx.font = 'bold 34px sans-serif';
+    ctx.fillText('Pintu Keluar ↗', 536, 62);
+    ctx.font = '600 22px sans-serif';
+    ctx.fillStyle = '#24292E';
+    ctx.fillText('Exit  •  KRL / TransJakarta', 536, 104);
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillStyle = '#333940';
+    ctx.fillText('← JALAN RAYA / STREET LEVEL', 536, 138);
+    etx.fillStyle = '#6E5A12';
     etx.fillRect(512, 0, 384, 160);
 
     // Green Jalur Evakuasi (896..1024, 0..160)
@@ -1267,58 +1380,64 @@
     ctx.font = '12px sans-serif';
     ctx.fillText('DAHULUKAN PENUMPANG TURUN', 252, 635);
 
-    // TILE 8 (512..1024, 512..672): Peron 1 Hanging Banner (PERON 1 • ARAH MISI MAJU →)
-    ctx.fillStyle = '#0F2A4A';
+    // TILE 8 (512..1024, 512..672): Authentic Navy Blue Jakarta LRT "Ke Peron ↓ / To Platforms" Sign
+    ctx.fillStyle = '#152952';
     ctx.fillRect(512, 512, 512, 160);
-    ctx.fillStyle = '#10B981';
-    ctx.fillRect(512, 512, 512, 10);
-    ctx.fillStyle = '#E5D429';
-    ctx.fillRect(512, 664, 512, 8);
-    etx.fillStyle = '#123359';
+    ctx.fillStyle = '#1E3A70';
+    ctx.fillRect(512, 512, 512, 8);
+    ctx.fillStyle = '#0D1C3A';
+    ctx.fillRect(512, 662, 512, 10);
+    etx.fillStyle = '#102246';
     etx.fillRect(512, 512, 512, 160);
-    etx.fillStyle = '#10B981';
-    etx.fillRect(512, 512, 512, 8);
 
-    ctx.fillStyle = '#059669';
-    ctx.beginPath();
-    ctx.arc(568, 592, 34, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#38BDF8';
-    ctx.lineWidth = 4;
-    ctx.stroke();
-    etx.fillStyle = '#059669';
-    etx.beginPath();
-    etx.arc(568, 592, 32, 0, Math.PI * 2);
-    etx.fill();
-
+    // Bold downward arrow on right side (matching Image 2 wayfinding sign!)
+    ctx.fillStyle = '#E6ECF5';
+    ctx.font = 'bold 64px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.fillText('↓', 944, 594);
+    etx.fillStyle = '#C8D8F0';
+    etx.font = 'bold 64px sans-serif';
     etx.textAlign = 'center';
     etx.textBaseline = 'middle';
+    etx.fillText('↓', 944, 594);
+
+    // Platform 1 badge
+    ctx.fillStyle = '#1D4ED8';
+    ctx.beginPath();
+    ctx.arc(566, 592, 30, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#E5C038';
+    ctx.lineWidth = 3;
+    ctx.stroke();
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 38px sans-serif';
-    ctx.fillText('1', 568, 593);
-    etx.fillStyle = '#ECFDF5';
-    etx.font = 'bold 38px sans-serif';
-    etx.fillText('1', 568, 593);
+    ctx.font = 'bold 34px sans-serif';
+    ctx.fillText('1', 566, 594);
+    etx.fillStyle = '#1D4ED8';
+    etx.beginPath();
+    etx.arc(566, 592, 28, 0, Math.PI * 2);
+    etx.fill();
+    etx.fillStyle = '#FFFFFF';
+    etx.font = 'bold 34px sans-serif';
+    etx.fillText('1', 566, 594);
 
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
     etx.textAlign = 'left';
     etx.textBaseline = 'alphabetic';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 25px sans-serif';
-    ctx.fillText('PERON 1 • ARAH MISI MAJU →', 618, 578);
-    etx.fillStyle = '#D1FAE5';
-    etx.font = 'bold 25px sans-serif';
-    etx.fillText('PERON 1 • ARAH MISI MAJU →', 618, 578);
+    ctx.fillStyle = '#F8FAFC';
+    ctx.font = 'bold 34px sans-serif';
+    ctx.fillText('Ke Peron', 616, 580);
+    etx.fillStyle = '#E2ECFA';
+    etx.font = 'bold 34px sans-serif';
+    etx.fillText('Ke Peron', 616, 580);
 
-    ctx.fillStyle = '#6EE7B7';
-    ctx.font = 'bold 16px sans-serif';
-    ctx.fillText('LRT JABODEBEK  •  KERETA MAJU', 618, 616);
-    etx.fillStyle = '#34D399';
-    etx.font = 'bold 16px sans-serif';
-    etx.fillText('LRT JABODEBEK  •  KERETA MAJU', 618, 616);
+    ctx.fillStyle = '#B8C9E0';
+    ctx.font = '600 22px sans-serif';
+    ctx.fillText('To Platforms  •  Peron 1 →', 616, 622);
+    etx.fillStyle = '#8FB0D8';
+    etx.font = '600 22px sans-serif';
+    etx.fillText('To Platforms  •  Peron 1 →', 616, 622);
 
     // TILE 9 (0..512, 672..832): Peron 2 Hanging Banner (PERON 2 • JALUR KEMBALI ←)
     ctx.fillStyle = '#24170B';
@@ -1748,6 +1867,8 @@
     buildTerrazzoSet,
     buildTactileYellowSet,
     buildCorrugatedRoofSet,
+    buildCanopyWoodSlatSet,
+    buildTrackBallastSet,
     buildTrainLiveryAtlas,
     buildTrainInteriorAtlas,
     buildStallAtlas,

@@ -36,7 +36,7 @@
   CORE.dismembermentEnabled = true;
   CORE.waypointMode = 'auto';
   CORE.difficultyKey = 'medium';
-  CORE.currentLightingKey = 'DAYLIGHT_CLEAR';
+  CORE.currentLightingKey = 'DAYLIGHT_OVERCAST';
   CORE.lightingLockedByUser = false;
   CORE.isMoodLerping = false;
   CORE.currentBrightness = 1.0;

@@ -2117,13 +2117,54 @@
     return g;
   }
 
+  let _skylineSmokeMat = null;
+  function getSkylineSmokeMaterial() {
+    if (_skylineSmokeMat) return _skylineSmokeMat;
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 512;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, 256, 512);
+    // Soft organic billowing dark outbreak smoke plume column (denser near base, wispy as it rises)
+    const puffs = [
+      [128, 430, 58, 0.72], [116, 365, 68, 0.66], [138, 305, 76, 0.58],
+      [120, 238, 86, 0.48], [142, 172, 92, 0.36], [126, 108, 96, 0.24], [134, 58, 88, 0.14]
+    ];
+    for (let i = 0; i < puffs.length; i++) {
+      const [px, py, pr, alpha] = puffs[i];
+      const g = ctx.createRadialGradient(px, py, pr * 0.12, px, py, pr);
+      g.addColorStop(0, `rgba(22, 26, 30, ${alpha})`);
+      g.addColorStop(0.55, `rgba(38, 44, 50, ${alpha * 0.65})`);
+      g.addColorStop(1, 'rgba(54, 62, 70, 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(px, py, pr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const tex = new THREE.CanvasTexture(c);
+    if ('colorSpace' in tex && THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    _skylineSmokeMat = new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      opacity: 0.78,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      fog: true
+    });
+    return _skylineSmokeMat;
+  }
+
   function buildSkylineSilhouetteRing(city, cMinX, cMaxX, root) {
     // Distant Jakarta CBD Skyline Silhouette Ring split into 4 directional cullChunks (N/S/E/W)
-    // 1 shared low-poly material, no colliders, no shadows, leaving [cMinX - 9 .. cMaxX + 9] rail corridor clear
-    const matSkyline = city._getMat('citySkylineDistant', null, {
-      color: 0x141f2b,
-      roughness: 0.95,
-      metalness: 0.05
+    // Uses detailed window-grid skylineBuilding material when available so towers look realistic through concourse glass & arch!
+    const sharedSkyMat = (window.LRT && window.LRT.Materials && window.LRT.Materials.mats && window.LRT.Materials.mats.skylineBuilding)
+      ? window.LRT.Materials.mats.skylineBuilding
+      : null;
+    const matSkyline = sharedSkyMat || city._getMat('citySkylineDistant', null, {
+      color: 0x3b4856,
+      roughness: 0.90,
+      metalness: 0.08
     });
     const buckets = { N: [], S: [], E: [], W: [] };
     const skylineRng = fallbackRng(7719);
@@ -2185,6 +2226,37 @@
         isFar: true,
         isSkyline: true
       });
+    }
+
+    // Distant Fresh Outbreak Smoke Plumes rising behind Jakarta skyscrapers (visible down track arch & through concourse curtain wall, 1 draw call!)
+    const plumeSpecs = [
+      { x: -12, z: -102, w: 34, h: 74, ry: 0.12 },
+      { x: 16, z: -122, w: 42, h: 88, ry: -0.18 },
+      { x: -10, z: 106, w: 36, h: 78, ry: 0.10 },
+      { x: 14, z: 128, w: 44, h: 92, ry: -0.15 },
+      { x: 74, z: -18, w: 38, h: 82, ry: Math.PI * 0.5 },
+      { x: 86, z: 24, w: 42, h: 86, ry: Math.PI * 0.46 },
+      { x: -84, z: 16, w: 40, h: 84, ry: Math.PI * 0.5 }
+    ];
+    const plumeGeos = [];
+    for (let pi = 0; pi < plumeSpecs.length; pi++) {
+      const ps = plumeSpecs[pi];
+      // Crossed vertical smoke cards so plume reads naturally from any camera angle
+      for (const angOff of [0, Math.PI * 0.38]) {
+        const g = new THREE.PlaneGeometry(ps.w, ps.h);
+        g.rotateY(ps.ry + angOff);
+        g.translate(ps.x, STREET_GROUND_Y + ps.h * 0.48, ps.z);
+        plumeGeos.push(prepGeo(g, false));
+      }
+    }
+    const mergedPlumes = THREE_UTILS.mergeGeometries(plumeGeos, false);
+    for (let i = 0; i < plumeGeos.length; i++) plumeGeos[i].dispose();
+    if (mergedPlumes) {
+      city.disposableGeometries.push(mergedPlumes);
+      const plumeMesh = new THREE.Mesh(mergedPlumes, getSkylineSmokeMaterial());
+      plumeMesh.name = 'SkylineOutbreakSmokePlumes';
+      plumeMesh.renderOrder = 2;
+      root.add(plumeMesh);
     }
   }
 
